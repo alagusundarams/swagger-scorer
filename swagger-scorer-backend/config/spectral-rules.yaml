@@ -1,0 +1,63 @@
+# Custom Spectral Rules
+# This file defines additional rules specific to our organization.
+# It extends the standard OpenAPI ruleset (loaded in code).
+
+rules:
+  # 1. Documentation Quality
+  # Require a contact email ending in @example.com
+  contact-email-domain:
+    description: Contact email must be an @example.com address
+    message: "Contact email must end with @example.com"
+    severity: error
+    given: $.info.contact.email
+    then:
+      function: pattern
+      functionOptions:
+        match: "@example\\.com$"
+
+  # 2. API Design
+  # Enforce kebab-case for path segments
+  paths-kebab-case:
+    description: Path segments must be kebab-case
+    message: "{{property}} is not kebab-case"
+    severity: warn
+    given: $.paths[*]~
+    then:
+      function: pattern
+      functionOptions:
+        match: "^(/|[a-z0-9-.]+|{[a-zA-Z0-9_]+})+$"
+
+  # 3. Security
+  # Ensure all operations have a security requirement defined
+  operation-security-defined:
+    description: Operation must have security defined
+    message: "Operation must have a security requirement"
+    severity: error
+    given: $.paths[*][*]
+    then:
+      field: security
+      function: truthy
+
+  # 4. Data Models
+  # Require all schemas to have a description
+  schema-description:
+    description: Schemas must have a description
+    message: "Schema is missing a description"
+    severity: warn
+    given: $.components.schemas[*]
+    then:
+      field: description
+      function: truthy
+
+  # 5. Error Handling
+  # Require 400 and 500 responses for all operations
+  operation-standard-responses:
+    description: Operations must define 400 and 500 error responses
+    message: "Operation is missing standard error responses (400, 500)"
+    severity: warn
+    given: $.paths[*][*].responses
+    then:
+      - field: "400"
+        function: truthy
+      - field: "500"
+        function: truthy

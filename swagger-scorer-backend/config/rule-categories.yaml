@@ -1,0 +1,60 @@
+# Rule Category Mapping
+# This file defines how Spectral rules are mapped to scoring categories.
+# Rules are matched by pattern (regex). The first matching pattern determines the category.
+
+mappings:
+  # 1. Documentation Quality
+  - pattern: "info-description"
+    category: "documentation"
+  - pattern: "info-contact"
+    category: "documentation"
+  - pattern: "info-license"
+    category: "documentation"
+  - pattern: "operation-tags"
+    category: "documentation"
+  - pattern: ".*example.*"
+    category: "documentation"
+  - pattern: "contact-email-domain" # Custom rule
+    category: "documentation"
+
+  # 2. API Design
+  - pattern: "operation-operationId"
+    category: "apiDesign"
+  - pattern: ".*tag.*"
+    category: "apiDesign"
+  - pattern: ".*server.*"
+    category: "apiDesign"
+  - pattern: ".*path.*"
+    category: "apiDesign"
+  - pattern: "paths-kebab-case" # Custom rule
+    category: "apiDesign"
+
+  # 3. Security
+  - pattern: ".*security.*"
+    category: "security"
+  - pattern: ".*owasp.*"
+    category: "security"
+  - pattern: "operation-security-defined" # Custom rule
+    category: "security"
+
+  # 4. Data Models
+  - pattern: ".*schema.*"
+    category: "dataModels"
+  - pattern: ".*type.*"
+    category: "dataModels"
+  - pattern: ".*enum.*"
+    category: "dataModels"
+  - pattern: ".*component.*"
+    category: "dataModels"
+
+  # 5. Error Handling
+  - pattern: ".*response.*"
+    category: "errorHandling"
+  - pattern: ".*error.*"
+    category: "errorHandling"
+  - pattern: "operation-standard-responses" # Custom rule
+    category: "errorHandling"
+
+  # Default fallback
+  - pattern: ".*"
+    category: "completeness"

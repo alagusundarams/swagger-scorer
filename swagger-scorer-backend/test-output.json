@@ -1,0 +1,5 @@
+
+> swagger-scorer-backend@1.0.0 test
+> vitest src/services/spectral.test.ts --run --reporter=json
+
+{"numTotalTestSuites":2,"numPassedTestSuites":2,"numFailedTestSuites":0,"numPendingTestSuites":0,"numTotalTests":2,"numPassedTests":0,"numFailedTests":2,"numPendingTests":0,"numTodoTests":0,"startTime":1764650803911,"success":false,"testResults":[{"assertionResults":[{"ancestorTitles":["","Spectral Service"],"fullName":" Spectral Service should find violations in a sample spec","status":"failed","title":"should find violations in a sample spec","duration":37,"failureMessages":[""],"location":{"line":26,"column":11}},{"ancestorTitles":["","Spectral Service"],"fullName":" Spectral Service should return empty violations for perfect spec","status":"failed","title":"should return empty violations for perfect spec","duration":3,"failureMessages":[""],"location":{"line":26,"column":11}}],"startTime":1764650804248,"endTime":1764650804288,"status":"failed","message":"","name":"/Users/alagusundaramswaminathan/.gemini/antigravity/playground/ruby-ionosphere/swagger-scorer-backend/src/services/spectral.test.ts"}]}

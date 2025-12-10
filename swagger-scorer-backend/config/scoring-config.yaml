@@ -1,0 +1,55 @@
+# Scoring Configuration Version 1.0
+# Defines the weights, thresholds, and severity multipliers for quality scoring.
+# Admins can modify these values to adjust how strict the scoring is.
+
+version: "1.0"
+
+# Category Weights
+# These determine how much each aspect contributes to the overall score
+# All enabled category weights must sum to 100
+categories:
+  documentation:
+    weight: 30     # Documentation is most important (30% of total)
+    enabled: true
+  
+  apiDesign:
+    weight: 25     # RESTful design and consistency
+    enabled: true
+  
+  security:
+    weight: 20     # Security best practices
+    enabled: true
+  
+  dataModels:
+    weight: 15     # Schema quality
+    enabled: true
+  
+  errorHandling:
+    weight: 7      # Error response patterns
+    enabled: true
+  
+  completeness:
+    weight: 3      # Basic OpenAPI requirements
+    enabled: true
+
+# Severity Multipliers
+# Control how much violations of different severities impact the score
+# error: Full deduction, warning: Half deduction, info: Minimal deduction
+severityMultipliers:
+  error: 1.0       # Critical issues - full point deduction
+  warning: 0.5     # Important issues - half point deduction
+  info: 0.1        # Minor improvements - minimal deduction
+  hint: 0.0        # Suggestions only - no deduction
+
+# Score Thresholds
+# Define the cutoff points for Green/Amber/Red status
+thresholds:
+  green: 95        # Score >= 95: Excellent quality (Green)
+  amber: 85        # Score >= 85: Needs improvement (Amber)
+  # Score < 85: Poor quality (Red)
+
+# Future: Could add more settings here
+# - maxDeductionPerRule: Cap how much a single rule can deduct
+# - ignoredRules: List of rules to skip
+# - customRuleWeights: Override default point values for specific rules
+

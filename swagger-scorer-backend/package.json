@@ -1,0 +1,54 @@
+{
+    "name": "swagger-scorer-backend",
+    "version": "1.0.0",
+    "description": "OpenAPI/Swagger quality scoring API using Spectral",
+    "type": "module",
+    "main": "dist/server.js",
+    "scripts": {
+        "dev": "tsx watch src/server.ts",
+        "build": "tsc",
+        "start": "node dist/server.js",
+        "test": "vitest",
+        "test:coverage": "vitest --coverage",
+        "test:ui": "vitest --ui",
+        "lint": "eslint src --ext .ts",
+        "format": "prettier --write \"src/**/*.ts\""
+    },
+    "keywords": [
+        "openapi",
+        "swagger",
+        "spectral",
+        "api-quality",
+        "linter"
+    ],
+    "author": "",
+    "license": "MIT",
+    "dependencies": {
+        "@fastify/cors": "^8.5.0",
+        "@opentelemetry/auto-instrumentations-node": "^0.40.0",
+        "@opentelemetry/exporter-trace-otlp-http": "^0.45.0",
+        "@opentelemetry/sdk-node": "^0.45.0",
+        "@stoplight/spectral-core": "^1.18.0",
+        "@stoplight/spectral-functions": "^1.10.1",
+        "@stoplight/spectral-owasp-ruleset": "^1.0.0",
+        "@stoplight/spectral-parsers": "^1.0.5",
+        "@stoplight/spectral-rulesets": "^1.18.0",
+        "fastify": "^4.25.0",
+        "js-yaml": "^4.1.0",
+        "pino": "^8.17.0",
+        "pino-pretty": "^10.3.1"
+    },
+    "devDependencies": {
+        "@types/js-yaml": "^4.0.9",
+        "@types/node": "^20.10.0",
+        "@typescript-eslint/eslint-plugin": "^6.15.0",
+        "@typescript-eslint/parser": "^6.15.0",
+        "@vitest/coverage-v8": "^1.0.0",
+        "@vitest/ui": "^1.0.0",
+        "eslint": "^8.56.0",
+        "prettier": "^3.1.0",
+        "tsx": "^4.7.0",
+        "typescript": "^5.3.0",
+        "vitest": "^1.0.0"
+    }
+}

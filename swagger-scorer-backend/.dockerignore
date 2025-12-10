@@ -1,0 +1,16 @@
+node_modules
+dist
+coverage
+.git
+.github
+.vscode
+.idea
+*.log
+.env
+.env.local
+README.md
+vitest.config.ts
+.eslintrc.js
+.prettierrc
+tests
+src/**/*.test.ts

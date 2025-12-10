@@ -1,0 +1,33 @@
+# Sample OpenAPI spec for testing
+# This is a minimal but valid OpenAPI 3.0 spec
+# It has some violations intentionally for testing
+
+openapi: 3.0.0
+info:
+  title: Pet Store API
+  version: 1.0.0
+  # Missing: description, contact, license (will trigger violations)
+
+servers:
+  - url: https://api.example.com/v1
+
+paths:
+  /pets:
+    get:
+      summary: List all pets
+      # Missing: description, tags (will trigger violations)
+      responses:
+        '200':
+          description: A list of pets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    name:
+                      type: string
+                  # Missing: required fields (will trigger violations)
