@@ -175,7 +175,7 @@ async function loadCategoryMappings(): Promise<Array<{ pattern: RegExp; category
             { pattern: /security|owasp/, category: 'security' },
             { pattern: /schema|type|enum|component/, category: 'dataModels' },
             { pattern: /response|error/, category: 'errorHandling' },
-            { pattern: /.*/, category: 'completeness' }
+            { pattern: /.*/, category: 'structural' }
         ];
     }
 
@@ -200,5 +200,5 @@ function determineCategory(
             return mapping.category;
         }
     }
-    return 'completeness'; // Should be caught by .* pattern anyway
+    return 'structural'; // Should be caught by .* pattern anyway
 }

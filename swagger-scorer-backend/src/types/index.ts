@@ -23,12 +23,12 @@ export interface ScoringConfig {
 
     // Map of category name to its configuration
     categories: {
-        documentation: CategoryConfig;
-        apiDesign: CategoryConfig;
         security: CategoryConfig;
+        structural: CategoryConfig;
+        apiDesign: CategoryConfig;
+        documentation: CategoryConfig;
         dataModels: CategoryConfig;
         errorHandling: CategoryConfig;
-        completeness: CategoryConfig;
     };
 
     // Multipliers for different severity levels
