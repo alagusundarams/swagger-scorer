@@ -26,7 +26,7 @@ describe('Config Loader', () => {
 
         // Verify it has the expected structure
         expect(config).toBeDefined();
-        expect(config.version).toBe('1.0');
+        expect(config.version).toBe('2.0');
         expect(config.categories).toBeDefined();
         expect(config.thresholds).toBeDefined();
     });

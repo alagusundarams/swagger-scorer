@@ -43,11 +43,11 @@ export const ViolationsTable: React.FC = () => {
     const getCategoryColor = (category: string): string => {
         const colors: Record<string, string> = {
             'security': '#f87171',
+            'structural': '#22d3ee',
             'documentation': '#60a5fa',
             'apiDesign': '#a78bfa',
             'dataModels': '#fbbf24',
             'errorHandling': '#34d399',
-            'completeness': '#22d3ee',
         };
         return colors[category] || '#94a3b8';
     };

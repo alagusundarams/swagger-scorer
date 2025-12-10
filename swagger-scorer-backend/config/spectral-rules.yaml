@@ -1,25 +1,143 @@
-# Custom Spectral Rules
-# This file defines additional rules specific to our organization.
-# It extends the standard OpenAPI ruleset (loaded in code).
+# Market-Standard Spectral Rules
+# Industry Rules based on OWASP, Spectral OAS, Zalando Guidelines
+
+extends:
+  - "spectral:oas"
 
 rules:
-  # 1. Documentation Quality
-  # Require a contact email ending in @example.com
-  contact-email-domain:
-    description: Contact email must be an @example.com address
-    message: "Contact email must end with @example.com"
+  # =========================================
+  # SECURITY - OWASP API Top 10
+  # =========================================
+
+  # Security scheme defined
+  security-schemes-defined:
+    description: API must define security schemes
+    message: "No security schemes defined - API is unprotected"
     severity: error
+    given: $.components
+    then:
+      field: securitySchemes
+      function: truthy
+
+  # Operations require auth
+  operation-security-defined:
+    description: Operations must have security defined
+    message: "Operation has no security requirement"
+    severity: error
+    given: $.paths[*][get,post,put,patch,delete]
+    then:
+      field: security
+      function: truthy
+
+  # HTTPS only
+  servers-https-only:
+    description: Server URLs must use HTTPS
+    message: "Server URL must use HTTPS, not HTTP"
+    severity: error
+    given: $.servers[*].url
+    then:
+      function: pattern
+      functionOptions:
+        match: "^https://|^/"
+
+  # No credentials in URL
+  no-credentials-in-url:
+    description: No credentials in URL paths
+    message: "Path contains sensitive terms"
+    severity: error
+    given: $.paths[*]~
+    then:
+      function: pattern
+      functionOptions:
+        notMatch: "(password|token|secret|apikey|api_key)"
+
+  # 401 response
+  define-401-response:
+    description: Define 401 Unauthorized response
+    message: "Missing 401 response"
+    severity: warn
+    given: $.paths[*][get,post,put,patch,delete].responses
+    then:
+      field: "401"
+      function: truthy
+
+  # 403 response
+  define-403-response:
+    description: Define 403 Forbidden response
+    message: "Missing 403 response"
+    severity: warn
+    given: $.paths[*][get,post,put,patch,delete].responses
+    then:
+      field: "403"
+      function: truthy
+
+  # Contact email domain
+  contact-email-domain:
+    description: Contact email must be a valid company address
+    message: "Contact email must end with @example.com"
+    severity: warn
     given: $.info.contact.email
     then:
       function: pattern
       functionOptions:
         match: "@example\\.com$"
 
-  # 2. API Design
-  # Enforce kebab-case for path segments
+  # =========================================
+  # STRUCTURAL
+  # =========================================
+
+  info-title:
+    description: API must have a title
+    message: "API is missing a title"
+    severity: error
+    given: $.info
+    then:
+      field: title
+      function: truthy
+
+  info-version:
+    description: API must have a version
+    message: "API is missing a version"
+    severity: error
+    given: $.info
+    then:
+      field: version
+      function: truthy
+
+  paths-defined:
+    description: API must define paths
+    message: "No paths defined in API"
+    severity: error
+    given: $
+    then:
+      field: paths
+      function: truthy
+
+  # =========================================
+  # API DESIGN
+  # =========================================
+
+  operation-operationId:
+    description: Every operation must have a unique operationId
+    message: "Operation is missing operationId"
+    severity: error
+    given: $.paths[*][get,post,put,patch,delete]
+    then:
+      field: operationId
+      function: truthy
+
+  operation-tags:
+    description: Operations should have tags for organization
+    message: "Operation is missing tags"
+    severity: warn
+    given: $.paths[*][get,post,put,patch,delete]
+    then:
+      field: tags
+      function: truthy
+
   paths-kebab-case:
-    description: Path segments must be kebab-case
-    message: "{{property}} is not kebab-case"
+    description: Path segments should use kebab-case
+    message: "Path should use kebab-case"
     severity: warn
     given: $.paths[*]~
     then:
@@ -27,37 +145,132 @@ rules:
       functionOptions:
         match: "^(/|[a-z0-9-.]+|{[a-zA-Z0-9_]+})+$"
 
-  # 3. Security
-  # Ensure all operations have a security requirement defined
-  operation-security-defined:
-    description: Operation must have security defined
-    message: "Operation must have a security requirement"
-    severity: error
-    given: $.paths[*][*]
+  no-trailing-slash:
+    description: Paths should not have trailing slashes
+    message: "Path should not end with a slash"
+    severity: warn
+    given: $.paths[*]~
     then:
-      field: security
+      function: pattern
+      functionOptions:
+        notMatch: "/$"
+
+  servers-defined:
+    description: At least one server URL should be defined
+    message: "No server URLs defined"
+    severity: warn
+    given: $
+    then:
+      field: servers
       function: truthy
 
-  # 4. Data Models
-  # Require all schemas to have a description
-  schema-description:
-    description: Schemas must have a description
-    message: "Schema is missing a description"
+  # =========================================
+  # DOCUMENTATION
+  # =========================================
+
+  info-description:
+    description: API should have a description
+    message: "API is missing a description"
     severity: warn
+    given: $.info
+    then:
+      field: description
+      function: truthy
+
+  info-contact:
+    description: API should have contact information
+    message: "API is missing contact information"
+    severity: info
+    given: $.info
+    then:
+      field: contact
+      function: truthy
+
+  info-license:
+    description: API should have license information
+    message: "API is missing license information"
+    severity: info
+    given: $.info
+    then:
+      field: license
+      function: truthy
+
+  operation-description:
+    description: Operations should have descriptions
+    message: "Operation is missing description"
+    severity: warn
+    given: $.paths[*][get,post,put,patch,delete]
+    then:
+      field: description
+      function: truthy
+
+  operation-summary:
+    description: Operations should have summaries
+    message: "Operation is missing summary"
+    severity: warn
+    given: $.paths[*][get,post,put,patch,delete]
+    then:
+      field: summary
+      function: truthy
+
+  parameter-description:
+    description: Parameters should have descriptions
+    message: "Parameter is missing description"
+    severity: warn
+    given: $.paths..parameters[*]
+    then:
+      field: description
+      function: truthy
+
+  schema-description:
+    description: Schemas should have descriptions
+    message: "Schema is missing description"
+    severity: info
     given: $.components.schemas[*]
     then:
       field: description
       function: truthy
 
-  # 5. Error Handling
-  # Require 400 and 500 responses for all operations
-  operation-standard-responses:
-    description: Operations must define 400 and 500 error responses
-    message: "Operation is missing standard error responses (400, 500)"
-    severity: warn
-    given: $.paths[*][*].responses
+  # =========================================
+  # DATA MODELS
+  # =========================================
+
+  array-items-defined:
+    description: Array schemas must define items
+    message: "Array is missing items definition"
+    severity: error
+    given: $..properties[?(@.type == 'array')]
     then:
-      - field: "400"
-        function: truthy
-      - field: "500"
-        function: truthy
+      field: items
+      function: truthy
+
+  typed-enum:
+    description: Enums should have explicit types
+    message: "Enum should have explicit type defined"
+    severity: warn
+    given: $..properties[?(@.enum)]
+    then:
+      field: type
+      function: truthy
+
+  # =========================================
+  # ERROR HANDLING
+  # =========================================
+
+  client-error-response:
+    description: Operations should define client error responses
+    message: "Consider adding 400 Bad Request response"
+    severity: warn
+    given: $.paths[*][post,put,patch].responses
+    then:
+      field: "400"
+      function: truthy
+
+  server-error-response:
+    description: Operations should define server error responses
+    message: "Consider adding 500 response"
+    severity: info
+    given: $.paths[*][get,post,put,patch,delete].responses
+    then:
+      field: "500"
+      function: truthy

@@ -1,55 +1,51 @@
-# Scoring Configuration Version 1.0
-# Defines the weights, thresholds, and severity multipliers for quality scoring.
-# Admins can modify these values to adjust how strict the scoring is.
+# Scoring Configuration Version 2.0
+# Market-Standard OpenAPI Scoring with 52 Industry Rules
 
-version: "1.0"
+version: "2.0"
 
-# Category Weights
-# These determine how much each aspect contributes to the overall score
-# All enabled category weights must sum to 100
+# Category Weights (Total: 100%)
+# Based on industry standards - Security is highest priority
 categories:
-  documentation:
-    weight: 30     # Documentation is most important (30% of total)
+  security:
+    weight: 30       # OWASP API Security Top 10
+    enabled: true
+  
+  structural:
+    weight: 20       # OpenAPI spec compliance
     enabled: true
   
   apiDesign:
-    weight: 25     # RESTful design and consistency
+    weight: 20       # RESTful best practices
     enabled: true
   
-  security:
-    weight: 20     # Security best practices
+  documentation:
+    weight: 15       # API discoverability
     enabled: true
   
   dataModels:
-    weight: 15     # Schema quality
+    weight: 10       # Schema quality
     enabled: true
   
   errorHandling:
-    weight: 7      # Error response patterns
-    enabled: true
-  
-  completeness:
-    weight: 3      # Basic OpenAPI requirements
+    weight: 5        # Response consistency
     enabled: true
 
 # Severity Multipliers
-# Control how much violations of different severities impact the score
-# error: Full deduction, warning: Half deduction, info: Minimal deduction
 severityMultipliers:
-  error: 1.0       # Critical issues - full point deduction
-  warning: 0.5     # Important issues - half point deduction
-  info: 0.1        # Minor improvements - minimal deduction
-  hint: 0.0        # Suggestions only - no deduction
+  error: 1.0         # Critical - full deduction
+  warning: 0.5       # Important - half deduction
+  info: 0.1          # Minor - minimal deduction
+  hint: 0.0          # Suggestions - no deduction
 
-# Score Thresholds
-# Define the cutoff points for Green/Amber/Red status
+# Score Thresholds (RAG Status)
 thresholds:
-  green: 95        # Score >= 95: Excellent quality (Green)
-  amber: 85        # Score >= 85: Needs improvement (Amber)
-  # Score < 85: Poor quality (Red)
+  green: 90          # Excellent quality
+  amber: 70          # Needs improvement
+  # Score < 70: Poor quality (Red)
 
-# Future: Could add more settings here
-# - maxDeductionPerRule: Cap how much a single rule can deduct
-# - ignoredRules: List of rules to skip
-# - customRuleWeights: Override default point values for specific rules
-
+# Auth exceptions - endpoints that don't require security
+authExceptions:
+  - "/health"
+  - "/docs"
+  - "/openapi.json"
+  - "/swagger.json"

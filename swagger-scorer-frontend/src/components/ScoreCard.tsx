@@ -1,30 +1,38 @@
+/**
+ * @fileoverview ScoreCard Component
+ * 
+ * Displays the overall API quality score with a multi-segment donut chart
+ * and a category breakdown showing individual scores for each rule category.
+ * 
+ * Features:
+ * - SVG donut chart with colored segments per category
+ * - RAG status indicator (Red/Amber/Green)
+ * - Category progress bars with glow effects
+ * - Dark theme optimized styling
+ * 
+ * @component
+ */
+
 import React from 'react';
 import { useAnalysis } from '../store/useAnalysis';
 
 export const ScoreCard: React.FC = () => {
     const { result } = useAnalysis();
 
+    // Don't render if no analysis results
     if (!result) return null;
 
     const { score, status, categories } = result;
 
-    const getRagColor = (status: string) => {
-        switch (status) {
-            case 'GREEN': return 'text-green-400 border-green-500/50 bg-green-500/10';
-            case 'AMBER': return 'text-yellow-400 border-yellow-500/50 bg-yellow-500/10';
-            case 'RED': return 'text-red-400 border-red-500/50 bg-red-500/10';
-            default: return 'text-gray-400 border-gray-500/50 bg-gray-500/10';
-        }
-    };
+    // === SVG DONUT CHART CONSTANTS ===
+    const size = 160;                          // Chart size in pixels
+    const strokeWidth = 12;                    // Thickness of donut ring
+    const center = size / 2;                   // Center point
+    const radius = center - strokeWidth;       // Inner radius
+    const circumference = 2 * Math.PI * radius; // Full circle length
 
-    // SVG Constants
-    const size = 160;
-    const strokeWidth = 12;
-    const center = size / 2;
-    const radius = center - strokeWidth;
-    const circumference = 2 * Math.PI * radius;
-
-    // Handle categories as array (from backend)
+    // === CATEGORY DATA PROCESSING ===
+    // Handle categories as array (from backend API)
     type CategoryItem = { name: string; score: number; weight?: number; violationCount?: number };
     const categoryArray: CategoryItem[] = Array.isArray(categories)
         ? categories as CategoryItem[]
@@ -33,34 +41,50 @@ export const ScoreCard: React.FC = () => {
         );
     const totalCategories = categoryArray.length;
     const segmentLength = circumference / totalCategories;
-    const gapLength = 4; // visual gap between segments
+    const gapLength = 4; // Visual gap between donut segments
 
-    // Category Color Mapping (Distinct Palette)
+    // === COLOR MAPPING ===
+    /**
+     * Get the color for a specific category.
+     * Each category has a distinct color for visual differentiation.
+     * 
+     * @param categoryName - Name of the category
+     * @param index - Index for fallback color
+     * @returns Hex color string
+     */
     const getCategoryColor = (categoryName: string, index: number) => {
-        // Map specific category names to colors
         const colorMap: Record<string, string> = {
-            'security': '#ef4444',        // Red-500
-            'documentation': '#3b82f6',   // Blue-500  
-            'apiDesign': '#8b5cf6',       // Violet-500
-            'dataModels': '#f59e0b',      // Amber-500
-            'errorHandling': '#10b981',   // Emerald-500
-            'completeness': '#06b6d4',    // Cyan-500
+            'security': '#ef4444',        // Red - High priority
+            'structural': '#06b6d4',      // Cyan - Compliance
+            'documentation': '#3b82f6',   // Blue - Docs
+            'apiDesign': '#8b5cf6',       // Violet - Design
+            'dataModels': '#f59e0b',      // Amber - Schemas
+            'errorHandling': '#10b981',   // Emerald - Errors
         };
-
-        // Return mapped color or fallback to index-based color
         return colorMap[categoryName] || ['#ef4444', '#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#06b6d4'][index % 6];
     };
 
-    // Determine RAG Color Helper
-    const getScoreColor = (s: number) => {
-        if (s >= 80) return '#10b981'; // Emerald-500
-        if (s >= 50) return '#f59e0b'; // Amber-500
-        return '#ef4444'; // Red-500
+    /**
+     * Get vibrant category colors for progress bars.
+     * These are slightly brighter versions for better visibility.
+     */
+    const getBarColor = (categoryName: string) => {
+        const colors: Record<string, string> = {
+            'security': '#f87171',      // Bright red
+            'structural': '#22d3ee',    // Bright cyan
+            'documentation': '#60a5fa', // Bright blue
+            'apiDesign': '#a78bfa',     // Bright purple
+            'dataModels': '#fbbf24',    // Bright amber
+            'errorHandling': '#34d399', // Bright emerald
+        };
+        return colors[categoryName] || '#94a3b8';
     };
 
+    // === RENDER ===
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 animate-fade-in">
-            {/* Overall Score with Multi-Segment Donut Chart - DARK THEME */}
+
+            {/* === DONUT CHART SECTION === */}
             <div style={{
                 backgroundColor: '#1e293b',
                 borderRadius: '12px',
@@ -83,7 +107,7 @@ export const ScoreCard: React.FC = () => {
                 {/* SVG Donut Chart */}
                 <div className="relative flex items-center justify-center mb-2">
                     <svg width={size} height={size} className="transform -rotate-90">
-                        {/* Background Ring (Faint) */}
+                        {/* Background Ring */}
                         <circle
                             cx={center}
                             cy={center}
@@ -93,26 +117,15 @@ export const ScoreCard: React.FC = () => {
                             strokeWidth={strokeWidth}
                         />
 
-                        {/* Segments */}
-                        {categoryArray.map((category: { name: string; score: number }, index: number) => {
-                            const categoryName = category.name;
-
-                            // Use categorical color based on category name
-                            const color = getCategoryColor(categoryName, index);
-
-                            // Calculate stroke dash array for segment
-                            // dasharray: "length visible, length gap"
-                            // We want uniform segments, but colored by their score
-                            // Wait, "replication of violations"? 
-                            // Creating segments proportional to score is one way, but preserving the "ring" shape with gaps works best for "categories".
-                            // Let's do equal segments, colored by their individual status.
-
+                        {/* Category Segments */}
+                        {categoryArray.map((category, index) => {
+                            const color = getCategoryColor(category.name, index);
                             const dashArray = `${segmentLength - gapLength} ${circumference - (segmentLength - gapLength)}`;
                             const dashOffset = -(segmentLength * index);
 
                             return (
                                 <circle
-                                    key={categoryName}
+                                    key={category.name}
                                     cx={center}
                                     cy={center}
                                     r={radius}
@@ -124,13 +137,13 @@ export const ScoreCard: React.FC = () => {
                                     strokeLinecap="round"
                                     className="transition-all duration-1000 ease-out hover:opacity-80 cursor-pointer"
                                 >
-                                    <title>{categoryName}</title>
+                                    <title>{category.name}</title>
                                 </circle>
                             );
                         })}
                     </svg>
 
-                    {/* Score Text Centered */}
+                    {/* Center Score Display */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                         <span className={`text-4xl font-extrabold tracking-tight ${status === 'green' ? 'text-emerald-500' : status === 'amber' ? 'text-amber-500' : 'text-red-500'}`}>
                             {score}
@@ -142,7 +155,7 @@ export const ScoreCard: React.FC = () => {
                 </div>
             </div>
 
-            {/* Category Breakdown - DARK THEME */}
+            {/* === CATEGORY BREAKDOWN SECTION === */}
             <div style={{
                 gridColumn: 'span 2',
                 backgroundColor: '#1e293b',
@@ -158,24 +171,13 @@ export const ScoreCard: React.FC = () => {
                     letterSpacing: '0.08em',
                     fontSize: '11px'
                 }}>Category Breakdown</h3>
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     {categoryArray.map((category) => {
-                        const categoryScore = category.score;
-                        const categoryName = category.name;
-
-                        // Vibrant colors that pop on dark background
-                        const colors: Record<string, string> = {
-                            'security': '#f87171',      // Bright red
-                            'documentation': '#60a5fa', // Bright blue
-                            'apiDesign': '#a78bfa',     // Bright purple
-                            'dataModels': '#fbbf24',    // Bright amber
-                            'errorHandling': '#34d399', // Bright emerald
-                            'completeness': '#22d3ee',  // Bright cyan
-                        };
-                        const barColor = colors[categoryName] || '#94a3b8';
+                        const barColor = getBarColor(category.name);
 
                         return (
-                            <div key={categoryName} style={{
+                            <div key={category.name} style={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '16px'
@@ -187,10 +189,10 @@ export const ScoreCard: React.FC = () => {
                                         fontWeight: '500',
                                         color: '#e2e8f0',
                                         textTransform: 'capitalize'
-                                    }}>{categoryName}</span>
+                                    }}>{category.name}</span>
                                 </div>
 
-                                {/* Progress Bar Track */}
+                                {/* Progress Bar */}
                                 <div style={{
                                     flexGrow: 1,
                                     height: '10px',
@@ -199,13 +201,12 @@ export const ScoreCard: React.FC = () => {
                                     overflow: 'hidden',
                                     position: 'relative'
                                 }}>
-                                    {/* Colored Progress Bar */}
                                     <div style={{
                                         position: 'absolute',
                                         left: 0,
                                         top: 0,
                                         height: '100%',
-                                        width: `${categoryScore}%`,
+                                        width: `${category.score}%`,
                                         backgroundColor: barColor,
                                         borderRadius: '5px',
                                         transition: 'width 1s ease-out',
@@ -219,7 +220,7 @@ export const ScoreCard: React.FC = () => {
                                         fontSize: '14px',
                                         fontWeight: '700',
                                         color: '#f1f5f9'
-                                    }}>{Math.round(categoryScore)}%</span>
+                                    }}>{Math.round(category.score)}%</span>
                                 </div>
                             </div>
                         );
