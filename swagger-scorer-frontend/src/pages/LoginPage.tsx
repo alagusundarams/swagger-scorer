@@ -1,0 +1,216 @@
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../auth/useAuth';
+import { LoginButton } from '../components/LoginButton';
+
+// Configure SSO domains - emails with these domains go to SSO
+const SSO_DOMAINS = ['company.com', 'example.org'];
+
+type LoginStep = 'email' | 'password';
+
+export const LoginPage: React.FC = () => {
+    const { isAuthenticated, login } = useAuth();
+    const navigate = useNavigate();
+
+    const [step, setStep] = useState<LoginStep>('email');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        if (isAuthenticated) {
+            navigate('/');
+        }
+    }, [isAuthenticated, navigate]);
+
+    const getDomain = (email: string) => {
+        const parts = email.split('@');
+        return parts.length > 1 ? parts[1].toLowerCase() : '';
+    };
+
+    const handleEmailSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+
+        if (!email || !email.includes('@')) {
+            setError('Please enter a valid email address');
+            return;
+        }
+
+        const domain = getDomain(email);
+
+        // Check if this is an SSO domain
+        if (SSO_DOMAINS.some(d => domain.endsWith(d))) {
+            // Trigger SSO login
+            setIsLoading(true);
+            login();
+        } else {
+            // Show password screen for guest users
+            setStep('password');
+        }
+    };
+
+    const handlePasswordSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+
+        if (!password) {
+            setError('Please enter your password');
+            return;
+        }
+
+        // TODO: Implement guest user authentication
+        // For now, just trigger the login (which will use SSO)
+        setIsLoading(true);
+        login();
+        setError('Guest authentication not yet configured');
+    };
+
+    const handleBack = () => {
+        setStep('email');
+        setPassword('');
+        setError('');
+    };
+
+    return (
+        <div className="min-h-screen flex flex-col items-center justify-center font-sans bg-gray-50 text-gray-900 overflow-hidden relative antialiased">
+
+            {/* TODO (MVP2): Add Carousel Component Here
+                - Showcase portal features (API Quality, Ease of Onboarding, etc.)
+                - Auto-rotating cards with feature highlights
+                - Position: Left side of screen or above login card
+            */}
+            <div className="w-full max-w-[560px] px-6 relative z-10 flex flex-col items-center">
+
+                {/* Logo Section */}
+                <div className="mb-8 flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-sm">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </div>
+                    <h1 className="text-xl font-bold text-gray-900 tracking-tight">APIM Self Service</h1>
+                </div>
+
+                {/* Login Card - Emulsified Floating Tile */}
+                <div
+                    className="w-full bg-white rounded-2xl"
+                    style={{
+                        padding: '3rem',
+                        borderRadius: '1rem',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.05), 0 20px 40px -10px rgba(0, 0, 0, 0.4), 0 10px 20px -5px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                        transform: 'translateY(-4px)'
+                    }}
+                >
+                    <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Sign in</h2>
+
+                    {/* Error Message */}
+                    {error && (
+                        <div className="mb-6 p-3 bg-red-50 rounded-lg text-red-700 text-sm text-center" style={{ border: '1px solid #fecaca', borderStyle: 'solid' }}>
+                            {error}
+                        </div>
+                    )}
+
+                    {step === 'email' ? (
+                        <>
+                            <form className="space-y-5" onSubmit={handleEmailSubmit}>
+                                <input
+                                    id="email"
+                                    type="email"
+                                    autoComplete="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="login-form-element border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:border-indigo-400 focus:bg-white"
+                                    placeholder="Enter your email"
+                                />
+
+                                <button
+                                    type="submit"
+                                    disabled={isLoading}
+                                    className="login-form-element border-transparent bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg hover:from-indigo-600 hover:to-purple-700 hover:border-indigo-300/50 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {isLoading ? (
+                                        <>
+                                            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Loading...
+                                        </>
+                                    ) : (
+                                        'Next →'
+                                    )}
+                                </button>
+                            </form>
+
+                            <div className="relative my-6">
+                                <div className="absolute inset-0 flex items-center">
+                                    <div className="w-full border-t border-gray-200"></div>
+                                </div>
+                                <div className="relative flex justify-center text-xs">
+                                    <span className="bg-white px-3 text-gray-500 font-medium uppercase tracking-wide">or</span>
+                                </div>
+                            </div>
+
+                            <LoginButton fullWidth />
+                        </>
+                    ) : (
+                        <>
+                            {/* Password Step for Guest Users */}
+                            <div className="login-form-element border-gray-200 bg-gray-50 flex items-center justify-between">
+                                <span className="text-gray-900 truncate">{email}</span>
+                                <button
+                                    type="button"
+                                    onClick={handleBack}
+                                    className="text-indigo-600 text-sm font-semibold hover:text-indigo-700 hover:bg-indigo-50 ml-4 px-3 py-1 rounded-md transition-all flex-shrink-0"
+                                >
+                                    Change
+                                </button>
+                            </div>
+
+                            <form className="space-y-5" style={{ marginTop: '1.25rem' }} onSubmit={handlePasswordSubmit}>
+                                <input
+                                    id="password"
+                                    type="password"
+                                    autoComplete="current-password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="login-form-element border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:border-indigo-400 focus:bg-white"
+                                    placeholder="Enter your password"
+                                    autoFocus
+                                />
+
+                                <button
+                                    type="submit"
+                                    disabled={isLoading}
+                                    className="login-form-element border-transparent bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg hover:from-indigo-600 hover:to-purple-700 hover:border-indigo-300/50 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {isLoading ? (
+                                        <>
+                                            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Loading...
+                                        </>
+                                    ) : (
+                                        'Sign in'
+                                    )}
+                                </button>
+                            </form>
+                        </>
+                    )}
+                </div>
+
+                {/* Footer Links */}
+                <div className="mt-10 flex justify-center gap-8 text-xs text-gray-500">
+                    <a href="#" className="hover:text-blue-600 transition-colors duration-200 font-medium">Help</a>
+                    <a href="#" className="hover:text-blue-600 transition-colors duration-200 font-medium">Privacy</a>
+                    <a href="#" className="hover:text-blue-600 transition-colors duration-200 font-medium">Security</a>
+                </div>
+            </div>
+        </div>
+    );
+};
