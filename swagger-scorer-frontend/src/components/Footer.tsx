@@ -1,23 +1,10 @@
-import React, { type ReactNode } from 'react';
+import React from 'react';
 
-interface FooterProps {
-    children?: ReactNode; // Allows embedding custom links, copyright, version info, etc.
-}
-
-export const Footer: React.FC<FooterProps> = ({ children }) => {
+export const Footer = () => {
     return (
-        <footer className="mt-12 py-6 border-t border-gray-800 text-center text-gray-500 text-sm">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                <div>
-                    &copy; {new Date().getFullYear()} Swagger Scorer. All rights reserved.
-                </div>
-
-                {/* Embedded content area */}
-                {children && (
-                    <div className="flex gap-6 items-center">
-                        {children}
-                    </div>
-                )}
+        <footer className="bg-white border-t border-gray-200 mt-auto">
+            <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-center text-sm text-gray-500">
+                <p>&copy; 2024 APIM Self Service. Internal Tool.</p>
             </div>
         </footer>
     );
