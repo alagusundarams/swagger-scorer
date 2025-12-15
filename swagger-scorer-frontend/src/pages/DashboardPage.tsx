@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { mockUser, mockTeams, mockProducts, mockSubscriptions, type Product, type Subscription, type Team } from '../mocks';
+import { mockUser, mockTeams, mockProducts, mockSubscriptions, type Product, type Subscription, type Team, type Environment } from '../mocks';
 import { MainLayout } from '../layouts/MainLayout';
 import { useStore } from '../store/useStore';
 import { Input } from '../components/ui/Input';
@@ -17,6 +17,7 @@ export const DashboardPage = () => {
     const [activeTab, setActiveTab] = useState<'produced' | 'consumed' | 'approvals'>('produced');
     // const [selectedTeamId, setSelectedTeamId] = useState<string>('all'); // Removed local state
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedEnvironment, setSelectedEnvironment] = useState<Environment>('ALL'); // Environment filter
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     const [revealedKeys, setRevealedKeys] = useState<Set<string>>(new Set());
     const [processedApprovals, setProcessedApprovals] = useState<Set<string>>(new Set()); // IDs of approved/rejected items
@@ -31,8 +32,15 @@ export const DashboardPage = () => {
     // 1. My Products (Produced)
     const myProducts = useMemo(() => {
         const teamIds = activeTeamId === 'all' ? mockUser.teams : [activeTeamId];
-        return mockProducts.filter(p => teamIds.includes(p.ownerTeamId));
-    }, [activeTeamId]);
+        let products = mockProducts.filter(p => teamIds.includes(p.ownerTeamId));
+
+        // Filter by environment
+        if (selectedEnvironment !== 'ALL') {
+            products = products.filter(p => p.environment === selectedEnvironment);
+        }
+
+        return products;
+    }, [activeTeamId, selectedEnvironment]);
 
     // 2. Subscriptions (Consumed)
     const subscribedProducts = useMemo((): ProductWithSubscription[] => {
@@ -149,7 +157,7 @@ export const DashboardPage = () => {
 
             <div className="max-w-7xl mx-auto px-6 py-6 w-full">
 
-                {/* Control Bar: Search (Left) and Context (Right) - Same Horizontal Line */}
+                {/* Control Bar: Search (Left) and Context/Environment (Right) - Same Horizontal Line */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8">
                     {/* Search - Left */}
                     <div className="w-full md:w-64">
@@ -168,18 +176,38 @@ export const DashboardPage = () => {
                         />
                     </div>
 
-                    {/* Context - Right */}
-                    <div className="w-full md:w-64">
-                        <Select
-                            label="Context"
-                            value={activeTeamId}
-                            onChange={e => { setActiveTeamId(e.target.value); setCurrentPage(1); }}
-                            options={[
-                                { value: 'all', label: 'All My Teams' },
-                                ...userTeams.map(t => ({ value: t.id, label: t.name }))
-                            ]}
-                            fullWidth
-                        />
+                    {/* Right: Environment + Context */}
+                    <div className="flex flex-col md:flex-row gap-4 items-start md:items-end w-full md:w-auto">
+                        {/* Environment Filter */}
+                        <div className="w-full md:w-48">
+                            <Select
+                                label="Environment"
+                                value={selectedEnvironment}
+                                onChange={e => { setSelectedEnvironment(e.target.value as Environment); setCurrentPage(1); }}
+                                options={[
+                                    { value: 'ALL', label: 'All Environments' },
+                                    { value: 'DEV', label: '⚪ Dev' },
+                                    { value: 'QA', label: '🔵 QA' },
+                                    { value: 'STAGE', label: '🟣 Stage' },
+                                    { value: 'PROD', label: '🟢 Prod' }
+                                ]}
+                                fullWidth
+                            />
+                        </div>
+
+                        {/* Context - Team Switcher */}
+                        <div className="w-full md:w-48">
+                            <Select
+                                label="Context"
+                                value={activeTeamId}
+                                onChange={e => { setActiveTeamId(e.target.value); setCurrentPage(1); }}
+                                options={[
+                                    { value: 'all', label: 'All My Teams' },
+                                    ...userTeams.map(t => ({ value: t.id, label: t.name }))
+                                ]}
+                                fullWidth
+                            />
+                        </div>
                     </div>
                 </div>
 

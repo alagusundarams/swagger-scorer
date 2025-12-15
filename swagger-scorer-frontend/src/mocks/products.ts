@@ -31,7 +31,10 @@ export interface Product {
     qualityScore?: number;
     createdAt: string;
     updatedAt: string;
+    environment?: 'DEV' | 'QA' | 'STAGE' | 'PROD'; // Multi-environment support
 }
+
+export type Environment = 'ALL' | 'DEV' | 'QA' | 'STAGE' | 'PROD';
 
 export const mockProducts: Product[] = [
     // Products exposed by Platform Team
@@ -47,6 +50,7 @@ export const mockProducts: Product[] = [
         qualityScore: 87,
         createdAt: '2024-01-15T10:00:00Z',
         updatedAt: '2024-03-20T14:30:00Z',
+        environment: 'PROD', // Deployed to Production
         apis: [
             {
                 id: 'api-user-management',
