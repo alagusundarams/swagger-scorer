@@ -41,7 +41,7 @@ describe('Swagger Scorer UI', () => {
 
     it('renders the header and form initially', () => {
         render(<App />);
-        expect(screen.getByRole('heading', { level: 1, name: /Swagger Scorer/i })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { level: 1, name: /APIM Self Service/i })).toBeInTheDocument();
         expect(screen.getByTestId('monaco-editor-mock')).toBeInTheDocument();
         expect(screen.getByText('Run')).toBeInTheDocument();
     });

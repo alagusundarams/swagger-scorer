@@ -68,3 +68,31 @@ body {
 .category-bar-completeness {
   background-color: #06b6d4;
 }
+
+/* Shared form element styling to ensure perfect alignment */
+.login-form-element {
+  width: 100% !important;
+  border-radius: 0.75rem !important;
+  /* rounded-xl */
+  border-width: 2px !important;
+  border-style: solid !important;
+  padding-left: 1.5rem !important;
+  /* px-6 */
+  padding-right: 1.5rem !important;
+  /* px-6 */
+  padding-top: 0.625rem !important;
+  /* py-2.5 */
+  padding-bottom: 0.625rem !important;
+  /* py-2.5 */
+  font-size: 1rem !important;
+  /* text-base */
+  font-weight: 600 !important;
+  /* font-semibold */
+  box-sizing: border-box !important;
+  margin-bottom: 0 !important;
+}
+
+.login-form-element+.login-form-element {
+  margin-top: 1.25rem !important;
+  /* 20px spacing between elements */
+}
