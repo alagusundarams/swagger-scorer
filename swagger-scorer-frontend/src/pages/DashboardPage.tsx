@@ -91,7 +91,8 @@ export const DashboardPage = () => {
 
         return result.filter((item) =>
             item.displayName?.toLowerCase().includes(query) ||
-            item.name?.toLowerCase().includes(query)
+            item.name?.toLowerCase().includes(query) ||
+            item.identity?.clientId.toLowerCase().includes(query) // Linked App Registration Search
         );
     }, [activeTab, myProducts, subscribedProducts, pendingApprovals, searchQuery]);
 
@@ -124,10 +125,34 @@ export const DashboardPage = () => {
         setTimeout(() => setToast({ message: '', show: false }), 3000);
     };
 
+    const showToast = (message: string) => {
+        setToast({ message, show: true });
+        setTimeout(() => setToast({ message: '', show: false }), 3000);
+    };
+
     const handleCopyKey = async (keyValue: string) => {
         await navigator.clipboard.writeText(keyValue);
-        setToast({ message: 'Key copied!', show: true });
+        showToast('Key copied!');
         setTimeout(() => setToast({ message: '', show: false }), 2000);
+    };
+
+    // Environment badge helper
+    const getEnvironmentBadge = (env?: 'DEV' | 'QA' | 'STAGE' | 'PROD') => {
+        if (!env) return <span className="text-xs text-gray-400">-</span>;
+
+        const badges = {
+            DEV: { color: 'bg-gray-100 text-gray-700', icon: '⚪' },
+            QA: { color: 'bg-blue-100 text-blue-700', icon: '🔵' },
+            STAGE: { color: 'bg-purple-100 text-purple-700', icon: '🟣' },
+            PROD: { color: 'bg-green-100 text-green-700', icon: '🟢' }
+        };
+
+        const badge = badges[env];
+        return (
+            <span className={`px-2 py-1 text-xs font-medium rounded-full ${badge.color}`}>
+                {badge.icon} {env}
+            </span>
+        );
     };
 
     const handleToggleReveal = (subscriptionId: string) => {
@@ -155,60 +180,43 @@ export const DashboardPage = () => {
                 </div>
             )}
 
-            <div className="max-w-7xl mx-auto px-6 py-6 w-full">
+            {/* Dashboard Control Bar Section */}
+            <div className="max-w-7xl mx-auto px-6 py-4 mt-8 w-full">
 
-                {/* Control Bar: Search (Left) and Context/Environment (Right) - Same Horizontal Line */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8">
-                    {/* Search - Left */}
-                    <div className="w-full md:w-64">
-                        <Input
-                            label="Search"
-                            type="text"
-                            placeholder="Search products..."
-                            value={searchQuery}
-                            onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                            fullWidth
-                            icon={
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                </svg>
-                            }
-                        />
-                    </div>
+                <div className="flex flex-wrap gap-10 mb-10">
+                    <Input
+                        type="text"
+                        placeholder="🔍 Search products..."
+                        value={searchQuery}
+                        onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                        fullWidth
+                        containerClassName="flex-1"
+                    />
 
-                    {/* Right: Environment + Context */}
-                    <div className="flex flex-col md:flex-row gap-4 items-start md:items-end w-full md:w-auto">
-                        {/* Environment Filter */}
-                        <div className="w-full md:w-48">
-                            <Select
-                                label="Environment"
-                                value={selectedEnvironment}
-                                onChange={e => { setSelectedEnvironment(e.target.value as Environment); setCurrentPage(1); }}
-                                options={[
-                                    { value: 'ALL', label: 'All Environments' },
-                                    { value: 'DEV', label: '⚪ Dev' },
-                                    { value: 'QA', label: '🔵 QA' },
-                                    { value: 'STAGE', label: '🟣 Stage' },
-                                    { value: 'PROD', label: '🟢 Prod' }
-                                ]}
-                                fullWidth
-                            />
-                        </div>
+                    <Select
+                        value={selectedEnvironment}
+                        onChange={e => { setSelectedEnvironment(e.target.value as Environment); setCurrentPage(1); }}
+                        options={[
+                            { value: 'ALL', label: 'All Environments' },
+                            { value: 'DEV', label: '⚪ Dev' },
+                            { value: 'QA', label: '🔵 QA' },
+                            { value: 'STAGE', label: '🟣 Stage' },
+                            { value: 'PROD', label: '🟢 Prod' }
+                        ]}
+                        fullWidth
+                        containerClassName="flex-1"
+                    />
 
-                        {/* Context - Team Switcher */}
-                        <div className="w-full md:w-48">
-                            <Select
-                                label="Context"
-                                value={activeTeamId}
-                                onChange={e => { setActiveTeamId(e.target.value); setCurrentPage(1); }}
-                                options={[
-                                    { value: 'all', label: 'All My Teams' },
-                                    ...userTeams.map(t => ({ value: t.id, label: t.name }))
-                                ]}
-                                fullWidth
-                            />
-                        </div>
-                    </div>
+                    <Select
+                        value={activeTeamId}
+                        onChange={e => { setActiveTeamId(e.target.value); setCurrentPage(1); }}
+                        options={[
+                            { value: 'all', label: 'All My Teams' },
+                            ...userTeams.map(t => ({ value: t.id, label: t.name }))
+                        ]}
+                        fullWidth
+                        containerClassName="flex-1"
+                    />
                 </div>
 
                 {/* --- Tabs (Modern Underline Style) with Actions --- */}
@@ -278,6 +286,7 @@ export const DashboardPage = () => {
                                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider pl-8">Name</th>
                                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ver</th>
                                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">State</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Env</th>
 
                                         {activeTab === 'produced' && <>
                                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">APIs</th>
@@ -306,7 +315,18 @@ export const DashboardPage = () => {
                                                             ▶
                                                         </div>
                                                         <div>
-                                                            <div className="text-sm font-medium text-gray-900 group-hover:text-blue-600">{item.displayName}</div>
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="text-sm font-medium text-gray-900 group-hover:text-blue-600">
+                                                                    {item.displayName}
+                                                                </div>
+                                                                {item.identity && (
+                                                                    <span title={`Linked App: ${item.identity.displayName}\nClient ID: ${item.identity.clientId}`} className="text-blue-600 cursor-help">
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                                            <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                                        </svg>
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                             <div className="text-xs text-gray-500">{item.name}</div>
                                                         </div>
                                                     </div>
@@ -317,6 +337,9 @@ export const DashboardPage = () => {
                                                         }`}>
                                                         {item.state}
                                                     </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    {getEnvironmentBadge(item.environment)}
                                                 </td>
 
                                                 {activeTab === 'produced' && <>

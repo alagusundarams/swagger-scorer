@@ -32,6 +32,11 @@ export interface Product {
     createdAt: string;
     updatedAt: string;
     environment?: 'DEV' | 'QA' | 'STAGE' | 'PROD'; // Multi-environment support
+    identity?: {
+        clientId: string;
+        displayName: string;
+        appIdUri: string;
+    };
 }
 
 export type Environment = 'ALL' | 'DEV' | 'QA' | 'STAGE' | 'PROD';
@@ -49,8 +54,14 @@ export const mockProducts: Product[] = [
         subscriberCount: 15,
         qualityScore: 87,
         createdAt: '2024-01-15T10:00:00Z',
+        createdAt: '2024-01-15T10:00:00Z',
         updatedAt: '2024-03-20T14:30:00Z',
         environment: 'PROD', // Deployed to Production
+        identity: {
+            clientId: 'a1b2c3d4-e5f6-4789-0123-abcdef123456',
+            displayName: 'User Service [PROD]',
+            appIdUri: 'api://user-service-prod'
+        },
         apis: [
             {
                 id: 'api-user-management',
@@ -176,6 +187,12 @@ export const mockProducts: Product[] = [
         qualityScore: 92,
         createdAt: '2024-02-01T09:00:00Z',
         updatedAt: '2024-03-15T11:20:00Z',
+        environment: 'QA', // Currently in QA testing
+        identity: {
+            clientId: 'b2c3d4e5-f6g7-5890-1234-bcdef2345678',
+            displayName: 'Order API [QA]',
+            appIdUri: 'api://order-api-qa'
+        },
         apis: [
             {
                 id: 'api-order-management',
@@ -217,7 +234,14 @@ export const mockProducts: Product[] = [
         subscriberCount: 12,
         qualityScore: 85,
         createdAt: '2024-01-20T08:00:00Z',
+        createdAt: '2024-01-20T08:00:00Z',
         updatedAt: '2024-03-18T16:45:00Z',
+        environment: 'PROD', // Production deployment
+        identity: {
+            clientId: 'c3d4e5f6-g7h8-6901-2345-cdef34567890',
+            displayName: 'Analytics Service [PROD]',
+            appIdUri: 'api://analytics-prod'
+        },
         apis: [
             {
                 id: 'api-reports',
@@ -249,7 +273,14 @@ export const mockProducts: Product[] = [
         state: 'published',
         ownerTeamId: 'team-external-1',
         createdAt: '2023-11-10T10:00:00Z',
+        createdAt: '2023-11-10T10:00:00Z',
         updatedAt: '2024-03-10T09:30:00Z',
+        environment: 'STAGE', // Staging environment
+        identity: {
+            clientId: 'd4e5f6g7-h8i9-7012-3456-def456789012',
+            displayName: 'Payment Gateway [STAGE]',
+            appIdUri: 'api://payment-gateway-stage'
+        },
         apis: [
             {
                 id: 'api-payment-processing',
@@ -280,7 +311,14 @@ export const mockProducts: Product[] = [
         state: 'published',
         ownerTeamId: 'team-external-2',
         createdAt: '2023-12-05T14:00:00Z',
+        createdAt: '2023-12-05T14:00:00Z',
         updatedAt: '2024-02-28T10:15:00Z',
+        environment: 'DEV', // Development environment
+        identity: {
+            clientId: 'e5f6g7h8-i9j0-8123-4567-ef5678901234',
+            displayName: 'Email Service [DEV]',
+            appIdUri: 'api://email-service-dev'
+        },
         apis: [
             {
                 id: 'api-email-sending',

@@ -74,6 +74,44 @@ export const ProductDetailPage = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Left Column: Stats & Subscription */}
                     <div className="space-y-6">
+                        {/* Identity Card */}
+                        {product.identity && (
+                            <div className="bg-white rounded-xl p-6 border-2 border-indigo-100 shadow-sm">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                    </svg>
+                                    <h2 className="text-lg font-bold text-gray-900">Identity & Security</h2>
+                                </div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <p className="text-sm text-gray-600 mb-1">Linked Application</p>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-semibold text-gray-900 truncate">{product.identity.displayName}</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-600 mb-1">Client ID</p>
+                                        <div className="flex items-center gap-2 bg-gray-50 p-2 rounded border border-gray-200 group">
+                                            <code className="text-xs font-mono text-gray-900 flex-1 truncate">{product.identity.clientId}</code>
+                                            <button
+                                                onClick={() => navigator.clipboard.writeText(product.identity?.clientId || '')}
+                                                className="text-gray-400 hover:text-indigo-600 transition-colors"
+                                                title="Copy Client ID"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <a href="#" className="w-full text-sm text-indigo-600 hover:text-indigo-800 font-medium flex items-center justify-center gap-1 mt-2 pt-2 border-t border-gray-100">
+                                        Manage in Port ↗
+                                    </a>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Stats Card */}
                         <div className="bg-white rounded-xl p-6 border-2 border-gray-200">
                             <h2 className="text-lg font-bold text-gray-900 mb-4">Statistics</h2>
