@@ -5,6 +5,7 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
     error?: string;
     fullWidth?: boolean;
     options: { value: string; label: string }[];
+    containerClassName?: string;
 }
 
 export const Select: React.FC<SelectProps> = ({
@@ -13,41 +14,34 @@ export const Select: React.FC<SelectProps> = ({
     className = '',
     fullWidth = false,
     options,
+    containerClassName = '',
     ...props
 }) => {
-    // Shared consistent styles
-    // Shared consistent styles
-    // Matches login-form-element exactly but implemented manually to avoid global class conflicts
-    const baseStyles = "appearance-none border-2 border-gray-200 bg-gray-50 text-gray-900 text-base font-semibold rounded-xl focus:border-indigo-400 focus:bg-white focus:outline-none block transition-colors pr-10";
-    const paddingStyles = "px-6 py-2.5"; // Match Input padding
-    const widthStyles = fullWidth ? "w-full" : "";
-    const errorStyles = error ? "border-red-300 bg-red-50 focus:border-red-500" : "";
-
     return (
-        <div className={`${fullWidth ? 'w-full' : ''} relative`}>
+        <div className={`${fullWidth ? "w-full" : ""} ${containerClassName}`}>
             {label && (
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                     {label}
                 </label>
             )}
             <div className="relative">
                 <select
-                    className={`${baseStyles} ${paddingStyles} ${widthStyles} ${errorStyles} ${className}`}
+                    className={`dashboard-input dashboard-input-select ${error ? 'dashboard-input-error' : ''} ${className}`}
                     {...props}
                 >
                     {options.map(opt => (
-                        <option key={opt.value} value={opt.value}>
+                        <option key={opt.value} value={opt.value} className="bg-slate-800">
                             {opt.label}
                         </option>
                     ))}
                 </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                <div className="absolute inset-y-0 right-0 flex items-center pr-4" style={{ pointerEvents: 'none', zIndex: 50 }}>
+                    <svg className="h-6 w-6 text-slate-100" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                     </svg>
                 </div>
             </div>
-            {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+            {error && <p className="mt-1.5 text-xs text-red-500">{error}</p>}
         </div>
     );
 };

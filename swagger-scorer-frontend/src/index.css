@@ -69,6 +69,89 @@ body {
   background-color: #06b6d4;
 }
 
+@layer components {
+
+  /* Dashboard specific input styling - Industry Standard Pure CSS Approach */
+  .dashboard-input {
+    display: block;
+    width: 100%;
+
+    /* Box Sizing - Critical for preventing overlap/overflow */
+    box-sizing: border-box;
+
+    /* Geometry matches Login Page */
+    border-radius: 0.75rem;
+    /* rounded-xl */
+    border-width: 2px;
+    border-style: solid;
+    padding: 0.625rem 1.5rem;
+    /* py-2.5 px-6 */
+
+    /* Typography */
+    font-weight: 600;
+    font-size: 1rem;
+    line-height: 1.5;
+    outline: none;
+
+    /* Transitions */
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Dark Theme Colors (Slate) */
+    background-color: #1e293b;
+    /* bg-slate-800 */
+    border-color: #475569;
+    /* border-slate-600 */
+    color: #f1f5f9;
+    /* text-slate-100 */
+  }
+
+  /* Placeholder Styling */
+  .dashboard-input::placeholder {
+    color: #94a3b8;
+    /* placeholder-slate-400 */
+    opacity: 1;
+  }
+
+  /* Focus State */
+  .dashboard-input:focus {
+    border-color: #3b82f6;
+    /* border-blue-500 */
+    box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.5);
+    /* ring-blue-900/50 */
+  }
+
+  /* Disabled State */
+  .dashboard-input:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  /* Modifiers */
+  .dashboard-input-with-icon {
+    padding-left: 2.75rem;
+    /* pl-11 */
+  }
+
+  .dashboard-input-select {
+    padding-right: 3rem;
+    /* pr-12 */
+    appearance: none;
+  }
+
+  /* Error State */
+  .dashboard-input-error {
+    border-color: #ef4444;
+    /* border-red-500 */
+  }
+
+  .dashboard-input-error:focus {
+    border-color: #ef4444;
+    box-shadow: 0 0 0 2px #fecaca;
+    /* ring-red-200 */
+  }
+}
+
+
 /* Shared form element styling to ensure perfect alignment */
 .login-form-element {
   width: 100% !important;
