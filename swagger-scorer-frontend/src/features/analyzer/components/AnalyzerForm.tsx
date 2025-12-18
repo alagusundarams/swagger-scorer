@@ -15,6 +15,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import Editor, { type OnMount, type Monaco } from '@monaco-editor/react';
 import { useAuth } from '../../auth/hooks/useAuth';
 import { saveDraft, getLatestDraft } from '../api/client';
@@ -41,7 +42,17 @@ export const AnalyzerForm: React.FC = () => {
     // === EFFECTS ===
 
     // Auto-load draft on mount if authenticated
+    const location = useLocation();
     useEffect(() => {
+        // High Priority: Check for deep-linked spec from navigation
+        const state = location.state as { startWithSpec?: string } | null;
+        if (state?.startWithSpec) {
+            setSpec(state.startWithSpec);
+            // Optional: Clear state to avoid reloading on refresh? 
+            // window.history.replaceState({}, document.title);
+            return;
+        }
+
         const loadDraft = async () => {
             if (isAuthenticated && !spec) {
                 try {
@@ -60,7 +71,7 @@ export const AnalyzerForm: React.FC = () => {
             }
         };
         loadDraft();
-    }, [isAuthenticated]);
+    }, [isAuthenticated, location]);
 
     // === HANDLERS ===
 

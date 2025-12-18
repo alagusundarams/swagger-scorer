@@ -53,9 +53,27 @@ export const APIDetailPage = () => {
                                 ⚡ API RESOURCE NODE
                             </span>
                         </div>
-                        <h1 className="text-5xl font-black text-gray-900 dark:text-white tracking-tighter leading-none mb-6">
-                            {api.displayName}
-                        </h1>
+                        <div className="flex justify-between items-end mb-6">
+                            <h1 className="text-5xl font-black text-gray-900 dark:text-white tracking-tighter leading-none">
+                                {api.displayName}
+                            </h1>
+                            <button
+                                onClick={() => navigate('/discovery', {
+                                    state: {
+                                        startWithSpec: `openapi: 3.0.0
+info:
+  title: ${api.displayName}
+  version: 1.0.0
+paths: {}
+# Loaded from Product Inventory
+`
+                                    }
+                                })}
+                                className="px-8 py-4 bg-slate-900 dark:bg-slate-800 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-xl hover:scale-105 transition-all flex items-center gap-2 border border-slate-700"
+                            >
+                                <span className="text-lg">⚡</span> Analyze Spec
+                            </button>
+                        </div>
                         <p className="text-gray-500 dark:text-slate-400 text-lg max-w-3xl leading-relaxed font-medium">
                             {api.description}
                         </p>

@@ -156,7 +156,82 @@ export const ProductDetailPage = () => {
                     </div>
                 </div>
 
-                {/* API Inventory Explorer */}
+                {/* Subscription & Connection Details (Visible to Subscribers) */}
+                {isSubscribed && subscription && (
+                    <div className="bg-slate-900 text-white rounded-[2.5rem] p-10 mb-12 shadow-2xl border border-slate-700 relative overflow-hidden group">
+                        {/* Decorative background */}
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/20 rounded-full blur-[100px] pointer-events-none"></div>
+
+                        <div className="flex flex-col md:flex-row gap-12 relative z-10">
+                            {/* Connection Info */}
+                            <div className="flex-1">
+                                <h3 className="text-xl font-black uppercase tracking-widest mb-8 flex items-center gap-3">
+                                    <span className="bg-blue-600 p-2 rounded-lg">🔌</span>
+                                    Connection Context
+                                </h3>
+
+                                <div className="space-y-6">
+                                    <div>
+                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Primary Gateway URL</p>
+                                        <code className="block bg-black/30 p-4 rounded-xl font-mono text-sm text-blue-400 border border-white/5">
+                                            https://api.ionosphere.io/gateway/{product.name}/v{product.version}
+                                        </code>
+                                    </div>
+                                    <div className="flex gap-8">
+                                        <div>
+                                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Environment</p>
+                                            <span className="font-bold text-white">Production (US-East)</span>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Expiration</p>
+                                            <span className="font-bold text-amber-500">
+                                                {subscription.expirationDate ? new Date(subscription.expirationDate).toLocaleDateString() : 'Never'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Divider */}
+                            <div className="w-px bg-white/10 hidden md:block"></div>
+
+                            {/* Credentials */}
+                            <div className="flex-1">
+                                <h3 className="text-xl font-black uppercase tracking-widest mb-8 flex items-center gap-3">
+                                    <span className="bg-amber-500 p-2 rounded-lg text-black">🔑</span>
+                                    Secure Credentials
+                                </h3>
+
+                                <div className="space-y-6">
+                                    <div>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Primary Subscription Key</p>
+                                            <button className="text-[10px] font-bold text-blue-400 hover:text-white transition-colors uppercase">Regenerate</button>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <code className="flex-1 bg-black/30 p-4 rounded-xl font-mono text-sm text-emerald-400 border border-white/5 tracking-wider">
+                                                {subscription.primaryKey.value}
+                                            </code>
+                                            <button
+                                                onClick={() => { navigator.clipboard.writeText(subscription.primaryKey.value); setToast({ message: 'Primary Key Copied', show: true }); setTimeout(() => setToast({ message: '', show: false }), 2000); }}
+                                                className="bg-white/5 hover:bg-white/10 p-4 rounded-xl border border-white/5 text-white transition-all"
+                                                title="Copy Key"
+                                            >
+                                                📋
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Secondary Subscription Key</p>
+                                        <code className="block bg-black/30 p-4 rounded-xl font-mono text-sm text-slate-500 border border-white/5 tracking-wider">
+                                            ••••••••••••••••••••••••••••••••
+                                        </code>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 <div className="mb-12">
                     <div className="flex items-center gap-4 mb-8">
                         <div className="w-1 h-8 bg-blue-600 rounded-full"></div>
