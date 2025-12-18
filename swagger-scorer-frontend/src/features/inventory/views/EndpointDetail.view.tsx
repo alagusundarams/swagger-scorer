@@ -203,26 +203,52 @@ export const EndpointDetailPage = () => {
                                     </button>
                                 </section>
                             ) : (
-                                // === CONSUMER VIEW: Integration Support ===
-                                <section className="bg-white dark:bg-slate-800 p-10 rounded-[2.5rem] border border-gray-100 dark:border-slate-700/30 shadow-sm relative overflow-hidden group">
-                                    <h2 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest mb-8 flex items-center gap-3">
-                                        <span className="w-2 h-2 bg-purple-500 rounded-full"></span> Integration Support
+                                // === CONSUMER VIEW: Implementation Guide ===
+                                <section className="bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] border border-gray-100 dark:border-slate-700/30 shadow-sm relative overflow-hidden group">
+                                    <h2 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest mb-6 flex items-center gap-3">
+                                        <span className="w-2 h-2 bg-purple-500 rounded-full"></span> Implementation Guide
                                     </h2>
 
-                                    <div className="flex flex-col gap-4">
-                                        <button className="w-full bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800 text-gray-600 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest py-4 rounded-xl hover:bg-white dark:hover:bg-slate-800 hover:border-blue-200 dark:hover:border-blue-500/30 hover:text-blue-600 dark:hover:text-blue-400 transition-all flex items-center justify-between px-6">
-                                            <span>Download SDK (Node.js)</span>
-                                            <span className="text-lg">📦</span>
-                                        </button>
-                                        <button className="w-full bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800 text-gray-600 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest py-4 rounded-xl hover:bg-white dark:hover:bg-slate-800 hover:border-rose-200 dark:hover:border-rose-500/30 hover:text-rose-600 dark:hover:text-rose-400 transition-all flex items-center justify-between px-6">
-                                            <span>Report Integration Issue</span>
-                                            <span className="text-lg">🚩</span>
-                                        </button>
+                                    {/* Dynamic Code Snippet */}
+                                    <div className="bg-slate-900 rounded-2xl p-6 mb-6 overflow-x-auto group/code relative">
+                                        <div className="absolute top-4 right-4 opacity-0 group-hover/code:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={() => {
+                                                    const snippet = `curl -X ${operation.method} "https://api.ionosphere.io${api.path}${operation.urlTemplate}" \\
+  -H "Authorization: Bearer <YOUR_TOKEN>"${['POST', 'PUT', 'PATCH'].includes(operation.method) ? ' \\\n  -H "Content-Type: application/json" \\ \n  -d \'{ ... }\'' : ''}`;
+                                                    navigator.clipboard.writeText(snippet);
+                                                }}
+                                                className="bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold px-3 py-1 rounded-lg uppercase tracking-wider backdrop-blur-md transition-all"
+                                            >
+                                                Copy
+                                            </button>
+                                        </div>
+                                        <div className="flex gap-4 mb-4 border-b border-white/10 pb-2">
+                                            <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">cURL</span>
+                                        </div>
+                                        <pre className="font-mono text-xs leading-relaxed text-slate-300">
+                                            <span className="text-purple-400">curl</span> -X {operation.method} "https://api.ionosphere.io{api.path}{operation.urlTemplate}" \<br />
+                                            &nbsp;&nbsp;-H "Authorization: Bearer &lt;YOUR_TOKEN&gt;"
+                                            {['POST', 'PUT', 'PATCH'].includes(operation.method) && (
+                                                <>
+                                                    {" \\"}<br />
+                                                    &nbsp;&nbsp;-H "Content-Type: application/json" \<br />
+                                                    &nbsp;&nbsp;-d {'\'{ ... }'}
+                                                </>
+                                            )}
+                                        </pre>
                                     </div>
 
-                                    <p className="text-[10px] text-gray-400 dark:text-slate-600 font-medium mt-6 text-center leading-relaxed">
-                                        Need help? Contact the <span className="font-bold text-gray-900 dark:text-white">{product.ownerTeamId}</span> team directly.
-                                    </p>
+                                    {/* Support Reference */}
+                                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800">
+                                        <div>
+                                            <p className="text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-1">Owner Contact</p>
+                                            <p className="text-xs font-bold text-gray-900 dark:text-white">{product.ownerTeamId}@company.com</p>
+                                        </div>
+                                        <a href={`mailto:${product.ownerTeamId}@company.com`} className="text-xs font-bold text-blue-600 hover:underline">
+                                            Request Support
+                                        </a>
+                                    </div>
                                 </section>
                             )}
                         </div>
