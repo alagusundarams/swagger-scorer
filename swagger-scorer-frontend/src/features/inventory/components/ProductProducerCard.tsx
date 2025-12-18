@@ -101,23 +101,12 @@ export const ProductProducerCard: React.FC<ProductProducerCardProps> = ({
                 </div>
 
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                        <span className={`px-2.5 py-1 text-[9px] font-black rounded-lg border uppercase tracking-wider ${product.environment === 'PROD'
-                            ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                            : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
-                            }`}>
-                            {product.environment}
-                        </span>
-                        <span className="px-2.5 py-1 text-[9px] font-black rounded-lg bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 border border-gray-200 dark:border-slate-600 uppercase tracking-wider">
-                            v{product.version}
-                        </span>
-                    </div>
-                    <div className="flex -space-x-2">
-                        {/* Mock Avatar list */}
-                        {[1, 2, 3].map(i => (
-                            <div key={i} className="w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 bg-gray-200 dark:bg-slate-700 flex items-center justify-center text-[10px]">👤</div>
-                        ))}
-                    </div>
+                    <span className={`px-2.5 py-1 text-[9px] font-black rounded-lg border uppercase tracking-wider ${product.environment === 'PROD'
+                        ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                        : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                        }`}>
+                        {product.environment}
+                    </span>
                 </div>
             </div>
 

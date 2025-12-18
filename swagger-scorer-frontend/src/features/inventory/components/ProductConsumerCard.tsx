@@ -105,12 +105,9 @@ export const ProductConsumerCard: React.FC<ProductConsumerCardProps> = ({
 
             {/* Environment & Metadata Footer */}
             <div className="px-7 py-4 border-t border-gray-100 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 backdrop-blur-sm flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 text-[9px] font-black rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20 uppercase tracking-widest">
-                        {product.environment}
-                    </span>
-                    <span className="text-[10px] font-bold text-gray-400 dark:text-slate-500">v{product.version}</span>
-                </div>
+                <span className="px-2 py-0.5 text-[9px] font-black rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20 uppercase tracking-widest">
+                    {product.environment}
+                </span>
                 <div className="text-[10px] font-black text-blue-500 uppercase tracking-widest hover:underline">
                     Usage Guide →
                 </div>
