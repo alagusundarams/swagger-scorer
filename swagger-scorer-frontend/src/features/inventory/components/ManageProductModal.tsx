@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { useStore } from '../../../store/useStore';
 import { TeamSearch } from '../../provisioning/components/TeamSearch';
+import { type Product } from '../../../types/entities';
 
 interface ManageProductModalProps {
     isOpen: boolean;
     onClose: () => void;
-    product: any;
+    product: Product;
     currentStage: 'DEV' | 'QA' | 'PROD';
     onPromote: () => void;
-    onUpdate: (data: any) => void;
+    onUpdate: (data: Partial<Product>) => void;
 }
 
 export const ManageProductModal = ({
@@ -20,26 +21,96 @@ export const ManageProductModal = ({
     onUpdate
 }: ManageProductModalProps) => {
     // --- Store Content ---
-    const { teams: allTeams } = useStore();
+    const {
+        user,
+        teams: allTeams,
+        addNotification
+    } = useStore();
 
     // --- Local State ---
     const [activeTab, setActiveTab] = useState<'metadata' | 'access'>('metadata');
-    const [formData, setFormData] = useState({
-        displayName: product.displayName,
-        description: product.description,
-        version: product.version,
-        visibility: product.visibility || 'public' as 'public' | 'internal' | 'private' | 'owner-only',
+
+    // Ensure we have a default structure for local state to avoid 'undefined' checks
+    const [formData, setFormData] = useState<Required<Pick<Product, 'displayName' | 'description' | 'version' | 'visibility' | 'authorizedTeamsByEnv'>>>({
+        displayName: product.displayName || '',
+        description: product.description || '',
+        version: product.version || '1.0.0',
+        visibility: product.visibility || 'public',
         authorizedTeamsByEnv: product.authorizedTeamsByEnv || {
             DEV: [],
             QA: [],
             STAGE: [],
             PROD: []
-        } as Record<'DEV' | 'QA' | 'STAGE' | 'PROD', string[]>
+        }
     });
 
     const [expandedEnv, setExpandedEnv] = useState<'DEV' | 'QA' | 'STAGE' | 'PROD' | null>('DEV');
+    const [localToast, setLocalToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
+    const [isRequestingApproval, setIsRequestingApproval] = useState(false);
 
+    // --- Governance Logic ---
+    const isOwnerLead = user?.leadsTeams.includes(product.ownerTeamId) || user?.role === 'admin';
     const isMetadataLocked = currentStage !== 'DEV';
+    const isVisibilityChanged = formData.visibility !== product.visibility;
+    const isAccessChanged = JSON.stringify(formData.authorizedTeamsByEnv) !== JSON.stringify(product.authorizedTeamsByEnv);
+    const requiresApproval = (isVisibilityChanged || isAccessChanged) && currentStage === 'PROD';
+
+    const getImpactSummary = () => {
+        if (formData.visibility === product.visibility) return null;
+        if (formData.visibility === 'private' && product.visibility === 'public') {
+            return {
+                message: "Switching to Private will immediately hide this product from the public catalog. Access will be strictly limited to authorized teams; existing subscribers not in the authorized list for this environment will lose access immediately.",
+                type: 'warning' as const
+            };
+        }
+        if (formData.visibility === 'owner-only') {
+            return {
+                message: "Owner Only visibility will eventually revoke access for all non-owner teams. Use with caution.",
+                type: 'warning' as const
+            };
+        }
+        return null;
+    };
+
+    const impact = getImpactSummary();
+
+    const handleSave = () => {
+        if (!isOwnerLead) {
+            setLocalToast({ message: 'Authorization Failed: Only Team Leads or Architects can modify governance.', type: 'warning' });
+            return;
+        }
+
+        if (requiresApproval) {
+            setIsRequestingApproval(true);
+            setTimeout(() => {
+                setLocalToast({ message: 'Approval Request Submitted: Security vetting initiated for Production visibility change.', type: 'success' });
+                addNotification({
+                    type: 'governance',
+                    title: 'PROD Approval Requested',
+                    message: `Visibility change for ${product.displayName} submitted for security vetting.`,
+                    navigateTo: '/'
+                });
+                setIsRequestingApproval(false);
+                onUpdate(formData); // Mocking update after "request"
+            }, 1000);
+            return;
+        }
+
+        onUpdate(formData);
+
+        // Proactive Intimation for non-prod changes
+        if (isVisibilityChanged || isAccessChanged) {
+            addNotification({
+                type: 'info',
+                title: 'Governance Updated',
+                message: `${user?.name} updated visibility settings for ${product.displayName} in ${currentStage}.`,
+                navigateTo: '/'
+            });
+        }
+
+        setLocalToast({ message: 'Governance settings saved successfully!', type: 'success' });
+        setTimeout(() => setLocalToast(null), 3000);
+    };
 
     if (!isOpen) return null;
 
@@ -98,7 +169,15 @@ export const ManageProductModal = ({
                     </div>
                 )}
 
-                <div className="p-8 overflow-y-auto custom-scrollbar">
+                <div className="p-8 overflow-y-auto custom-scrollbar relative">
+                    {/* Floating Local Toast */}
+                    {localToast && (
+                        <div className={`absolute top-4 left-8 right-8 p-3 rounded-xl border flex items-center gap-3 animate-slide-up z-20 ${localToast.type === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-amber-50 border-amber-100 text-amber-700'
+                            }`}>
+                            <span>{localToast.type === 'success' ? '✨' : '⚠️'}</span>
+                            <span className="text-xs font-bold uppercase tracking-widest">{localToast.message}</span>
+                        </div>
+                    )}
 
                     {/* --- METADATA TAB --- */}
                     {activeTab === 'metadata' && (
@@ -203,6 +282,17 @@ export const ManageProductModal = ({
                                 </div>
                             </div>
 
+                            {/* Impact Warning */}
+                            {impact && (
+                                <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-200 dark:border-amber-800/30 flex items-start gap-3">
+                                    <span className="text-xl">⚠️</span>
+                                    <div>
+                                        <p className="text-[10px] uppercase tracking-widest font-black text-amber-600 dark:text-amber-500 mb-1">Impact Warning</p>
+                                        <p className="text-xs text-amber-700 dark:text-amber-400 font-medium leading-relaxed">{impact.message}</p>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Environment-Scoped Team Authorization - Only show if Private visibility */}
                             {formData.visibility === 'private' && (
                                 <div>
@@ -218,16 +308,16 @@ export const ManageProductModal = ({
 
                                         return (
                                             <div key={env} className={`mb-3 border rounded-xl overflow-hidden ${env === 'PROD' ? 'border-red-200 dark:border-red-800' :
-                                                    env === 'STAGE' ? 'border-amber-200 dark:border-amber-800' :
-                                                        'border-gray-200 dark:border-slate-700'
+                                                env === 'STAGE' ? 'border-amber-200 dark:border-amber-800' :
+                                                    'border-gray-200 dark:border-slate-700'
                                                 }`}>
                                                 {/* Environment Header */}
                                                 <button
                                                     type="button"
                                                     onClick={() => setExpandedEnv(isExpanded ? null : env)}
                                                     className={`w-full p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-900 transition ${env === 'PROD' ? 'bg-red-50/50 dark:bg-red-900/10' :
-                                                            env === 'STAGE' ? 'bg-amber-50/50 dark:bg-amber-900/10' :
-                                                                'bg-gray-50/50 dark:bg-slate-900/50'
+                                                        env === 'STAGE' ? 'bg-amber-50/50 dark:bg-amber-900/10' :
+                                                            'bg-gray-50/50 dark:bg-slate-900/50'
                                                         }`}
                                                 >
                                                     <div className="flex items-center gap-3">
@@ -262,7 +352,7 @@ export const ManageProductModal = ({
                                                                         ...formData,
                                                                         authorizedTeamsByEnv: {
                                                                             ...formData.authorizedTeamsByEnv,
-                                                                            [env]: [...(formData.authorizedTeamsByEnv[lowerEnv] || [])]
+                                                                            [env]: [...(formData.authorizedTeamsByEnv[lowerEnv])]
                                                                         }
                                                                     });
                                                                 }}
@@ -279,8 +369,8 @@ export const ManageProductModal = ({
                                                         <TeamSearch
                                                             allTeams={allTeams}
                                                             selectedTeamIds={teamsInEnv}
-                                                            onToggleTeam={(id) => {
-                                                                const current = formData.authorizedTeamsByEnv[env] || [];
+                                                            onToggleTeam={(id: string) => {
+                                                                const current = formData.authorizedTeamsByEnv[env];
                                                                 if (current.includes(id)) {
                                                                     setFormData({
                                                                         ...formData,
@@ -320,12 +410,30 @@ export const ManageProductModal = ({
                         </button>
 
                         {/* Save Button (Always available if changes made, logic varies by tab) */}
-                        {((activeTab === 'metadata' && !isMetadataLocked) || activeTab === 'access') && (
+                        {((activeTab === 'metadata' && !isMetadataLocked) || (activeTab === 'access' && (isVisibilityChanged || isAccessChanged))) && (
                             <button
-                                onClick={() => onUpdate(formData)}
-                                className="px-8 py-4 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-900 dark:text-white hover:bg-gray-50 transition-all"
+                                onClick={handleSave}
+                                disabled={isRequestingApproval || (!isOwnerLead && activeTab === 'access')}
+                                className={`px-8 py-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${isRequestingApproval ? 'bg-gray-100 text-gray-400 cursor-wait' :
+                                    !isOwnerLead && activeTab === 'access' ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' :
+                                        requiresApproval
+                                            ? 'bg-amber-600 text-white shadow-lg shadow-amber-500/20 hover:bg-amber-700'
+                                            : 'bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-gray-900 dark:text-white hover:bg-gray-50'
+                                    }`}
                             >
-                                Save Changes
+                                {isRequestingApproval ? (
+                                    <>
+                                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                        </svg>
+                                        Processing...
+                                    </>
+                                ) : (
+                                    <>
+                                        {requiresApproval ? '🛡️ Request PROD Approval' : (!isOwnerLead && activeTab === 'access' ? '🔒 Lead Only' : 'Save Changes')}
+                                    </>
+                                )}
                             </button>
                         )}
 

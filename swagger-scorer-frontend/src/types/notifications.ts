@@ -1,6 +1,6 @@
 // Notification types and interfaces
 
-export type NotificationType = 'approval' | 'success' | 'warning' | 'info' | 'error';
+export type NotificationType = 'approval' | 'success' | 'warning' | 'info' | 'error' | 'governance';
 
 export interface Notification {
     id: string;

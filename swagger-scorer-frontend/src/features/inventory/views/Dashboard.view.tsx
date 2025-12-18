@@ -9,6 +9,7 @@ import { Select } from '../../../core/ui/Select';
 import { StatCard } from '../components/StatCard';
 import { ProductProducerCard } from '../components/ProductProducerCard';
 import { ProductConsumerCard } from '../components/ProductConsumerCard';
+import { canAccessProduct } from '../../../utils/productRoleDetection';
 
 /**
  * DashboardPage: The central command center for both API Producers and Consumers.
@@ -44,8 +45,8 @@ export const DashboardPage = () => {
     const [searchParams] = useSearchParams();
     const [activeTab, setActiveTab] = useState<'produced' | 'consumed' | 'admin' | 'approvals'>(() => {
         const tabParam = searchParams.get('tab');
-        if (tabParam && ['produced', 'consumed', 'admin', 'approvals'].includes(tabParam)) {
-            return tabParam as any;
+        if (tabParam === 'produced' || tabParam === 'consumed' || tabParam === 'admin' || tabParam === 'approvals') {
+            return tabParam;
         }
         return 'produced';
     });
@@ -66,7 +67,7 @@ export const DashboardPage = () => {
             displayName: `Enterprise ${['Core', 'Security', 'Data', 'Audit', 'Finance'][i % 5]} API ${i + 1}`,
             description: `Global administrative endpoint for ${['identity management', 'transaction auditing', 'real-time analytics', 'ledger synchronization', 'policy enforcement'][i % 5]} across all production gateways.`,
             version: `v${(i % 3) + 1}.0.${i % 10}`,
-            state: (i % 15 === 0 ? 'Review' : 'Published') as any,
+            state: (i % 15 === 0 ? 'Review' : 'Published'),
             ownerTeamId: i % 2 === 0 ? 'team-cloudops' : 'team-security',
             apis: Array.from({ length: (i % 8) + 1 }),
             qualityScore: 70 + (i % 30),
@@ -103,7 +104,7 @@ export const DashboardPage = () => {
         );
         return subscriptions.map(sub => {
             const product = allProducts.find(p => p.id === sub.productId);
-            if (!product) return null;
+            if (!product || !canAccessProduct(product, user)) return null;
             return { ...product, subscription: sub };
         }).filter((p): p is ProductWithSubscription => p !== null);
     }, [user, activeTeamId, allProducts, allSubscriptions]);
@@ -146,22 +147,24 @@ export const DashboardPage = () => {
         if (!searchQuery) return baseData;
         const query = searchQuery.toLowerCase();
 
-        return baseData.filter((item: any) => {
-            if ('displayName' in item) {
+        return baseData.filter((item) => {
+            if ('displayName' in item && 'ownerTeamId' in item) {
                 // Product
+                const product = item as Product;
                 return (
-                    item.displayName?.toLowerCase().includes(query) ||
-                    item.description?.toLowerCase().includes(query)
+                    product.displayName?.toLowerCase().includes(query) ||
+                    product.description?.toLowerCase().includes(query)
                 );
             }
             if ('type' in item && 'requester' in item) {
                 // ApprovalRequest
+                const approval = item as any; // Still using any for complex recursive objects for now but narrowing where possible
                 return (
-                    item.type.toLowerCase().includes(query) ||
-                    item.requester.name.toLowerCase().includes(query) ||
-                    item.requester.email.toLowerCase().includes(query) ||
-                    item.requester.teamName.toLowerCase().includes(query) ||
-                    item.details?.targetName?.toLowerCase().includes(query)
+                    approval.type.toLowerCase().includes(query) ||
+                    approval.requester.name.toLowerCase().includes(query) ||
+                    approval.requester.email.toLowerCase().includes(query) ||
+                    approval.requester.teamName.toLowerCase().includes(query) ||
+                    approval.details?.targetName?.toLowerCase().includes(query)
                 );
             }
             return false;
@@ -464,21 +467,21 @@ export const DashboardPage = () => {
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
-                            {paginatedItems.map((item: any) => (
+                            {paginatedItems.map((item) => (
                                 activeTab === 'consumed' ? (
                                     <ProductConsumerCard
-                                        key={item.id}
-                                        product={item}
-                                        isRevealed={item.subscription ? revealedKeys.has(item.subscription.id) : false}
-                                        onToggleReveal={() => item.subscription && handleToggleReveal(item.subscription.id)}
+                                        key={(item as ProductWithSubscription).id}
+                                        product={item as ProductWithSubscription}
+                                        isRevealed={(item as ProductWithSubscription).subscription ? revealedKeys.has((item as ProductWithSubscription).subscription!.id) : false}
+                                        onToggleReveal={() => (item as ProductWithSubscription).subscription && handleToggleReveal((item as ProductWithSubscription).subscription!.id)}
                                         onCopyKey={(key) => handleCopyKey(key)}
-                                        onClick={() => navigate(`/products/${item.id}`)}
+                                        onClick={() => navigate(`/products/${(item as ProductWithSubscription).id}`)}
                                     />
                                 ) : (
                                     <ProductProducerCard
-                                        key={item.id}
-                                        product={item}
-                                        onClick={() => navigate(`/products/${item.id}`)}
+                                        key={(item as Product).id}
+                                        product={item as Product}
+                                        onClick={() => navigate(`/products/${(item as Product).id}`)}
                                     />
                                 )
                             ))}

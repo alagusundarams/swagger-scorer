@@ -18,7 +18,7 @@
  * @module productRoleDetection
  */
 
-import type { Product, User, Subscription } from '../types/entities';
+import type { Product, User } from '../types/entities';
 
 /**
  * User's role in relation to a specific product
@@ -169,8 +169,7 @@ export function canManageProduct(
  */
 export function canAccessProduct(
     product: Product,
-    user: User | null,
-    subscriptions: Subscription[]
+    user: User | null
 ): boolean {
     // Public products are visible to everyone
     if (product.visibility === 'public') {
@@ -192,22 +191,15 @@ export function canAccessProduct(
         return false;
     }
 
-    // Private products: Check authorized teams
+    // Private products: Check authorized teams for the current environment
     if (product.visibility === 'private') {
-        const authorizedTeams = product.authorizedTeams || [];
+        const env = product.environment || 'PROD';
+        const authorizedTeams = product.authorizedTeamsByEnv?.[env] || [];
 
-        // User must be in an authorized team OR have active subscription
-        const isInAuthorizedTeam = user.teams.some(teamId =>
-            authorizedTeams.includes(teamId)
-        );
-
-        const hasActiveSubscription = subscriptions.some(sub =>
-            sub.productId === product.id &&
-            user.teams.includes(sub.subscriberTeamId) &&
-            sub.state === 'active'
-        );
-
-        return isInAuthorizedTeam || hasActiveSubscription;
+        // User must be in an authorized team for this environment
+        // NOTE: Strictly enforcing this means existing subscriptions for non-authorized teams
+        // will be effectively disabled right away for discovery and detail views.
+        return user.teams.some(teamId => authorizedTeams.includes(teamId));
     }
 
     // Default: allow access (fallback for undefined visibility)
@@ -223,7 +215,6 @@ export function canAccessProduct(
  * 
  * @param {Product[]} products - All products
  * @param {User | null} user - Current user
- * @param {Subscription[]} subscriptions - User's subscriptions
  * @returns {Product[]} Filtered list of accessible products
  * 
  * @example
@@ -231,18 +222,16 @@ export function canAccessProduct(
  * // In Dashboard
  * const accessibleProducts = filterAccessibleProducts(
  *   allProducts,
- *   currentUser,
- *   userSubscriptions
+ *   currentUser
  * );
  * ```
  */
 export function filterAccessibleProducts(
     products: Product[],
-    user: User | null,
-    subscriptions: Subscription[]
+    user: User | null
 ): Product[] {
     return products.filter(product =>
-        canAccessProduct(product, user, subscriptions)
+        canAccessProduct(product, user)
     );
 }
 

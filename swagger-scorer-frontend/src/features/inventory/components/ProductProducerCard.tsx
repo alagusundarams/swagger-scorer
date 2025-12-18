@@ -13,7 +13,6 @@ interface ProductProducerCardProps {
 export const ProductProducerCard: React.FC<ProductProducerCardProps> = ({
     product,
     onClick,
-    onManage,
 }) => {
     const score = product.qualityScore || 0;
 

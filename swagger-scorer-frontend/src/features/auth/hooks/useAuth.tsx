@@ -28,6 +28,7 @@ const MockAuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
         name: "Mock Developer",
         azureAdObjectId: "mock-azure-ad-id",
         teams: ['team-platform', 'team-payments', 'team-data'],
+        leadsTeams: ['team-platform', 'team-payments'], // Mocking lead status for these teams
         defaultTeamId: 'team-platform',
         role: 'admin', // Default to admin for easier dev testing of all features
         username: "mock@local.dev"
@@ -74,6 +75,7 @@ const MsalAuthAdapter: React.FC<{ children: ReactNode }> = ({ children }) => {
         name: account.name || "Unknown",
         azureAdObjectId: account.localAccountId,
         teams: claims?.groups || [],
+        leadsTeams: claims?.groups?.filter(g => g.includes('Lead')) || [], // Mock logic: group name contains Lead
         defaultTeamId: claims?.groups?.[0] || '',
         role: claims?.roles?.includes('Scorer.Admin') ? 'admin' : 'user',
         username: account.username

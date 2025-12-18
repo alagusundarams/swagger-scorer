@@ -20,6 +20,7 @@ export interface User {
     name: string;
     azureAdObjectId: string;
     teams: string[]; // Team IDs
+    leadsTeams: string[]; // Team IDs where user is a Lead/Architect
     defaultTeamId: string;
     role: 'user' | 'admin';
     username?: string; // Compatibility for MSAL

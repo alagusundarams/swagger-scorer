@@ -56,44 +56,56 @@ export const TeamSearch = ({ allTeams, selectedTeamIds, onToggleTeam }: TeamSear
                 </div>
             )}
 
-            {/* Search Input */}
-            <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <span className="text-gray-400">🔍</span>
+            {/* Search Input & Inline Results */}
+            <div className={`border-2 transition-all duration-300 overflow-hidden ${isFocused && searchTerm
+                    ? 'bg-white dark:bg-slate-800 border-blue-500 rounded-2xl shadow-lg'
+                    : 'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700 rounded-2xl'
+                }`}>
+                <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <span className="text-gray-400">🔍</span>
+                    </div>
+                    <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        onFocus={() => setIsFocused(true)}
+                        onBlur={() => setTimeout(() => setIsFocused(false), 200)} // Delay to allow click
+                        placeholder="Search teams by name (e.g. 'Payment', 'Platform')..."
+                        className="w-full pl-11 pr-4 py-4 bg-transparent border-none focus:outline-none transition-all font-medium text-sm text-gray-900 dark:text-white"
+                    />
                 </div>
-                <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    onFocus={() => setIsFocused(true)}
-                    onBlur={() => setTimeout(() => setIsFocused(false), 200)} // Delay to allow click
-                    placeholder="Search teams by name (e.g. 'Payment', 'Platform')..."
-                    className="w-full pl-11 pr-4 py-4 bg-white dark:bg-slate-800 border-2 border-gray-100 dark:border-slate-700 rounded-2xl focus:border-blue-500 focus:outline-none transition-all font-medium text-sm text-gray-900 dark:text-white"
-                />
 
-                {/* Dropdown Results */}
+                {/* Inline Results Area */}
                 {isFocused && searchTerm && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-700 overflow-hidden z-20 animate-fade-in">
+                    <div className="border-t border-gray-100 dark:border-slate-700 animate-slide-down">
                         {suggestions.length > 0 ? (
-                            suggestions.map(team => (
-                                <button
-                                    key={team.id}
-                                    onClick={() => {
-                                        onToggleTeam(team.id);
-                                        setSearchTerm('');
-                                    }}
-                                    className="w-full text-left px-6 py-4 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-3 group/item"
-                                >
-                                    <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-slate-900 flex items-center justify-center text-gray-500 group-hover/item:bg-blue-100 group-hover/item:text-blue-600">
-                                        🏢
-                                    </div>
-                                    <span className="text-sm font-bold text-gray-700 dark:text-slate-300 group-hover/item:text-blue-600">
-                                        {team.name.toUpperCase()}
-                                    </span>
-                                </button>
-                            ))
+                            <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                                {suggestions.map(team => (
+                                    <button
+                                        key={team.id}
+                                        onClick={() => {
+                                            onToggleTeam(team.id);
+                                            setSearchTerm('');
+                                        }}
+                                        className="w-full text-left px-6 py-4 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors flex items-center justify-between group/item"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-slate-900 flex items-center justify-center text-gray-500 group-hover/item:bg-blue-100 group-hover/item:text-blue-600 transition-colors">
+                                                🏢
+                                            </div>
+                                            <span className="text-sm font-bold text-gray-700 dark:text-slate-300 group-hover/item:text-blue-600">
+                                                {team.name.toUpperCase()}
+                                            </span>
+                                        </div>
+                                        <span className="text-[10px] font-black text-blue-500 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                                            ADD +
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
                         ) : (
-                            <div className="p-6 text-center text-gray-400 text-xs font-medium">
+                            <div className="p-6 text-center text-gray-400 text-xs font-medium italic">
                                 No teams found matching "{searchTerm}"
                             </div>
                         )}

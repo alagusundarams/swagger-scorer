@@ -65,7 +65,13 @@ type SubscriberPermission = 'read-only' | 'read-write';
  * />
  * ```
  */
-export const ProductDetailProducer = ({ product }: ProductDetailProducerProps) => {
+export const ProductDetailProducer = ({ product, user }: ProductDetailProducerProps) => {
+    const {
+        subscriptions: allSubscriptions,
+        teams: allTeams,
+        updateProduct,
+        addNotification
+    } = useStore();
     const navigate = useNavigate();
 
     // === Modal State ===
@@ -75,13 +81,12 @@ export const ProductDetailProducer = ({ product }: ProductDetailProducerProps) =
     const [modifyPermissionsModalOpen, setModifyPermissionsModalOpen] = useState(false);
     const [selectedSubscription, setSelectedSubscription] = useState<string | null>(null);
     const [newPermission, setNewPermission] = useState<SubscriberPermission>('read-only');
+    const [revocationReason, setRevocationReason] = useState('');
+    const [activeTab, setActiveTab] = useState<'subscribers' | 'apis' | 'audit'>('subscribers');
+    const [localToast, setLocalToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
 
-    // === Store Integration ===
-    /**
-     * Subscribe to specific slices of Zustand store
-     * Only subscribes to subscriptions and teams to minimize re-renders
-     */
-    const { subscriptions: allSubscriptions, teams: allTeams } = useStore();
+    // === Governance / Role Logic ===
+    const isOwnerLead = user?.leadsTeams.includes(product.ownerTeamId) || user?.role === 'admin';
 
     // === Memoized Computations ===
 
@@ -163,23 +168,30 @@ export const ProductDetailProducer = ({ product }: ProductDetailProducerProps) =
      * - Creates audit log entry
      */
     const confirmRevoke = useCallback(() => {
-        // TODO [BACKEND]: Implement actual revocation API call
-        // Example implementation:
-        // try {
-        //   await revokeSubscription(selectedSubscription, {
-        //     reason: 'Manual revocation by product owner',
-        //     notifyTeam: true
-        //   });
-        //   showToast('Access revoked successfully', 'success');
-        //   refetchSubscriptions();
-        // } catch (error) {
-        //   showToast('Failed to revoke access', 'error');
-        // }
+        if (!isOwnerLead) {
+            setLocalToast({ message: 'Authorization Denied: Only Team Leads can revoke access.', type: 'warning' });
+            return;
+        }
 
-        console.log('[TODO] Revoking subscription:', selectedSubscription);
+        // TODO [BACKEND]: Implement actual revocation API call
+        console.log('[TODO] Revoking subscription:', selectedSubscription, 'Reason:', revocationReason);
+
+        // Proactive Intimation
+        addNotification({
+            type: 'governance',
+            title: 'Critical: Access Revoked',
+            message: `Lead ${user.name} revoked access for a subscriber of ${product.displayName}. Reason: ${revocationReason}`,
+            navigateTo: '/'
+        });
+
+        // Show local feedback
+        setLocalToast({ message: `Access Revoked. Governance audit entry created.`, type: 'warning' });
+        setTimeout(() => setLocalToast(null), 3000);
+
         setRevokeModalOpen(false);
         setSelectedSubscription(null);
-    }, [selectedSubscription]);
+        setRevocationReason('');
+    }, [selectedSubscription, revocationReason, isOwnerLead, user.name, product.displayName, addNotification]);
 
     /**
      * Handle modify permissions action
@@ -221,6 +233,21 @@ export const ProductDetailProducer = ({ product }: ProductDetailProducerProps) =
     }, [selectedSubscription, newPermission]);
 
     /**
+     * Handle product metadata and governance updates
+     * 
+     * **Flow**:
+     * 1. Receive updated data from ManageProductModal
+     * 2. Dispatch updateProduct to store
+     * 3. Close modal
+     * 
+     * @param {Partial<Product>} data - Updated product data
+     */
+    const handleUpdateProduct = useCallback((data: Partial<Product>) => {
+        updateProduct(product.id, data);
+        setIsManageModalOpen(false);
+    }, [product.id, updateProduct]);
+
+    /**
      * Navigate to API detail page
      * 
      * **Memoized**: Prevents recreation on every render
@@ -252,11 +279,30 @@ export const ProductDetailProducer = ({ product }: ProductDetailProducerProps) =
                 ============================================ */}
             <div className="mb-8">
                 <div className="flex items-center justify-between mb-4">
-                    <div>
-                        <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-2">
-                            {product.displayName}
-                        </h1>
-                        <p className="text-gray-600 dark:text-slate-400">{product.description}</p>
+                    <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-3xl shadow-xl shadow-blue-500/10">
+                            📦
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-3">
+                                <h1 className="text-3xl font-black text-gray-900 dark:text-white">
+                                    {product.displayName}
+                                </h1>
+                                <span className="bg-gray-100 dark:bg-slate-900 px-2 py-1 rounded text-[10px] font-black text-gray-400 uppercase tracking-widest border border-gray-100 dark:border-slate-800">
+                                    V{product.version}
+                                </span>
+                                {/* Visibility Badge */}
+                                <span className={`px-2 py-1 text-[10px] font-black rounded-lg border uppercase ${product.visibility === 'private'
+                                    ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                                    : product.visibility === 'owner-only'
+                                        ? 'bg-red-500/10 text-red-500 border-red-500/20'
+                                        : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                                    }`}>
+                                    {product.visibility || 'public'}
+                                </span>
+                            </div>
+                            <p className="text-gray-600 dark:text-slate-400 mt-1">{product.description}</p>
+                        </div>
                     </div>
                     <div className="flex items-center gap-4">
                         {/* Environment Badge */}
@@ -334,248 +380,350 @@ export const ProductDetailProducer = ({ product }: ProductDetailProducerProps) =
                 </div>
             </div>
 
+            {/* Tab Navigation */}
+            <div className="flex border-b border-gray-100 dark:border-slate-800 mb-8">
+                {[
+                    { id: 'subscribers', label: 'Subscribers' },
+                    { id: 'apis', label: 'API Inventory' },
+                    { id: 'audit', label: 'Audit Log' }
+                ].map(tab => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id as any)}
+                        className={`py-4 px-6 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === tab.id
+                            ? 'border-blue-600 text-blue-600'
+                            : 'border-transparent text-gray-400 hover:text-gray-600'
+                            }`}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
+
             {/* ============================================
-                ALL SUBSCRIBERS: Complete list with actions
+                TAB CONTENT
                 ============================================ */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-slate-700 mb-8">
-                <h2 className="text-xl font-black text-gray-900 dark:text-white mb-4">All Subscribers</h2>
-                {productSubscriptions.length > 0 ? (
-                    <div className="space-y-3">
-                        {productSubscriptions.map((subscription) => {
-                            // Join with teams data for display
-                            const team = allTeams.find(t => t.id === subscription.subscriberTeamId);
-                            const isMenuOpen = selectedSubscriberMenu === subscription.id;
+            {activeTab === 'subscribers' && (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-slate-700 mb-8 animate-fade-in">
+                    <h2 className="text-xl font-black text-gray-900 dark:text-white mb-4">All Subscribers</h2>
+                    {productSubscriptions.length > 0 ? (
+                        <div className="space-y-3">
+                            {productSubscriptions.map((subscription) => {
+                                // Join with teams data for display
+                                const team = allTeams.find(t => t.id === subscription.subscriberTeamId);
+                                const isMenuOpen = selectedSubscriberMenu === subscription.id;
 
-                            return (
-                                <div key={subscription.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-900 rounded-lg">
-                                    {/* Team Info */}
-                                    <div className="flex-1">
-                                        <div className="font-semibold text-gray-900 dark:text-white">
-                                            {team?.name || subscription.subscriberTeamId}
+                                return (
+                                    <div key={subscription.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-900 rounded-lg">
+                                        {/* Team Info */}
+                                        <div className="flex-1">
+                                            <div className="font-semibold text-gray-900 dark:text-white">
+                                                {team?.name || subscription.subscriberTeamId}
+                                            </div>
+                                            <div className="text-xs text-gray-500 dark:text-slate-500">
+                                                {team?.description || 'Team'} • Subscribed {new Date(subscription.createdAt).toLocaleDateString()}
+                                            </div>
                                         </div>
-                                        <div className="text-xs text-gray-500 dark:text-slate-500">
-                                            {team?.description || 'Team'} • Subscribed {new Date(subscription.createdAt).toLocaleDateString()}
-                                        </div>
-                                    </div>
 
-                                    {/* Status Badge & Actions */}
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-xs font-semibold px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
-                                            {subscription.state}
-                                        </span>
+                                        {/* Status Badge & Actions */}
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-xs font-semibold px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
+                                                {subscription.state}
+                                            </span>
 
-                                        {/* Actions Dropdown */}
-                                        <div className="relative">
-                                            <button
-                                                onClick={() => setSelectedSubscriberMenu(isMenuOpen ? null : subscription.id)}
-                                                className="p-2 hover:bg-gray-200 dark:hover:bg-slate-700 rounded transition"
-                                                aria-label="Subscriber actions menu"
-                                                aria-haspopup="true"
-                                                aria-expanded={isMenuOpen}
-                                            >
-                                                <svg className="w-5 h-5 text-gray-600 dark:text-slate-400" fill="currentColor" viewBox="0 0 20 20">
-                                                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                                                </svg>
-                                            </button>
-
-                                            {/* Dropdown Menu - Only real actions */}
-                                            {isMenuOpen && (
-                                                <div
-                                                    className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-gray-200 dark:border-slate-700 z-10"
-                                                    role="menu"
+                                            {/* Actions Dropdown */}
+                                            <div className="relative">
+                                                <button
+                                                    onClick={() => setSelectedSubscriberMenu(isMenuOpen ? null : subscription.id)}
+                                                    className="p-2 hover:bg-gray-200 dark:hover:bg-slate-700 rounded transition"
+                                                    aria-label="Subscriber actions menu"
+                                                    aria-haspopup="true"
+                                                    aria-expanded={isMenuOpen}
                                                 >
-                                                    <button
-                                                        onClick={() => handleModifyPermissions(subscription.id)}
-                                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-t-lg transition"
-                                                        role="menuitem"
+                                                    <svg className="w-5 h-5 text-gray-600 dark:text-slate-400" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                                    </svg>
+                                                </button>
+
+                                                {/* Dropdown Menu - Only real actions */}
+                                                {isMenuOpen && (
+                                                    <div
+                                                        className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-gray-200 dark:border-slate-700 z-10"
+                                                        role="menu"
                                                     >
-                                                        Modify Permissions
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleRevokeAccess(subscription.id)}
-                                                        className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-b-lg transition"
-                                                        role="menuitem"
-                                                    >
-                                                        Revoke Access
-                                                    </button>
-                                                </div>
-                                            )}
+                                                        {isOwnerLead ? (
+                                                            <>
+                                                                <button
+                                                                    onClick={() => handleModifyPermissions(subscription.id)}
+                                                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-t-lg transition"
+                                                                    role="menuitem"
+                                                                >
+                                                                    Modify Permissions
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleRevokeAccess(subscription.id)}
+                                                                    className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-b-lg transition"
+                                                                    role="menuitem"
+                                                                >
+                                                                    Revoke Access
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            <div className="px-4 py-3 bg-gray-50 dark:bg-slate-900 rounded-lg">
+                                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-relaxed">
+                                                                    🔒 Governance Locked
+                                                                </p>
+                                                                <p className="text-[9px] text-gray-500 font-medium mt-1 leading-relaxed">
+                                                                    Only Team Leads can modify subscriptions.
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                ) : (
-                    <p className="text-gray-500 dark:text-slate-500 text-center py-8">
-                        No subscribers yet. Share your API to get started.
-                    </p>
-                )}
-            </div>
-
-            {/* ============================================
-                API LIST: All APIs in this product
-                ============================================ */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-slate-700">
-                <h2 className="text-xl font-black text-gray-900 dark:text-white mb-4">APIs in this Product</h2>
-                <div className="space-y-3">
-                    {product.apis.map((api) => (
-                        <div
-                            key={api.id}
-                            onClick={() => navigateToAPI(api.id)}
-                            className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-900 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer transition"
-                            role="button"
-                            tabIndex={0}
-                            onKeyPress={(e) => e.key === 'Enter' && navigateToAPI(api.id)}
-                            aria-label={`View details for ${api.displayName}`}
-                        >
-                            {/* API Info */}
-                            <div className="flex-1">
-                                <div className="font-semibold text-gray-900 dark:text-white">{api.displayName}</div>
-                                <div className="text-xs text-gray-500 dark:text-slate-500">{api.description}</div>
-                                <div className="text-xs text-gray-400 dark:text-slate-600 mt-1">
-                                    {api.operations.length} operations
-                                </div>
-                            </div>
-
-                            {/* Quality Score & Analyze Button */}
-                            <div className="flex items-center gap-3">
-                                {api.qualityScore && (
-                                    <div className={`text-sm font-bold ${getScoreColor(api.qualityScore)}`}>
-                                        {api.qualityScore}%
-                                    </div>
-                                )}
-                                <button
-                                    onClick={(e) => navigateToAnalyzer(e, api.id)}
-                                    className="px-3 py-1.5 text-xs font-semibold bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition flex items-center gap-1.5"
-                                    aria-label={`Analyze ${api.displayName}`}
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                        <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
-                                    </svg>
-                                    Analyze
-                                </button>
-                            </div>
+                                );
+                            })}
                         </div>
-                    ))}
+                    ) : (
+                        <p className="text-gray-500 dark:text-slate-500 text-center py-8">
+                            No subscribers yet. Share your API to get started.
+                        </p>
+                    )}
                 </div>
-            </div>
+            )}
+
+            {activeTab === 'apis' && (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-slate-700 animate-fade-in">
+                    <h2 className="text-xl font-black text-gray-900 dark:text-white mb-4">APIs in this Product</h2>
+                    <div className="space-y-3">
+                        {product.apis.map((api) => (
+                            <div
+                                key={api.id}
+                                onClick={() => navigateToAPI(api.id)}
+                                className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-900 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer transition"
+                                role="button"
+                                tabIndex={0}
+                                onKeyPress={(e) => e.key === 'Enter' && navigateToAPI(api.id)}
+                                aria-label={`View details for ${api.displayName}`}
+                            >
+                                {/* API Info */}
+                                <div className="flex-1">
+                                    <div className="font-semibold text-gray-900 dark:text-white">{api.displayName}</div>
+                                    <div className="text-xs text-gray-500 dark:text-slate-500">{api.description}</div>
+                                    <div className="text-xs text-gray-400 dark:text-slate-600 mt-1">
+                                        {api.operations.length} operations
+                                    </div>
+                                </div>
+
+                                {/* Quality Score & Analyze Button */}
+                                <div className="flex items-center gap-3">
+                                    {api.qualityScore && (
+                                        <div className={`text-sm font-bold ${getScoreColor(api.qualityScore)}`}>
+                                            {api.qualityScore}%
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={(e) => navigateToAnalyzer(e, api.id)}
+                                        className="px-3 py-1.5 text-xs font-semibold bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition flex items-center gap-1.5"
+                                        aria-label={`Analyze ${api.displayName}`}
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+                                        </svg>
+                                        Analyze
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'audit' && (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-lg border border-gray-100 dark:border-slate-700 animate-fade-in">
+                    <div className="flex items-center justify-between mb-8">
+                        <div>
+                            <h2 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-widest">Governance Audit Log</h2>
+                            <p className="text-xs text-slate-500 font-medium mt-1">Immutable record of all access and lifecycle events</p>
+                        </div>
+                        <button className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:underline">Export CSV</button>
+                    </div>
+
+                    <div className="space-y-4">
+                        {[
+                            { date: '2025-12-18 14:30', user: 'Admin User', event: 'Visibility Changed', details: 'Public → Private', impact: 'Medium' },
+                            { date: '2025-12-17 09:15', user: 'System', event: 'Team Authorized', details: 'CloudOps added to PROD', impact: 'Low' },
+                            { date: '2025-12-16 16:45', user: 'Product Owner', event: 'Access Revoked', details: 'Team-Alpha revoked (Breach of terms)', impact: 'High' }
+                        ].map((log, i) => (
+                            <div key={i} className="flex items-center gap-6 p-4 bg-gray-50 dark:bg-slate-900/50 rounded-xl border border-gray-100 dark:border-slate-800 group hover:border-blue-500/30 transition-all">
+                                <div className="text-[10px] font-mono text-slate-400 w-32 shrink-0">{log.date}</div>
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-3 mb-1">
+                                        <span className="text-[10px] font-black text-gray-900 dark:text-white uppercase tracking-wider">{log.event}</span>
+                                        <span className={`px-2 py-0.5 rounded-[4px] text-[8px] font-black uppercase tracking-widest ${log.impact === 'High' ? 'bg-red-500/10 text-red-500' : log.impact === 'Medium' ? 'bg-amber-500/10 text-amber-500' : 'bg-blue-500/10 text-blue-500'
+                                            }`}>
+                                            {log.impact} Impact
+                                        </span>
+                                    </div>
+                                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                                        {log.details} • Modified by <span className="text-slate-900 dark:text-slate-200 font-bold">{log.user}</span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-blue-500 transition-colors">📄</button>
+                                    <button className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:underline">Details</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Floating Local Toast */}
+            {localToast && (
+                <div className={`fixed bottom-8 right-8 p-4 rounded-2xl border shadow-2xl flex items-center gap-3 animate-slide-up z-[100] ${localToast.type === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-amber-50 border-amber-100 text-amber-700'
+                    }`}>
+                    <span className="text-xl">{localToast.type === 'success' ? '✨' : '⚠️'}</span>
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest opacity-60">System Notification</p>
+                        <p className="text-xs font-bold uppercase tracking-widest">{localToast.message}</p>
+                    </div>
+                </div>
+            )}
 
             {/* ============================================
                 MODALS: Revoke, Modify Permissions, Manage Product
                 ============================================ */}
 
             {/* Revoke Access Confirmation Modal */}
-            {revokeModalOpen && (
-                <div
-                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-                    role="dialog"
-                    aria-modal="true"
-                    aria-labelledby="revoke-modal-title"
-                >
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
-                        <h3 id="revoke-modal-title" className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-                            Revoke Access?
-                        </h3>
-                        <p className="text-gray-600 dark:text-slate-400 mb-6">
-                            This will immediately disable API keys and remove access to all {product.apis.length} APIs in this product.
-                            The team will be notified.
-                        </p>
-                        <div className="flex gap-3 justify-end">
-                            <button
-                                onClick={() => setRevokeModalOpen(false)}
-                                className="px-4 py-2 bg-gray-100 dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600 transition"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={confirmRevoke}
-                                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
-                            >
-                                Revoke Access
-                            </button>
+            {
+                revokeModalOpen && (
+                    <div
+                        className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="revoke-modal-title"
+                    >
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+                            <h3 id="revoke-modal-title" className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                                Revoke Access?
+                            </h3>
+                            <p className="text-gray-600 dark:text-slate-400 mb-6">
+                                This will immediately disable API keys and remove access to all {product.apis.length} APIs in this product.
+                                The team will be notified.
+                            </p>
+                            <div className="mb-6">
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Reason for Revocation</label>
+                                <textarea
+                                    value={revocationReason}
+                                    onChange={(e) => setRevocationReason(e.target.value)}
+                                    placeholder="e.g., Compliance breach, Project termination..."
+                                    className="w-full p-4 rounded-xl bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 text-sm focus:ring-2 focus:ring-red-500/20 outline-none h-24 resize-none"
+                                />
+                            </div>
+                            <div className="flex gap-3 justify-end">
+                                <button
+                                    onClick={() => setRevokeModalOpen(false)}
+                                    className="px-4 py-2 bg-gray-100 dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600 transition font-bold text-xs"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmRevoke}
+                                    disabled={!revocationReason.trim()}
+                                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-bold text-xs disabled:opacity-50"
+                                >
+                                    Revoke Access
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Modify Permissions Modal */}
-            {modifyPermissionsModalOpen && (
-                <div
-                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-                    role="dialog"
-                    aria-modal="true"
-                    aria-labelledby="permissions-modal-title"
-                >
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
-                        <h3 id="permissions-modal-title" className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-                            Modify Permissions
-                        </h3>
-                        <p className="text-gray-600 dark:text-slate-400 mb-4">
-                            Change access level for this subscriber.
-                        </p>
+            {
+                modifyPermissionsModalOpen && (
+                    <div
+                        className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="permissions-modal-title"
+                    >
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+                            <h3 id="permissions-modal-title" className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                                Modify Permissions
+                            </h3>
+                            <p className="text-gray-600 dark:text-slate-400 mb-4">
+                                Change access level for this subscriber.
+                            </p>
 
-                        <div className="space-y-3 mb-6">
-                            <label className="flex items-center p-3 border border-gray-200 dark:border-slate-700 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-900 transition">
-                                <input
-                                    type="radio"
-                                    name="permission"
-                                    value="read-only"
-                                    checked={newPermission === 'read-only'}
-                                    onChange={(e) => setNewPermission(e.target.value as SubscriberPermission)}
-                                    className="mr-3"
-                                />
-                                <div>
-                                    <div className="font-semibold text-gray-900 dark:text-white">Read Only</div>
-                                    <div className="text-xs text-gray-500 dark:text-slate-500">Can view documentation and make API calls</div>
-                                </div>
-                            </label>
+                            <div className="space-y-3 mb-6">
+                                <label className="flex items-center p-3 border border-gray-200 dark:border-slate-700 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-900 transition">
+                                    <input
+                                        type="radio"
+                                        name="permission"
+                                        value="read-only"
+                                        checked={newPermission === 'read-only'}
+                                        onChange={(e) => setNewPermission(e.target.value as SubscriberPermission)}
+                                        className="mr-3"
+                                    />
+                                    <div>
+                                        <div className="font-semibold text-gray-900 dark:text-white">Read Only</div>
+                                        <div className="text-xs text-gray-500 dark:text-slate-500">Can view documentation and make API calls</div>
+                                    </div>
+                                </label>
 
-                            <label className="flex items-center p-3 border border-gray-200 dark:border-slate-700 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-900 transition">
-                                <input
-                                    type="radio"
-                                    name="permission"
-                                    value="read-write"
-                                    checked={newPermission === 'read-write'}
-                                    onChange={(e) => setNewPermission(e.target.value as SubscriberPermission)}
-                                    className="mr-3"
-                                />
-                                <div>
-                                    <div className="font-semibold text-gray-900 dark:text-white">Read-Write</div>
-                                    <div className="text-xs text-gray-500 dark:text-slate-500">Can make all API calls including modifications</div>
-                                </div>
-                            </label>
-                        </div>
+                                <label className="flex items-center p-3 border border-gray-200 dark:border-slate-700 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-900 transition">
+                                    <input
+                                        type="radio"
+                                        name="permission"
+                                        value="read-write"
+                                        checked={newPermission === 'read-write'}
+                                        onChange={(e) => setNewPermission(e.target.value as SubscriberPermission)}
+                                        className="mr-3"
+                                    />
+                                    <div>
+                                        <div className="font-semibold text-gray-900 dark:text-white">Read-Write</div>
+                                        <div className="text-xs text-gray-500 dark:text-slate-500">Can make all API calls including modifications</div>
+                                    </div>
+                                </label>
+                            </div>
 
-                        <div className="flex gap-3 justify-end">
-                            <button
-                                onClick={() => setModifyPermissionsModalOpen(false)}
-                                className="px-4 py-2 bg-gray-100 dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600 transition"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={confirmModifyPermissions}
-                                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
-                            >
-                                Save Changes
-                            </button>
+                            <div className="flex gap-3 justify-end">
+                                <button
+                                    onClick={() => setModifyPermissionsModalOpen(false)}
+                                    className="px-4 py-2 bg-gray-100 dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600 transition"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmModifyPermissions}
+                                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+                                >
+                                    Save Changes
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Manage Product Modal */}
-            {isManageModalOpen && (
-                <ManageProductModal
-                    product={product}
-                    isOpen={isManageModalOpen}
-                    onClose={() => setIsManageModalOpen(false)}
-                    currentStage="DEV"
-                    onPromote={() => { }}
-                    onUpdate={() => { }}
-                />
-            )}
-        </div>
+            {
+                isManageModalOpen && (
+                    <ManageProductModal
+                        product={product}
+                        isOpen={isManageModalOpen}
+                        onClose={() => setIsManageModalOpen(false)}
+                        currentStage="DEV" // TODO: Connect to actual product stage
+                        onPromote={() => { }} // TODO: Implement promotion logic
+                        onUpdate={handleUpdateProduct}
+                    />
+                )
+            }
+        </div >
     );
 };

@@ -26,13 +26,12 @@ interface AppState {
     updateSubscription: (id: string, updates: Partial<Subscription>, getToken?: () => Promise<string | null>) => Promise<void>;
     addSubscription: (productId: string, teamId: string, getToken?: () => Promise<string | null>) => Promise<void>;
 
-    // Notification Actions
+    processApproval: (id: string, decision: 'APPROVE' | 'REJECT', getToken?: () => Promise<string | null>) => Promise<void>;
     setNotifications: (notifications: Notification[]) => void;
     markNotificationAsRead: (id: string) => void;
     markAllNotificationsAsRead: () => void;
-
-    processApproval: (id: string, decision: 'APPROVE' | 'REJECT', getToken?: () => Promise<string | null>) => Promise<void>;
-
+    updateProduct: (id: string, updates: Partial<Product>) => void;
+    addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => void;
     logout: () => void;
 }
 
@@ -63,6 +62,15 @@ export const useStore = create<AppState>((set) => ({
             // Notifications = status updates about YOUR submissions/actions
             // NOT duplicate of Approvals tab (which shows work YOU must do)
             const mockNotifications: Notification[] = [
+                {
+                    id: 'notif-0',
+                    type: 'governance',
+                    title: 'Privacy Violation Prevented',
+                    message: 'Automatic lockout triggered: Consumer Team "Alpha" attempted to access private product "Payments Core v2". Access successfully denied.',
+                    timestamp: 'Just now',
+                    read: false,
+                    navigateTo: '/'
+                },
                 {
                     id: 'notif-1',
                     type: 'success',
@@ -141,7 +149,7 @@ export const useStore = create<AppState>((set) => ({
         }
     },
 
-    addSubscription: async (productId: string, teamId: string, getToken) => {
+    addSubscription: async (productId: string, teamId: string, getToken?: () => Promise<string | null>) => {
         if (!getToken) return;
         try {
             const token = await getToken();
@@ -159,7 +167,7 @@ export const useStore = create<AppState>((set) => ({
 
     approvalRequests: [],
 
-    processApproval: async (id: string, decision: 'APPROVE' | 'REJECT', getToken) => {
+    processApproval: async (id: string, decision: 'APPROVE' | 'REJECT', getToken?: () => Promise<string | null>) => {
         const newStatus = decision === 'APPROVE' ? 'APPROVED' : 'REJECTED';
 
         // Optimistic Update
@@ -192,6 +200,19 @@ export const useStore = create<AppState>((set) => ({
         notifications: state.notifications.map((n: Notification) => ({ ...n, read: true }))
     })),
 
+    updateProduct: (id: string, updates: Partial<Product>) => set((state: AppState) => ({
+        products: state.products.map(p => p.id === id ? { ...p, ...updates } : p)
+    })),
+    addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => set((state: AppState) => ({
+        notifications: [
+            {
+                ...notification,
+                id: `notif-${Math.random().toString(36).substr(2, 9)}`,
+                timestamp: 'Just now',
+                read: false
+            },
+            ...state.notifications
+        ]
+    })),
     logout: () => set({ user: null, activeTeamId: 'all', notifications: [] }),
 }));
-

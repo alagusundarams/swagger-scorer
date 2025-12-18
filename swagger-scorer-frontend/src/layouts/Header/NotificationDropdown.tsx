@@ -50,6 +50,12 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 );
+            case 'governance':
+                return (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                );
             default:
                 return (
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -60,13 +66,13 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
     };
 
     return (
-        <div className="absolute right-0 mt-2 w-96 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 max-h-[500px] overflow-hidden">
+        <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-800 z-50 max-h-[500px] overflow-hidden animate-fade-in scale-100">
             {/* Header */}
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+            <div className="p-4 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between bg-gray-50/50 dark:bg-slate-800/50 backdrop-blur-sm">
                 <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-gray-900">Notifications</h3>
+                    <h3 className="font-black text-[10px] uppercase tracking-widest text-gray-500 dark:text-slate-400">Notifications</h3>
                     {unreadCount > 0 && (
-                        <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                        <span className="bg-blue-600 text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full">
                             {unreadCount}
                         </span>
                     )}
@@ -82,7 +88,7 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
             </div>
 
             {/* Notifications List */}
-            <div className="overflow-y-auto max-h-[400px]">
+            <div className="overflow-y-auto max-h-[400px] bg-white dark:bg-slate-900">
                 {notifications.length === 0 ? (
                     <div className="p-8 text-center">
                         <svg className="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -96,16 +102,17 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                         <div
                             key={notification.id}
                             onClick={() => handleNotificationClick(notification)}
-                            className={`p-4 border-b border-gray-100 hover:bg-blue-50 cursor-pointer transition-colors group ${!notification.read ? 'bg-blue-50/50' : ''
+                            className={`p-4 border-b border-gray-100 dark:border-slate-800/50 hover:bg-gray-50 dark:hover:bg-slate-800/50 cursor-pointer transition-all group ${!notification.read ? 'bg-blue-50/20 dark:bg-blue-900/10' : ''
                                 }`}
                         >
                             <div className="flex gap-3">
                                 {/* Icon */}
-                                <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${notification.type === 'approval' ? 'bg-amber-100 text-amber-600' :
-                                    notification.type === 'success' ? 'bg-green-100 text-green-600' :
-                                        notification.type === 'warning' ? 'bg-orange-100 text-orange-600' :
-                                            notification.type === 'error' ? 'bg-red-100 text-red-600' :
-                                                'bg-blue-100 text-blue-600'
+                                <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 ${notification.type === 'approval' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' :
+                                    notification.type === 'success' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' :
+                                        notification.type === 'warning' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400' :
+                                            notification.type === 'error' ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' :
+                                                notification.type === 'governance' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' :
+                                                    'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
                                     }`}>
                                     {getIcon(notification.type)}
                                 </div>
@@ -142,19 +149,19 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
             {/* Footer */}
             {
                 notifications.length > 0 && (
-                    <div className="p-2 border-t border-gray-200 bg-gray-50">
+                    <div className="p-3 border-t border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 backdrop-blur-sm">
                         <button
                             onClick={() => {
-                                navigate('/notifications');
+                                navigate('/'); // Temporarily to dashboard as dedicated notifications page might not exist
                                 onClose();
                             }}
-                            className="w-full text-center text-sm text-blue-600 hover:text-blue-800 font-medium py-2 rounded-lg hover:bg-blue-50 transition-colors"
+                            className="w-full text-center text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-500 transition-colors"
                         >
-                            View all notifications
+                            View All Events
                         </button>
                     </div>
                 )
             }
-        </div >
+        </div>
     );
 };
