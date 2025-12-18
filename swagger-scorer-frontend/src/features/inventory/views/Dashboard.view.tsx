@@ -173,8 +173,7 @@ export const DashboardPage = () => {
             return [
                 { label: 'Total Products', value: myProducts.length, icon: '📦' },
                 { label: 'Avg Quality Score', value: `${Math.round(myProducts.reduce((acc, p) => acc + (p.qualityScore || 0), 0) / (myProducts.length || 1))}%`, icon: '📈' },
-                { label: 'Active Subscribers', value: myProducts.reduce((acc, p) => acc + (p.subscriberCount || 0), 0), icon: '👥' },
-                { label: 'System Health', value: '98%', icon: '🛡️', trend: { value: '2%', isPositive: true } }
+                { label: 'Active Subscribers', value: myProducts.reduce((acc, p) => acc + (p.subscriberCount || 0), 0), icon: '👥' }
             ];
         }
         if (activeTab === 'admin') {
