@@ -9,8 +9,6 @@
       "DOM.Iterable"
     ],
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "noEmit": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "strict": true,
@@ -19,7 +17,8 @@
     "noFallthroughCasesInSwitch": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "noEmit": true
   },
   "include": [
     "src"

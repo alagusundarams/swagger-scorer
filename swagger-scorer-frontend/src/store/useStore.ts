@@ -1,38 +1,159 @@
 import { create } from 'zustand';
-import { User } from '../mocks';
+import { type Product, type Subscription, type Team, type User, type ApprovalRequest } from '../types/entities';
 import type { Notification } from '../types/notifications';
+import { getProducts, getTeams, getSubscriptions, requestProductAccess, updateSubscription as apiUpdateSubscription, getApprovals, updateApproval } from '../features/analyzer/api/client';
 
 interface AppState {
+    // Auth & Identity
     user: User | null;
     activeTeamId: string;
+
+    // Core Data (Isolated in Store)
+    products: Product[];
+    subscriptions: Subscription[];
+    teams: Team[];
+    approvalRequests: ApprovalRequest[];
+
+    // UI & Feedback
     notifications: Notification[];
+
+    // Actions
     setUser: (user: User | null) => void;
     setActiveTeamId: (id: string) => void;
+
+    // Data Actions
+    fetchInitialData: (getToken?: () => Promise<string | null>) => Promise<void>;
+    updateSubscription: (id: string, updates: Partial<Subscription>, getToken?: () => Promise<string | null>) => Promise<void>;
+    addSubscription: (productId: string, teamId: string, getToken?: () => Promise<string | null>) => Promise<void>;
+
+    // Notification Actions
     setNotifications: (notifications: Notification[]) => void;
     markNotificationAsRead: (id: string) => void;
     markAllNotificationsAsRead: () => void;
+
+    processApproval: (id: string, decision: 'APPROVE' | 'REJECT', getToken?: () => Promise<string | null>) => Promise<void>;
+
     logout: () => void;
 }
 
 export const useStore = create<AppState>((set) => ({
-    user: null, // Start null, SSO login will set this via setUser()
+    user: null,
     activeTeamId: 'all',
-    notifications: [], // Start empty, will be fetched after login
 
-    setUser: (user) => set({ user }),
-    setActiveTeamId: (activeTeamId) => set({ activeTeamId }),
+    products: [],
+    subscriptions: [],
+    teams: [],
 
-    setNotifications: (notifications) => set({ notifications }),
+    notifications: [],
 
-    markNotificationAsRead: (id) => set((state) => ({
-        notifications: state.notifications.map(n =>
+    setUser: (user: User | null) => set({ user }),
+    setActiveTeamId: (activeTeamId: string) => set({ activeTeamId }),
+
+    fetchInitialData: async (getToken) => {
+        try {
+            const [productsRes, teamsRes, approvalsRes] = await Promise.all([
+                getProducts(),
+                getTeams(),
+                getApprovals()
+            ]);
+
+            const allTeams = teamsRes.data;
+            set({ products: productsRes.data, teams: allTeams, approvalRequests: approvalsRes.data });
+
+            // Map user teams (Group IDs) to Team Entity IDs if not already mapped
+            set((state: AppState) => {
+                if (state.user) {
+                    const mappedTeamIds = state.user.teams.map(groupIdOrId => {
+                        const team = allTeams.find(t => t.azureAdGroupId === groupIdOrId || t.id === groupIdOrId);
+                        return team ? team.id : groupIdOrId;
+                    });
+                    return { user: { ...state.user, teams: mappedTeamIds } };
+                }
+                return {};
+            });
+
+            if (getToken) {
+                const token = await getToken();
+                if (token) {
+                    const subsRes = await getSubscriptions(token);
+                    set({ subscriptions: subsRes.data });
+                }
+            }
+        } catch (error) {
+            console.error("Failed to fetch initial data", error);
+        }
+    },
+
+    updateSubscription: async (id: string, updates: Partial<Subscription>, getToken) => {
+        // Optimistic update
+        set((state: AppState) => ({
+            subscriptions: state.subscriptions.map((s: Subscription) => s.id === id ? { ...s, ...updates } : s)
+        }));
+
+        if (getToken && updates.state && (updates.state === 'active' || updates.state === 'rejected')) {
+            try {
+                const token = await getToken();
+                if (token) {
+                    await apiUpdateSubscription(id, updates.state, token);
+                }
+            } catch (error) {
+                console.error("Failed to update subscription", error);
+                // Revert optimistic update (todo: proper rollback)
+            }
+        }
+    },
+
+    addSubscription: async (productId: string, teamId: string, getToken) => {
+        if (!getToken) return;
+        try {
+            const token = await getToken();
+            if (token) {
+                const response = await requestProductAccess(productId, teamId, token);
+                const sub = response.data;
+                set((state: AppState) => ({
+                    subscriptions: [sub, ...state.subscriptions]
+                }));
+            }
+        } catch (error) {
+            console.error("Failed to add subscription", error);
+        }
+    },
+
+    approvalRequests: [],
+
+    processApproval: async (id: string, decision: 'APPROVE' | 'REJECT', getToken) => {
+        const newStatus = decision === 'APPROVE' ? 'APPROVED' : 'REJECTED';
+
+        // Optimistic Update
+        set((state: AppState) => ({
+            approvalRequests: state.approvalRequests.map(r => r.id === id ? { ...r, status: newStatus } : r)
+        }));
+
+        if (getToken) {
+            try {
+                const token = await getToken();
+                if (token) {
+                    await updateApproval(id, newStatus, token);
+                }
+            } catch (error) {
+                console.error("Failed to process approval", error);
+                // Revert optimistic update could be added here
+            }
+        }
+    },
+
+    setNotifications: (notifications: Notification[]) => set({ notifications }),
+
+    markNotificationAsRead: (id: string) => set((state: AppState) => ({
+        notifications: state.notifications.map((n: Notification) =>
             n.id === id ? { ...n, read: true } : n
         )
     })),
 
-    markAllNotificationsAsRead: () => set((state) => ({
-        notifications: state.notifications.map(n => ({ ...n, read: true }))
+    markAllNotificationsAsRead: () => set((state: AppState) => ({
+        notifications: state.notifications.map((n: Notification) => ({ ...n, read: true }))
     })),
 
     logout: () => set({ user: null, activeTeamId: 'all', notifications: [] }),
 }));
+

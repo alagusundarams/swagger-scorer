@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 p-20">
+    <div class="w-full max-w-[480px] mx-auto bg-white rounded-2xl shadow-2xl p-10">
+        <h2 class="text-2xl font-bold text-gray-900 mb-8 text-center">Alignment Test</h2>
+        
+        <!-- Email Input -->
+        <div class="mb-4">
+            <input 
+                type="email"
+                class="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-6 py-3.5 text-gray-900 placeholder-gray-400 text-base font-semibold"
+                placeholder="Email Input (border-2, px-6, py-3.5)"
+            />
+        </div>
+
+        <!-- Next Button -->
+        <div class="mb-4">
+            <button class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold px-6 py-3.5 rounded-xl border-2 border-transparent">
+                Next Button (border-2 transparent, px-6, py-3.5)
+            </button>
+        </div>
+
+        <!-- SSO Button -->
+        <div>
+            <button class="w-full bg-white text-gray-700 font-semibold py-3.5 px-6 rounded-xl border-2 border-gray-200">
+                SSO Button (border-2, px-6, py-3.5)
+            </button>
+        </div>
+
+        <div class="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded text-sm">
+            <p class="font-bold mb-2">All elements should have:</p>
+            <ul class="list-disc ml-4">
+                <li>w-full</li>
+                <li>px-6</li>
+                <li>py-3.5</li>
+                <li>border-2</li>
+                <li>rounded-xl</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
