@@ -1,29 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
-import { handleMarkNotificationAsRead } from '../../handlers/notificationHandlers';
 
 interface HeaderProps {
     pageName?: string;
 }
 
 export const Header = ({ pageName = 'Dashboard' }: HeaderProps) => {
-    const [notificationOpen, setNotificationOpen] = useState(false);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
 
     // Get data from Zustand store (populated after SSO login)
     const user = useStore((state) => state.user);
-    const notifications = useStore((state) => state.notifications);
 
-    const notificationRef = useRef<HTMLDivElement>(null);
     const userMenuRef = useRef<HTMLDivElement>(null);
 
-    // Close dropdowns when clicking outside
+    // Close user menu when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
-                setNotificationOpen(false);
-            }
             if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
                 setUserMenuOpen(false);
             }
@@ -32,8 +25,6 @@ export const Header = ({ pageName = 'Dashboard' }: HeaderProps) => {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
-
-    const unreadCount = notifications.filter(n => !n.read).length;
 
     // Use default values if user not logged in yet
     const displayName = user?.name || 'User';
@@ -125,137 +116,8 @@ export const Header = ({ pageName = 'Dashboard' }: HeaderProps) => {
                     </span>
                 </div>
 
-                {/* Right Side - Bell + Avatar */}
+                {/* Right Side - Avatar Only */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px', justifyContent: 'flex-end' }}>
-
-                    {/* Bell with Notification Dropdown */}
-                    <div style={{ position: 'relative' }} ref={notificationRef}>
-                        <button
-                            onClick={() => setNotificationOpen(!notificationOpen)}
-                            style={{
-                                padding: '8px',
-                                backgroundColor: notificationOpen ? '#334155' : 'transparent',
-                                border: 'none',
-                                borderRadius: '8px',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                            }}>
-                            <svg style={{ width: '24px', height: '24px', color: '#cbd5e1' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                            </svg>
-                            {unreadCount > 0 && (
-                                <span style={{
-                                    position: 'absolute', top: '-4px', right: '-4px', width: '20px', height: '20px',
-                                    backgroundColor: '#ef4444', color: 'white', fontSize: '12px', fontWeight: 'bold',
-                                    borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    border: '2px solid #1e293b'
-                                }}>{unreadCount}</span>
-                            )}
-                        </button>
-
-                        {/* Notification Dropdown */}
-                        {notificationOpen && (
-                            <div style={{
-                                position: 'absolute',
-                                right: 0,
-                                top: '100%',
-                                marginTop: '8px',
-                                width: '380px',
-                                backgroundColor: '#1e293b',
-                                border: '1px solid #334155',
-                                borderRadius: '12px',
-                                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.5)',
-                                zIndex: 50
-                            }}>
-                                {/* Header */}
-                                <div style={{ padding: '16px', borderBottom: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#f1f5f9' }}>Notifications</span>
-                                        {unreadCount > 0 && (
-                                            <span style={{ backgroundColor: '#3b82f6', color: 'white', fontSize: '12px', fontWeight: 'bold', padding: '2px 8px', borderRadius: '999px' }}>
-                                                {unreadCount}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Notifications */}
-                                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                                    {notifications.length === 0 ? (
-                                        <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>
-                                            <svg style={{ width: '48px', height: '48px', margin: '0 auto 12px', opacity: 0.5 }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                                            </svg>
-                                            <p style={{ fontSize: '14px', fontWeight: '500' }}>No notifications</p>
-                                        </div>
-                                    ) : (
-                                        notifications.map((notification) => (
-                                            <Link
-                                                key={notification.id}
-                                                to={notification.navigateTo || '#'}
-                                                onClick={async () => {
-                                                    await handleMarkNotificationAsRead(notification.id);
-                                                    setNotificationOpen(false);
-                                                }}
-                                                style={{
-                                                    display: 'block',
-                                                    padding: '16px',
-                                                    borderBottom: '1px solid #334155',
-                                                    cursor: 'pointer',
-                                                    backgroundColor: notification.read ? '#1e293b' : '#1f2937',
-                                                    textDecoration: 'none',
-                                                    color: 'inherit'
-                                                }}
-                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#334155'}
-                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = notification.read ? '#1e293b' : '#1f2937'}>
-                                                <div style={{ display: 'flex', gap: '12px' }}>
-                                                    <div style={{
-                                                        width: '40px',
-                                                        height: '40px',
-                                                        backgroundColor: notification.type === 'approval' ? '#fef3c7' :
-                                                            notification.type === 'success' ? '#d1fae5' :
-                                                                notification.type === 'warning' ? '#fee2e2' : '#dbeafe',
-                                                        color: notification.type === 'approval' ? '#f59e0b' :
-                                                            notification.type === 'success' ? '#10b981' :
-                                                                notification.type === 'warning' ? '#ef4444' : '#3b82f6',
-                                                        borderRadius: '50%',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        flexShrink: 0
-                                                    }}>
-                                                        {notification.type === 'approval' ? (
-                                                            <svg style={{ width: '20px', height: '20px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                            </svg>
-                                                        ) : notification.type === 'success' ? (
-                                                            <svg style={{ width: '20px', height: '20px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                            </svg>
-                                                        ) : (
-                                                            <svg style={{ width: '20px', height: '20px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                            </svg>
-                                                        )}
-                                                    </div>
-                                                    <div style={{ flex: 1 }}>
-                                                        <p style={{ fontSize: '14px', fontWeight: '600', color: '#f1f5f9', margin: '0 0 4px 0' }}>{notification.title}</p>
-                                                        <p style={{ fontSize: '12px', color: '#cbd5e1', margin: '0 0 8px 0' }}>{notification.message}</p>
-                                                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>{notification.timestamp}</span>
-                                                    </div>
-                                                    {!notification.read && (
-                                                        <div style={{ width: '8px', height: '8px', backgroundColor: '#3b82f6', borderRadius: '50%', flexShrink: 0, marginTop: '4px' }}></div>
-                                                    )}
-                                                </div>
-                                            </Link>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
 
                     {/* User Avatar with Menu */}
                     <div style={{ position: 'relative' }} ref={userMenuRef}>
@@ -314,20 +176,6 @@ export const Header = ({ pageName = 'Dashboard' }: HeaderProps) => {
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                                         </svg>
                                         Team Preference
-                                    </button>
-                                    <button style={{
-                                        width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
-                                        padding: '12px', backgroundColor: 'transparent', border: 'none',
-                                        borderRadius: '8px', cursor: 'pointer', color: '#cbd5e1',
-                                        fontSize: '14px', fontWeight: '500', textAlign: 'left'
-                                    }}
-                                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#334155'; e.currentTarget.style.color = '#3b82f6'; }}
-                                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#cbd5e1'; }}>
-                                        <svg style={{ width: '20px', height: '20px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        </svg>
-                                        Settings
                                     </button>
                                 </div>
 
