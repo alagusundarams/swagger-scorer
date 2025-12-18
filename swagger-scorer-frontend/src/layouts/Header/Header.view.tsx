@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
-import { handleMarkNotificationAsRead, handleMarkAllNotificationsAsRead } from '../../handlers/notificationHandlers';
+import { handleMarkNotificationAsRead } from '../../handlers/notificationHandlers';
 
 interface HeaderProps {
     pageName?: string;
@@ -171,67 +171,113 @@ export const Header = ({ pageName = 'Dashboard' }: HeaderProps) => {
                                 <div style={{ padding: '16px', borderBottom: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#f1f5f9' }}>Notifications</span>
-                                        <span style={{ backgroundColor: '#3b82f6', color: 'white', fontSize: '12px', fontWeight: 'bold', padding: '2px 8px', borderRadius: '999px' }}>2</span>
+                                        {unreadCount > 0 && (
+                                            <span style={{ backgroundColor: '#3b82f6', color: 'white', fontSize: '12px', fontWeight: 'bold', padding: '2px 8px', borderRadius: '999px' }}>
+                                                {unreadCount}
+                                            </span>
+                                        )}
                                     </div>
-                                    <button
-                                        onClick={async () => {
-                                            await handleMarkAllNotificationsAsRead();
-                                            setNotificationOpen(false);
-                                        }}
-                                        style={{ fontSize: '12px', color: '#60a5fa', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '500' }}>
-                                        Mark all read
-                                    </button>
                                 </div>
 
                                 {/* Notifications */}
                                 <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                                    <div
-                                        onClick={() => handleMarkNotificationAsRead(notifications[0]?.id || '')}
-                                        style={{ padding: '16px', borderBottom: '1px solid #334155', cursor: 'pointer', backgroundColor: '#1e293b' }}
-                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#334155'}
-                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1e293b'}>
-                                        <div style={{ display: 'flex', gap: '12px' }}>
-                                            <div style={{ width: '40px', height: '40px', backgroundColor: '#fef3c7', color: '#f59e0b', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                <svg style={{ width: '20px', height: '20px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                            </div>
-                                            <div style={{ flex: 1 }}>
-                                                <p style={{ fontSize: '14px', fontWeight: '600', color: '#f1f5f9', margin: '0 0 4px 0' }}>New Approval Request</p>
-                                                <p style={{ fontSize: '12px', color: '#cbd5e1', margin: '0 0 8px 0' }}>Team Alpha is requesting access to Product X API</p>
-                                                <span style={{ fontSize: '11px', color: '#94a3b8' }}>5 minutes ago</span>
-                                            </div>
-                                            <div style={{ width: '8px', height: '8px', backgroundColor: '#3b82f6', borderRadius: '50%', flexShrink: 0, marginTop: '4px' }}></div>
+                                    {notifications.length === 0 ? (
+                                        <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>
+                                            <svg style={{ width: '48px', height: '48px', margin: '0 auto 12px', opacity: 0.5 }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                            </svg>
+                                            <p style={{ fontSize: '14px', fontWeight: '500' }}>No notifications</p>
                                         </div>
-                                    </div>
-
-                                    <div style={{ padding: '16px', borderBottom: '1px solid #334155', cursor: 'pointer', backgroundColor: '#1e293b' }}
-                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#334155'}
-                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1e293b'}>
-                                        <div style={{ display: 'flex', gap: '12px' }}>
-                                            <div style={{ width: '40px', height: '40px', backgroundColor: '#d1fae5', color: '#10b981', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                <svg style={{ width: '20px', height: '20px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                            </div>
-                                            <div style={{ flex: 1 }}>
-                                                <p style={{ fontSize: '14px', fontWeight: '600', color: '#f1f5f9', margin: '0 0 4px 0' }}>API Quality Improved</p>
-                                                <p style={{ fontSize: '12px', color: '#cbd5e1', margin: '0 0 8px 0' }}>Your User Service API quality score is now 95/100</p>
-                                                <span style={{ fontSize: '11px', color: '#94a3b8' }}>1 hour ago</span>
-                                            </div>
-                                            <div style={{ width: '8px', height: '8px', backgroundColor: '#3b82f6', borderRadius: '50%', flexShrink: 0, marginTop: '4px' }}></div>
-                                        </div>
-                                    </div>
+                                    ) : (
+                                        notifications.map((notification) => (
+                                            <Link
+                                                key={notification.id}
+                                                to={notification.navigateTo || '#'}
+                                                onClick={async () => {
+                                                    await handleMarkNotificationAsRead(notification.id);
+                                                    setNotificationOpen(false);
+                                                }}
+                                                style={{
+                                                    display: 'block',
+                                                    padding: '16px',
+                                                    borderBottom: '1px solid #334155',
+                                                    cursor: 'pointer',
+                                                    backgroundColor: notification.read ? '#1e293b' : '#1f2937',
+                                                    textDecoration: 'none',
+                                                    color: 'inherit'
+                                                }}
+                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#334155'}
+                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = notification.read ? '#1e293b' : '#1f2937'}>
+                                                <div style={{ display: 'flex', gap: '12px' }}>
+                                                    <div style={{
+                                                        width: '40px',
+                                                        height: '40px',
+                                                        backgroundColor: notification.type === 'approval' ? '#fef3c7' :
+                                                            notification.type === 'success' ? '#d1fae5' :
+                                                                notification.type === 'warning' ? '#fee2e2' : '#dbeafe',
+                                                        color: notification.type === 'approval' ? '#f59e0b' :
+                                                            notification.type === 'success' ? '#10b981' :
+                                                                notification.type === 'warning' ? '#ef4444' : '#3b82f6',
+                                                        borderRadius: '50%',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        flexShrink: 0
+                                                    }}>
+                                                        {notification.type === 'approval' ? (
+                                                            <svg style={{ width: '20px', height: '20px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
+                                                        ) : notification.type === 'success' ? (
+                                                            <svg style={{ width: '20px', height: '20px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
+                                                        ) : (
+                                                            <svg style={{ width: '20px', height: '20px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
+                                                        )}
+                                                    </div>
+                                                    <div style={{ flex: 1 }}>
+                                                        <p style={{ fontSize: '14px', fontWeight: '600', color: '#f1f5f9', margin: '0 0 4px 0' }}>{notification.title}</p>
+                                                        <p style={{ fontSize: '12px', color: '#cbd5e1', margin: '0 0 8px 0' }}>{notification.message}</p>
+                                                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>{notification.timestamp}</span>
+                                                    </div>
+                                                    {!notification.read && (
+                                                        <div style={{ width: '8px', height: '8px', backgroundColor: '#3b82f6', borderRadius: '50%', flexShrink: 0, marginTop: '4px' }}></div>
+                                                    )}
+                                                </div>
+                                            </Link>
+                                        ))
+                                    )}
                                 </div>
 
-                                {/* Footer */}
-                                <div style={{ padding: '12px', borderTop: '1px solid #334155', textAlign: 'center' }}>
-                                    <button style={{ color: '#60a5fa', fontSize: '14px', fontWeight: '500', background: 'none', border: 'none', cursor: 'pointer', width: '100%', padding: '8px', borderRadius: '8px' }}
-                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#334155'}
-                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
-                                        View all notifications
-                                    </button>
-                                </div>
+                                {/* Footer - Only show if there are notifications */}
+                                {notifications.length > 0 && (
+                                    <div style={{ padding: '12px', borderTop: '1px solid #334155', textAlign: 'center' }}>
+                                        <Link
+                                            to="/approvals"
+                                            onClick={() => setNotificationOpen(false)}
+                                            style={{
+                                                color: '#60a5fa',
+                                                fontSize: '14px',
+                                                fontWeight: '500',
+                                                background: 'none',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                width: '100%',
+                                                padding: '8px',
+                                                borderRadius: '8px',
+                                                display: 'block',
+                                                textDecoration: 'none',
+                                                textAlign: 'center'
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#334155'}
+                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+                                            View all approvals
+                                        </Link>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
