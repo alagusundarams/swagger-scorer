@@ -29,8 +29,15 @@ export const ManageProductModal = ({
         description: product.description,
         version: product.version,
         visibility: product.visibility || 'public' as 'public' | 'internal' | 'private' | 'owner-only',
-        authorizedTeams: product.authorizedTeams || [] as string[]
+        authorizedTeamsByEnv: product.authorizedTeamsByEnv || {
+            DEV: [],
+            QA: [],
+            STAGE: [],
+            PROD: []
+        } as Record<'DEV' | 'QA' | 'STAGE' | 'PROD', string[]>
     });
+
+    const [expandedEnv, setExpandedEnv] = useState<'DEV' | 'QA' | 'STAGE' | 'PROD' | null>('DEV');
 
     const isMetadataLocked = currentStage !== 'DEV';
 
@@ -137,7 +144,7 @@ export const ManageProductModal = ({
                             </div>
 
                             {/* Visibility Selector */}
-                            <div className="mb-8">
+                            <div className="mb-6">
                                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Product Visibility</label>
                                 <div className="space-y-2">
                                     {[
@@ -196,22 +203,108 @@ export const ManageProductModal = ({
                                 </div>
                             </div>
 
-                            {/* Authorized Teams - Only show if Private visibility */}
+                            {/* Environment-Scoped Team Authorization - Only show if Private visibility */}
                             {formData.visibility === 'private' && (
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Authorized Consumers</label>
-                                    <TeamSearch
-                                        allTeams={allTeams}
-                                        selectedTeamIds={formData.authorizedTeams}
-                                        onToggleTeam={(id) => {
-                                            const current = formData.authorizedTeams;
-                                            if (current.includes(id)) {
-                                                setFormData({ ...formData, authorizedTeams: current.filter((t: string) => t !== id) });
-                                            } else {
-                                                setFormData({ ...formData, authorizedTeams: [...current, id] });
-                                            }
-                                        }}
-                                    />
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Authorized Teams by Environment</label>
+                                    <p className="text-xs text-gray-500 dark:text-slate-400 mb-4">
+                                        Teams have different Azure AD groups per environment. Manage access separately for each stage.
+                                    </p>
+
+                                    {(['DEV', 'QA', 'STAGE', 'PROD'] as const).map((env, idx) => {
+                                        const isExpanded = expandedEnv === env;
+                                        const teamsInEnv = formData.authorizedTeamsByEnv[env] || [];
+                                        const lockIcon = env === 'PROD' ? '🔒' : env === 'STAGE' ? '🔐' : '';
+
+                                        return (
+                                            <div key={env} className={`mb-3 border rounded-xl overflow-hidden ${env === 'PROD' ? 'border-red-200 dark:border-red-800' :
+                                                    env === 'STAGE' ? 'border-amber-200 dark:border-amber-800' :
+                                                        'border-gray-200 dark:border-slate-700'
+                                                }`}>
+                                                {/* Environment Header */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setExpandedEnv(isExpanded ? null : env)}
+                                                    className={`w-full p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-900 transition ${env === 'PROD' ? 'bg-red-50/50 dark:bg-red-900/10' :
+                                                            env === 'STAGE' ? 'bg-amber-50/50 dark:bg-amber-900/10' :
+                                                                'bg-gray-50/50 dark:bg-slate-900/50'
+                                                        }`}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-lg">{lockIcon || '📂'}</span>
+                                                        <div className="text-left">
+                                                            <div className="text-sm font-bold text-gray-900 dark:text-white">{env}</div>
+                                                            <div className="text-xs text-gray-500 dark:text-slate-400">
+                                                                {teamsInEnv.length} team{teamsInEnv.length !== 1 ? 's' : ''} authorized
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <svg
+                                                        className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                                        fill="none"
+                                                        viewBox="0 0 24 24"
+                                                        stroke="currentColor"
+                                                    >
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </button>
+
+                                                {/* Environment Content */}
+                                                {isExpanded && (
+                                                    <div className="p-4 border-t border-gray-100 dark:border-slate-700">
+                                                        {/* Copy from lower env button (except for DEV) */}
+                                                        {idx > 0 && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const lowerEnv = (['DEV', 'QA', 'STAGE', 'PROD'] as const)[idx - 1];
+                                                                    setFormData({
+                                                                        ...formData,
+                                                                        authorizedTeamsByEnv: {
+                                                                            ...formData.authorizedTeamsByEnv,
+                                                                            [env]: [...(formData.authorizedTeamsByEnv[lowerEnv] || [])]
+                                                                        }
+                                                                    });
+                                                                }}
+                                                                className="mb-3 text-xs px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition flex items-center gap-2"
+                                                            >
+                                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                                </svg>
+                                                                Copy from {(['DEV', 'QA', 'STAGE', 'PROD'] as const)[idx - 1]}
+                                                            </button>
+                                                        )}
+
+                                                        {/* Team Search */}
+                                                        <TeamSearch
+                                                            allTeams={allTeams}
+                                                            selectedTeamIds={teamsInEnv}
+                                                            onToggleTeam={(id) => {
+                                                                const current = formData.authorizedTeamsByEnv[env] || [];
+                                                                if (current.includes(id)) {
+                                                                    setFormData({
+                                                                        ...formData,
+                                                                        authorizedTeamsByEnv: {
+                                                                            ...formData.authorizedTeamsByEnv,
+                                                                            [env]: current.filter((t: string) => t !== id)
+                                                                        }
+                                                                    });
+                                                                } else {
+                                                                    setFormData({
+                                                                        ...formData,
+                                                                        authorizedTeamsByEnv: {
+                                                                            ...formData.authorizedTeamsByEnv,
+                                                                            [env]: [...current, id]
+                                                                        }
+                                                                    });
+                                                                }
+                                                            }}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>

@@ -58,8 +58,9 @@ export interface Product {
     createdAt: string;
     updatedAt: string;
     environment?: 'DEV' | 'QA' | 'STAGE' | 'PROD';
-    visibility?: 'public' | 'private' | 'owner-only';
-    authorizedTeams?: string[]; // IDs of teams with access
+    visibility?: 'public' | 'internal' | 'private' | 'owner-only';
+    authorizedTeams?: string[]; // DEPRECATED: Legacy, use authorizedTeamsByEnv
+    authorizedTeamsByEnv?: Record<'DEV' | 'QA' | 'STAGE' | 'PROD', string[]>; // Environment-scoped authorization
     identity?: {
         clientId: string;
         displayName: string;
