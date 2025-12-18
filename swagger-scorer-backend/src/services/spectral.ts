@@ -9,7 +9,7 @@
 import spectralCore from '@stoplight/spectral-core';
 // @ts-ignore
 const { Spectral: SpectralClass, Document: DocumentClass } = spectralCore;
-import type { Spectral, Document, RulesetDefinition } from '@stoplight/spectral-core';
+import type { Spectral, RulesetDefinition } from '@stoplight/spectral-core';
 // @ts-ignore
 import spectralRulesets from '@stoplight/spectral-rulesets';
 // @ts-ignore
@@ -17,7 +17,7 @@ const { oas } = spectralRulesets;
 // @ts-ignore
 import spectralParsers from '@stoplight/spectral-parsers';
 // @ts-ignore
-const { Yaml } = spectralParsers;
+const { Yaml, Json } = spectralParsers;
 // @ts-ignore
 import spectralFunctions from '@stoplight/spectral-functions';
 // @ts-ignore
@@ -108,32 +108,46 @@ export async function analyzeWithSpectral(
     spectral: Spectral,
     originalContent?: string
 ): Promise<Violation[]> {
-    // Create a Spectral document from the ORIGINAL content string
-    // This preserves line numbers from the source
+    // 1. Determine content format and parser
+    // If originalContent is provided, check if it looks like JSON
     const content = originalContent || JSON.stringify(spec, null, 2);
+    const isJson = content.trim().startsWith('{');
+    const parser = isJson ? spectralParsers.Json : spectralParsers.Yaml;
+    const filename = isJson ? 'openapi.json' : 'openapi.yaml';
+
+    // 2. Create Document
+    // Using the appropriate parser ensures Spectral understands the line numbers correctly
     const document = new DocumentClass(
         content,
-        Yaml,
-        'openapi.yaml'
+        parser as any,
+        filename
     );
 
-    // Run Spectral - this is where the actual linting happens
-    const results = await spectral.run(document);
+    // 3. Run Spectral
+    try {
+        const results = await spectral.run(document);
+        const mappings = await loadCategoryMappings();
 
-    // Load category mappings
-    const mappings = await loadCategoryMappings();
-
-    // Convert Spectral results to our Violation format
-    const violations: Violation[] = results.map((diagnostic) => ({
-        rule: diagnostic.code as string,
-        severity: diagnostic.severity === 0 ? 'error' : diagnostic.severity === 1 ? 'warning' : 'info',
-        message: diagnostic.message,
-        path: diagnostic.path.join('.'),
-        line: diagnostic.range.start.line + 1, // 1-indexed line number
-        category: determineCategory(diagnostic.code as string, mappings),
-    }));
-
-    return violations;
+        return results.map((diagnostic) => ({
+            rule: diagnostic.code as string,
+            severity: diagnostic.severity === 0 ? 'error' : diagnostic.severity === 1 ? 'warning' : 'info',
+            message: diagnostic.message,
+            path: diagnostic.path.join('.'),
+            line: diagnostic.range.start.line + 1,
+            category: determineCategory(diagnostic.code as string, mappings),
+        }));
+    } catch (err: any) {
+        // Fallback for catastrophic Spectral errors
+        console.error("Spectral run failed:", err);
+        return [{
+            rule: 'parser-error',
+            severity: 'error',
+            message: err.message || 'Failed to parse specification',
+            path: 'root',
+            line: 1,
+            category: 'structural'
+        }];
+    }
 }
 
 /**

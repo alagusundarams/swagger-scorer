@@ -3,6 +3,10 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
 import { useAuth } from '../../../features/auth/hooks/useAuth';
 import { useStore } from '../../../store/useStore';
+import { ManageProductModal } from '../components/ManageProductModal';
+
+// Helper to mask keys (consistent with Dashboard)
+const maskKey = (key: string) => key.substring(0, 4) + '••••••••••••••••' + key.substring(key.length - 4);
 
 /**
  * ProductDetailPage: Comprehensive view of an API Product.
@@ -34,6 +38,12 @@ export const ProductDetailPage = () => {
     const [isPending, setIsPending] = useState(false);
     const [businessReason, setBusinessReason] = useState('');
     const [toast, setToast] = useState<{ message: string; show: boolean }>({ message: '', show: false });
+
+    // Governance State
+    // Governance State
+    const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+    const [lifecycleStage, setLifecycleStage] = useState<'DEV' | 'QA' | 'PROD'>('DEV');
+    const [isKeyRevealed, setIsKeyRevealed] = useState(false);
 
     // --- Data Selectors ---
     const product = useMemo(() => allProducts.find(p => p.id === productId), [allProducts, productId]);
@@ -76,6 +86,22 @@ export const ProductDetailPage = () => {
         setTimeout(() => setToast({ message: '', show: false }), 4000);
     };
 
+    const handleProductUpdate = () => {
+        // In real app: dispatch(updateProduct(productId, data));
+        setToast({ message: 'Metadata Updated Successfully', show: true });
+        setTimeout(() => setToast({ message: '', show: false }), 2000);
+        setIsManageModalOpen(false);
+    };
+
+    const handlePromote = () => {
+        if (lifecycleStage === 'DEV') setLifecycleStage('QA');
+        else if (lifecycleStage === 'QA') setLifecycleStage('PROD');
+
+        setToast({ message: `Pipeline Success: Promoted to ${lifecycleStage === 'DEV' ? 'QA' : 'PROD'}`, show: true });
+        setTimeout(() => setToast({ message: '', show: false }), 2000);
+        setIsManageModalOpen(false);
+    };
+
     return (
         <MainLayout>
             {/* Feedback Notification */}
@@ -107,8 +133,11 @@ export const ProductDetailPage = () => {
                         {/* Contextual Action: Access Management */}
                         <div className="shrink-0 w-full md:w-auto">
                             {isOwner ? (
-                                <button className="w-full md:w-auto bg-slate-900 dark:bg-slate-700 text-white font-black text-[10px] uppercase tracking-[0.2em] py-5 px-10 rounded-2xl shadow-xl transition-all hover:scale-[1.02]">
-                                    Product Ownership
+                                <button
+                                    onClick={() => setIsManageModalOpen(true)}
+                                    className="w-full md:w-auto bg-slate-900 dark:bg-slate-700 text-white font-black text-[10px] uppercase tracking-[0.2em] py-5 px-10 rounded-2xl shadow-xl transition-all hover:scale-[1.02] flex items-center gap-3"
+                                >
+                                    <span>⚙️</span> Product Ownership
                                 </button>
                             ) : isSubscribed ? (
                                 <div className="flex items-center gap-3 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 font-bold px-8 py-5 rounded-2xl border border-green-100 dark:border-green-800/50">
@@ -249,13 +278,25 @@ export const ProductDetailPage = () => {
                                     <div className="animate-fade-in" key={selectedEnv}>
                                         <div className="flex justify-between items-center mb-2">
                                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Primary Subscription Key</p>
-                                            <button className="text-[10px] font-bold text-blue-400 hover:text-white transition-colors uppercase">Regenerate</button>
+                                            <div className="flex gap-3">
+                                                <button
+                                                    onClick={() => setIsKeyRevealed(!isKeyRevealed)}
+                                                    className="text-[10px] font-bold text-blue-400 hover:text-white transition-colors uppercase flex items-center gap-1"
+                                                >
+                                                    {isKeyRevealed ? 'Hide' : 'Reveal'}
+                                                </button>
+                                                <button className="text-[10px] font-bold text-blue-400 hover:text-white transition-colors uppercase">Regenerate</button>
+                                            </div>
                                         </div>
                                         <div className="flex gap-2">
-                                            <code className="flex-1 bg-black/30 p-4 rounded-xl font-mono text-sm text-emerald-400 border border-white/5 tracking-wider transition-all">
-                                                {/* Simulate discrete keys for display purposes */}
-                                                {selectedEnv === 'PROD' ? subscription.primaryKey.value : `${selectedEnv}_${subscription.primaryKey.value.substring(0, 10)}...`}
-                                            </code>
+                                            <div className="flex-1 bg-black/30 p-4 rounded-xl border border-white/5 flex items-center justify-between">
+                                                <code className="font-mono text-sm text-emerald-400 tracking-wider">
+                                                    {isKeyRevealed
+                                                        ? (selectedEnv === 'PROD' ? subscription.primaryKey.value : `${selectedEnv}_${subscription.primaryKey.value}`)
+                                                        : maskKey(selectedEnv === 'PROD' ? subscription.primaryKey.value : `${selectedEnv}_${subscription.primaryKey.value}`)
+                                                    }
+                                                </code>
+                                            </div>
                                             <button
                                                 onClick={() => {
                                                     const keyVal = selectedEnv === 'PROD' ? subscription.primaryKey.value : `${selectedEnv}_${subscription.primaryKey.value}`;
@@ -391,6 +432,16 @@ export const ProductDetailPage = () => {
                     </div>
                 </div>
             )}
+
+            {/* Governance Control Modal */}
+            <ManageProductModal
+                isOpen={isManageModalOpen}
+                onClose={() => setIsManageModalOpen(false)}
+                product={product}
+                currentStage={lifecycleStage}
+                onUpdate={handleProductUpdate}
+                onPromote={handlePromote}
+            />
         </MainLayout>
     );
 };

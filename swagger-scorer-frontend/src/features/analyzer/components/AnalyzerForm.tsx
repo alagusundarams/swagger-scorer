@@ -30,8 +30,7 @@ export const AnalyzerForm: React.FC = () => {
     const editorRef = useRef<any>(null);
     const monacoRef = useRef<Monaco | null>(null);
 
-    // Local state for active tab
-    const [activeTab, setActiveTab] = useState<'yaml' | 'config'>('yaml');
+
 
     // === HANDLERS ===
 
@@ -41,6 +40,9 @@ export const AnalyzerForm: React.FC = () => {
 
     // === EFFECTS ===
 
+    // Track initial content for dirty checking
+    const initialSpecRef = useRef(spec);
+
     // Auto-load draft on mount if authenticated
     const location = useLocation();
     useEffect(() => {
@@ -48,6 +50,9 @@ export const AnalyzerForm: React.FC = () => {
         const state = location.state as { startWithSpec?: string } | null;
         if (state?.startWithSpec) {
             setSpec(state.startWithSpec);
+            initialSpecRef.current = state.startWithSpec;
+            // Trigger analysis immediately for the "Visual Validation" use case
+            setTimeout(() => runAnalysis(), 100);
             return;
         }
 
@@ -55,7 +60,7 @@ export const AnalyzerForm: React.FC = () => {
         const params = new URLSearchParams(location.search);
         const specType = params.get('spec');
         if (specType === 'deprecation-check') {
-            setSpec(`openapi: 3.0.0
+            const demoSpec = `openapi: 3.0.0
 info:
   title: Legacy XML Gateway
   version: 0.9.0
@@ -68,7 +73,9 @@ paths:
       responses:
         '200':
           description: OK
-`);
+`;
+            setSpec(demoSpec);
+            initialSpecRef.current = demoSpec;
             return;
         }
 
@@ -82,6 +89,7 @@ paths:
                     if (draft.data.spec) {
                         if (confirm(`Found a saved draft "${draft.data.apiTitle}" from ${new Date(draft.data.updatedAt).toLocaleDateString()}. Load it?`)) {
                             setSpec(draft.data.spec);
+                            initialSpecRef.current = draft.data.spec;
                         }
                     }
                 } catch (err) {
@@ -91,6 +99,19 @@ paths:
         };
         loadDraft();
     }, [isAuthenticated, location]);
+
+    // Warn on unsaved changes
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (spec !== initialSpecRef.current) {
+                e.preventDefault();
+                e.returnValue = ''; // Required for Chrome
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [spec]);
 
     // === HANDLERS ===
 
@@ -106,6 +127,8 @@ paths:
             if (!token) throw new Error("No access token");
 
             await saveDraft(spec, token, "My API Spec");
+            // Mark as clean after successful save
+            initialSpecRef.current = spec;
             // Could show a toast here
         } catch (err) {
             console.error("Failed to save", err);
@@ -122,6 +145,8 @@ paths:
     const handleClear = () => {
         if (confirm('Are you sure you want to clear the editor?')) {
             reset();
+            // Mark as clean after clearing
+            initialSpecRef.current = '';
             // Also clear any error markers from the editor
             if (editorRef.current && monacoRef.current) {
                 monacoRef.current.editor.setModelMarkers(editorRef.current.getModel(), 'owner', []);
@@ -192,33 +217,14 @@ paths:
             <div className="flex flex-row shrink-0 bg-[#252526] border-b border-[#1e1e1e] items-center h-[38px]">
                 {/* Tabs */}
                 <div className="flex items-center h-full">
-                    {/* YAML Tab */}
+                    {/* YAML Tab (Static Title) */}
                     <div
-                        onClick={() => setActiveTab('yaml')}
-                        className={`px-4 h-full text-[13px] flex items-center gap-2 cursor-pointer select-none border-t-2 ${activeTab === 'yaml'
-                            ? 'bg-[#1e1e1e] text-white border-t-blue-500'
-                            : 'bg-[#2d2d2d] text-[#969696] hover:bg-[#2a2d2e] border-t-transparent'
-                            }`}
+                        className="px-4 h-full text-[13px] flex items-center gap-2 select-none border-t-2 bg-[#1e1e1e] text-white border-t-blue-500"
                     >
-                        <svg className={`w-4 h-4 ${activeTab === 'yaml' ? 'text-blue-400' : 'opacity-50'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                         <span>openapi.yaml</span>
-                    </div>
-
-                    {/* Config Tab */}
-                    <div
-                        onClick={() => setActiveTab('config')}
-                        className={`px-4 h-full text-[13px] flex items-center gap-2 cursor-pointer select-none border-t-2 ${activeTab === 'config'
-                            ? 'bg-[#1e1e1e] text-white border-t-blue-500'
-                            : 'bg-[#2d2d2d] text-[#969696] hover:bg-[#2a2d2e] border-t-transparent'
-                            }`}
-                    >
-                        <svg className={`w-4 h-4 ${activeTab === 'config' ? 'text-yellow-400' : 'opacity-50'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        <span>scorer.config.json</span>
                     </div>
                 </div>
 
@@ -283,59 +289,45 @@ paths:
 
             {/* Editor Area */}
             <div className="flex-grow relative w-full bg-[#1e1e1e] flex flex-col overflow-hidden">
-                {activeTab === 'yaml' ? (
-                    <>
-                        {/* Monaco Editor */}
-                        <Editor
-                            height="100%"
-                            defaultLanguage={spec.trim().startsWith('{') ? 'json' : 'yaml'}
-                            value={spec}
-                            theme="vs-dark"
-                            onChange={(value) => setSpec(value || '')}
-                            onMount={handleEditorMountWithTheme}
-                            options={{
-                                minimap: { enabled: true, scale: 0.75 },
-                                fontSize: 13,
-                                lineHeight: 24,
-                                padding: { top: 16, bottom: 16 },
-                                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                                fontLigatures: true,
-                                smoothScrolling: true,
-                                cursorBlinking: 'smooth',
-                                cursorSmoothCaretAnimation: 'on',
-                                scrollBeyondLastLine: true,
-                                automaticLayout: true,
-                                renderLineHighlight: 'all',
-                                overviewRulerBorder: false,
-                                hideCursorInOverviewRuler: true,
-                                roundedSelection: true,
-                            }}
-                        />
+                <>
+                    {/* Monaco Editor */}
+                    <Editor
+                        height="100%"
+                        defaultLanguage={spec.trim().startsWith('{') ? 'json' : 'yaml'}
+                        value={spec}
+                        theme="vs-dark"
+                        onChange={(value) => setSpec(value || '')}
+                        onMount={handleEditorMountWithTheme}
+                        options={{
+                            minimap: { enabled: true, scale: 0.75 },
+                            fontSize: 13,
+                            lineHeight: 24,
+                            padding: { top: 16, bottom: 16 },
+                            fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                            fontLigatures: true,
+                            smoothScrolling: true,
+                            cursorBlinking: 'smooth',
+                            cursorSmoothCaretAnimation: 'on',
+                            scrollBeyondLastLine: true,
+                            automaticLayout: true,
+                            renderLineHighlight: 'all',
+                            overviewRulerBorder: false,
+                            hideCursorInOverviewRuler: true,
+                            roundedSelection: true,
+                        }}
+                    />
 
-                        {/* Status Bar */}
-                        <div className="bg-[#1e1e1e] border-t border-[#333] text-gray-500 px-3 py-1 flex justify-between items-center text-[11px] shrink-0">
-                            <div className="flex gap-4">
-                                <span>YAML</span>
-                                <span>UTF-8</span>
-                            </div>
-                            <div>
-                                <span>Ln {spec.split('\n').length}, Col 1</span>
-                            </div>
+                    {/* Status Bar */}
+                    <div className="bg-[#1e1e1e] border-t border-[#333] text-gray-500 px-3 py-1 flex justify-between items-center text-[11px] shrink-0">
+                        <div className="flex gap-4">
+                            <span>YAML</span>
+                            <span>UTF-8</span>
                         </div>
-                    </>
-                ) : (
-                    // Config Tab Placeholder
-                    <div className="flex flex-col items-center justify-center h-full w-full text-gray-400 p-8 text-center">
-                        <svg className="w-12 h-12 opacity-30 text-yellow-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        <h3 className="text-lg font-medium text-gray-300 mb-2">Editor Configuration</h3>
-                        <p className="text-sm text-gray-500 max-w-sm">
-                            This panel is reserved for configuring scoring weights and global rulesets.
-                        </p>
+                        <div>
+                            <span>Ln {spec.split('\n').length}, Col 1</span>
+                        </div>
                     </div>
-                )}
+                </>
             </div>
         </div>
     );

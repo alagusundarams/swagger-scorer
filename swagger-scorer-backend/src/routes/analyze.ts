@@ -75,11 +75,11 @@ export async function analyzeRoutes(
                         categories: [],
                         violations: [{
                             rule: 'parser-error',
-                            message: parseError.message || 'Failed to parse OpenAPI document',
-                            path: 'root',
+                            message: `Syntax Error: ${parseError.message}`,
+                            path: 'parser',
                             line: 1,
                             severity: 'error',
-                            category: 'syntax'
+                            category: 'structural'
                         }],
                         metadata: {
                             specVersion: 'unknown',

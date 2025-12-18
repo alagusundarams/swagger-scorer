@@ -1,76 +1,115 @@
 # Swagger Scorer Frontend 🚀
 
-A premium, modern React application for analyzing and scoring OpenAPI (Swagger) specifications. This UI interacts with the Swagger Scorer Backend to provide real-time quality assessments, RAG (Red/Amber/Green) status, and detailed violation reports.
+Modern React application for analyzing, scoring, and managing OpenAPI (Swagger) specifications with enterprise-grade features.
 
-![Swagger Scorer](https://via.placeholder.com/800x400?text=Swagger+Scorer+UI+Preview)
+## ✨ Current Features
 
-## ✨ Key Features
+### 🔍 API Analyzer
+- **Real-time Analysis**: Instant OpenAPI spec validation and scoring
+- **Quality Score**: 0-100 scoring with weighted deductions
+- **RAG Status**: Visual health indicators (🟢 Green >95 | 🟡 Amber >85 | 🔴 Red ≤85)
+- **Violations Table**: Sortable issues by severity (Error/Warn/Info/Hint)
+- **Category
 
-- **Real-time Analysis**: Instant feedback on your OpenAPI specs.
-- **Quality Score**: 0-100 numeric score based on weighted deductions.
-- **RAG Status**: Visual health indicators (Green > 95, Amber > 85, Red <= 85).
-- **Detailed Violations**: Sortable table of issues with severity levels (Error, Warn, Info, Hint).
-- **Category Breakdown**: granular scoring for Security, Documentation, Best Practices, etc.
-- **Premium UX**: Glassmorphism design, smooth micro-animations, and full Dark Mode.
+ Breakdown**: Granular scoring for Security, Documentation, Best Practices
+- **Maximize/Restore**: Full-screen editor mode with smooth transitions
+- **Draft Autosave**: Auto-saves work to backend with 7-day retention
+- **Unsaved Changes Protection**: Browser warns before losing work
+
+### 📊 Product & API Inventory
+- **Product Catalog**: Browse and manage API products
+- **API Explorer**: Navigate through APIs and operations 
+- **Breadcrumb Navigation**: Smart breadcrumbs with context preservation
+  - Survives browser refresh (sessionStorage fallback)
+  - Deep navigation: Product → API → Analyzer
+- **Access Management**: Request/approve API access with team-based permissions
+- **Subscription Tracking**: Monitor active API subscriptions
+
+### 🎨 Premium UX
+- **Dark Mode**: Full dark theme support
+- **Glassmorphism Design**: Modern, translucent UI elements
+- **Micro-animations**: Smooth transitions and hover effects
+- **Responsive Layout**: Mobile-first design
+- **Production-ready**: Clean code, no debug logs
 
 ## 🛠️ Tech Stack
 
 - **Framework**: React 18 + TypeScript + Vite
-- **Styling**: Tailwind CSS v4 (with `@tailwindcss/postcss`)
-- **State Management**: Zustand
-- **HTTP Client**: Axios
-- **Deployment**: Nginx (Reverse Proxy & Static Serve) + Docker
+- **Styling**: Tailwind CSS v4
+- **State**: Zustand (analyzer) + React Context (auth)
+- **Routing**: React Router v7 with protected routes
+- **HTTP**: Axios
+- **Testing**: Vitest + Playwright (E2E)
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js 20+ (required by Vite)
-- Docker (optional, for production build)
+- Node.js 20+
+- npm or yarn
 
-### Local Development
+### Development
 
-1. **Install Dependencies**
-   ```bash
-   npm install
-   ```
+```bash
+# Install dependencies
+npm install
 
-2. **Start Development Server**
-   ```bash
-   npm run dev
-   ```
-   The app will run at `http://localhost:5173`.
-   
-   > **Note**: Ensure the backend is running on port `3001` locally. The Vite proxy is configured to forward `/api` requests to `http://localhost:3001`.
+# Start dev server (http://localhost:5173)
+npm run dev
 
-3. **Run Tests**
-   ```bash
-   npm test
-   ```
+# Run tests
+npm test
 
-### 🐳 Docker Production Build
+# E2E tests
+npm run test:e2e
+```
 
-The project includes a multi-stage Dockerfile that builds the React app and serves it via Nginx.
+### Environment Variables
 
-1. **Build the Image**
-   ```bash
-   docker build -t swagger-scorer-ui .
-   ```
+Create `.env` file:
+```bash
+VITE_API_URL=http://localhost:3001
+VITE_USE_MOCK_AUTH=true  # Set to false for real auth
+```
 
-2. **Run the Container**
-   ```bash
-   docker run -p 8080:80 swagger-scorer-ui
-   ```
-   Access the app at `http://localhost:8080`.
+### 🐳 Docker Production
 
-   > **Note**: In production, Nginx proxies API calls to `http://backend:3000`. Ensure your docker-compose network is set up correctly.
+```bash
+# Build
+docker build -t swagger-scorer-ui .
+
+# Run (http://localhost:8080)
+docker run -p 8080:80 swagger-scorer-ui
+```
 
 ## 📐 Architecture
 
-- **Proxying**: 
-  - In **Development**, `vite.config.ts` proxies `/api` to `localhost:3001`.
-  - In **Production**, `nginx.conf` proxies `/api/v1/` to the backend service.
-- **State**: `useAnalysis` store (Zustand) handles the entire analysis session state.
-- **Components**: Modular design (`AnalyzerForm`, `ScoreCard`, `ViolationsTable`) for maintainability.
+### Routing
+- `/` - Dashboard
+- `/products/:id` - Product detail
+- `/products/:id/apis/:id` - API detail
+- `/analyzer` - OpenAPI analyzer
+- `/discovery` - API marketplace
+
+### State Management
+- `useAnalysis`: Analyzer state (Zustand)
+- `useStore`: Global app state (products, subscriptions)
+- `useAuth`: Authentication context
+
+### Navigation
+- **URI-based breadcrumbs**: For hierarchical routes (`/products/:id/apis/:id`)
+- **State-based breadcrumbs**: For flat routes (`/analyzer`) with context
+- **sessionStorage fallback**: Preserves breadcrumbs on refresh
+
+## 🔜 Coming Soon
+
+### Deployment Pipeline (In Progress)
+- 4-tier environments: DEV → QA → STAGE → PROD
+- Full audit trail (who promoted, when, approvals)
+- Git commit tracking
+- Deployment history timeline
+- Rollback functionality
+
+See [implementation_plan.md](./.gemini/antigravity/brain/234d4628-b0ec-498c-ba71-a88033b0e34f/implementation_plan.md) for details.
 
 ## 📝 License
 MIT

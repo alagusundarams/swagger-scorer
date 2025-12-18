@@ -18,7 +18,7 @@ export const EndpointDetailPage = () => {
     const navigate = useNavigate();
 
     // --- Store Integration ---
-    const { products, user } = useStore();
+    const { products } = useStore();
 
     // --- Data Selectors (Hierarchical Resolution) ---
     const product = useMemo(() => products.find(p => p.id === productId), [products, productId]);
@@ -184,77 +184,57 @@ export const EndpointDetailPage = () => {
 
                         {/* Role-Based Action Card */}
                         <div className="animate-fade-in">
-                            {user?.teams.includes(product.ownerTeamId) ? (
-                                // === PRODUCER VIEW: Deep Dive Analysis ===
-                                <section className="bg-gradient-to-br from-blue-600 to-indigo-700 p-10 rounded-[2.5rem] shadow-2xl shadow-blue-500/20 text-white relative overflow-hidden group">
-                                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl transform group-hover:scale-150 transition-transform duration-1000"></div>
+                            {/* Implementation Guide Section */}
+                            <section className="bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] border border-gray-100 dark:border-slate-700/30 shadow-sm relative overflow-hidden group mb-6">
+                                <h2 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest mb-6 flex items-center gap-3">
+                                    <span className="w-2 h-2 bg-purple-500 rounded-full"></span> Implementation Guide
+                                </h2>
 
-                                    <h2 className="text-xl font-black uppercase tracking-widest mb-4 relative z-10 flex items-center gap-2">
-                                        <span className="text-2xl">⚡️</span> Designer Actions
-                                    </h2>
-                                    <p className="text-blue-100/80 text-sm font-medium mb-8 leading-relaxed relative z-10">
-                                        As a developer of this API, you can inspect the raw specification and validate compliance against enterprise standards.
-                                    </p>
-                                    <button
-                                        onClick={() => navigate('/analyzer', { state: { startWithSpec: 'schema-check', apiId: api.id } })}
-                                        className="w-full bg-white text-blue-600 font-black text-[10px] uppercase tracking-widest py-5 rounded-2xl shadow-premium hover:shadow-2xl transition-all hover:scale-[1.02] active:scale-[0.98] relative z-10 flex items-center justify-center gap-3"
-                                    >
-                                        <span>🔍</span> Open in Analyzer
-                                    </button>
-                                </section>
-                            ) : (
-                                // === CONSUMER VIEW: Implementation Guide ===
-                                <section className="bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] border border-gray-100 dark:border-slate-700/30 shadow-sm relative overflow-hidden group">
-                                    <h2 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest mb-6 flex items-center gap-3">
-                                        <span className="w-2 h-2 bg-purple-500 rounded-full"></span> Implementation Guide
-                                    </h2>
-
-                                    {/* Dynamic Code Snippet */}
-                                    <div className="bg-slate-900 rounded-2xl p-6 mb-6 overflow-x-auto group/code relative">
-                                        <div className="absolute top-4 right-4 opacity-0 group-hover/code:opacity-100 transition-opacity">
-                                            <button
-                                                onClick={() => {
-                                                    const snippet = `curl -X ${operation.method} "https://api.ionosphere.io${api.path}${operation.urlTemplate}" \\
+                                {/* Dynamic Code Snippet */}
+                                <div className="bg-slate-900 rounded-2xl p-6 mb-6 overflow-x-auto group/code relative">
+                                    <div className="absolute top-4 right-4 opacity-0 group-hover/code:opacity-100 transition-opacity">
+                                        <button
+                                            onClick={() => {
+                                                const snippet = `curl -X ${operation.method} "https://api.ionosphere.io${api.path}${operation.urlTemplate}" \\
   -H "Authorization: Bearer <YOUR_TOKEN>"${['POST', 'PUT', 'PATCH'].includes(operation.method) ? ' \\\n  -H "Content-Type: application/json" \\ \n  -d \'{ ... }\'' : ''}`;
-                                                    navigator.clipboard.writeText(snippet);
-                                                }}
-                                                className="bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold px-3 py-1 rounded-lg uppercase tracking-wider backdrop-blur-md transition-all"
-                                            >
-                                                Copy
-                                            </button>
-                                        </div>
-                                        <div className="flex gap-4 mb-4 border-b border-white/10 pb-2">
-                                            <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">cURL</span>
-                                        </div>
-                                        <pre className="font-mono text-xs leading-relaxed text-slate-300">
-                                            <span className="text-purple-400">curl</span> -X {operation.method} "https://api.ionosphere.io{api.path}{operation.urlTemplate}" \<br />
-                                            &nbsp;&nbsp;-H "Authorization: Bearer &lt;YOUR_TOKEN&gt;"
-                                            {['POST', 'PUT', 'PATCH'].includes(operation.method) && (
-                                                <>
-                                                    {" \\"}<br />
-                                                    &nbsp;&nbsp;-H "Content-Type: application/json" \<br />
-                                                    &nbsp;&nbsp;-d {'\'{ ... }'}
-                                                </>
-                                            )}
-                                        </pre>
+                                                navigator.clipboard.writeText(snippet);
+                                            }}
+                                            className="bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold px-3 py-1 rounded-lg uppercase tracking-wider backdrop-blur-md transition-all"
+                                        >
+                                            Copy
+                                        </button>
                                     </div>
+                                    <div className="flex gap-4 mb-4 border-b border-white/10 pb-2">
+                                        <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">cURL</span>
+                                    </div>
+                                    <pre className="font-mono text-xs leading-relaxed text-slate-300">
+                                        <span className="text-purple-400">curl</span> -X {operation.method} "https://api.ionosphere.io{api.path}{operation.urlTemplate}" \<br />
+                                        &nbsp;&nbsp;-H "Authorization: Bearer &lt;YOUR_TOKEN&gt;"
+                                        {['POST', 'PUT', 'PATCH'].includes(operation.method) && (
+                                            <>
+                                                {" \\"}<br />
+                                                &nbsp;&nbsp;-H "Content-Type: application/json" \<br />
+                                                &nbsp;&nbsp;-d {'\'{ ... }'}
+                                            </>
+                                        )}
+                                    </pre>
+                                </div>
 
-                                    {/* Support Reference */}
-                                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800">
-                                        <div>
-                                            <p className="text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-1">Owner Contact</p>
-                                            <p className="text-xs font-bold text-gray-900 dark:text-white">{product.ownerTeamId}@company.com</p>
-                                        </div>
-                                        <a href={`mailto:${product.ownerTeamId}@company.com`} className="text-xs font-bold text-blue-600 hover:underline">
-                                            Request Support
-                                        </a>
+                                {/* Support Reference */}
+                                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800">
+                                    <div>
+                                        <p className="text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-1">Owner Contact</p>
+                                        <p className="text-xs font-bold text-gray-900 dark:text-white">{product.ownerTeamId}@company.com</p>
                                     </div>
-                                </section>
-                            )}
+                                    <a href={`mailto:${product.ownerTeamId}@company.com`} className="text-xs font-bold text-blue-600 hover:underline">
+                                        Request Support
+                                    </a>
+                                </div>
+                            </section>
                         </div>
                     </div>
                 </div>
             </main>
-        </MainLayout>
+        </MainLayout >
     );
 };

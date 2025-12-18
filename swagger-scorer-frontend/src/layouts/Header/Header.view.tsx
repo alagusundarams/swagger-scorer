@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { handleMarkNotificationAsRead, handleMarkAllNotificationsAsRead } from '../../handlers/notificationHandlers';
 
@@ -59,47 +60,62 @@ export const Header = ({ pageName = 'Dashboard' }: HeaderProps) => {
                 gap: '16px'
             }}>
 
-                {/* Left Side - Everest Re Logo + APIM Self Service */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{
-                        width: '120px',
-                        height: '48px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: '6px',
-                        padding: '8px'
-                    }}>
-                        <img
-                            src="https://www.everestglobal.com/ca-en/-/media/evre/company-logos/everest-logo-header.ashx"
-                            alt="Everest Re"
-                            style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'contain',
-                                filter: 'brightness(0) invert(1)'
-                            }}
-                        />
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {/* Left Side - Everest Re Logo + APIM Self Service + Nav Links */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+
+                    {/* Brand Group */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{
-                            width: '32px',
-                            height: '32px',
-                            background: 'linear-gradient(to bottom right, #3b82f6, #2563eb)',
-                            borderRadius: '8px',
+                            width: '120px',
+                            height: '48px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
+                            borderRadius: '6px',
+                            padding: '8px'
                         }}>
-                            <svg style={{ width: '18px', height: '18px', color: 'white' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
+                            <img
+                                src="https://www.everestglobal.com/ca-en/-/media/evre/company-logos/everest-logo-header.ashx"
+                                alt="Everest Re"
+                                style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'contain',
+                                    filter: 'brightness(0) invert(1)'
+                                }}
+                            />
                         </div>
-                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#cbd5e1' }}>
-                            APIM Self Service
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{
+                                width: '32px',
+                                height: '32px',
+                                background: 'linear-gradient(to bottom right, #3b82f6, #2563eb)',
+                                borderRadius: '8px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
+                            }}>
+                                <svg style={{ width: '18px', height: '18px', color: 'white' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <span style={{ fontSize: '14px', fontWeight: '600', color: '#cbd5e1' }}>
+                                APIM Self Service
+                            </span>
+                        </div>
                     </div>
+
+                    {/* Navigation Links (Inside Left Column) */}
+                    <div style={{ display: 'flex', gap: '24px', borderLeft: '1px solid #334155', paddingLeft: '24px', height: '32px', alignItems: 'center' }}>
+                        <Link to="/" style={{ color: pageName === 'Dashboard' ? '#60a5fa' : '#94a3b8', fontWeight: '600', fontSize: '14px', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', transition: 'color 0.2s' }}>
+                            <span>📊</span> Dashboard
+                        </Link>
+                        <Link to="/catalog" style={{ color: pageName === 'Marketplace' ? '#60a5fa' : '#94a3b8', fontWeight: '600', fontSize: '14px', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', transition: 'color 0.2s' }}>
+                            <span>🛒</span> Marketplace
+                        </Link>
+                    </div>
+
                 </div>
 
                 {/* CENTER - Page Name */}

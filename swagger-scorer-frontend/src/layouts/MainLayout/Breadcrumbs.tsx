@@ -13,6 +13,31 @@ export const Breadcrumbs: React.FC = () => {
             { label: 'Home', href: '/', current: location.pathname === '/' }
         ];
 
+        // Check for Dynamic Context (passed via navigation state or sessionStorage)
+        const state = location.state as { breadcrumbContext?: Array<{ label: string; href: string }> } | null;
+
+        // Fallback to sessionStorage if state is missing (e.g., after refresh)
+        let breadcrumbContext = state?.breadcrumbContext;
+        if (!breadcrumbContext && location.pathname.startsWith('/analyzer')) {
+            const saved = sessionStorage.getItem('analyzerBreadcrumbs');
+            if (saved) {
+                try {
+                    breadcrumbContext = JSON.parse(saved);
+                } catch (e) {
+                    console.error('Failed to parse breadcrumb context from sessionStorage');
+                }
+            }
+        }
+
+        if (breadcrumbContext) {
+            items.push(...breadcrumbContext.map(b => ({ ...b, current: false })));
+
+            if (location.pathname.startsWith('/analyzer')) {
+                items.push({ label: 'API Analyzer', href: '/analyzer', current: true });
+                return items;
+            }
+        }
+
         // 1. Product Level
         if (productId) {
             const product = products.find(p => p.id === productId);
@@ -47,7 +72,7 @@ export const Breadcrumbs: React.FC = () => {
         }
 
         // Other Routes (Browse, Analyzer, etc.) - Fallback to simple matching if not an Entity Route
-        if (!productId && location.pathname !== '/') {
+        if (!state?.breadcrumbContext && !productId && location.pathname !== '/') {
             const path = location.pathname;
             if (path.startsWith('/browse')) {
                 items.push({ label: 'Browse APIs', href: '/browse', current: true });
@@ -59,7 +84,7 @@ export const Breadcrumbs: React.FC = () => {
         }
 
         return items;
-    }, [location.pathname, productId, apiId, operationId, products]);
+    }, [location.pathname, location.state, productId, apiId, operationId, products]);
 
     // Don't render if only Home (optional, but cleaner)
     if (breadcrumbs.length <= 1) return null;

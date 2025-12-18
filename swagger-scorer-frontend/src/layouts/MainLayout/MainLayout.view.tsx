@@ -35,6 +35,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         if (path.startsWith('/browse')) return 'Browse APIs';
         if (path.startsWith('/onboard')) return 'Onboard Product';
         if (path.startsWith('/analyzer')) return 'API Analyzer';
+        if (path.startsWith('/catalog')) return 'Marketplace';
         return 'Dashboard';
     };
 

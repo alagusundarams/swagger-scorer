@@ -58,17 +58,28 @@ export const APIDetailPage = () => {
                                 {api.displayName}
                             </h1>
                             <button
-                                onClick={() => navigate('/analyzer', {
-                                    state: {
+                                onClick={() => {
+                                    const breadcrumbContext = [
+                                        { label: product.displayName, href: `/products/${productId}` },
+                                        { label: api.displayName, href: `/products/${productId}/apis/${apiId}` }
+                                    ];
+
+                                    const navState = {
                                         startWithSpec: `openapi: 3.0.0
 info:
   title: ${api.displayName}
   version: 1.0.0
 paths: {}
 # Loaded from Product Inventory
-`
-                                    }
-                                })}
+`,
+                                        breadcrumbContext
+                                    };
+
+                                    // Persist breadcrumbs for browser refresh
+                                    sessionStorage.setItem('analyzerBreadcrumbs', JSON.stringify(breadcrumbContext));
+
+                                    navigate('/analyzer', { state: navState });
+                                }}
                                 className="px-8 py-4 bg-slate-900 dark:bg-slate-800 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-xl hover:scale-105 transition-all flex items-center gap-2 border border-slate-700"
                             >
                                 <span className="text-lg">⚡</span> Analyze Spec

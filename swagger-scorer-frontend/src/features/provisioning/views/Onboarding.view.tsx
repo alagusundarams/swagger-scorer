@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
 import { useStore } from '../../../store/useStore';
+import { TeamSearch } from '../components/TeamSearch';
 
 /**
  * OnboardingWizard: Multi-step intake flow for new API Products.
@@ -164,21 +165,19 @@ export const OnboardingWizard = () => {
 
                                                     {/* Nested Conditional Selection for Private Mode */}
                                                     {formData.visibility === 'private' && opt.id === 'private' && (
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8 animate-fade-in">
-                                                            {allTeams.map(team => (
-                                                                <label key={team.id} className="flex items-center gap-4 p-4 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 hover:border-blue-400 transition-colors">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={formData.selectedTeams.includes(team.id)}
-                                                                        onChange={e => {
-                                                                            if (e.target.checked) setFormData({ ...formData, selectedTeams: [...formData.selectedTeams, team.id] });
-                                                                            else setFormData({ ...formData, selectedTeams: formData.selectedTeams.filter(id => id !== team.id) });
-                                                                        }}
-                                                                        className="w-4 h-4 rounded text-blue-600"
-                                                                    />
-                                                                    <span className="text-[10px] font-black text-gray-700 dark:text-slate-300 uppercase truncate">{team.name}</span>
-                                                                </label>
-                                                            ))}
+                                                        <div className="mt-8 animate-fade-in">
+                                                            <TeamSearch
+                                                                allTeams={allTeams}
+                                                                selectedTeamIds={formData.selectedTeams}
+                                                                onToggleTeam={(toggelId) => {
+                                                                    const current = formData.selectedTeams;
+                                                                    if (current.includes(toggelId)) {
+                                                                        setFormData({ ...formData, selectedTeams: current.filter(id => id !== toggelId) });
+                                                                    } else {
+                                                                        setFormData({ ...formData, selectedTeams: [...current, toggelId] });
+                                                                    }
+                                                                }}
+                                                            />
                                                         </div>
                                                     )}
                                                 </div>

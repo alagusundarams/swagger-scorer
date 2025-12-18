@@ -4,10 +4,12 @@ import { useAnalysis } from '../store/useAnalysis';
 export const ViolationsTable: React.FC = () => {
     const { result, selectLine } = useAnalysis();
 
-    if (!result || !result.violations || result.violations.length === 0) return null;
+    const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+    const [allExpanded, setAllExpanded] = useState(false);
 
     // Group violations by category
     const groupedViolations = React.useMemo(() => {
+        if (!result || !result.violations || result.violations.length === 0) return {};
         const groups: Record<string, typeof result.violations> = {};
         result.violations.forEach(v => {
             const cat = v.category || 'General';
@@ -15,10 +17,9 @@ export const ViolationsTable: React.FC = () => {
             groups[cat].push(v);
         });
         return groups;
-    }, [result.violations]);
+    }, [result]);
 
-    const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
-    const [allExpanded, setAllExpanded] = useState(false);
+    if (!result || !result.violations || result.violations.length === 0) return null;
 
     const toggleGroup = (category: string) => {
         setExpandedGroups(prev => ({ ...prev, [category]: !prev[category] }));

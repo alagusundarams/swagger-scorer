@@ -84,7 +84,7 @@ export const useAnalysis = create<AnalysisStore>((set, get) => ({
 
         // Validate input
         if (!spec.trim()) {
-            set({ error: 'Please enter a valid OpenAPI specification.' });
+            set({ error: 'Swagger content missing. Please enter a valid OpenAPI specification to analyze.' });
             return;
         }
 

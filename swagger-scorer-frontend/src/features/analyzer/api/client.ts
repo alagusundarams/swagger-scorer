@@ -18,7 +18,7 @@ import { type Product, type Subscription, type Team, type ApprovalRequest, type 
  * Axios instance configured for the Swagger Scorer API (Catalog Service).
  */
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1',
+    baseURL: import.meta.env.VITE_API_URL || '/api/v1',
     headers: { 'Content-Type': 'application/json' },
 });
 
@@ -26,7 +26,7 @@ const api = axios.create({
  * Separate instance for Workflow Service.
  */
 const workflowApi = axios.create({
-    baseURL: import.meta.env.VITE_WORKFLOW_API_URL || 'http://localhost:3002/api/v1',
+    baseURL: import.meta.env.VITE_WORKFLOW_API_URL || '/api/v1', // Assuming for now usage of same backend or need proxy update if different
     headers: { 'Content-Type': 'application/json' },
 });
 
