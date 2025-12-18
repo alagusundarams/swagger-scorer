@@ -70,7 +70,7 @@ export const useStore = create<AppState>((set) => ({
                     message: 'Your request for Payment Gateway API was approved by Platform Team',
                     timestamp: '2 hours ago',
                     read: false,
-                    navigateTo: '/dashboard' // User's subscriptions
+                    navigateTo: '/' // Dashboard - user can see their subscriptions
                 },
                 {
                     id: 'notif-2',
@@ -79,7 +79,7 @@ export const useStore = create<AppState>((set) => ({
                     message: 'Your Customer Service API access expires in 7 days',
                     timestamp: '1 day ago',
                     read: false,
-                    navigateTo: '/dashboard' // Renewal page
+                    navigateTo: '/' // Dashboard - renewal section
                 },
                 {
                     id: 'notif-3',
@@ -88,7 +88,7 @@ export const useStore = create<AppState>((set) => ({
                     message: 'Payment Gateway API v2.1 successfully deployed to PROD',
                     timestamp: '3 days ago',
                     read: true,
-                    navigateTo: '/products/prod-payment' // Deployment history
+                    navigateTo: '/products/prod-payment' // Product detail page
                 }
             ];
             set({
