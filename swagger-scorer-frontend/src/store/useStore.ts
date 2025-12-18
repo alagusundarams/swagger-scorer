@@ -59,37 +59,38 @@ export const useStore = create<AppState>((set) => ({
 
             const allTeams = teamsRes.data;
 
-            // Mock notifications for testing
+            // Mock notifications for testing (following notification strategy)
+            // Notifications = status updates about YOUR submissions/actions
+            // NOT duplicate of Approvals tab (which shows work YOU must do)
             const mockNotifications: Notification[] = [
                 {
                     id: 'notif-1',
-                    type: 'approval',
-                    title: 'New Approval Request',
-                    message: 'Team Alpha is requesting access to Payment Gateway API',
-                    timestamp: '5 minutes ago',
+                    type: 'success',
+                    title: 'Subscription Approved',
+                    message: 'Your request for Payment Gateway API was approved by Platform Team',
+                    timestamp: '2 hours ago',
                     read: false,
-                    navigateTo: '/approvals'
+                    navigateTo: '/dashboard' // User's subscriptions
                 },
                 {
                     id: 'notif-2',
-                    type: 'approval',
-                    title: 'Subscription Approval Pending',
-                    message: 'Team Beta requested access to Customer Service API',
-                    timestamp: '2 hours ago',
+                    type: 'warning',
+                    title: 'Access Expiring Soon',
+                    message: 'Your Customer Service API access expires in 7 days',
+                    timestamp: '1 day ago',
                     read: false,
-                    navigateTo: '/approvals'
+                    navigateTo: '/dashboard' // Renewal page
                 },
                 {
                     id: 'notif-3',
-                    type: 'success',
-                    title: 'API Quality Improved',
-                    message: 'Your User Service API quality score is now 95/100',
-                    timestamp: '1 day ago',
+                    type: 'info',
+                    title: 'API Deployed to Production',
+                    message: 'Payment Gateway API v2.1 successfully deployed to PROD',
+                    timestamp: '3 days ago',
                     read: true,
-                    navigateTo: '/products/prod-user-service'
+                    navigateTo: '/products/prod-payment' // Deployment history
                 }
             ];
-
             set({
                 products: productsRes.data,
                 teams: allTeams,
