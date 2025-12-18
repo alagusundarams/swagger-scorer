@@ -56,11 +56,11 @@ export const notificationApi = {
             {
                 id: 'notif-003',
                 type: 'warning',
-                title: 'High Latency Alert',
-                message: 'Payment Gateway is experiencing 500ms+ latency.',
+                title: 'Deprecation Notice',
+                message: 'Legacy XML Gateway is scheduled for sunset in 30 days.',
                 timestamp: '5 hours ago',
                 read: true,
-                navigateTo: '/products/prod-001'
+                navigateTo: '/products/prod-003' // Lifecycle Navigation
             }
         ];
     }
