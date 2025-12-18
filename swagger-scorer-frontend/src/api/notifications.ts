@@ -33,11 +33,35 @@ export const notificationApi = {
      * @returns Promise that resolves with notifications array
      */
     async fetchNotifications(): Promise<any[]> {
-        // TODO: Replace with actual API call
-        // Example: const res = await fetch('/api/notifications'); return res.json();
-        console.log('[API PLACEHOLDER] Fetching notifications');
-
-        // Return empty array for now
-        return [];
+        // Mock Data for Navigational Triggers
+        return [
+            {
+                id: 'notif-001',
+                type: 'approval',
+                title: 'New API Access Request',
+                message: 'Team Checkout requested access to Payment Gateway.',
+                timestamp: 'Just now',
+                read: false,
+                navigateTo: '/dashboard?tab=approvals' // DIRECT NAVIGATION
+            },
+            {
+                id: 'notif-002',
+                type: 'success',
+                title: 'Subscription Approved',
+                message: 'Your access to Identity Service PROD is now active.',
+                timestamp: '2 hours ago',
+                read: false,
+                navigateTo: '/products/prod-002' // Contextual Navigation
+            },
+            {
+                id: 'notif-003',
+                type: 'warning',
+                title: 'High Latency Alert',
+                message: 'Payment Gateway is experiencing 500ms+ latency.',
+                timestamp: '5 hours ago',
+                read: true,
+                navigateTo: '/products/prod-001'
+            }
+        ];
     }
 };

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { type Product, type Subscription, type Environment } from '../../../types/entities';
 import { useAuth } from '../../../features/auth/hooks/useAuth';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
@@ -41,7 +41,14 @@ export const DashboardPage = () => {
     } = useStore();
 
     // --- Local UI State ---
-    const [activeTab, setActiveTab] = useState<'produced' | 'consumed' | 'admin' | 'approvals'>('produced');
+    const [searchParams] = useSearchParams();
+    const [activeTab, setActiveTab] = useState<'produced' | 'consumed' | 'admin' | 'approvals'>(() => {
+        const tabParam = searchParams.get('tab');
+        if (tabParam && ['produced', 'consumed', 'admin', 'approvals'].includes(tabParam)) {
+            return tabParam as any;
+        }
+        return 'produced';
+    });
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedEnvironment, setSelectedEnvironment] = useState<Environment>('ALL');
     const [currentPage, setCurrentPage] = useState(1);
