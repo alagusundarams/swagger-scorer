@@ -109,9 +109,9 @@ export const ProductDetailProducer = ({ product }: ProductDetailProducerProps) =
                 </div>
             </div>
 
-            {/* Subscribers Section */}
+            {/* All Subscribers Section */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-slate-700 mb-8">
-                <h2 className="text-xl font-black text-gray-900 dark:text-white mb-4">Top Subscribers</h2>
+                <h2 className="text-xl font-black text-gray-900 dark:text-white mb-4">All Subscribers</h2>
                 {product.subscriberCount && product.subscriberCount > 0 ? (
                     <div className="space-y-3">
                         {/* Placeholder subscriber list - would come from actual data */}
@@ -165,8 +165,11 @@ export const ProductDetailProducer = ({ product }: ProductDetailProducerProps) =
                                         e.stopPropagation();
                                         navigate(`/analyzer?apiId=${api.id}`);
                                     }}
-                                    className="px-3 py-1 text-xs font-semibold bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+                                    className="px-3 py-1.5 text-xs font-semibold bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition flex items-center gap-1.5"
                                 >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+                                    </svg>
                                     Analyze
                                 </button>
                             </div>

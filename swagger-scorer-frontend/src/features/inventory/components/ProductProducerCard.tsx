@@ -4,7 +4,6 @@ import { type Product } from '../../../types/entities';
 interface ProductProducerCardProps {
     product: Product;
     onClick?: () => void;
-    onManage?: () => void;
 }
 
 /**
@@ -110,19 +109,12 @@ export const ProductProducerCard: React.FC<ProductProducerCardProps> = ({
                 </div>
             </div>
 
-            <div className="flex border-t border-gray-100 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 backdrop-blur-sm">
+            <div className="border-t border-gray-100 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 backdrop-blur-sm">
                 <button
                     onClick={(e) => { e.stopPropagation(); onClick?.(); }}
-                    className="flex-1 py-4 text-[10px] font-black text-gray-500 dark:text-slate-400 hover:text-blue-500 uppercase tracking-widest transition-all hover:bg-white dark:hover:bg-slate-700/50"
+                    className="w-full py-4 text-[10px] font-black text-gray-500 dark:text-slate-400 hover:text-blue-500 uppercase tracking-widest transition-all hover:bg-white dark:hover:bg-slate-700/50"
                 >
                     View Details
-                </button>
-                <div className="w-px bg-gray-100 dark:bg-slate-700" />
-                <button
-                    onClick={(e) => { e.stopPropagation(); onManage?.(); }}
-                    className="flex-1 py-4 text-[10px] font-black text-gray-500 dark:text-slate-400 hover:text-blue-500 uppercase tracking-widest transition-all hover:bg-white dark:hover:bg-slate-700/50"
-                >
-                    Manage
                 </button>
             </div>
         </div>

@@ -479,7 +479,6 @@ export const DashboardPage = () => {
                                         key={item.id}
                                         product={item}
                                         onClick={() => navigate(`/products/${item.id}`)}
-                                        onManage={() => { }}
                                     />
                                 )
                             ))}
