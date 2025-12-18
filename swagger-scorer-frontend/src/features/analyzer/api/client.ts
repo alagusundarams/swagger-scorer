@@ -80,19 +80,57 @@ const MOCK_PRODUCTS: Product[] = [
         id: 'prod-001', name: 'payment-gateway', displayName: 'Payment Gateway', version: 'v1.2.0',
         description: 'Unified payment processing API supporting Stripe, PayPal, and Adyen.',
         state: 'published', ownerTeamId: 'team-payments', createdAt: '2023-01-15T00:00:00Z', updatedAt: '2023-11-20T00:00:00Z',
-        apis: [], environment: 'PROD', qualityScore: 92, subscriberCount: 12
+        apis: [
+            {
+                id: 'api-pay-01', name: 'charges-api', displayName: 'Charges & Voids', description: 'Core transaction processing', path: '/v1/charges',
+                operations: [
+                    { id: 'op-chg-01', name: 'createCharge', displayName: 'Create Charge', method: 'POST', urlTemplate: '/v1/charges', description: 'Authorize and capture a new payment charge.' },
+                    { id: 'op-chg-02', name: 'getCharge', displayName: 'Get Charge', method: 'GET', urlTemplate: '/v1/charges/{id}', description: 'Retrieve details of a specific transaction.' },
+                    { id: 'op-chg-03', name: 'updateCharge', displayName: 'Update Charge', method: 'PATCH', urlTemplate: '/v1/charges/{id}', description: 'Update metadata for a transaction.' }
+                ]
+            },
+            {
+                id: 'api-pay-02', name: 'refunds-api', displayName: 'Refunds', description: 'Post-transaction refund processing', path: '/v1/refunds',
+                operations: [
+                    { id: 'op-ref-01', name: 'createRefund', displayName: 'Issue Refund', method: 'POST', urlTemplate: '/v1/refunds', description: 'Process a partial or full refund.' }
+                ]
+            }
+        ], environment: 'PROD', qualityScore: 92, subscriberCount: 12
     },
     {
         id: 'prod-002', name: 'identity-service', displayName: 'Identity Service', version: 'v2.0.1',
         description: 'Centralized authentication and authorization service (OAuth2/OIDC).',
         state: 'published', ownerTeamId: 'team-platform', createdAt: '2022-08-10T00:00:00Z', updatedAt: '2023-12-01T00:00:00Z',
-        apis: [], environment: 'PROD', qualityScore: 88, subscriberCount: 45
+        apis: [
+            {
+                id: 'api-auth-01', name: 'oauth-api', displayName: 'OAuth 2.0 Provider', description: 'Token issuance and validation', path: '/oauth2',
+                operations: [
+                    { id: 'op-auth-01', name: 'authorize', displayName: 'Authorize', method: 'GET', urlTemplate: '/oauth2/authorize', description: 'Initiate authorization flow.' },
+                    { id: 'op-auth-02', name: 'token', displayName: 'Token Endpoint', method: 'POST', urlTemplate: '/oauth2/token', description: 'Exchange code for access tokens.' },
+                    { id: 'op-auth-03', name: 'keys', displayName: 'JWKS', method: 'GET', urlTemplate: '/oauth2/keys', description: 'Retrieve public signing keys.' }
+                ]
+            },
+            {
+                id: 'api-auth-02', name: 'scim-api', displayName: 'SCIM User Management', description: 'User provisioning standard', path: '/scim/v2',
+                operations: [
+                    { id: 'op-scim-01', name: 'createUser', displayName: 'Create User', method: 'POST', urlTemplate: '/scim/v2/Users', description: 'Provision a new identity.' },
+                    { id: 'op-scim-02', name: 'getUser', displayName: 'Get User', method: 'GET', urlTemplate: '/scim/v2/Users/{id}', description: 'Retrieve identity profile.' }
+                ]
+            }
+        ], environment: 'PROD', qualityScore: 88, subscriberCount: 45
     },
     {
         id: 'prod-003', name: 'audit-log', displayName: 'Audit Log API', version: 'v1.0.0',
         description: 'Immutable ledger for all system transaction events.',
         state: 'published', ownerTeamId: 'team-platform', createdAt: '2023-03-10T00:00:00Z', updatedAt: '2023-03-10T00:00:00Z',
-        apis: [], environment: 'PROD', qualityScore: 95, subscriberCount: 8
+        apis: [
+            {
+                id: 'api-audit-01', name: 'events-api', displayName: 'Audit Events', description: 'Read-only event stream', path: '/v1/events',
+                operations: [
+                    { id: 'op-audit-01', name: 'getEvents', displayName: 'List Events', method: 'GET', urlTemplate: '/v1/events', description: 'Filterable list of system events.' }
+                ]
+            }
+        ], environment: 'PROD', qualityScore: 95, subscriberCount: 8
     },
     {
         id: 'prod-004', name: 'recommendations', displayName: 'Recommendation Engine', version: 'v0.5.0-beta',

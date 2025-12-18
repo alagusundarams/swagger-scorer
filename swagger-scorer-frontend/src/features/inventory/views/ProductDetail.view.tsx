@@ -30,6 +30,7 @@ export const ProductDetailPage = () => {
     // --- State ---
     const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
     const [requestTeamId, setRequestTeamId] = useState(user?.defaultTeamId || '');
+    const [selectedEnv, setSelectedEnv] = useState<'DEV' | 'QA' | 'PROD'>('PROD'); // Default to PROD
     const [isPending, setIsPending] = useState(false);
     const [businessReason, setBusinessReason] = useState('');
     const [toast, setToast] = useState<{ message: string; show: boolean }>({ message: '', show: false });
@@ -162,6 +163,22 @@ export const ProductDetailPage = () => {
                         {/* Decorative background */}
                         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/20 rounded-full blur-[100px] pointer-events-none"></div>
 
+                        {/* Environment Selector Tabs */}
+                        <div className="flex gap-2 mb-8 border-b border-white/10 pb-1 relative z-10">
+                            {(['DEV', 'QA', 'PROD'] as const).map(env => (
+                                <button
+                                    key={env}
+                                    onClick={() => setSelectedEnv(env)}
+                                    className={`px-6 py-2 rounded-t-xl text-[10px] font-black uppercase tracking-widest transition-all ${selectedEnv === env
+                                        ? 'bg-blue-600 text-white border-blue-500 mb-[-1px] border-b-2 border-slate-900' // Active: connect to card
+                                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                                        }`}
+                                >
+                                    {env} Environment
+                                </button>
+                            ))}
+                        </div>
+
                         <div className="flex flex-col md:flex-row gap-12 relative z-10">
                             {/* Connection Info */}
                             <div className="flex-1">
@@ -173,14 +190,16 @@ export const ProductDetailPage = () => {
                                 <div className="space-y-6">
                                     <div>
                                         <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Primary Gateway URL</p>
-                                        <code className="block bg-black/30 p-4 rounded-xl font-mono text-sm text-blue-400 border border-white/5">
-                                            https://api.ionosphere.io/gateway/{product.name}/v{product.version}
+                                        <code className="block bg-black/30 p-4 rounded-xl font-mono text-sm text-blue-400 border border-white/5 transition-all duration-300">
+                                            https://api.{selectedEnv === 'PROD' ? 'ionosphere' : selectedEnv.toLowerCase() + '.ionosphere'}.io/gateway/{product.name}/v{product.version}
                                         </code>
                                     </div>
                                     <div className="flex gap-8">
                                         <div>
                                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Environment</p>
-                                            <span className="font-bold text-white">Production (US-East)</span>
+                                            <span className={`font-bold transition-all ${selectedEnv === 'PROD' ? 'text-white' : selectedEnv === 'QA' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                                {selectedEnv === 'PROD' ? 'Production (US-East)' : selectedEnv === 'QA' ? 'Quality Assurance' : 'Development Lab'}
+                                            </span>
                                         </div>
                                         <div>
                                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Expiration</p>
@@ -195,7 +214,7 @@ export const ProductDetailPage = () => {
                             {/* Divider */}
                             <div className="w-px bg-white/10 hidden md:block"></div>
 
-                            {/* Credentials */}
+                            {/* Credentials - Simulated per Environment */}
                             <div className="flex-1">
                                 <h3 className="text-xl font-black uppercase tracking-widest mb-8 flex items-center gap-3">
                                     <span className="bg-amber-500 p-2 rounded-lg text-black">🔑</span>
@@ -203,17 +222,23 @@ export const ProductDetailPage = () => {
                                 </h3>
 
                                 <div className="space-y-6">
-                                    <div>
+                                    <div className="animate-fade-in" key={selectedEnv}>
                                         <div className="flex justify-between items-center mb-2">
                                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Primary Subscription Key</p>
                                             <button className="text-[10px] font-bold text-blue-400 hover:text-white transition-colors uppercase">Regenerate</button>
                                         </div>
                                         <div className="flex gap-2">
-                                            <code className="flex-1 bg-black/30 p-4 rounded-xl font-mono text-sm text-emerald-400 border border-white/5 tracking-wider">
-                                                {subscription.primaryKey.value}
+                                            <code className="flex-1 bg-black/30 p-4 rounded-xl font-mono text-sm text-emerald-400 border border-white/5 tracking-wider transition-all">
+                                                {/* Simulate discrete keys for display purposes */}
+                                                {selectedEnv === 'PROD' ? subscription.primaryKey.value : `${selectedEnv}_${subscription.primaryKey.value.substring(0, 10)}...`}
                                             </code>
                                             <button
-                                                onClick={() => { navigator.clipboard.writeText(subscription.primaryKey.value); setToast({ message: 'Primary Key Copied', show: true }); setTimeout(() => setToast({ message: '', show: false }), 2000); }}
+                                                onClick={() => {
+                                                    const keyVal = selectedEnv === 'PROD' ? subscription.primaryKey.value : `${selectedEnv}_${subscription.primaryKey.value}`;
+                                                    navigator.clipboard.writeText(keyVal);
+                                                    setToast({ message: `${selectedEnv} Key Copied`, show: true });
+                                                    setTimeout(() => setToast({ message: '', show: false }), 2000);
+                                                }}
                                                 className="bg-white/5 hover:bg-white/10 p-4 rounded-xl border border-white/5 text-white transition-all"
                                                 title="Copy Key"
                                             >
