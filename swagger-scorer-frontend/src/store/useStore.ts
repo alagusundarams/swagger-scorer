@@ -58,7 +58,44 @@ export const useStore = create<AppState>((set) => ({
             ]);
 
             const allTeams = teamsRes.data;
-            set({ products: productsRes.data, teams: allTeams, approvalRequests: approvalsRes.data });
+
+            // Mock notifications for testing
+            const mockNotifications: Notification[] = [
+                {
+                    id: 'notif-1',
+                    type: 'approval',
+                    title: 'New Approval Request',
+                    message: 'Team Alpha is requesting access to Payment Gateway API',
+                    timestamp: '5 minutes ago',
+                    read: false,
+                    navigateTo: '/approvals'
+                },
+                {
+                    id: 'notif-2',
+                    type: 'approval',
+                    title: 'Subscription Approval Pending',
+                    message: 'Team Beta requested access to Customer Service API',
+                    timestamp: '2 hours ago',
+                    read: false,
+                    navigateTo: '/approvals'
+                },
+                {
+                    id: 'notif-3',
+                    type: 'success',
+                    title: 'API Quality Improved',
+                    message: 'Your User Service API quality score is now 95/100',
+                    timestamp: '1 day ago',
+                    read: true,
+                    navigateTo: '/products/prod-user-service'
+                }
+            ];
+
+            set({
+                products: productsRes.data,
+                teams: allTeams,
+                approvalRequests: approvalsRes.data,
+                notifications: mockNotifications
+            });
 
             // Map user teams (Group IDs) to Team Entity IDs if not already mapped
             set((state: AppState) => {
