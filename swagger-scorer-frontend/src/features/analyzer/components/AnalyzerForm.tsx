@@ -44,12 +44,31 @@ export const AnalyzerForm: React.FC = () => {
     // Auto-load draft on mount if authenticated
     const location = useLocation();
     useEffect(() => {
-        // High Priority: Check for deep-linked spec from navigation
+        // Priority 1: Check for deep-linked spec from navigation state
         const state = location.state as { startWithSpec?: string } | null;
         if (state?.startWithSpec) {
             setSpec(state.startWithSpec);
-            // Optional: Clear state to avoid reloading on refresh? 
-            // window.history.replaceState({}, document.title);
+            return;
+        }
+
+        // Priority 2: Check for query params (e.g. from Notifications)
+        const params = new URLSearchParams(location.search);
+        const specType = params.get('spec');
+        if (specType === 'deprecation-check') {
+            setSpec(`openapi: 3.0.0
+info:
+  title: Legacy XML Gateway
+  version: 0.9.0
+paths:
+  /soap/v1/transaction:
+    post:
+      deprecated: true
+      summary: Handle SOAP transaction
+      description: This endpoint is deprecated. Use REST API at /v1/payments instead.
+      responses:
+        '200':
+          description: OK
+`);
             return;
         }
 

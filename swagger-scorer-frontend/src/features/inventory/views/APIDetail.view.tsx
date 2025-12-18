@@ -58,7 +58,7 @@ export const APIDetailPage = () => {
                                 {api.displayName}
                             </h1>
                             <button
-                                onClick={() => navigate('/discovery', {
+                                onClick={() => navigate('/analyzer', {
                                     state: {
                                         startWithSpec: `openapi: 3.0.0
 info:

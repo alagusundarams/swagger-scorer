@@ -60,7 +60,7 @@ export const notificationApi = {
                 message: 'Legacy XML Gateway is scheduled for sunset in 30 days.',
                 timestamp: '5 hours ago',
                 read: true,
-                navigateTo: '/products/prod-003' // Lifecycle Navigation
+                navigateTo: '/analyzer?spec=deprecation-check' // Lifecycle Navigation → Analyzer
             }
         ];
     }
