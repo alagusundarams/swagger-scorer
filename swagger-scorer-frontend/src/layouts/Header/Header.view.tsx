@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
+import { useAuth } from '../../features/auth/hooks/useAuth';
 
 interface HeaderProps {
     pageName?: string;
@@ -8,11 +9,12 @@ interface HeaderProps {
 
 export const Header = ({ pageName = 'Dashboard' }: HeaderProps) => {
     const navigate = useNavigate();
+    const { logout: authLogout } = useAuth();
     const [userMenuOpen, setUserMenuOpen] = useState(false);
 
     // Get data from Zustand store (populated after SSO login)
     const user = useStore((state) => state.user);
-    const logout = useStore((state) => state.logout);
+    const storeLogout = useStore((state) => state.logout);
 
     const userMenuRef = useRef<HTMLDivElement>(null);
 
