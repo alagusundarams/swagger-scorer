@@ -187,7 +187,8 @@ export const Header = ({ pageName = 'Dashboard' }: HeaderProps) => {
                                 <div style={{ padding: '8px', borderTop: '1px solid #334155' }}>
                                     <button
                                         onClick={() => {
-                                            logout();
+                                            storeLogout(); // Clear Zustand state
+                                            authLogout(); // Clear auth session
                                             navigate('/login');
                                         }}
                                         style={{
