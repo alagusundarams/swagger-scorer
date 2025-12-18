@@ -163,23 +163,47 @@ export const ProductDetailPage = () => {
                         {/* Decorative background */}
                         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/20 rounded-full blur-[100px] pointer-events-none"></div>
 
-                        {/* Environment Selector Tabs */}
-                        <div className="flex gap-2 mb-8 border-b border-white/10 pb-1 relative z-10">
-                            {(['DEV', 'QA', 'PROD'] as const).map(env => (
-                                <button
-                                    key={env}
-                                    onClick={() => setSelectedEnv(env)}
-                                    className={`px-6 py-2 rounded-t-xl text-[10px] font-black uppercase tracking-widest transition-all ${selectedEnv === env
-                                        ? 'bg-blue-600 text-white border-blue-500 mb-[-1px] border-b-2 border-slate-900' // Active: connect to card
-                                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                                        }`}
-                                >
-                                    {env} Environment
-                                </button>
-                            ))}
+                        {/* Strict Deployment Pipeline (Chain of Enforcement) */}
+                        <div className="mb-10 px-4">
+                            <div className="flex items-center justify-between relative">
+                                {/* Connection Line */}
+                                <div className="absolute top-1/2 left-0 w-full h-1 bg-gradient-to-r from-blue-900 via-blue-800 to-emerald-900/50 -translate-y-1/2 z-0 rounded-full"></div>
+
+                                {(['DEV', 'QA', 'PROD'] as const).map((env, index) => {
+                                    const isActive = selectedEnv === env;
+                                    // const isCompleted = array.indexOf(selectedEnv) >= index; // Logic reserved for future progress visualization
+
+                                    // Region Mock Logic
+                                    const region = env === 'DEV' ? 'East US 2' : env === 'QA' ? 'Central US' : 'Traffic Manager (Global)';
+
+                                    return (
+                                        <button
+                                            key={env}
+                                            onClick={() => setSelectedEnv(env)}
+                                            className={`relative z-10 flex flex-col items-center group transition-all duration-300 ${isActive ? 'scale-110' : 'scale-100 hover:scale-105 opacity-60 hover:opacity-100'}`}
+                                        >
+                                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-black shadow-xl border-4 transition-all duration-300 ${isActive
+                                                ? 'bg-blue-500 border-white text-white shadow-blue-500/50'
+                                                : 'bg-slate-900 border-slate-700 text-slate-500 group-hover:border-blue-500/50'
+                                                }`}>
+                                                {index + 1}
+                                            </div>
+                                            <div className={`mt-4 text-center transition-all ${isActive ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-80'}`}>
+                                                <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isActive ? 'text-white' : 'text-slate-500'}`}>{env} Environment</p>
+                                                <p className="text-[9px] font-mono text-slate-400">{region}</p>
+                                            </div>
+
+                                            {/* Active Indicator Triangle */}
+                                            {isActive && (
+                                                <div className="absolute -bottom-16 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[10px] border-t-white/10"></div>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
 
-                        <div className="flex flex-col md:flex-row gap-12 relative z-10">
+                        <div className="flex flex-col md:flex-row gap-12 relative z-10 bg-black/20 p-8 rounded-3xl border border-white/5 backdrop-blur-sm">
                             {/* Connection Info */}
                             <div className="flex-1">
                                 <h3 className="text-xl font-black uppercase tracking-widest mb-8 flex items-center gap-3">
@@ -196,9 +220,9 @@ export const ProductDetailPage = () => {
                                     </div>
                                     <div className="flex gap-8">
                                         <div>
-                                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Environment</p>
-                                            <span className={`font-bold transition-all ${selectedEnv === 'PROD' ? 'text-white' : selectedEnv === 'QA' ? 'text-amber-400' : 'text-emerald-400'}`}>
-                                                {selectedEnv === 'PROD' ? 'Production (US-East)' : selectedEnv === 'QA' ? 'Quality Assurance' : 'Development Lab'}
+                                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Region</p>
+                                            <span className={`font-bold transition-all ${selectedEnv === 'PROD' ? 'text-white' : 'text-slate-300'}`}>
+                                                {selectedEnv === 'PROD' ? 'Global (Traffic Manager)' : selectedEnv === 'QA' ? 'Central US' : 'East US 2'}
                                             </span>
                                         </div>
                                         <div>
