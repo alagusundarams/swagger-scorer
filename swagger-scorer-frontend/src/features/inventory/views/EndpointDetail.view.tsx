@@ -187,12 +187,12 @@ export const EndpointDetailPage = () => {
                             {/* Animated background accent */}
                             <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl transform group-hover:scale-150 transition-transform duration-1000"></div>
 
-                            <h2 className="text-xl font-black uppercase tracking-widest mb-4 relative z-10">Architecture Sandbox</h2>
+                            <h2 className="text-xl font-black uppercase tracking-widest mb-4 relative z-10">API Console</h2>
                             <p className="text-blue-100/80 text-sm font-medium mb-8 leading-relaxed relative z-10">
-                                Ready to experiment? Our interactive testing environment provides mocked data specific to your subscribed environment.
+                                Validate this endpoint with live data. Using your active subscription credentials for authentication.
                             </p>
                             <button className="w-full bg-white text-blue-600 font-black text-[10px] uppercase tracking-widest py-5 rounded-2xl shadow-premium hover:shadow-2xl transition-all hover:scale-[1.02] active:scale-[0.98] relative z-10">
-                                Switch to Live Console
+                                Launch Console
                             </button>
                         </section>
                     </div>
