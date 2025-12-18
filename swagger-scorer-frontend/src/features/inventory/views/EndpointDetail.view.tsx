@@ -18,7 +18,7 @@ export const EndpointDetailPage = () => {
     const navigate = useNavigate();
 
     // --- Store Integration ---
-    const { products } = useStore();
+    const { products, user } = useStore();
 
     // --- Data Selectors (Hierarchical Resolution) ---
     const product = useMemo(() => products.find(p => p.id === productId), [products, productId]);
@@ -182,19 +182,50 @@ export const EndpointDetailPage = () => {
                             </div>
                         </section>
 
-                        {/* Sandbox Call-to-Action */}
-                        <section className="bg-gradient-to-br from-blue-600 to-indigo-700 p-10 rounded-[2.5rem] shadow-2xl shadow-blue-500/20 text-white relative overflow-hidden group">
-                            {/* Animated background accent */}
-                            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl transform group-hover:scale-150 transition-transform duration-1000"></div>
+                        {/* Role-Based Action Card */}
+                        <div className="animate-fade-in">
+                            {user?.teams.includes(product.ownerTeamId) ? (
+                                // === PRODUCER VIEW: Deep Dive Analysis ===
+                                <section className="bg-gradient-to-br from-blue-600 to-indigo-700 p-10 rounded-[2.5rem] shadow-2xl shadow-blue-500/20 text-white relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl transform group-hover:scale-150 transition-transform duration-1000"></div>
 
-                            <h2 className="text-xl font-black uppercase tracking-widest mb-4 relative z-10">API Console</h2>
-                            <p className="text-blue-100/80 text-sm font-medium mb-8 leading-relaxed relative z-10">
-                                Validate this endpoint with live data. Using your active subscription credentials for authentication.
-                            </p>
-                            <button className="w-full bg-white text-blue-600 font-black text-[10px] uppercase tracking-widest py-5 rounded-2xl shadow-premium hover:shadow-2xl transition-all hover:scale-[1.02] active:scale-[0.98] relative z-10">
-                                Launch Console
-                            </button>
-                        </section>
+                                    <h2 className="text-xl font-black uppercase tracking-widest mb-4 relative z-10 flex items-center gap-2">
+                                        <span className="text-2xl">⚡️</span> Designer Actions
+                                    </h2>
+                                    <p className="text-blue-100/80 text-sm font-medium mb-8 leading-relaxed relative z-10">
+                                        As a product owner, you can inspect the raw specification and validate compliance against enterprise standards.
+                                    </p>
+                                    <button
+                                        onClick={() => navigate('/analyzer', { state: { startWithSpec: 'schema-check', apiId: api.id } })}
+                                        className="w-full bg-white text-blue-600 font-black text-[10px] uppercase tracking-widest py-5 rounded-2xl shadow-premium hover:shadow-2xl transition-all hover:scale-[1.02] active:scale-[0.98] relative z-10 flex items-center justify-center gap-3"
+                                    >
+                                        <span>🔍</span> Open in Analyzer
+                                    </button>
+                                </section>
+                            ) : (
+                                // === CONSUMER VIEW: Integration Support ===
+                                <section className="bg-white dark:bg-slate-800 p-10 rounded-[2.5rem] border border-gray-100 dark:border-slate-700/30 shadow-sm relative overflow-hidden group">
+                                    <h2 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest mb-8 flex items-center gap-3">
+                                        <span className="w-2 h-2 bg-purple-500 rounded-full"></span> Integration Support
+                                    </h2>
+
+                                    <div className="flex flex-col gap-4">
+                                        <button className="w-full bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800 text-gray-600 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest py-4 rounded-xl hover:bg-white dark:hover:bg-slate-800 hover:border-blue-200 dark:hover:border-blue-500/30 hover:text-blue-600 dark:hover:text-blue-400 transition-all flex items-center justify-between px-6">
+                                            <span>Download SDK (Node.js)</span>
+                                            <span className="text-lg">📦</span>
+                                        </button>
+                                        <button className="w-full bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800 text-gray-600 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest py-4 rounded-xl hover:bg-white dark:hover:bg-slate-800 hover:border-rose-200 dark:hover:border-rose-500/30 hover:text-rose-600 dark:hover:text-rose-400 transition-all flex items-center justify-between px-6">
+                                            <span>Report Integration Issue</span>
+                                            <span className="text-lg">🚩</span>
+                                        </button>
+                                    </div>
+
+                                    <p className="text-[10px] text-gray-400 dark:text-slate-600 font-medium mt-6 text-center leading-relaxed">
+                                        Need help? Contact the <span className="font-bold text-gray-900 dark:text-white">{product.ownerTeamId}</span> team directly.
+                                    </p>
+                                </section>
+                            )}
+                        </div>
                     </div>
                 </div>
             </main>
