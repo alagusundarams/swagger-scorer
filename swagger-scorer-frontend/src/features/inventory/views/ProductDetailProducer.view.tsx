@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Product, User } from '../../../types/entities';
+import { useStore } from '../../../store/useStore';
 import { ManageProductModal } from '../components/ManageProductModal';
 
 interface ProductDetailProducerProps {
@@ -21,13 +22,36 @@ interface ProductDetailProducerProps {
 export const ProductDetailProducer = ({ product }: ProductDetailProducerProps) => {
     const navigate = useNavigate();
     const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+    const [selectedSubscriberMenu, setSelectedSubscriberMenu] = useState<string | null>(null);
+    const [revokeModalOpen, setRevokeModalOpen] = useState(false);
+    const [selectedSubscription, setSelectedSubscription] = useState<string | null>(null);
+
     const score = product.qualityScore || 0;
+
+    // Get subscriptions for this product from store
+    const { subscriptions: allSubscriptions, teams: allTeams } = useStore();
+    const productSubscriptions = allSubscriptions.filter(sub =>
+        sub.productId === product.id && sub.state === 'active'
+    );
 
     // Color coding for quality score
     const getScoreColor = (s: number) => {
         if (s >= 90) return 'text-green-500';
         if (s >= 70) return 'text-amber-500';
         return 'text-red-500';
+    };
+
+    const handleRevokeAccess = (subscriptionId: string) => {
+        setSelectedSubscription(subscriptionId);
+        setRevokeModalOpen(true);
+        setSelectedSubscriberMenu(null);
+    };
+
+    const confirmRevoke = () => {
+        // In real app: call API to revoke subscription
+        console.log('Revoking subscription:', selectedSubscription);
+        setRevokeModalOpen(false);
+        setSelectedSubscription(null);
     };
 
     return (
@@ -90,7 +114,7 @@ export const ProductDetailProducer = ({ product }: ProductDetailProducerProps) =
                 <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-slate-700">
                     <div className="text-sm font-bold text-gray-500 dark:text-slate-400 mb-4">Subscribers</div>
                     <div className="text-5xl font-black text-blue-500 mb-2">
-                        {product.subscriberCount || 0}
+                        {productSubscriptions.length}
                     </div>
                     <div className="text-xs text-gray-500 dark:text-slate-500">
                         Active teams using this API
@@ -112,23 +136,63 @@ export const ProductDetailProducer = ({ product }: ProductDetailProducerProps) =
             {/* All Subscribers Section */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-slate-700 mb-8">
                 <h2 className="text-xl font-black text-gray-900 dark:text-white mb-4">All Subscribers</h2>
-                {product.subscriberCount && product.subscriberCount > 0 ? (
+                {productSubscriptions.length > 0 ? (
                     <div className="space-y-3">
-                        {/* Placeholder subscriber list - would come from actual data */}
-                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-900 rounded-lg">
-                            <div>
-                                <div className="font-semibold text-gray-900 dark:text-white">Team Alpha</div>
-                                <div className="text-xs text-gray-500 dark:text-slate-500">Finance Division</div>
-                            </div>
-                            <span className="text-xs font-semibold text-green-500">Active</span>
-                        </div>
-                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-900 rounded-lg">
-                            <div>
-                                <div className="font-semibold text-gray-900 dark:text-white">Team Beta</div>
-                                <div className="text-xs text-gray-500 dark:text-slate-500">Operations</div>
-                            </div>
-                            <span className="text-xs font-semibold text-green-500">Active</span>
-                        </div>
+                        {productSubscriptions.map((subscription) => {
+                            const team = allTeams.find(t => t.id === subscription.subscriberTeamId);
+                            const isMenuOpen = selectedSubscriberMenu === subscription.id;
+
+                            return (
+                                <div key={subscription.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-900 rounded-lg">
+                                    <div className="flex-1">
+                                        <div className="font-semibold text-gray-900 dark:text-white">
+                                            {team?.name || subscription.subscriberTeamId}
+                                        </div>
+                                        <div className="text-xs text-gray-500 dark:text-slate-500">
+                                            {team?.description || 'Team'} • Subscribed {new Date(subscription.createdAt).toLocaleDateString()}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-xs font-semibold px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
+                                            {subscription.state}
+                                        </span>
+                                        <div className="relative">
+                                            <button
+                                                onClick={() => setSelectedSubscriberMenu(isMenuOpen ? null : subscription.id)}
+                                                className="p-2 hover:bg-gray-200 dark:hover:bg-slate-700 rounded transition"
+                                            >
+                                                <svg className="w-5 h-5 text-gray-600 dark:text-slate-400" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                                </svg>
+                                            </button>
+
+                                            {isMenuOpen && (
+                                                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-gray-200 dark:border-slate-700 z-10">
+                                                    <button
+                                                        onClick={() => handleRevokeAccess(subscription.id)}
+                                                        className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-t-lg transition"
+                                                    >
+                                                        Revoke Access
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setSelectedSubscriberMenu(null)}
+                                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition"
+                                                    >
+                                                        View Usage Stats
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setSelectedSubscriberMenu(null)}
+                                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-b-lg transition"
+                                                    >
+                                                        Modify Permissions
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 ) : (
                     <p className="text-gray-500 dark:text-slate-500 text-center py-8">
@@ -177,6 +241,33 @@ export const ProductDetailProducer = ({ product }: ProductDetailProducerProps) =
                     ))}
                 </div>
             </div>
+
+            {/* Revoke Confirmation Modal */}
+            {revokeModalOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Revoke Access?</h3>
+                        <p className="text-gray-600 dark:text-slate-400 mb-6">
+                            This will immediately disable API keys and remove access to all {product.apis.length} APIs in this product.
+                            The team will be notified.
+                        </p>
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => setRevokeModalOpen(false)}
+                                className="px-4 py-2 bg-gray-100 dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600 transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmRevoke}
+                                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+                            >
+                                Revoke Access
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Manage Product Modal */}
             {isManageModalOpen && (
