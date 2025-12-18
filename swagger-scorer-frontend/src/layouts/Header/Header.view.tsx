@@ -251,7 +251,7 @@ export const Header = ({ pageName = 'Dashboard' }: HeaderProps) => {
                                                 </div>
                                             </Link>
                                         ))
-                                    ))}
+                                    )}
                                 </div>
                             </div>
                         )}
