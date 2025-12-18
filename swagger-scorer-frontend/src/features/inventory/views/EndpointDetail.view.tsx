@@ -193,7 +193,7 @@ export const EndpointDetailPage = () => {
                                         <span className="text-2xl">⚡️</span> Designer Actions
                                     </h2>
                                     <p className="text-blue-100/80 text-sm font-medium mb-8 leading-relaxed relative z-10">
-                                        As a product owner, you can inspect the raw specification and validate compliance against enterprise standards.
+                                        As a developer of this API, you can inspect the raw specification and validate compliance against enterprise standards.
                                     </p>
                                     <button
                                         onClick={() => navigate('/analyzer', { state: { startWithSpec: 'schema-check', apiId: api.id } })}
