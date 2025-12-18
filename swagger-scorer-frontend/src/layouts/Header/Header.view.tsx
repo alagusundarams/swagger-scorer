@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 
 interface HeaderProps {
@@ -7,10 +7,12 @@ interface HeaderProps {
 }
 
 export const Header = ({ pageName = 'Dashboard' }: HeaderProps) => {
+    const navigate = useNavigate();
     const [userMenuOpen, setUserMenuOpen] = useState(false);
 
     // Get data from Zustand store (populated after SSO login)
     const user = useStore((state) => state.user);
+    const logout = useStore((state) => state.logout);
 
     const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -181,12 +183,17 @@ export const Header = ({ pageName = 'Dashboard' }: HeaderProps) => {
 
                                 {/* Sign Out */}
                                 <div style={{ padding: '8px', borderTop: '1px solid #334155' }}>
-                                    <button style={{
-                                        width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
-                                        padding: '12px', backgroundColor: 'transparent', border: 'none',
-                                        borderRadius: '8px', cursor: 'pointer', color: '#f87171',
-                                        fontSize: '14px', fontWeight: '600', textAlign: 'left'
-                                    }}
+                                    <button
+                                        onClick={() => {
+                                            logout();
+                                            navigate('/login');
+                                        }}
+                                        style={{
+                                            width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
+                                            padding: '12px', backgroundColor: 'transparent', border: 'none',
+                                            borderRadius: '8px', cursor: 'pointer', color: '#f87171',
+                                            fontSize: '14px', fontWeight: '600', textAlign: 'left'
+                                        }}
                                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#7f1d1d'}
                                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                                         <svg style={{ width: '20px', height: '20px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
