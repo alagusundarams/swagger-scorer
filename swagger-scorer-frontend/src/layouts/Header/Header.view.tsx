@@ -251,35 +251,8 @@ export const Header = ({ pageName = 'Dashboard' }: HeaderProps) => {
                                                 </div>
                                             </Link>
                                         ))
-                                    )}
+                                    ))}
                                 </div>
-
-                                {/* Footer - Only show if there are notifications */}
-                                {notifications.length > 0 && (
-                                    <div style={{ padding: '12px', borderTop: '1px solid #334155', textAlign: 'center' }}>
-                                        <Link
-                                            to="/approvals"
-                                            onClick={() => setNotificationOpen(false)}
-                                            style={{
-                                                color: '#60a5fa',
-                                                fontSize: '14px',
-                                                fontWeight: '500',
-                                                background: 'none',
-                                                border: 'none',
-                                                cursor: 'pointer',
-                                                width: '100%',
-                                                padding: '8px',
-                                                borderRadius: '8px',
-                                                display: 'block',
-                                                textDecoration: 'none',
-                                                textAlign: 'center'
-                                            }}
-                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#334155'}
-                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
-                                            View all approvals
-                                        </Link>
-                                    </div>
-                                )}
                             </div>
                         )}
                     </div>
