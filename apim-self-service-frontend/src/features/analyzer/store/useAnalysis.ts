@@ -1,7 +1,7 @@
 /**
  * @fileoverview Zustand Store for Analysis State
  * 
- * This store manages the global state for the Swagger Scorer application.
+ * This store manages the global state for the APIM Self Service application.
  * It uses Zustand for simple, scalable state management.
  * 
  * State includes:
@@ -84,7 +84,7 @@ export const useAnalysis = create<AnalysisStore>((set, get) => ({
 
         // Validate input
         if (!spec.trim()) {
-            set({ error: 'Swagger content missing. Please enter a valid OpenAPI specification to analyze.' });
+            set({ error: 'Interface content missing. Please enter a valid OpenAPI specification to analyze.' });
             return;
         }
 

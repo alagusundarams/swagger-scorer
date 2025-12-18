@@ -259,7 +259,32 @@ export const DashboardPage = () => {
                 </div>
             )}
 
-            <div className="max-w-7xl mx-auto px-6 w-full pt-12 pb-24">
+            <div className="max-w-7xl mx-auto px-6 w-full pt-16 pb-24">
+                {/* Welcome Hero Area */}
+                <div className="mb-16">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8">
+                        <div>
+                            <h1 className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter mb-3 uppercase">
+                                {activeTab === 'consumed' ? 'Enterprise API Ecosystem' :
+                                    activeTab === 'produced' ? 'Your Provider Portfolio' :
+                                        activeTab === 'approvals' ? 'Governance Pipeline' : 'Global API Inventory'}
+                            </h1>
+                            <p className="text-gray-500 dark:text-slate-400 text-lg font-medium max-w-2xl leading-relaxed">
+                                {activeTab === 'consumed' ? 'Securely discover and consume high-integrity interfaces vetted by the Enterprise Architecture board.' :
+                                    activeTab === 'produced' ? 'Manage your team\'s API lifecycle, monitor quality scores, and oversee consumer access guardrails.' :
+                                        activeTab === 'approvals' ? 'Review pending access requests and visibility changes with a security-first vetting mindset.' : 'Full administrative visibility across the entire Everest Re API landscape.'}
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-3 p-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800/30 rounded-2xl animate-pulse">
+                            <span className="text-xl">🛡️</span>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-black text-violet-600 dark:text-violet-400 uppercase tracking-widest">Security Status</span>
+                                <span className="text-xs font-bold text-violet-800 dark:text-violet-300">AI Safety Vetting: Active</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Dashboard Control Center */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-20 bg-white/60 dark:bg-slate-800/40 p-10 rounded-[2.5rem] border border-gray-100/50 dark:border-slate-700/30 backdrop-blur-2xl shadow-premium">
                     <div className="flex flex-col gap-4">

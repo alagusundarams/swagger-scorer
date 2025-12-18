@@ -274,3 +274,43 @@ rules:
     then:
       field: "500"
       function: truthy
+
+  # =========================================
+  # AI GOVERNANCE & SAFETY (Custom)
+  # =========================================
+
+  ai-model-attribution:
+    description: AI APIs must specify the underlying model version
+    message: "Missing x-ai-model metadata. AI endpoints must specify the model version used."
+    severity: error
+    given: $.paths.[?(@property.match(/chat|prompt|ai|generate/i))]
+    then:
+      field: x-ai-model
+      function: truthy
+
+  ai-prompt-vetting:
+    description: AI features must be vetted for prompt injection risks
+    message: "Endpoint requires security vetting status. Use x-ai-vetting-status: audited."
+    severity: error
+    given: $.paths.[?(@property.match(/chat|prompt/i))]
+    then:
+      field: x-ai-vetting-status
+      function: truthy
+
+  ai-privacy-policy:
+    description: AI endpoints must link to an AI Data Privacy policy
+    message: "Missing x-ai-privacy-link. Users must know how their prompts are used."
+    severity: warn
+    given: $.paths.[?(@property.match(/chat|prompt/i))]
+    then:
+      field: x-ai-privacy-link
+      function: truthy
+
+  ai-output-schema:
+    description: AI responses should have structured schemas, not just strings
+    message: "LLM output uses unstructured string. Consider using a structured schema for reliability."
+    severity: warn
+    given: $.paths..responses[?(@property.match(/200|201/))].content..schema
+    then:
+      field: properties
+      function: truthy

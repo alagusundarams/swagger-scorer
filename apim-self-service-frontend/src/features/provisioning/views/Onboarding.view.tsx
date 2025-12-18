@@ -29,6 +29,8 @@ export const OnboardingWizard = () => {
         visibility: 'public' as 'public' | 'private' | 'owner-only',
         selectedTeams: [] as string[],
         requiresAuth: false,
+        isAiIntegrated: false,
+        aiModel: '',
     });
 
     // Derived teams for the current user
@@ -117,6 +119,38 @@ export const OnboardingWizard = () => {
                                             className="w-full px-6 py-5 bg-gray-50 dark:bg-slate-900 border border-transparent dark:border-slate-800 rounded-2xl focus:border-blue-500 focus:outline-none dark:text-white transition-all font-medium min-h-[140px]"
                                             placeholder="Summarize the core capabilities and value proposition..."
                                         />
+                                    </div>
+
+                                    {/* AI Integration Opt-in */}
+                                    <div className="p-8 bg-violet-50/50 dark:bg-violet-900/10 border border-violet-100 dark:border-violet-800/20 rounded-[2rem] space-y-6">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-4">
+                                                <div className="text-2xl">🤖</div>
+                                                <div>
+                                                    <p className="text-[10px] font-black text-violet-600 dark:text-violet-400 uppercase tracking-widest">AI Security Channel</p>
+                                                    <p className="text-xs text-violet-800 dark:text-violet-300 font-bold uppercase tracking-tight">Does this interface provide AI/LLM features?</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => setFormData({ ...formData, isAiIntegrated: !formData.isAiIntegrated })}
+                                                className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${formData.isAiIntegrated ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/20' : 'bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-slate-400'}`}
+                                            >
+                                                {formData.isAiIntegrated ? 'INTEGRATED' : 'OPT-IN'}
+                                            </button>
+                                        </div>
+
+                                        {formData.isAiIntegrated && (
+                                            <div className="animate-fade-in pt-4 border-t border-violet-100 dark:border-violet-800/30">
+                                                <label className="block text-[9px] font-black text-violet-500 uppercase tracking-widest mb-3">Target Model Attribution (e.g., GPT-4o, Claude 3.5)</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.aiModel}
+                                                    onChange={e => setFormData({ ...formData, aiModel: e.target.value })}
+                                                    className="w-full px-6 py-4 bg-white dark:bg-slate-950 border border-violet-100 dark:border-violet-800/50 rounded-xl focus:border-violet-500 focus:outline-none dark:text-white transition-all font-mono text-sm"
+                                                    placeholder="x-ai-model: gpt-4o-latest"
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -243,7 +277,16 @@ export const OnboardingWizard = () => {
                                                         <p className="text-xs font-mono text-slate-400">East US 2 (Internal Network)</p>
                                                     </div>
                                                 </div>
-                                                <p className="text-[10px] text-slate-400 mt-2 font-medium bg-blue-50 dark:bg-blue-900/10 p-3 rounded-xl border border-blue-100 dark:border-blue-800/20 inline-block">
+                                                {formData.isAiIntegrated && (
+                                                    <div className="mt-6 p-4 bg-violet-50 dark:bg-violet-900/10 border border-violet-100 dark:border-violet-800/30 rounded-2xl flex items-center gap-4">
+                                                        <span className="text-xl">🛡️</span>
+                                                        <div>
+                                                            <p className="text-[10px] font-black text-violet-600 dark:text-violet-400 uppercase tracking-widest">AI Safety Commitment</p>
+                                                            <p className="text-xs text-violet-800 dark:text-violet-300 font-bold">This interface will be scanned for Prompt Injection via Spectral AI-Sec rules.</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                <p className="text-[10px] text-slate-400 mt-4 font-medium bg-blue-50 dark:bg-blue-900/10 p-3 rounded-xl border border-blue-100 dark:border-blue-800/20 inline-block">
                                                     ℹ️ Production promotion requires passing automated Quality Gates in the Pipeline.
                                                 </p>
                                             </div>

@@ -1,7 +1,7 @@
 /**
  * @fileoverview AnalyzerForm Component
  * 
- * This is the main editor component for the Swagger Scorer application.
+ * This is the main editor component for the APIM Self Service portal.
  * It provides a VS Code-like interface for editing OpenAPI specifications.
  * 
  * Features:

@@ -9,21 +9,25 @@ categories:
   security:
     weight: 30       # OWASP API Security Top 10
     enabled: true
+
+  aiSecurity:
+    weight: 20       # AI Safe Harbor & Safety Guardrails
+    enabled: true
   
   structural:
-    weight: 20       # OpenAPI spec compliance
+    weight: 15       # OpenAPI spec compliance
     enabled: true
   
   apiDesign:
-    weight: 20       # RESTful best practices
+    weight: 15       # RESTful best practices
     enabled: true
   
   documentation:
-    weight: 15       # API discoverability
+    weight: 10       # API discoverability
     enabled: true
   
   dataModels:
-    weight: 10       # Schema quality
+    weight: 5        # Schema quality
     enabled: true
   
   errorHandling:
