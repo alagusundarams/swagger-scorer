@@ -233,6 +233,21 @@ export const OnboardingWizard = () => {
                                                     {formData.visibility === 'owner-only' && '👤 Internal Node'}
                                                 </p>
                                             </div>
+                                            <div className="col-span-2 border-t border-gray-200 dark:border-slate-700 pt-6 mt-2">
+                                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                                    INITIAL DEPLOYMENT TARGET <span className="bg-gray-200 text-gray-600 px-1.5 rounded-[4px] text-[9px]">LOCKED</span>
+                                                </p>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-200 dark:border-emerald-800">1</div>
+                                                    <div>
+                                                        <p className="text-sm font-black text-gray-900 dark:text-white">Development Environment</p>
+                                                        <p className="text-xs font-mono text-slate-400">East US 2 (Internal Network)</p>
+                                                    </div>
+                                                </div>
+                                                <p className="text-[10px] text-slate-400 mt-2 font-medium bg-blue-50 dark:bg-blue-900/10 p-3 rounded-xl border border-blue-100 dark:border-blue-800/20 inline-block">
+                                                    ℹ️ Production promotion requires passing automated Quality Gates in the Pipeline.
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
 
