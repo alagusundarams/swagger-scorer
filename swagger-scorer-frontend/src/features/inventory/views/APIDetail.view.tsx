@@ -75,14 +75,20 @@ paths: {}
                             </button>
                         </div>
                         <p className="text-gray-500 dark:text-slate-400 text-lg max-w-3xl leading-relaxed font-medium">
-                            {api.description}
+                            {api.description || (
+                                <span className="flex items-center gap-2 p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/30 rounded-xl text-amber-700 dark:text-amber-500 text-sm font-bold">
+                                    ⚠️ Governance Alert: This interface lacks a functional description. Please update the registry metadata.
+                                </span>
+                            )}
                         </p>
 
                         {/* Deployment Context */}
                         <div className="flex flex-wrap items-center gap-8 mt-10 p-6 bg-gray-50/50 dark:bg-slate-800/40 rounded-[2rem] border border-gray-100 dark:border-slate-700/30">
                             <div className="flex flex-col gap-1">
                                 <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Base Routing Path</span>
-                                <span className="font-mono text-sm font-black text-blue-600 dark:text-blue-400">{api.path}</span>
+                                <span className="font-mono text-sm font-black text-blue-600 dark:text-blue-400">
+                                    {api.path || <span className="text-red-500">UNASSIGNED_ROUTE</span>}
+                                </span>
                             </div>
                             <div className="w-px h-8 bg-gray-200 dark:bg-slate-700/50 hidden md:block"></div>
                             <div className="flex flex-col gap-1">
