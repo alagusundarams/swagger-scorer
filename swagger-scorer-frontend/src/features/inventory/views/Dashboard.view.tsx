@@ -194,7 +194,6 @@ export const DashboardPage = () => {
         }
         return [
             { label: 'Active Subscriptions', value: subscribedProducts.length, icon: '📥' },
-            { label: 'Pending Requests', value: allSubscriptions.filter(s => s.state === 'pending').length, icon: '⏳', trend: { value: 'Awaiting Approval', isPositive: false } },
             { label: 'Provider Diversity', value: new Set(subscribedProducts.map(p => p.ownerTeamId)).size, icon: '🌐' },
             { label: 'Environment Mix', value: 'PROD / DEV', icon: '🏗️' }
         ];
@@ -297,14 +296,14 @@ export const DashboardPage = () => {
                 </div>
 
                 {/* Performance Metrics Hero */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-20">
+                <div className={`grid grid-cols-1 md:grid-cols-2 ${heroStats.length === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-8 mb-20`}>
                     {heroStats.map((stat, idx) => (
                         <StatCard
                             key={idx}
                             label={stat.label}
                             value={stat.value}
                             icon={stat.icon}
-                            trend={stat.trend}
+                            trend={(stat as any).trend}
                         />
                     ))}
                 </div>
