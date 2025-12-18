@@ -1,5 +1,5 @@
 {
-    "name": "swagger-scorer-backend",
+    "name": "apim-self-service-backend",
     "version": "1.0.0",
     "description": "OpenAPI/Swagger quality scoring API using Spectral",
     "type": "module",
