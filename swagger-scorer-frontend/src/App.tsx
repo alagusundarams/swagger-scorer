@@ -1,5 +1,5 @@
 
-import React from 'react';
+
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Header } from './components/Header';
 import { AnalyzerForm } from './components/AnalyzerForm';
@@ -13,6 +13,7 @@ import { EndpointDetailPage } from './pages/EndpointDetailPage';
 import { OnboardingWizard } from './pages/OnboardingWizard';
 import { BrowsePage } from './pages/BrowsePage';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { HeaderFooterTest } from './pages/HeaderFooterTest';
 
 function SwaggerAnalyzerLayout() {
   return (
@@ -21,12 +22,12 @@ function SwaggerAnalyzerLayout() {
       <main className="flex-grow flex flex-col overflow-hidden">
         <div className="flex h-full">
           {/* Left: Input (Standard/Monaco) */}
-          <div className="w-1/2 h-full flex flex-col border-r border-[#1e1e1e]">
+          <div className="w-1/2 h-full flex flex-col border-r-2 border-[#1e1e1e]">
             <AnalyzerForm />
           </div>
 
           {/* Right: Output (Results) */}
-          <div className="w-1/2 h-full overflow-y-auto bg-gray-50 p-6 space-y-6">
+          <div className="w-1/2 h-full overflow-y-auto bg-gray-50 p-8 space-y-8">
             <ScoreCard />
             <ViolationsTable />
           </div>
@@ -41,13 +42,10 @@ function App() {
     <Router>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/test-header" element={<HeaderFooterTest />} />
         <Route
           path="/"
-          element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
+          element={<DashboardPage />}
         />
         <Route
           path="/products/:productId"

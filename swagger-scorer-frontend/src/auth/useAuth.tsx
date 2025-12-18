@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { useMsal, MsalProvider } from "@azure/msal-react";
 import { PublicClientApplication } from "@azure/msal-browser";
 import { msalConfig, loginRequest } from "./authConfig";
@@ -8,6 +8,10 @@ interface User {
     name: string;
     username: string; // email or preferred_username
     id: string; // oid or sub
+    email: string;
+    azureAdObjectId: string;
+    teams: string[];
+    defaultTeamId: string;
 }
 
 interface AuthContextType {
@@ -29,7 +33,11 @@ const MockAuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const user: User = {
         name: "Mock Developer",
         username: "mock@local.dev",
-        id: "mock-user-id"
+        id: "mock-user-id",
+        email: "mock@local.dev",
+        azureAdObjectId: "mock-azure-ad-id",
+        teams: ['team-platform', 'team-payments', 'team-data'],
+        defaultTeamId: 'team-platform'
     };
 
     const login = () => {
@@ -68,7 +76,11 @@ const MsalAuthAdapter: React.FC<{ children: ReactNode }> = ({ children }) => {
     const user: User | null = account ? {
         name: account.name || "Unknown",
         username: account.username,
-        id: account.localAccountId // or account.homeAccountId
+        id: account.localAccountId, // or account.homeAccountId
+        email: account.username,
+        azureAdObjectId: account.localAccountId,
+        teams: [], // TODO: Get teams from token claims or API
+        defaultTeamId: '' // TODO: Get default team from user preferences
     } : null;
 
     const login = () => {

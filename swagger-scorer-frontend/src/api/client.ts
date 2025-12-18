@@ -22,6 +22,12 @@ const api = axios.create({
     headers: { 'Content-Type': 'application/json' },
 });
 
+// Separate instance for Workflow Service (different port/URL in dev)
+const workflowApi = axios.create({
+    baseURL: import.meta.env.VITE_WORKFLOW_API_URL || 'http://localhost:3002/api/v1',
+    headers: { 'Content-Type': 'application/json' },
+});
+
 /**
  * Analysis result returned from the /analyze endpoint.
  */
@@ -76,3 +82,22 @@ export interface AnalysisResult {
  */
 export const postAnalyze = (spec: string) =>
     api.post<AnalysisResult>('/analyze', { content: spec, format: 'yaml' });
+
+/**
+ * Save the current spec as a draft.
+ * Requires Authentication.
+ */
+export const saveDraft = (spec: string, token: string, apiTitle?: string) =>
+    workflowApi.post<{ success: true; requestId: string }>('/drafts',
+        { spec, apiTitle },
+        { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+/**
+ * Get the latest draft for the signed-in user.
+ * Requires Authentication.
+ */
+export const getLatestDraft = (token: string) =>
+    workflowApi.get<{ spec: string; apiTitle: string; updatedAt: string }>('/drafts/latest',
+        { headers: { Authorization: `Bearer ${token}` } }
+    );

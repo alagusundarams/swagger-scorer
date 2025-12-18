@@ -16,6 +16,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Editor, { type OnMount, type Monaco } from '@monaco-editor/react';
+import { useAuth } from '../auth/useAuth';
+import { saveDraft, getLatestDraft } from '../api/client';
 import { useAnalysis } from '../store/useAnalysis';
 
 export const AnalyzerForm: React.FC = () => {
@@ -31,6 +33,57 @@ export const AnalyzerForm: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'yaml' | 'config'>('yaml');
 
     // === HANDLERS ===
+
+    // === IMPORTS & AUTH ===
+    const { isAuthenticated, login, getToken } = useAuth();
+    const [saving, setSaving] = useState(false);
+
+    // === EFFECTS ===
+
+    // Auto-load draft on mount if authenticated
+    useEffect(() => {
+        const loadDraft = async () => {
+            if (isAuthenticated && !spec) {
+                try {
+                    const token = await getToken();
+                    if (!token) return;
+
+                    const draft = await getLatestDraft(token);
+                    if (draft.data.spec) {
+                        if (confirm(`Found a saved draft "${draft.data.apiTitle}" from ${new Date(draft.data.updatedAt).toLocaleDateString()}. Load it?`)) {
+                            setSpec(draft.data.spec);
+                        }
+                    }
+                } catch (err) {
+                    console.log("No draft found or silent auth failed");
+                }
+            }
+        };
+        loadDraft();
+    }, [isAuthenticated]);
+
+    // === HANDLERS ===
+
+    const handleSave = async () => {
+        if (!isAuthenticated) {
+            login();
+            return;
+        }
+
+        setSaving(true);
+        try {
+            const token = await getToken();
+            if (!token) throw new Error("No access token");
+
+            await saveDraft(spec, token, "My API Spec");
+            // Could show a toast here
+        } catch (err) {
+            console.error("Failed to save", err);
+            alert("Failed to save draft. Please try signing in again.");
+        } finally {
+            setSaving(false);
+        }
+    };
 
     /**
      * Clear the editor and reset analysis results.
@@ -97,7 +150,7 @@ export const AnalyzerForm: React.FC = () => {
         <div className="flex flex-col h-full bg-[#1e1e1e] relative">
             {/* Error Banner - Shows API errors */}
             {error && (
-                <div className="mx-4 mt-3 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-start gap-2">
+                <div className="m-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-start gap-2 animate-fade-in">
                     <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -113,8 +166,8 @@ export const AnalyzerForm: React.FC = () => {
                     <div
                         onClick={() => setActiveTab('yaml')}
                         className={`px-4 h-full text-[13px] flex items-center gap-2 cursor-pointer select-none border-t-2 ${activeTab === 'yaml'
-                                ? 'bg-[#1e1e1e] text-white border-t-blue-500'
-                                : 'bg-[#2d2d2d] text-[#969696] hover:bg-[#2a2d2e] border-t-transparent'
+                            ? 'bg-[#1e1e1e] text-white border-t-blue-500'
+                            : 'bg-[#2d2d2d] text-[#969696] hover:bg-[#2a2d2e] border-t-transparent'
                             }`}
                     >
                         <svg className={`w-4 h-4 ${activeTab === 'yaml' ? 'text-blue-400' : 'opacity-50'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -127,8 +180,8 @@ export const AnalyzerForm: React.FC = () => {
                     <div
                         onClick={() => setActiveTab('config')}
                         className={`px-4 h-full text-[13px] flex items-center gap-2 cursor-pointer select-none border-t-2 ${activeTab === 'config'
-                                ? 'bg-[#1e1e1e] text-white border-t-blue-500'
-                                : 'bg-[#2d2d2d] text-[#969696] hover:bg-[#2a2d2e] border-t-transparent'
+                            ? 'bg-[#1e1e1e] text-white border-t-blue-500'
+                            : 'bg-[#2d2d2d] text-[#969696] hover:bg-[#2a2d2e] border-t-transparent'
                             }`}
                     >
                         <svg className={`w-4 h-4 ${activeTab === 'config' ? 'text-yellow-400' : 'opacity-50'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -146,7 +199,7 @@ export const AnalyzerForm: React.FC = () => {
                 <div className="flex items-center px-3 gap-2 h-full">
                     <button
                         onClick={handleClear}
-                        className="px-2.5 py-1.5 text-xs font-medium text-gray-400 hover:text-white hover:bg-white/10 rounded transition-all"
+                        className="px-3 py-1.5 text-xs font-medium text-gray-400 hover:text-white hover:bg-white/10 rounded transition-all duration-200 hover:scale-105 active:scale-95"
                         title="Clear Workspace"
                     >
                         Clear
@@ -154,18 +207,42 @@ export const AnalyzerForm: React.FC = () => {
 
                     <button
                         onClick={toggleMaximize}
-                        className="px-2.5 py-1.5 text-xs font-medium text-gray-400 hover:text-white hover:bg-white/10 rounded transition-all"
+                        className="px-3 py-1.5 text-xs font-medium text-gray-400 hover:text-white hover:bg-white/10 rounded transition-all duration-200 hover:scale-105 active:scale-95"
                         title={isMaximized ? "Restore Editor" : "Maximize Editor"}
                     >
                         {isMaximized ? "Restore" : "Maximize"}
                     </button>
 
                     <button
+                        onClick={handleSave}
+                        disabled={saving || !spec.trim()}
+                        className={`px-3 py-1.5 text-xs font-medium rounded transition-all duration-200 flex items-center gap-1.5 ${saving || !spec.trim()
+                            ? 'text-gray-500 cursor-not-allowed'
+                            : 'text-gray-400 hover:text-white hover:bg-white/10 hover:scale-105 active:scale-95'
+                            }`}
+                        title={isAuthenticated ? "Save Draft" : "Sign in to Save"}
+                    >
+                        {saving ? (
+                            <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        ) : (
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                            </svg>
+                        )}
+                        <span>{saving ? 'Saving...' : 'Save Draft'}</span>
+                    </button>
+
+                    <div className="w-px h-4 bg-gray-700 mx-1"></div>
+
+                    <button
                         onClick={runAnalysis}
                         disabled={loading || !spec.trim()}
-                        className={`px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wide transition-all ${loading || !spec.trim()
-                                ? 'bg-[#3b3b3b] text-gray-600 cursor-not-allowed'
-                                : 'bg-[#0e639c] text-white hover:bg-[#1177bb]'
+                        className={`px-4 py-1.5 rounded text-xs font-bold uppercase tracking-wide transition-all duration-200 ${loading || !spec.trim()
+                            ? 'bg-[#3b3b3b] text-gray-600 cursor-not-allowed'
+                            : 'bg-[#0e639c] text-white hover:bg-[#1177bb] hover:scale-105 hover:shadow-lg hover:shadow-blue-500/50 active:scale-95'
                             }`}
                         title="Run Analysis"
                     >
@@ -181,7 +258,7 @@ export const AnalyzerForm: React.FC = () => {
                         {/* Monaco Editor */}
                         <Editor
                             height="100%"
-                            defaultLanguage="yaml"
+                            defaultLanguage={spec.trim().startsWith('{') ? 'json' : 'yaml'}
                             value={spec}
                             theme="vs-dark"
                             onChange={(value) => setSpec(value || '')}

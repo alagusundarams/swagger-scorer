@@ -8,7 +8,7 @@
  * - SVG donut chart with colored segments per category
  * - RAG status indicator (Red/Amber/Green)
  * - Category progress bars with glow effects
- * - Dark theme optimized styling
+ * - Dark theme optimized styling with Tailwind
  * 
  * @component
  */
@@ -82,27 +82,13 @@ export const ScoreCard: React.FC = () => {
 
     // === RENDER ===
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 animate-fade-in">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8 animate-fade-in">
 
             {/* === DONUT CHART SECTION === */}
-            <div style={{
-                backgroundColor: '#1e293b',
-                borderRadius: '12px',
-                padding: '24px',
-                border: '1px solid #334155',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center'
-            }}>
-                <h3 style={{
-                    color: '#94a3b8',
-                    fontWeight: '600',
-                    marginBottom: '24px',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.08em',
-                    fontSize: '12px'
-                }}>Quality Score</h3>
+            <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 flex flex-col items-center justify-center shadow-lg shadow-slate-900/50 hover:border-blue-500/30 transition-all duration-300">
+                <h3 className="text-xs font-semibold mb-6 uppercase tracking-widest text-slate-400">
+                    Quality Score
+                </h3>
 
                 {/* SVG Donut Chart */}
                 <div className="relative flex items-center justify-center mb-2">
@@ -145,10 +131,10 @@ export const ScoreCard: React.FC = () => {
 
                     {/* Center Score Display */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                        <span className={`text-4xl font-extrabold tracking-tight ${status === 'green' ? 'text-emerald-500' : status === 'amber' ? 'text-amber-500' : 'text-red-500'}`}>
+                        <span className={`text-5xl font-extrabold tracking-tight transition-colors duration-300 ${status === 'green' ? 'text-emerald-500' : status === 'amber' ? 'text-amber-500' : 'text-red-500'}`}>
                             {score}
                         </span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mt-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-2">
                             {status?.toUpperCase()}
                         </span>
                     </div>
@@ -156,71 +142,41 @@ export const ScoreCard: React.FC = () => {
             </div>
 
             {/* === CATEGORY BREAKDOWN SECTION === */}
-            <div style={{
-                gridColumn: 'span 2',
-                backgroundColor: '#1e293b',
-                borderRadius: '12px',
-                padding: '24px',
-                border: '1px solid #334155'
-            }}>
-                <h3 style={{
-                    color: '#94a3b8',
-                    fontWeight: '600',
-                    marginBottom: '20px',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.08em',
-                    fontSize: '11px'
-                }}>Category Breakdown</h3>
+            <div className="col-span-1 lg:col-span-2 bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-lg shadow-slate-900/50 hover:border-blue-500/30 transition-all duration-300">
+                <h3 className="text-xs font-semibold mb-5 uppercase tracking-widest text-slate-400">
+                    Category Breakdown
+                </h3>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div className="flex flex-col gap-4">
                     {categoryArray.map((category) => {
                         const barColor = getBarColor(category.name);
 
                         return (
-                            <div key={category.name} style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '16px'
-                            }}>
+                            <div key={category.name} className="flex items-center gap-4">
                                 {/* Category Name */}
-                                <div style={{ width: '120px', flexShrink: 0 }}>
-                                    <span style={{
-                                        fontSize: '14px',
-                                        fontWeight: '500',
-                                        color: '#e2e8f0',
-                                        textTransform: 'capitalize'
-                                    }}>{category.name}</span>
+                                <div className="w-32 flex-shrink-0">
+                                    <span className="text-sm font-medium text-slate-200 capitalize">
+                                        {category.name}
+                                    </span>
                                 </div>
 
                                 {/* Progress Bar */}
-                                <div style={{
-                                    flexGrow: 1,
-                                    height: '10px',
-                                    backgroundColor: '#334155',
-                                    borderRadius: '5px',
-                                    overflow: 'hidden',
-                                    position: 'relative'
-                                }}>
-                                    <div style={{
-                                        position: 'absolute',
-                                        left: 0,
-                                        top: 0,
-                                        height: '100%',
-                                        width: `${category.score}%`,
-                                        backgroundColor: barColor,
-                                        borderRadius: '5px',
-                                        transition: 'width 1s ease-out',
-                                        boxShadow: `0 0 10px ${barColor}50`
-                                    }}></div>
+                                <div className="flex-grow h-2.5 bg-slate-700 rounded-full overflow-hidden relative">
+                                    <div 
+                                        className="absolute left-0 top-0 h-full rounded-full transition-all duration-1000 ease-out"
+                                        style={{
+                                            width: `${category.score}%`,
+                                            backgroundColor: barColor,
+                                            boxShadow: `0 0 10px ${barColor}50`
+                                        }}
+                                    />
                                 </div>
 
                                 {/* Percentage */}
-                                <div style={{ width: '48px', textAlign: 'right', flexShrink: 0 }}>
-                                    <span style={{
-                                        fontSize: '14px',
-                                        fontWeight: '700',
-                                        color: '#f1f5f9'
-                                    }}>{Math.round(category.score)}%</span>
+                                <div className="w-12 text-right flex-shrink-0">
+                                    <span className="text-sm font-bold text-slate-100">
+                                        {Math.round(category.score)}%
+                                    </span>
                                 </div>
                             </div>
                         );

@@ -1,10 +1,77 @@
-import React from 'react';
-
 export const Footer = () => {
     return (
-        <footer className="bg-white border-t border-gray-200 mt-auto">
-            <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-center text-sm text-gray-500">
-                <p>&copy; 2024 APIM Self Service. Internal Tool.</p>
+        <footer style={{
+            backgroundColor: '#1e293b',
+            borderTop: '2px solid #64748b',
+            marginTop: 'auto',
+            boxShadow: '0 -2px 4px 0 rgba(0, 0, 0, 0.2)'
+        }}>
+            <div style={{
+                maxWidth: '1920px',
+                margin: '0 auto',
+                padding: '24px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '16px'
+            }}>
+
+                {/* Left: Brand + Copyright */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    {/* APIM Icon */}
+                    <div style={{
+                        width: '28px',
+                        height: '28px',
+                        background: 'linear-gradient(to bottom right, #3b82f6, #2563eb)',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}>
+                        <svg style={{ width: '16px', height: '16px', color: 'white' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                    </div>
+
+                    <p style={{ fontSize: '14px', color: '#94a3b8', margin: 0 }}>
+                        © 2024 APIM Self Service. All rights reserved.
+                    </p>
+                </div>
+
+                {/* Right: Contact */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{
+                        width: '32px',
+                        height: '32px',
+                        backgroundColor: '#334155',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}>
+                        <svg style={{ width: '16px', height: '16px', color: '#60a5fa' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p style={{ fontSize: '11px', color: '#94a3b8', margin: '0 0 2px 0' }}>Contact</p>
+                        <a
+                            href="mailto:apim-admin@company.com"
+                            style={{
+                                fontSize: '14px',
+                                color: '#cbd5e1',
+                                textDecoration: 'none',
+                                transition: 'color 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.color = '#60a5fa'}
+                            onMouseLeave={(e) => e.currentTarget.style.color = '#cbd5e1'}
+                        >
+                            apim-admin@company.com
+                        </a>
+                    </div>
+                </div>
+
             </div>
         </footer>
     );

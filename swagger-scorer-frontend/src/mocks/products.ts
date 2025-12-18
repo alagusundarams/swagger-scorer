@@ -54,7 +54,6 @@ export const mockProducts: Product[] = [
         subscriberCount: 15,
         qualityScore: 87,
         createdAt: '2024-01-15T10:00:00Z',
-        createdAt: '2024-01-15T10:00:00Z',
         updatedAt: '2024-03-20T14:30:00Z',
         environment: 'PROD', // Deployed to Production
         identity: {
@@ -234,7 +233,6 @@ export const mockProducts: Product[] = [
         subscriberCount: 12,
         qualityScore: 85,
         createdAt: '2024-01-20T08:00:00Z',
-        createdAt: '2024-01-20T08:00:00Z',
         updatedAt: '2024-03-18T16:45:00Z',
         environment: 'PROD', // Production deployment
         identity: {
@@ -273,7 +271,6 @@ export const mockProducts: Product[] = [
         state: 'published',
         ownerTeamId: 'team-external-1',
         createdAt: '2023-11-10T10:00:00Z',
-        createdAt: '2023-11-10T10:00:00Z',
         updatedAt: '2024-03-10T09:30:00Z',
         environment: 'STAGE', // Staging environment
         identity: {
@@ -310,7 +307,6 @@ export const mockProducts: Product[] = [
         description: 'Send transactional and marketing emails',
         state: 'published',
         ownerTeamId: 'team-external-2',
-        createdAt: '2023-12-05T14:00:00Z',
         createdAt: '2023-12-05T14:00:00Z',
         updatedAt: '2024-02-28T10:15:00Z',
         environment: 'DEV', // Development environment

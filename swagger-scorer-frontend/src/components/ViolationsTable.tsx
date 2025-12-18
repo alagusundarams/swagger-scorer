@@ -53,60 +53,19 @@ export const ViolationsTable: React.FC = () => {
     };
 
     return (
-        <div style={{
-            width: '100%',
-            backgroundColor: '#1e293b',
-            borderRadius: '12px',
-            border: '1px solid #334155',
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column'
-        }}>
+        <div className="w-full bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex flex-col shadow-lg shadow-slate-900/50">
             {/* Header */}
-            <div style={{
-                padding: '16px 24px',
-                borderBottom: '1px solid #334155',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                backgroundColor: '#0f172a'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <h3 style={{
-                        fontSize: '16px',
-                        fontWeight: '700',
-                        color: '#f1f5f9',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        margin: 0
-                    }}>
+            <div className="px-6 py-4 border-b border-slate-700 flex justify-between items-center bg-slate-900">
+                <div className="flex items-center gap-4">
+                    <h3 className="text-base font-bold text-slate-100 flex items-center gap-3 m-0">
                         Violations
-                        <span style={{
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            color: '#94a3b8',
-                            backgroundColor: '#334155',
-                            padding: '4px 10px',
-                            borderRadius: '12px',
-                            border: '1px solid #475569'
-                        }}>
+                        <span className="text-xs font-semibold text-slate-400 bg-slate-700 px-2.5 py-1 rounded-xl border border-slate-600">
                             {result.violations.length}
                         </span>
                     </h3>
                     <button
                         onClick={toggleAll}
-                        style={{
-                            fontSize: '13px',
-                            fontWeight: '500',
-                            color: '#60a5fa',
-                            backgroundColor: '#1e3a5f',
-                            padding: '6px 14px',
-                            borderRadius: '6px',
-                            border: '1px solid #3b82f6',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s'
-                        }}
+                        className="text-sm font-medium text-blue-400 bg-blue-950/50 px-3.5 py-1.5 rounded-md border border-blue-600/50 cursor-pointer transition-all duration-200 hover:bg-blue-900/50 hover:border-blue-500"
                     >
                         {allExpanded ? 'Collapse All' : 'Expand All'}
                     </button>
@@ -133,20 +92,7 @@ export const ViolationsTable: React.FC = () => {
                         a.click();
                         window.URL.revokeObjectURL(url);
                     }}
-                    style={{
-                        padding: '6px 14px',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        color: '#e2e8f0',
-                        backgroundColor: '#334155',
-                        border: '1px solid #475569',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s'
-                    }}
+                    className="px-3.5 py-1.5 text-sm font-medium text-slate-200 bg-slate-700 border border-slate-600 rounded-md cursor-pointer flex items-center gap-2 transition-all duration-200 hover:bg-slate-600 hover:border-slate-500"
                 >
                     <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -156,108 +102,64 @@ export const ViolationsTable: React.FC = () => {
             </div>
 
             {/* Scrollable Content */}
-            <div style={{ overflowY: 'auto', maxHeight: '400px' }}>
+            <div className="overflow-y-auto max-h-[400px]">
                 {Object.entries(groupedViolations).map(([category, violations]) => {
                     const isExpanded = expandedGroups[category];
                     const categoryColor = getCategoryColor(category);
 
                     return (
-                        <div key={category} style={{ borderBottom: '1px solid #334155' }}>
+                        <div key={category} className="border-b border-slate-700 last:border-b-0">
                             {/* Category Header - Clickable */}
                             <div
                                 onClick={() => toggleGroup(category)}
-                                style={{
-                                    padding: '16px 24px',
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    cursor: 'pointer',
-                                    backgroundColor: isExpanded ? '#0f172a' : '#1e293b',
-                                    transition: 'background-color 0.2s',
-                                    userSelect: 'none'
-                                }}
+                                className={`px-6 py-4 flex justify-between items-center cursor-pointer transition-colors duration-200 select-none ${isExpanded ? 'bg-slate-900' : 'bg-slate-800 hover:bg-slate-750'
+                                    }`}
                             >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                                <div className="flex items-center gap-3.5">
                                     {/* Chevron Icon */}
-                                    <div style={{
-                                        width: '24px',
-                                        height: '24px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        backgroundColor: '#334155',
-                                        borderRadius: '6px'
-                                    }}>
+                                    <div className="w-6 h-6 flex items-center justify-center bg-slate-700 rounded-md">
                                         <svg
                                             width="14"
                                             height="14"
                                             fill="none"
                                             stroke="#94a3b8"
                                             viewBox="0 0 24 24"
-                                            style={{
-                                                transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                                                transition: 'transform 0.2s ease-out'
-                                            }}
+                                            className={`transition-transform duration-200 ease-out ${isExpanded ? 'rotate-90' : 'rotate-0'
+                                                }`}
                                         >
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                                         </svg>
                                     </div>
 
                                     {/* Category Color Dot with Glow */}
-                                    <div style={{
-                                        width: '12px',
-                                        height: '12px',
-                                        borderRadius: '50%',
-                                        backgroundColor: categoryColor,
-                                        boxShadow: `0 0 8px ${categoryColor}`
-                                    }}></div>
+                                    <div
+                                        className="w-3 h-3 rounded-full"
+                                        style={{
+                                            backgroundColor: categoryColor,
+                                            boxShadow: `0 0 8px ${categoryColor}`
+                                        }}
+                                    />
 
                                     {/* Category Name */}
-                                    <span style={{
-                                        fontSize: '15px',
-                                        fontWeight: '600',
-                                        color: '#f1f5f9',
-                                        textTransform: 'capitalize'
-                                    }}>{category}</span>
+                                    <span className="text-[15px] font-semibold text-slate-100 capitalize">
+                                        {category}
+                                    </span>
 
                                     {/* Violation Count */}
-                                    <span style={{
-                                        fontSize: '12px',
-                                        fontWeight: '500',
-                                        color: '#94a3b8',
-                                        backgroundColor: '#334155',
-                                        padding: '3px 10px',
-                                        borderRadius: '10px'
-                                    }}>
+                                    <span className="text-xs font-medium text-slate-400 bg-slate-700 px-2.5 py-0.5 rounded-lg">
                                         {violations.length} issue{violations.length !== 1 ? 's' : ''}
                                     </span>
                                 </div>
 
                                 {/* Severity Indicators */}
-                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <div className="flex gap-2 items-center">
                                     {violations.filter(v => v.severity === 'error').length > 0 && (
-                                        <span style={{
-                                            fontSize: '11px',
-                                            fontWeight: '600',
-                                            color: '#f87171',
-                                            backgroundColor: '#450a0a',
-                                            padding: '3px 8px',
-                                            borderRadius: '4px',
-                                            border: '1px solid #7f1d1d'
-                                        }}>
+                                        <span className="text-[11px] font-semibold text-red-400 bg-red-950 px-2 py-0.5 rounded border border-red-900">
                                             {violations.filter(v => v.severity === 'error').length} errors
                                         </span>
                                     )}
                                     {violations.filter(v => v.severity === 'warning').length > 0 && (
-                                        <span style={{
-                                            fontSize: '11px',
-                                            fontWeight: '600',
-                                            color: '#fbbf24',
-                                            backgroundColor: '#451a03',
-                                            padding: '3px 8px',
-                                            borderRadius: '4px',
-                                            border: '1px solid #78350f'
-                                        }}>
+                                        <span className="text-[11px] font-semibold text-amber-400 bg-amber-950 px-2 py-0.5 rounded border border-amber-900">
                                             {violations.filter(v => v.severity === 'warning').length} warnings
                                         </span>
                                     )}
@@ -266,29 +168,15 @@ export const ViolationsTable: React.FC = () => {
 
                             {/* Expanded Content */}
                             {isExpanded && (
-                                <div style={{
-                                    backgroundColor: '#0f172a',
-                                    borderTop: '1px solid #334155'
-                                }}>
+                                <div className="bg-slate-900 border-t border-slate-700">
                                     {sortViolations(violations).map((violation, idx) => (
                                         <div
                                             key={idx}
                                             onClick={() => selectLine(violation.line)}
-                                            style={{
-                                                padding: '16px 24px 16px 64px',
-                                                borderBottom: idx < violations.length - 1 ? '1px solid #334155' : 'none',
-                                                display: 'flex',
-                                                gap: '16px',
-                                                alignItems: 'flex-start',
-                                                cursor: 'pointer',
-                                                backgroundColor: '#1e293b',
-                                                transition: 'background-color 0.15s'
-                                            }}
-                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#334155'}
-                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1e293b'}
+                                            className="px-6 py-4 pl-16 flex gap-4 items-start cursor-pointer bg-slate-800 transition-colors duration-150 hover:bg-slate-700 border-b border-slate-700 last:border-b-0"
                                         >
                                             {/* Severity Icon */}
-                                            <div style={{ paddingTop: '2px', flexShrink: 0 }}>
+                                            <div className="pt-0.5 flex-shrink-0">
                                                 {violation.severity === 'error' ? (
                                                     <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#f87171">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -305,55 +193,24 @@ export const ViolationsTable: React.FC = () => {
                                             </div>
 
                                             {/* Content */}
-                                            <div style={{ flexGrow: 1, minWidth: 0 }}>
+                                            <div className="flex-grow min-w-0">
                                                 {/* Line & Rule */}
-                                                <div style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '10px',
-                                                    marginBottom: '6px'
-                                                }}>
-                                                    <span style={{
-                                                        fontFamily: 'monospace',
-                                                        fontSize: '13px',
-                                                        fontWeight: '600',
-                                                        color: '#60a5fa',
-                                                        backgroundColor: '#1e3a5f',
-                                                        padding: '2px 8px',
-                                                        borderRadius: '4px'
-                                                    }}>
+                                                <div className="flex items-center gap-2.5 mb-1.5">
+                                                    <span className="font-mono text-[13px] font-semibold text-blue-400 bg-blue-950/50 px-2 py-0.5 rounded">
                                                         Line {violation.line}
                                                     </span>
-                                                    <span style={{
-                                                        fontFamily: 'monospace',
-                                                        fontSize: '12px',
-                                                        color: '#64748b'
-                                                    }}>
+                                                    <span className="font-mono text-xs text-slate-500">
                                                         {violation.rule}
                                                     </span>
                                                 </div>
 
                                                 {/* Message */}
-                                                <p style={{
-                                                    fontSize: '14px',
-                                                    fontWeight: '500',
-                                                    color: '#e2e8f0',
-                                                    lineHeight: '1.5',
-                                                    margin: '0 0 6px 0'
-                                                }}>
+                                                <p className="text-sm font-medium text-slate-200 leading-relaxed m-0 mb-1.5">
                                                     {violation.message}
                                                 </p>
 
                                                 {/* Path */}
-                                                <p style={{
-                                                    fontSize: '12px',
-                                                    fontFamily: 'monospace',
-                                                    color: '#64748b',
-                                                    margin: 0,
-                                                    overflow: 'hidden',
-                                                    textOverflow: 'ellipsis',
-                                                    whiteSpace: 'nowrap'
-                                                }}>
+                                                <p className="text-xs font-mono text-slate-500 m-0 overflow-hidden text-ellipsis whitespace-nowrap">
                                                     {violation.path}
                                                 </p>
                                             </div>
