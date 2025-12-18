@@ -194,9 +194,9 @@ export const DashboardPage = () => {
         }
         return [
             { label: 'Active Subscriptions', value: subscribedProducts.length, icon: '📥' },
-            { label: 'Avg Latency', value: '124ms', icon: '⚡', trend: { value: '8ms', isPositive: true } },
-            { label: 'System Uptime', value: '99.9%', icon: '🛡️' },
-            { label: 'API Consumption', value: 'High', icon: '🔥' }
+            { label: 'Pending Requests', value: allSubscriptions.filter(s => s.state === 'pending').length, icon: '⏳', trend: { value: 'Awaiting Approval', isPositive: false } },
+            { label: 'Provider Diversity', value: new Set(subscribedProducts.map(p => p.ownerTeamId)).size, icon: '🌐' },
+            { label: 'Environment Mix', value: 'PROD / DEV', icon: '🏗️' }
         ];
     }, [activeTab, myProducts, subscribedProducts, adminMockData, pendingApprovals]);
 
