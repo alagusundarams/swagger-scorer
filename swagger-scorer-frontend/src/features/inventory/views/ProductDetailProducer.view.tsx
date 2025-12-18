@@ -208,7 +208,7 @@ export const ProductDetailProducer = ({ product }: ProductDetailProducerProps) =
                     {product.apis.map((api) => (
                         <div
                             key={api.id}
-                            onClick={() => navigate(`/api/${api.id}`)}
+                            onClick={() => navigate(`/products/${product.id}/apis/${api.id}`)}
                             className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-900 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer transition"
                         >
                             <div className="flex-1">
@@ -243,43 +243,47 @@ export const ProductDetailProducer = ({ product }: ProductDetailProducerProps) =
             </div>
 
             {/* Revoke Confirmation Modal */}
-            {revokeModalOpen && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Revoke Access?</h3>
-                        <p className="text-gray-600 dark:text-slate-400 mb-6">
-                            This will immediately disable API keys and remove access to all {product.apis.length} APIs in this product.
-                            The team will be notified.
-                        </p>
-                        <div className="flex gap-3 justify-end">
-                            <button
-                                onClick={() => setRevokeModalOpen(false)}
-                                className="px-4 py-2 bg-gray-100 dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600 transition"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={confirmRevoke}
-                                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
-                            >
-                                Revoke Access
-                            </button>
+            {
+                revokeModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Revoke Access?</h3>
+                            <p className="text-gray-600 dark:text-slate-400 mb-6">
+                                This will immediately disable API keys and remove access to all {product.apis.length} APIs in this product.
+                                The team will be notified.
+                            </p>
+                            <div className="flex gap-3 justify-end">
+                                <button
+                                    onClick={() => setRevokeModalOpen(false)}
+                                    className="px-4 py-2 bg-gray-100 dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600 transition"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmRevoke}
+                                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+                                >
+                                    Revoke Access
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Manage Product Modal */}
-            {isManageModalOpen && (
-                <ManageProductModal
-                    product={product}
-                    isOpen={isManageModalOpen}
-                    onClose={() => setIsManageModalOpen(false)}
-                    currentStage="DEV"
-                    onPromote={() => { }}
-                    onUpdate={() => { }}
-                />
-            )}
-        </div>
+            {
+                isManageModalOpen && (
+                    <ManageProductModal
+                        product={product}
+                        isOpen={isManageModalOpen}
+                        onClose={() => setIsManageModalOpen(false)}
+                        currentStage="DEV"
+                        onPromote={() => { }}
+                        onUpdate={() => { }}
+                    />
+                )
+            }
+        </div >
     );
 };
