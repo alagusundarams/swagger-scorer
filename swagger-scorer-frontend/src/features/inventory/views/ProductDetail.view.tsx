@@ -4,6 +4,8 @@ import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
 import { useAuth } from '../../../features/auth/hooks/useAuth';
 import { useStore } from '../../../store/useStore';
 import { ManageProductModal } from '../components/ManageProductModal';
+import { getUserRoleForProduct } from '../../../utils/productRoleDetection';
+import { ProductDetailProducer } from './ProductDetailProducer.view';
 
 // Helper to mask keys (consistent with Dashboard)
 const maskKey = (key: string) => key.substring(0, 4) + '••••••••••••••••' + key.substring(key.length - 4);
@@ -61,6 +63,19 @@ export const ProductDetailPage = () => {
     const isSubscribed = subscription?.state === 'active';
     const hasPendingRequest = subscription?.state === 'pending' || isPending;
 
+    // --- Role Detection ---
+    const userRole = getUserRoleForProduct(product || {} as any, user);
+
+    // If Producer, show Producer-specific view
+    if (product && userRole === 'producer' && user) {
+        return (
+            <MainLayout>
+                <ProductDetailProducer product={product} user={user} />
+            </MainLayout>
+        );
+    }
+
+    // Product Not Found
     if (!product) {
         return (
             <MainLayout>
