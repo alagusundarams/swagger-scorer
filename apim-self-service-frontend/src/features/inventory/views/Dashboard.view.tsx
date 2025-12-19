@@ -275,13 +275,6 @@ export const DashboardPage = () => {
                                         activeTab === 'approvals' ? 'Review pending access requests and visibility changes with a security-first vetting mindset.' : 'Full administrative visibility across the entire Everest Re API landscape.'}
                             </p>
                         </div>
-                        <div className="flex items-center gap-3 p-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800/30 rounded-2xl animate-pulse">
-                            <span className="text-xl">🛡️</span>
-                            <div className="flex flex-col">
-                                <span className="text-[10px] font-black text-violet-600 dark:text-violet-400 uppercase tracking-widest">Security Status</span>
-                                <span className="text-xs font-bold text-violet-800 dark:text-violet-300">AI Safety Vetting: Active</span>
-                            </div>
-                        </div>
                     </div>
                 </div>
 

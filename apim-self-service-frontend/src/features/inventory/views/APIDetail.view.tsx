@@ -23,13 +23,6 @@ export const APIDetailPage = () => {
     const product = useMemo(() => products.find(p => p.id === productId), [products, productId]);
     const api = useMemo(() => product?.apis.find(a => a.id === apiId), [product, apiId]);
 
-    // --- AI Safety Engine ---
-    const isAiApi = useMemo(() => {
-        const keywords = ['ai', 'chat', 'prompt', 'llm', 'generate', 'openai', 'model'];
-        const content = `${api?.displayName} ${api?.description}`.toLowerCase();
-        return keywords.some(k => content.includes(k));
-    }, [api]);
-
     // Handle missing data gracefully
     if (!product || !api) {
         return (
@@ -100,24 +93,6 @@ paths: {}
                             )}
                         </p>
 
-                        {/* AI Safety Shield - Highlighted for Security-First Folks */}
-                        {isAiApi && (
-                            <div className="mt-8 p-6 bg-violet-50/50 dark:bg-violet-900/10 border border-violet-100 dark:border-violet-800/30 rounded-[2rem] flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center text-2xl shadow-inner">
-                                        🛡️
-                                    </div>
-                                    <div>
-                                        <h3 className="text-sm font-black text-violet-900 dark:text-violet-400 uppercase tracking-widest">AI Safety Shield Active</h3>
-                                        <p className="text-xs text-violet-700 dark:text-violet-500 font-medium">This interface is subject to enhanced "Hard Privacy" and AI-Specific Security Vetting.</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2 px-4 py-2 bg-violet-100 dark:bg-violet-900/40 rounded-xl border border-violet-200 dark:border-violet-700">
-                                    <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                                    <span className="text-[10px] font-black text-violet-900 dark:text-violet-300 uppercase tracking-widest">Vetted for Prompt Injection</span>
-                                </div>
-                            </div>
-                        )}
 
                         {/* Deployment Context */}
                         <div className="flex flex-wrap items-center gap-8 mt-10 p-6 bg-gray-50/50 dark:bg-slate-800/40 rounded-[2rem] border border-gray-100 dark:border-slate-700/30">

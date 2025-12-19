@@ -55,10 +55,9 @@ export const ScoreCard: React.FC = () => {
     const getCategoryColor = (categoryName: string, index: number) => {
         const colorMap: Record<string, string> = {
             'security': '#ef4444',        // Red - High priority
-            'aiSecurity': '#8b5cf6',      // Violet - AI Security (New)
             'structural': '#06b6d4',      // Cyan - Compliance
             'documentation': '#3b82f6',   // Blue - Docs
-            'apiDesign': '#f97316',       // Orange - Design (Changed from violet)
+            'apiDesign': '#8b5cf6',       // Violet - Design
             'dataModels': '#f59e0b',      // Amber - Schemas
             'errorHandling': '#10b981',   // Emerald - Errors
         };
@@ -72,10 +71,9 @@ export const ScoreCard: React.FC = () => {
     const getBarColor = (categoryName: string) => {
         const colors: Record<string, string> = {
             'security': '#f87171',      // Bright red
-            'aiSecurity': '#a78bfa',    // Bright violet (AI)
             'structural': '#22d3ee',    // Bright cyan
             'documentation': '#60a5fa', // Bright blue
-            'apiDesign': '#fb923c',     // Bright orange
+            'apiDesign': '#a78bfa',     // Bright violet
             'dataModels': '#fbbf24',    // Bright amber
             'errorHandling': '#34d399', // Bright emerald
         };
