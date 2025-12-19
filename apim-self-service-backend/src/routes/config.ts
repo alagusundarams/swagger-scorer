@@ -21,7 +21,7 @@ export async function configRoutes(
     fastify: FastifyInstance,
     config: ScoringConfig
 ): Promise<void> {
-    fastify.get('/api/v1/config', async (_request, reply) => {
+    fastify.get('/config', async (_request, reply) => {
         // Return the config as-is
         // In the future, we might want to hide certain internal fields
         return reply.send(config);

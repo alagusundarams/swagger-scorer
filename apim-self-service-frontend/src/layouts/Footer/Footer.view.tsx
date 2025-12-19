@@ -29,8 +29,9 @@ export const Footer = () => {
                         alignItems: 'center',
                         justifyContent: 'center'
                     }}>
-                        <svg style={{ width: '16px', height: '16px', color: 'white' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        <svg style={{ width: '20px', height: '20px', color: 'white' }} viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            <text x="12" y="14.5" fill="#fbbf24" fontSize="16" fontWeight="900" textAnchor="middle" dominantBaseline="middle" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>A</text>
                         </svg>
                     </div>
 

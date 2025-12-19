@@ -70,9 +70,9 @@ export async function build() {
     fastify.log.info({ version: config.version }, 'Configuration loaded successfully');
 
     // Register routes
-    await fastify.register(healthRoutes);
-    await fastify.register(configRoutes, config);
-    await fastify.register(analyzeRoutes, config);
+    await fastify.register(healthRoutes, { prefix: '/api/v1' });
+    await fastify.register(configRoutes, { ...config, prefix: '/api/v1' });
+    await fastify.register(analyzeRoutes, { ...config, prefix: '/api/v1' });
     await fastify.register(draftsRoute, { prefix: '/api/v1' });
 
     // Error handler for uncaught errors

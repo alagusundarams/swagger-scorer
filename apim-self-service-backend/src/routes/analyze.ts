@@ -55,7 +55,7 @@ export async function analyzeRoutes(
     const spectral = await createSpectral();
 
     fastify.post<{ Body: AnalyzeRequest }>(
-        '/api/v1/analyze',
+        '/analyze',
         { schema: analyzeSchema },
         async (request, reply) => {
             const { content, format } = request.body;

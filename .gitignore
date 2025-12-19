@@ -1,1 +1,26 @@
 apim-discovery-tool/
+
+# Dependencies
+**/node_modules/
+
+# Build outputs
+**/dist/
+**/build/
+**/coverage/
+
+# Environment variables
+**/.env
+**/.env.local
+
+# Logs
+**/logs/
+**/*.log
+
+# IDEs
+.vscode/
+.idea/
+.DS_Store
+
+# Temporary files
+alagu_apim_shipped.zip
+test-output.json

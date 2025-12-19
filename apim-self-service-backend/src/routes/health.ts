@@ -16,7 +16,7 @@ import { FastifyInstance } from 'fastify';
  * @param fastify - Fastify instance
  */
 export async function healthRoutes(fastify: FastifyInstance): Promise<void> {
-    fastify.get('/api/v1/health', async (_request, reply) => {
+    fastify.get('/health', async (_request, reply) => {
         return reply.send({
             status: 'healthy',
             version: process.env.npm_package_version || '1.0.0',

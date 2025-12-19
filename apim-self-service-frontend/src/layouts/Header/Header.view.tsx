@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../features/auth/hooks/useAuth';
 import { useStore } from '../../store/useStore';
 
@@ -91,8 +91,9 @@ export const Header = ({ pageName = 'Dashboard' }: HeaderProps) => {
                                 justifyContent: 'center',
                                 boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
                             }}>
-                                <svg style={{ width: '18px', height: '18px', color: 'white' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                <svg style={{ width: '22px', height: '22px', color: 'white' }} viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    <text x="12" y="14.5" fill="#fbbf24" fontSize="16" fontWeight="900" textAnchor="middle" dominantBaseline="middle" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>A</text>
                                 </svg>
                             </div>
                             <span style={{ fontSize: '14px', fontWeight: '600', color: '#cbd5e1' }}>
@@ -102,11 +103,18 @@ export const Header = ({ pageName = 'Dashboard' }: HeaderProps) => {
                     </div>
 
                     {/* Navigation Links (Inside Left Column) */}
+                    {/* 
+                        PRE-SHIP CLEANUP:
+                        Hiding Dashboard demo link. Previously used for salespersona/dev demo.
+                        Uncomment the block below to re-enable during feature demos.
+                    */}
+                    {/* 
                     <div style={{ display: 'flex', gap: '24px', borderLeft: '1px solid #334155', paddingLeft: '24px', height: '32px', alignItems: 'center' }}>
                         <Link to="/" style={{ color: pageName === 'Dashboard' ? '#60a5fa' : '#94a3b8', fontWeight: '600', fontSize: '14px', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', transition: 'color 0.2s' }}>
                             <span>📊</span> Dashboard
                         </Link>
                     </div>
+                    */}
 
                 </div>
 
