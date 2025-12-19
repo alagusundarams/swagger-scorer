@@ -35,12 +35,13 @@
         "@stoplight/spectral-rulesets": "^1.18.0",
         "fastify": "^4.25.0",
         "js-yaml": "^4.1.0",
+        "pg": "^8.16.3",
         "pino": "^8.17.0",
         "pino-pretty": "^10.3.1"
     },
     "devDependencies": {
         "@types/js-yaml": "^4.0.9",
-        "@types/node": "^20.10.0",
+        "@types/node": "^20.19.27",
         "@typescript-eslint/eslint-plugin": "^6.15.0",
         "@typescript-eslint/parser": "^6.15.0",
         "@vitest/coverage-v8": "^1.0.0",
