@@ -18,12 +18,12 @@ describe('Scorer Service', () => {
         config = {
             version: '1.0',
             categories: {
-                documentation: { weight: 30, enabled: true },
-                apiDesign: { weight: 25, enabled: true },
-                security: { weight: 20, enabled: true },
-                dataModels: { weight: 15, enabled: true },
-                errorHandling: { weight: 7, enabled: true },
-                completeness: { weight: 3, enabled: true },
+                security: { weight: 30, enabled: true },
+                structural: { weight: 20, enabled: true },
+                apiDesign: { weight: 20, enabled: true },
+                documentation: { weight: 15, enabled: true },
+                dataModels: { weight: 10, enabled: true },
+                errorHandling: { weight: 5, enabled: true },
             },
             severityMultipliers: {
                 error: 1.0,
@@ -32,8 +32,8 @@ describe('Scorer Service', () => {
                 hint: 0.0,
             },
             thresholds: {
-                green: 95,
-                amber: 85,
+                green: 90,
+                amber: 70,
             },
         };
     });

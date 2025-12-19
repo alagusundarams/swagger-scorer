@@ -67,6 +67,10 @@ export interface Product {
         displayName: string;
         appIdUri: string;
     };
+
+    // Migration support: Track product management mode
+    management_mode?: 'TERRAFORM_MANAGED' | 'HYBRID' | 'PORTAL_MANAGED';
+    terraform_pipeline_url?: string; // Link to Azure DevOps pipeline for Terraform products
 }
 
 export type Environment = 'ALL' | 'DEV' | 'QA' | 'STAGE' | 'PROD';

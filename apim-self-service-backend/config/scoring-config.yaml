@@ -9,10 +9,6 @@ categories:
   security:
     weight: 30       # OWASP API Security Top 10
     enabled: true
-
-  security:
-    weight: 30       # OWASP API Security Top 10
-    enabled: true
   
   structural:
     weight: 20       # OpenAPI spec compliance

@@ -99,12 +99,25 @@ export const ProductProducerCard: React.FC<ProductProducerCardProps> = ({
                 </div>
 
                 <div className="flex items-center justify-between">
-                    <span className={`px-2.5 py-1 text-[9px] font-black rounded-lg border uppercase tracking-wider ${product.environment === 'PROD'
-                        ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                        : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
-                        }`}>
-                        {product.environment}
-                    </span>
+                    <div className="flex items-center gap-2">
+                        <span className={`px-2.5 py-1 text-[9px] font-black rounded-lg border uppercase tracking-wider ${product.environment === 'PROD'
+                            ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                            : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                            }`}>
+                            {product.environment}
+                        </span>
+
+                        {/* Management Mode Badge */}
+                        {product.management_mode && product.management_mode !== 'PORTAL_MANAGED' && (
+                            <span className={`px-2 py-1 text-[8px] font-black rounded-md border uppercase tracking-wider flex items-center gap-1 ${product.management_mode === 'TERRAFORM_MANAGED'
+                                    ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800'
+                                    : 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800'
+                                }`}>
+                                {product.management_mode === 'TERRAFORM_MANAGED' ? '🔴' : '🟡'}
+                                <span className="hidden sm:inline">{product.management_mode === 'TERRAFORM_MANAGED' ? 'TF' : 'Hybrid'}</span>
+                            </span>
+                        )}
+                    </div>
                 </div>
             </div>
 

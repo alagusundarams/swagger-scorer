@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../features/auth/hooks/useAuth';
-import { NotificationDropdown } from './NotificationDropdown';
 import { useStore } from '../../store/useStore';
 
 interface HeaderProps {
@@ -12,26 +11,18 @@ export const Header = ({ pageName = 'Dashboard' }: HeaderProps) => {
     const navigate = useNavigate();
     const { logout: authLogout } = useAuth();
     const [userMenuOpen, setUserMenuOpen] = useState(false);
-    const [notificationsOpen, setNotificationsOpen] = useState(false);
 
     // Get data from Zustand store (populated after SSO login)
     const user = useStore((state) => state.user);
-    const notifications = useStore((state) => state.notifications);
-    const markNotificationAsRead = useStore((state) => state.markNotificationAsRead);
-    const markAllNotificationsAsRead = useStore((state) => state.markAllNotificationsAsRead);
     const storeLogout = useStore((state) => state.logout);
 
     const userMenuRef = useRef<HTMLDivElement>(null);
-    const notificationsRef = useRef<HTMLDivElement>(null);
 
     // Close user menu when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
                 setUserMenuOpen(false);
-            }
-            if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
-                setNotificationsOpen(false);
             }
         };
 
@@ -215,52 +206,6 @@ export const Header = ({ pageName = 'Dashboard' }: HeaderProps) => {
                         )}
                     </div>
 
-                    {/* Notification Bell */}
-                    <div style={{ position: 'relative' }} ref={notificationsRef}>
-                        <button
-                            onClick={() => setNotificationsOpen(!notificationsOpen)}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                padding: '10px',
-                                backgroundColor: notificationsOpen ? '#334155' : 'transparent',
-                                border: 'none',
-                                borderRadius: '8px',
-                                cursor: 'pointer',
-                                color: '#94a3b8',
-                                position: 'relative',
-                                transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.color = '#3b82f6'}
-                            onMouseLeave={(e) => { if (!notificationsOpen) e.currentTarget.style.color = '#94a3b8' }}
-                        >
-                            <svg style={{ width: '22px', height: '22px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                            </svg>
-                            {notifications.filter(n => !n.read).length > 0 && (
-                                <span style={{
-                                    position: 'absolute',
-                                    top: '8px',
-                                    right: '8px',
-                                    width: '8px',
-                                    height: '8px',
-                                    backgroundColor: '#ef4444',
-                                    borderRadius: '50%',
-                                    border: '2px solid #1e293b'
-                                }}></span>
-                            )}
-                        </button>
-
-                        {notificationsOpen && (
-                            <NotificationDropdown
-                                notifications={notifications}
-                                onClose={() => setNotificationsOpen(false)}
-                                onMarkAsRead={markNotificationAsRead}
-                                onMarkAllRead={markAllNotificationsAsRead}
-                            />
-                        )}
-                    </div>
                 </div>
             </div>
         </header>

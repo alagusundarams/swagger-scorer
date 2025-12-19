@@ -137,6 +137,24 @@ const MOCK_PRODUCTS: Product[] = [
         description: 'AI-driven product recommendations based on user history.',
         state: 'published', ownerTeamId: 'team-data', createdAt: '2023-11-01T00:00:00Z', updatedAt: '2023-12-05T00:00:00Z',
         apis: [], environment: 'DEV', qualityScore: 75, subscriberCount: 2
+    },
+    {
+        id: 'prod-005', name: 'legacy-catalog', displayName: 'Legacy Catalog API', version: 'v3.5.0',
+        description: 'Product catalog service (managed via Terraform - migration pending).',
+        state: 'published', ownerTeamId: 'team-platform', createdAt: '2021-05-10T00:00:00Z', updatedAt: '2023-10-15T00:00:00Z',
+        apis: [
+            {
+                id: 'api-cat-01', name: 'products-api', displayName: 'Products API', description: 'Product catalog operations', path: '/v3/products',
+                operations: [
+                    { id: 'op-cat-01', name: 'listProducts', displayName: 'List Products', method: 'GET', urlTemplate: '/v3/products', description: 'Retrieve product catalog.' }
+                ]
+            }
+        ],
+        environment: 'PROD',
+        qualityScore: 82,
+        subscriberCount: 28,
+        management_mode: 'TERRAFORM_MANAGED',
+        terraform_pipeline_url: 'https://dev.azure.com/your-org/your-project/_build?definitionId=42'
     }
 ];
 
@@ -221,6 +239,7 @@ export const getApprovals = () => {
             details: {
                 targetName: 'Payment Gateway Service',
                 targetVersion: 'v1.0.0',
+                targetId: 'prod-001', // Linked to existing core mock
                 environment: 'DEV',
                 reason: 'Initial onboarding for new payment processing capability.'
             }
@@ -240,7 +259,7 @@ export const getApprovals = () => {
                 targetName: 'Stock Check API',
                 targetVersion: 'v2.1',
                 environment: 'QA',
-                targetId: 'prod-stock-001'
+                targetId: 'prod-001' // Pointing to prod-001 context
             }
         },
         {
@@ -257,6 +276,7 @@ export const getApprovals = () => {
             details: {
                 targetName: 'Order Fulfillment API',
                 targetVersion: 'v3.0.1',
+                targetId: 'prod-002',
                 modificationType: 'HOTFIX',
                 diffSummary: 'Fixes critical bug in address validation schema.',
                 environment: 'PROD'
@@ -274,8 +294,8 @@ export const getApprovals = () => {
                 teamName: 'Data Analytics'
             },
             details: {
-                targetName: 'User Profile API',
-                targetId: 'prod-user-001',
+                targetName: 'Identity Service',
+                targetId: 'prod-002',
                 environment: 'PROD',
                 reason: 'Need access for quarterly user growth report.'
             }
@@ -293,6 +313,7 @@ export const getApprovals = () => {
             },
             details: {
                 targetName: 'Auth Service',
+                targetId: 'prod-002',
                 targetVersion: 'v4.0-rc1',
                 promotionPath: { source: 'QA', target: 'STAGE' },
                 reason: 'Regression testing complete. promoting for UAT.'
@@ -310,8 +331,8 @@ export const getApprovals = () => {
                 teamName: 'Growth Hacking'
             },
             details: {
-                targetName: 'Email Notification API',
-                targetId: 'prod-email-001',
+                targetName: 'Payment Gateway',
+                targetId: 'prod-001',
                 environment: 'PROD',
                 requestedQuota: '5000 req/min (Gold Tier)',
                 reason: 'Black Friday campaign expected traffic surge.'
@@ -329,7 +350,8 @@ export const getApprovals = () => {
                 teamName: 'Core Systems'
             },
             details: {
-                targetName: 'Legacy XML Gateway',
+                targetName: 'Audit Log API',
+                targetId: 'prod-003',
                 targetVersion: 'v0.9-beta',
                 environment: 'PROD',
                 reason: 'End of Life reached. No active consumers observed for 90 days.'

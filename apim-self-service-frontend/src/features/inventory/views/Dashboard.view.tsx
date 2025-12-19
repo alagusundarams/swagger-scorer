@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { type Product, type Subscription, type Environment } from '../../../types/entities';
-import { useAuth } from '../../../features/auth/hooks/useAuth';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
 import { useStore } from '../../../store/useStore';
 import { Input } from '../../../core/ui/Input';
@@ -29,7 +28,6 @@ export const DashboardPage = () => {
 
     // --- Store Integration ---
     // Extracting centralized state to ensure UI reflects the single source of truth.
-    const { getToken } = useAuth();
     const {
         user,
         activeTeamId,
@@ -37,8 +35,7 @@ export const DashboardPage = () => {
         products: allProducts,
         subscriptions: allSubscriptions,
         teams: allTeams,
-        approvalRequests: enhancedApprovals,
-        processApproval
+        approvalRequests: enhancedApprovals
     } = useStore();
 
     // --- Local UI State ---
@@ -195,11 +192,14 @@ export const DashboardPage = () => {
             ];
         }
         if (activeTab === 'approvals') {
+            const highRiskCount = pendingApprovals.filter(a => a.details.environment === 'PROD' || a.details.environment === 'STAGE').length;
+            const uniqueTeams = new Set(pendingApprovals.map(a => a.requester.teamId)).size;
+
             return [
                 { label: 'Pending Decisions', value: pendingApprovals.length, icon: '⏱️' },
-                { label: 'Avg Approval Time', value: '4.2h', icon: '⚡' },
-                { label: 'Decision Rate', value: '92%', icon: '📊' },
-                { label: 'SLA Status', value: 'Green', icon: '🟢' }
+                { label: 'High Risk (PROD)', value: highRiskCount, icon: '🚩' },
+                { label: 'Blocked Teams', value: uniqueTeams, icon: '👥' },
+                { label: 'SLA Status', value: '4 At Risk', icon: '🔴' }
             ];
         }
         return [
@@ -229,12 +229,6 @@ export const DashboardPage = () => {
         });
     };
 
-    const handleApprovalDecision = (subId: string, decision: 'APPROVE' | 'REJECT') => {
-        // PERMANENT STATE UPDATE: Propagate to the store
-        processApproval(subId, decision, getToken);
-
-        showToast(`Request ${decision === 'APPROVE' ? 'APPROVED' : 'REJECTED'}. Notification sent to requester.`);
-    };
 
     // Helper to get badge color for approval type
     const getTypeBadge = (type: string) => {
@@ -470,13 +464,20 @@ export const DashboardPage = () => {
                                             </div>
                                         </div>
 
-                                        {/* Actions */}
+                                        {/* Triage Action */}
                                         <div className="flex gap-2 min-w-[180px] justify-end">
-                                            <button onClick={() => handleApprovalDecision(item.id, 'APPROVE')} className="bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-xl transition-all shadow-lg shadow-blue-500/20" title="Approve">
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
-                                            </button>
-                                            <button onClick={() => handleApprovalDecision(item.id, 'REJECT')} className="bg-red-50 dark:bg-red-900/20 hover:bg-red-100 text-red-500 dark:text-red-400 p-3 rounded-xl transition-all" title="Reject">
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                            <button
+                                                onClick={() => {
+                                                    if (item.details.targetId) {
+                                                        navigate(`/products/${item.details.targetId}?tab=audit`);
+                                                    } else {
+                                                        showToast('Target product context missing.');
+                                                    }
+                                                }}
+                                                className="px-6 py-3 bg-slate-900 dark:bg-slate-700 text-white font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-black dark:hover:bg-slate-600 transition-all flex items-center gap-2 group shadow-xl shadow-slate-900/10"
+                                            >
+                                                <span>Review & Decide</span>
+                                                <span className="group-hover:translate-x-1 transition-transform">→</span>
                                             </button>
                                         </div>
                                     </div>

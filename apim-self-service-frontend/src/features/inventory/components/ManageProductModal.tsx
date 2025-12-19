@@ -7,7 +7,7 @@ interface ManageProductModalProps {
     isOpen: boolean;
     onClose: () => void;
     product: Product;
-    currentStage: 'DEV' | 'QA' | 'PROD';
+    currentStage: 'DEV' | 'QA' | 'STAGE' | 'PROD';
     onPromote: () => void;
     onUpdate: (data: Partial<Product>) => void;
 }
@@ -48,12 +48,18 @@ export const ManageProductModal = ({
     const [localToast, setLocalToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
     const [isRequestingApproval, setIsRequestingApproval] = useState(false);
 
+
     // --- Governance Logic ---
     const isOwnerLead = user?.leadsTeams.includes(product.ownerTeamId) || user?.role === 'admin';
-    const isMetadataLocked = currentStage !== 'DEV';
+
+    // Allow metadata editing in all environments, but track changes for re-promotion
+    const isMetadataChanged = formData.displayName !== product.displayName || formData.description !== product.description || formData.version !== product.version;
+    const requiresRepromotion = isMetadataChanged && (currentStage === 'PROD' || currentStage === 'STAGE');
+
     const isVisibilityChanged = formData.visibility !== product.visibility;
     const isAccessChanged = JSON.stringify(formData.authorizedTeamsByEnv) !== JSON.stringify(product.authorizedTeamsByEnv);
     const requiresApproval = (isVisibilityChanged || isAccessChanged) && currentStage === 'PROD';
+
 
     const getImpactSummary = () => {
         if (formData.visibility === product.visibility) return null;
@@ -127,10 +133,23 @@ export const ManageProductModal = ({
                         <p className="text-xs text-slate-500 font-medium mt-1">Lifecycle Management & Metadata Standards</p>
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Management Mode Badge */}
+                        {product.management_mode && product.management_mode !== 'PORTAL_MANAGED' && (
+                            <span className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border flex items-center gap-1.5 ${product.management_mode === 'TERRAFORM_MANAGED'
+                                ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800'
+                                : 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800'
+                                }`}>
+                                {product.management_mode === 'TERRAFORM_MANAGED' ? '🔴' : '🟡'}
+                                {product.management_mode === 'TERRAFORM_MANAGED' ? 'Terraform' : 'Hybrid'}
+                            </span>
+                        )}
+
+                        {/* Environment Stage Badge */}
                         <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Current Stage:</span>
                         <span className={`px-4 py-2 rounded-xl text-xs font-black border uppercase tracking-widest shadow-sm ${currentStage === 'DEV' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                            currentStage === 'QA' ? 'bg-amber-100 text-amber-700 border-amber-200' :
-                                'bg-emerald-100 text-emerald-700 border-emerald-200'
+                            currentStage === 'QA' ? 'bg-cyan-100 text-cyan-700 border-cyan-200' :
+                                currentStage === 'STAGE' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                                    'bg-emerald-100 text-emerald-700 border-emerald-200'
                             }`}>
                             {currentStage}
                         </span>
@@ -156,14 +175,14 @@ export const ManageProductModal = ({
                     ))}
                 </div>
 
-                {/* Locked State Notification (Only for Metadata Tab) */}
-                {activeTab === 'metadata' && isMetadataLocked && (
-                    <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-100 dark:border-amber-800 px-8 py-4 flex items-center gap-4">
-                        <span className="text-xl">🔒</span>
+                {/* Re-Promotion Warning (Only for Metadata Tab in PROD/STAGE) */}
+                {activeTab === 'metadata' && requiresRepromotion && (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800 px-8 py-4 flex items-center gap-4">
+                        <span className="text-xl">🔄</span>
                         <div>
-                            <p className="text-[10px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-widest">Strict View-Only Mode</p>
-                            <p className="text-xs text-amber-700/70 dark:text-amber-400 font-medium">
-                                Modifications are disabled in <strong>{currentStage}</strong>. To make changes, you must initiate a new version in DEV.
+                            <p className="text-[10px] font-black text-blue-600 dark:text-blue-500 uppercase tracking-widest">Re-Promotion Required</p>
+                            <p className="text-xs text-blue-700/70 dark:text-blue-400 font-medium">
+                                Changes to <strong>{currentStage}</strong> products require re-promotion through the full lifecycle (DEV → QA → STAGE → PROD).
                             </p>
                         </div>
                     </div>
@@ -188,9 +207,9 @@ export const ManageProductModal = ({
                                     type="text"
                                     value={formData.displayName}
                                     onChange={e => setFormData({ ...formData, displayName: e.target.value })}
-                                    disabled={isMetadataLocked}
-                                    className={`w-full p-4 rounded-xl font-bold border transition-all outline-none focus:ring-2 focus:ring-blue-500/20 ${isMetadataLocked
-                                        ? 'bg-gray-100 dark:bg-slate-900 text-gray-500 cursor-not-allowed border-transparent'
+                                    disabled={product.management_mode === 'TERRAFORM_MANAGED'}
+                                    className={`w-full p-4 rounded-xl font-bold border transition-all outline-none focus:ring-2 focus:ring-blue-500/20 ${product.management_mode === 'TERRAFORM_MANAGED'
+                                        ? 'bg-gray-100 dark:bg-slate-900 text-gray-500 dark:text-slate-600  cursor-not-allowed border-gray-200 dark:border-slate-800'
                                         : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white hover:border-blue-400'
                                         }`}
                                 />
@@ -200,9 +219,9 @@ export const ManageProductModal = ({
                                 <textarea
                                     value={formData.description}
                                     onChange={e => setFormData({ ...formData, description: e.target.value })}
-                                    disabled={isMetadataLocked}
-                                    className={`w-full p-4 rounded-xl font-medium border transition-all outline-none focus:ring-2 focus:ring-blue-500/20 h-32 resize-none ${isMetadataLocked
-                                        ? 'bg-gray-100 dark:bg-slate-900 text-gray-500 cursor-not-allowed border-transparent'
+                                    disabled={product.management_mode === 'TERRAFORM_MANAGED'}
+                                    className={`w-full p-4 rounded-xl font-medium border transition-all outline-none focus:ring-2 focus:ring-blue-500/20 h-32 resize-none ${product.management_mode === 'TERRAFORM_MANAGED'
+                                        ? 'bg-gray-100 dark:bg-slate-900 text-gray-500 dark:text-slate-600 cursor-not-allowed border-gray-200 dark:border-slate-800'
                                         : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white hover:border-blue-400'
                                         }`}
                                 />
@@ -409,8 +428,8 @@ export const ManageProductModal = ({
                             Close Panel
                         </button>
 
-                        {/* Save Button (Always available if changes made, logic varies by tab) */}
-                        {((activeTab === 'metadata' && !isMetadataLocked) || (activeTab === 'access' && (isVisibilityChanged || isAccessChanged))) && (
+                        {/* Save Button - Hidden for Terraform mode */}
+                        {product.management_mode !== 'TERRAFORM_MANAGED' && ((activeTab === 'metadata' && isMetadataChanged) || (activeTab === 'access' && (isVisibilityChanged || isAccessChanged))) && (
                             <button
                                 onClick={handleSave}
                                 disabled={isRequestingApproval || (!isOwnerLead && activeTab === 'access')}
@@ -439,7 +458,7 @@ export const ManageProductModal = ({
 
                         {/* Promotion Actions */}
                         {activeTab === 'metadata' && (
-                            !isMetadataLocked ? (
+                            currentStage === 'DEV' ? (
                                 <button
                                     onClick={onPromote}
                                     className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/30 hover:shadow-xl hover:scale-105 transition-all flex items-center gap-2"
@@ -447,16 +466,22 @@ export const ManageProductModal = ({
                                     <span>Promote to QA</span>
                                     <span>→</span>
                                 </button>
-                            ) : (
-                                currentStage === 'QA' && (
-                                    <button
-                                        onClick={onPromote}
-                                        className="px-8 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:scale-105 transition-all flex items-center gap-2"
-                                    >
-                                        <span>INITIATE GOVERNANCE REVIEW</span>
-                                        <span>→</span>
-                                    </button>
-                                )
+                            ) : currentStage === 'QA' ? (
+                                <button
+                                    onClick={onPromote}
+                                    className="px-8 py-4 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-amber-500/30 hover:shadow-xl hover:scale-105 transition-all flex items-center gap-2"
+                                >
+                                    <span>Promote to STAGE</span>
+                                    <span>→</span>
+                                </button>
+                            ) : currentStage === 'STAGE' && (
+                                <button
+                                    onClick={onPromote}
+                                    className="px-8 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:scale-105 transition-all flex items-center gap-2"
+                                >
+                                    <span>INITIATE GOVERNANCE REVIEW</span>
+                                    <span>→</span>
+                                </button>
                             )
                         )}
                     </div>
