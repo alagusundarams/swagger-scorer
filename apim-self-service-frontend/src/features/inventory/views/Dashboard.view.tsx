@@ -192,10 +192,10 @@ export const DashboardPage = () => {
         }
         if (activeTab === 'admin') {
             return [
-                { label: 'Global Inventory', value: adminMockData.length, icon: '🌐' },
-                { label: 'Cross-Env Deployments', value: '342', icon: '🚀' },
-                { label: 'Compliance Score', value: '94%', icon: '⚖️' },
-                { label: 'Platform Load', value: '12%', icon: '📉' }
+                { label: 'Global Inventory', value: USE_MOCKS ? adminMockData.length : allProducts.length, icon: '🌐' },
+                { label: 'Deployments (Demo)', value: '342', icon: '🚀' },
+                { label: 'Compliance (Demo)', value: '94%', icon: '⚖️' },
+                { label: 'Load (Demo)', value: '12%', icon: '📉' }
             ];
         }
         if (activeTab === 'approvals') {
