@@ -149,9 +149,9 @@ async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEn
                 }
             }
 
-            // If no product found, use first product as fallback
+            // If no product found, use first product as fallback (with prefix)
             if (!productId && products.length > 0) {
-                productId = products[0].id || products[0].name;
+                productId = `${importEnv}-${products[0].id || products[0].name}`;
             }
 
             if (!productId) {
