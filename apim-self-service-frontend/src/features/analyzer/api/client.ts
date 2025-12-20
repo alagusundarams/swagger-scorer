@@ -172,7 +172,11 @@ const MOCK_SUBSCRIPTIONS: Subscription[] = [
 ];
 
 // === CONFIGURATION ===
-const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true' || !import.meta.env.VITE_API_URL;
+// Priority: 1. Strict 'true' 2. Undefined -> Check if API URL exists 3. default to true
+const envMock = import.meta.env.VITE_USE_MOCKS;
+const USE_MOCKS = envMock !== undefined ? envMock === 'true' : !import.meta.env.VITE_API_URL;
+
+console.log(`[SYS] APIM Portal Mode: ${USE_MOCKS ? 'MOCK' : 'LIVE (Database)'}`);
 
 // === CATALOG ENDPOINTS ===
 export const getProducts = async () => {
