@@ -35,13 +35,13 @@ const MockAuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     };
 
     const login = () => {
+        console.log("[Mock Auth] Login triggered. Setting isAuthenticated to true.");
         setIsAuthenticated(true);
-        console.log("[Mock Auth] Logged in");
     };
 
     const logout = () => {
+        console.log("[Mock Auth] Logout triggered.");
         setIsAuthenticated(false);
-        console.log("[Mock Auth] Logged out");
     };
 
     const getToken = async () => {
@@ -125,19 +125,13 @@ const RealAuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
 
 // === MAIN PROVIDER ===
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    // FORCE MOCK login by default. 
-    // To use real SSO, user MUST explicitly set VITE_USE_MOCK_AUTH to 'false'
-    const envFlag = import.meta.env.VITE_USE_MOCK_AUTH;
-    const dataMockFlag = import.meta.env.VITE_USE_MOCKS;
+    // Master Toggle for Identity: Default to MOCK unless explicitly 'false'
+    const authEnv = import.meta.env.VITE_USE_MOCK_AUTH;
+    const useMock = authEnv === undefined || String(authEnv).toLowerCase().trim() !== 'false';
 
-    // Aggressive Mock Logic: 
-    // Default to mock if:
-    // 1. Auth flag is NOT 'false' (undefined, '', 'true', etc)
-    // 2. OR Data flag is explicitly 'true'
-    const useMock = (envFlag !== 'false') || (dataMockFlag === 'true');
-
-    console.log(`[SYS] Identity Provider Check:`, { envFlag, dataMockFlag, useMock });
-    console.log(`[SYS] Identity Provider: ${useMock ? 'LOCAL MOCK' : 'AZURE AD SSO'}`);
+    // Global debug handle
+    (window as any).__AUTH_MODE = useMock ? 'MOCK' : 'SSO';
+    console.log(`[SYS] Identity Provider Check:`, { VITE_USE_MOCK_AUTH: authEnv, finalUseMock: useMock });
 
     if (useMock) {
         return <MockAuthProvider>{children}</MockAuthProvider>;

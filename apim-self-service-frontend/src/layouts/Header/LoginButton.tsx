@@ -8,12 +8,17 @@ import { useAuth } from "../../features/auth/hooks/useAuth";
 export const LoginButton: React.FC<LoginButtonProps> = ({ fullWidth = false }) => {
     const { login, isMock } = useAuth();
 
+    const handleLoginClick = () => {
+        console.log(`[SYS] LoginButton clicked. isMock: ${isMock}`);
+        login();
+    };
+
     const baseClasses = "login-form-element border-transparent bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg hover:from-indigo-600 hover:to-purple-700 flex items-center gap-3";
     const widthClass = fullWidth ? "justify-center" : "";
 
     return (
         <button
-            onClick={login}
+            onClick={handleLoginClick}
             className={`${baseClasses} ${widthClass}`}
         >
             <svg
