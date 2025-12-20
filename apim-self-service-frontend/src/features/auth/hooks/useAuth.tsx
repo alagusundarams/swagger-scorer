@@ -125,7 +125,10 @@ const RealAuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
 
 // === MAIN PROVIDER ===
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const useMock = import.meta.env.VITE_USE_MOCK_AUTH === 'true';
+    // Default to MOCK login unless explicitly disabled via environment
+    const useMock = import.meta.env.VITE_USE_MOCK_AUTH !== 'false';
+
+    console.log(`[SYS] Auth Mode: ${useMock ? 'MOCK (Local)' : 'SSO (Azure AD)'}`);
 
     if (useMock) {
         return <MockAuthProvider>{children}</MockAuthProvider>;
