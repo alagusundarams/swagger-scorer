@@ -85,25 +85,38 @@ async function getAzureAccessToken(): Promise<string> {
 }
 
 /**
- * Fetch data from APIM REST API
+ * Fetch data from APIM REST API with pagination support
  */
 async function fetchAPIM<T>(config: APIMConfig, path: string): Promise<{ value: T[] }> {
+    const results: T[] = [];
     const baseUrl = `https://management.azure.com/subscriptions/${config.subscriptionId}/resourceGroups/${config.resourceGroup}/providers/Microsoft.ApiManagement/service/${config.instance}`;
-    const url = `${baseUrl}${path}?api-version=2022-08-01`;
+    let nextLink: string | null = `${baseUrl}${path}?api-version=2022-08-01`;
 
-    const response = await fetch(url, {
-        headers: {
-            'Authorization': `Bearer ${config.accessToken}`,
-            'Content-Type': 'application/json'
+    while (nextLink) {
+        const response = await fetch(nextLink, {
+            headers: {
+                'Authorization': `Bearer ${config.accessToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(`APIM API error: ${response.status} ${response.statusText}\n${error}`);
         }
-    });
 
-    if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`APIM API error: ${response.status} ${response.statusText}\n${error}`);
+        const data = await response.json() as { value: T[], nextLink?: string };
+        results.push(...data.value);
+
+        // Azure ARM API uses nextLink for pagination
+        nextLink = data.nextLink || null;
+
+        if (nextLink) {
+            console.log(`   ..fetching next page (${results.length} items so far)`);
+        }
     }
 
-    return await response.json();
+    return { value: results };
 }
 
 /**
