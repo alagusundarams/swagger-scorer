@@ -41,4 +41,55 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
             return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to fetch subscriptions' });
         }
     });
+
+    // PATCH /api/v1/subscriptions/:id
+    fastify.patch('/subscriptions/:id', async (request, reply) => {
+        const { id } = request.params as any;
+        const { state } = request.body as any;
+        try {
+            // In a real app, this would update keys, expiry, etc.
+            await catalogService.updateSubscriptionState(id, state);
+            return { success: true };
+        } catch (error) {
+            fastify.log.error({ err: error }, 'Error updating subscription');
+            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to update subscription' });
+        }
+    });
+
+    // POST /api/v1/subscriptions (Request Access)
+    fastify.post('/subscriptions', async (request, reply) => {
+        const { productId, teamId } = request.body as any;
+        try {
+            const requester = { name: 'Portal User', email: 'user@portal.dev' };
+            const sub = await catalogService.addSubscription(productId, teamId, requester);
+            return sub;
+        } catch (error) {
+            fastify.log.error({ err: error }, 'Error creating subscription');
+            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to request access' });
+        }
+    });
+
+    // GET /api/v1/approvals
+    fastify.get('/approvals', async (_request, reply) => {
+        try {
+            const approvals = await catalogService.getAllApprovals();
+            return approvals;
+        } catch (error) {
+            fastify.log.error({ err: error }, 'Error fetching approvals');
+            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to fetch approvals' });
+        }
+    });
+
+    // PATCH /api/v1/approvals/:id (Process Approval)
+    fastify.patch('/approvals/:id', async (request, reply) => {
+        const { id } = request.params as any;
+        const { status } = request.body as any;
+        try {
+            const approval = await catalogService.updateApproval(id, status, 'Admin User');
+            return approval;
+        } catch (error) {
+            fastify.log.error({ err: error }, 'Error processing approval');
+            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to process approval' });
+        }
+    });
 }

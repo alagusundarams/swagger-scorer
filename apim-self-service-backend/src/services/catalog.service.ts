@@ -79,7 +79,103 @@ export async function getAllSubscriptions() {
         ...s,
         productId: s.product_id,
         subscriberTeamId: s.subscriber_team_id,
-        primaryKey: { name: 'Primary', value: '••••••••' }, // Do not expose keys in list view
-        secondaryKey: { name: 'Secondary', value: '••••••••' }
+        primaryKey: { name: 'Primary', value: s.primary_key_value || '••••••••' },
+        secondaryKey: { name: 'Secondary', value: s.secondary_key_value || '••••••••' }
     }));
+}
+
+/**
+ * Fetch all approval requests
+ */
+export async function getAllApprovals() {
+    const res = await query(`
+        SELECT a.*, t.name as team_name
+        FROM approval_requests a
+        JOIN teams t ON a.requester_team_id = t.id
+        ORDER BY a.submitted_at DESC
+    `);
+
+    return res.rows.map(a => ({
+        ...a,
+        requesterTeamId: a.requester_team_id,
+        requesterTeamName: a.team_name,
+        submittedAt: a.submitted_at,
+        resolvedAt: a.resolved_at,
+        resolvedBy: a.resolved_by,
+        productId: a.details.productId,
+        // Map to frontend-expected format
+        requester: {
+            name: a.requester_name,
+            email: a.requester_email,
+            teamId: a.requester_team_id,
+            teamName: a.team_name
+        }
+    }));
+}
+
+/**
+ * Handle new subscription request
+ */
+export async function addSubscription(productId: string, teamId: string, requester: { name: string, email: string }) {
+    const subId = `sub-${Math.random().toString(36).substr(2, 9)}`;
+    const approvalId = `appr-${Math.random().toString(36).substr(2, 9)}`;
+
+    // 1. Create Approval Request
+    await query(`
+        INSERT INTO approval_requests (id, type, status, requester_name, requester_email, requester_team_id, details)
+        VALUES ($1, 'SUBSCRIPTION', 'PENDING', $2, $3, $4, $5)
+    `, [approvalId, requester.name, requester.email, teamId, JSON.stringify({ productId, subscriptionId: subId })]);
+
+    // 2. Create Pending Subscription
+    const res = await query(`
+        INSERT INTO subscriptions (id, product_id, subscriber_team_id, state)
+        VALUES ($1, $2, $3, 'pending')
+        RETURNING *
+    `, [subId, productId, teamId]);
+
+    return {
+        ...res.rows[0],
+        productId: res.rows[0].product_id,
+        subscriberTeamId: res.rows[0].subscriber_team_id
+    };
+}
+
+/**
+ * Process an approval
+ */
+export async function updateApproval(id: string, status: 'APPROVED' | 'REJECTED', resolvedBy: string) {
+    // 1. Update Approval record
+    const apprRes = await query(`
+        UPDATE approval_requests 
+        SET status = $1, resolved_at = NOW(), resolved_by = $2
+        WHERE id = $3
+        RETURNING *
+    `, [status, resolvedBy, id]);
+
+    if (apprRes.rows.length === 0) throw new Error('Approval not found');
+
+    const approval = apprRes.rows[0];
+
+    // 2. If it was a subscription, update the subscription state
+    if (approval.type === 'SUBSCRIPTION' && approval.details.subscriptionId) {
+        const subState = status === 'APPROVED' ? 'active' : 'rejected';
+        await query(`
+            UPDATE subscriptions
+            SET state = $1, updated_at = NOW()
+            WHERE id = $2
+        `, [subState, approval.details.subscriptionId]);
+    }
+
+    return approval;
+}
+
+/**
+ * Direct subscription state update
+ */
+export async function updateSubscriptionState(id: string, state: string) {
+    await query(`
+        UPDATE subscriptions
+        SET state = $1, updated_at = NOW()
+        WHERE id = $2
+    `, [state, id]);
 }
