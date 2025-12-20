@@ -199,7 +199,11 @@ async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], product
     let inserted = 0;
     let skipped = 0;
 
-    const productMap = new Map(products.map(p => [p.name, `${importEnv}-${p.id || p.name}`]));
+    // For API-scoped subscriptions, we need to know which product an API belongs to
+    const apiToProductRes = await pool.query('SELECT name, product_id FROM apis');
+    const apiToProductMap = new Map(apiToProductRes.rows.map(r => [r.name.toLowerCase(), r.product_id]));
+
+    const productMap = new Map(products.map(p => [p.name.toLowerCase(), `${importEnv}-${p.id || p.name}`]));
 
     for (const subscription of subscriptions) {
         try {
@@ -210,15 +214,30 @@ async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], product
             let productId = null;
             if (props.scope) {
                 const scopeParts = props.scope.split('/');
+
+                // 1. Try Product Match
                 const productIdx = scopeParts.indexOf('products');
                 if (productIdx >= 0 && scopeParts[productIdx + 1]) {
-                    const productName = scopeParts[productIdx + 1];
+                    const productName = scopeParts[productIdx + 1].toLowerCase();
                     productId = productMap.get(productName);
+                }
+
+                // 2. Try API Match (fallback)
+                if (!productId) {
+                    const apiIdx = scopeParts.indexOf('apis');
+                    if (apiIdx >= 0 && scopeParts[apiIdx + 1]) {
+                        const apiName = scopeParts[apiIdx + 1].toLowerCase();
+                        productId = apiToProductMap.get(apiName);
+                    }
                 }
             }
 
             if (!productId) {
-                console.warn(`  ⚠️  Could not determine product for subscription ${subscription.name}, skipping`);
+                if (props.scope === '/' || !props.scope) {
+                    console.warn(`  ℹ️  Service-level subscription skipped (No specific product): ${subscription.name}`);
+                } else {
+                    console.warn(`  ⚠️  Unmatched scope for subscription ${subscription.name}: ${props.scope}`);
+                }
                 skipped++;
                 continue;
             }
