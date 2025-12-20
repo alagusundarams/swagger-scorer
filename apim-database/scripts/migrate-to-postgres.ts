@@ -19,6 +19,7 @@ const { Pool } = pg;
 interface APIMData {
     fetchedAt: string;
     instance: string;
+    environment: string;
     summary: {
         totalProducts: number;
         totalAPIs: number;
@@ -60,8 +61,8 @@ async function createDefaultTeam(pool: pg.Pool): Promise<string> {
 /**
  * Transform and insert products
  */
-async function migrateProducts(pool: pg.Pool, products: any[]) {
-    console.log(`\n📦 Migrating ${products.length} products...`);
+async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string) {
+    console.log(`\n📦 Migrating ${products.length} products to ${importEnv}...`);
     let inserted = 0;
     let skipped = 0;
 
@@ -92,17 +93,17 @@ async function migrateProducts(pool: pg.Pool, products: any[]) {
                 ON CONFLICT (id) DO UPDATE SET
                     display_name = EXCLUDED.display_name,
                     description = EXCLUDED.description,
-                    state = EXCLUDED.state,
+                    subscriber_count = EXCLUDED.subscriber_count,
                     updated_at = NOW()
             `, [
-                product.id || product.name,
+                `${importEnv}-${product.id || product.name}`,
                 product.name,
                 props.displayName || product.name,
                 '1.0.0', // Default version
                 props.description || '',
                 props.state === 'published' ? 'published' : 'notPublished',
                 null, // owner_team_id = NULL (no teams yet)
-                environment,
+                importEnv,
                 'internal', // Default visibility
                 'TERRAFORM_MANAGED', // All existing products start as Terraform-managed
                 gitRepoUrl,
@@ -125,13 +126,13 @@ async function migrateProducts(pool: pg.Pool, products: any[]) {
 /**
  * Transform and insert APIs
  */
-async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[]) {
-    console.log(`\n📡 Migrating ${apis.length} APIs...`);
+async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEnv: string) {
+    console.log(`\n📡 Migrating ${apis.length} APIs for ${importEnv}...`);
     let inserted = 0;
     let skipped = 0;
 
     // Create a map of product names to IDs
-    const productMap = new Map(products.map(p => [p.name, p.id || p.name]));
+    const productMap = new Map(products.map(p => [p.name, `${importEnv}-${p.id || p.name}`]));
 
     for (const api of apis) {
         try {
@@ -170,7 +171,7 @@ async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[]) {
                     path = EXCLUDED.path,
                     updated_at = NOW()
             `, [
-                api.id || api.name,
+                `${importEnv}-${api.id || api.name}`,
                 productId,
                 api.name,
                 props.displayName || api.name,
@@ -193,12 +194,12 @@ async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[]) {
 /**
  * Transform and insert subscriptions
  */
-async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], products: any[], defaultTeamId: string) {
-    console.log(`\n🔑 Migrating ${subscriptions.length} subscriptions...`);
+async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], products: any[], defaultTeamId: string, importEnv: string) {
+    console.log(`\n🔑 Migrating ${subscriptions.length} subscriptions for ${importEnv}...`);
     let inserted = 0;
     let skipped = 0;
 
-    const productMap = new Map(products.map(p => [p.name, p.id || p.name]));
+    const productMap = new Map(products.map(p => [p.name, `${importEnv}-${p.id || p.name}`]));
 
     for (const subscription of subscriptions) {
         try {
@@ -312,9 +313,10 @@ async function main() {
         console.log(`  ✅ Default team ready: ${defaultTeamId}`);
 
         // Migrate data
-        await migrateProducts(pool, apimData.products);
-        await migrateAPIs(pool, apimData.apis, apimData.products);
-        await migrateSubscriptions(pool, apimData.subscriptions, apimData.products, defaultTeamId);
+        const importEnv = apimData.environment || 'DEV';
+        await migrateProducts(pool, apimData.products, importEnv);
+        await migrateAPIs(pool, apimData.apis, apimData.products, importEnv);
+        await migrateSubscriptions(pool, apimData.subscriptions, apimData.products, defaultTeamId, importEnv);
 
         // Update stats
         await updateProductStats(pool);

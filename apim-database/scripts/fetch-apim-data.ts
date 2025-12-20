@@ -27,6 +27,7 @@ interface APIMConfig {
     instance: string;
     resourceGroup: string;
     subscriptionId: string;
+    environment: string;
     accessToken?: string;
 }
 
@@ -115,7 +116,8 @@ async function main() {
     const config: APIMConfig = {
         instance: process.env.APIM_INSTANCE || '',
         resourceGroup: process.env.RESOURCE_GROUP || '',
-        subscriptionId: process.env.SUBSCRIPTION_ID || ''
+        subscriptionId: process.env.SUBSCRIPTION_ID || '',
+        environment: (process.env.ENV || 'DEV').toUpperCase()
     };
 
     // Try to get access token from Azure CLI if not provided
@@ -137,7 +139,8 @@ async function main() {
 
     console.log(`📍 APIM Instance: ${config.instance}`);
     console.log(`📍 Resource Group: ${config.resourceGroup}`);
-    console.log(`📍 Subscription: ${config.subscriptionId}\n`);
+    console.log(`📍 Subscription: ${config.subscriptionId}`);
+    console.log(`📍 Tagged Env: ${config.environment}\n`);
 
     try {
         // Fetch Products
@@ -197,6 +200,7 @@ async function main() {
         const output = {
             fetchedAt: new Date().toISOString(),
             instance: config.instance,
+            environment: config.environment,
             summary: {
                 totalProducts: productsData.value.length,
                 totalAPIs: apisData.value.length,
@@ -215,7 +219,7 @@ async function main() {
             // Directory might already exist
         }
 
-        const outputFile = join(outputDir, `apim-data-${timestamp}.json`);
+        const outputFile = join(outputDir, `apim-data-${config.environment.toLowerCase()}-${timestamp}.json`);
         writeFileSync(outputFile, JSON.stringify(output, null, 2));
 
         console.log(`\n💾 Data saved to: ${outputFile}`);
