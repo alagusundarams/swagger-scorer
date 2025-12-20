@@ -17,6 +17,7 @@ import { loadConfig, validateConfig } from './config/loader.js';
 import { healthRoutes } from './routes/health.js';
 import { configRoutes } from './routes/config.js';
 import { analyzeRoutes } from './routes/analyze.js';
+import { catalogRoutes } from './routes/catalog.js';
 import draftsRoute from './routes/drafts.js';
 
 /**
@@ -73,6 +74,7 @@ export async function build() {
     await fastify.register(healthRoutes, { prefix: '/api/v1' });
     await fastify.register(configRoutes, { ...config, prefix: '/api/v1' });
     await fastify.register(analyzeRoutes, { ...config, prefix: '/api/v1' });
+    await fastify.register(catalogRoutes, { prefix: '/api/v1' });
     await fastify.register(draftsRoute, { prefix: '/api/v1' });
 
     // Error handler for uncaught errors
