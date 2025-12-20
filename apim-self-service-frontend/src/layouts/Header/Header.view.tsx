@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../features/auth/hooks/useAuth';
 import { useStore } from '../../store/useStore';
+import { USE_MOCKS } from '../../features/analyzer/api/client';
 
 interface HeaderProps {
     pageName?: string;
@@ -118,9 +119,22 @@ export const Header = ({ pageName = 'Dashboard' }: HeaderProps) => {
 
                 </div>
 
-                {/* CENTER - Page Name */}
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                    <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#f1f5f9', lineHeight: 1, whiteSpace: 'nowrap' }}>
+                {/* CENTER - Status & Page Name */}
+                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '4px' }}>
+                    <div style={{
+                        fontSize: '9px',
+                        fontWeight: '900',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        backgroundColor: USE_MOCKS ? 'rgba(251, 191, 36, 0.1)' : 'rgba(34, 197, 94, 0.1)',
+                        color: USE_MOCKS ? '#fbbf24' : '#22c55e',
+                        border: `1px solid ${USE_MOCKS ? '#fbbf2433' : '#22c55e33'}`,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.1em'
+                    }}>
+                        {USE_MOCKS ? '⚡️ Mock Dashboard' : '🌐 Live Database'}
+                    </div>
+                    <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#f1f5f9', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
                         {pageName}
                     </span>
                 </div>

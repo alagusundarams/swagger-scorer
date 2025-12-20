@@ -9,6 +9,7 @@ import { StatCard } from '../components/StatCard';
 import { ProductProducerCard } from '../components/ProductProducerCard';
 import { ProductConsumerCard } from '../components/ProductConsumerCard';
 import { canAccessProduct } from '../../../utils/productRoleDetection';
+import { USE_MOCKS } from '../../analyzer/api/client';
 
 /**
  * DashboardPage: The central command center for both API Producers and Consumers.
@@ -58,6 +59,7 @@ export const DashboardPage = () => {
 
     // --- Memoized Enterprise Dataset (Administrative Scale Demo) ---
     const adminMockData = useMemo(() => {
+        if (!USE_MOCKS) return []; // Skip mock data in "Reality" mode
         return Array.from({ length: 112 }).map((_, i) => ({
             id: `admin-api-${i}`,
             name: `ent-api-${i}`,
@@ -137,8 +139,13 @@ export const DashboardPage = () => {
         if (activeTab === 'produced') return myProducts;
         if (activeTab === 'consumed') return subscribedProducts;
         if (activeTab === 'approvals') return pendingApprovals;
+
+        // In LIVE mode, the 'admin' tab should ideally show allProducts
+        // In MOCK mode, it shows the massive demo dataset
+        if (!USE_MOCKS && activeTab === 'admin') return allProducts;
+
         return adminMockData;
-    }, [activeTab, myProducts, subscribedProducts, adminMockData, pendingApprovals]);
+    }, [activeTab, myProducts, subscribedProducts, adminMockData, pendingApprovals, allProducts]);
 
     const filteredData = useMemo(() => {
         if (!searchQuery) return baseData;
