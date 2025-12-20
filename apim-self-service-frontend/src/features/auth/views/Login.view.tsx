@@ -9,7 +9,7 @@ const SSO_DOMAINS = ['company.com', 'example.org'];
 type LoginStep = 'email' | 'password';
 
 export const LoginPage: React.FC = () => {
-    const { isAuthenticated, login } = useAuth();
+    const { isAuthenticated, login, isMock } = useAuth();
     const navigate = useNavigate();
 
     const [step, setStep] = useState<LoginStep>('email');
@@ -105,7 +105,12 @@ export const LoginPage: React.FC = () => {
                         transform: 'translateY(-4px)'
                     }}
                 >
-                    <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Sign in</h2>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">Sign in</h2>
+                    <div className="flex justify-center mb-6">
+                        <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest ${isMock ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>
+                            Identity Mode: {isMock ? 'Local Mock' : 'SSO (Azure AD)'}
+                        </span>
+                    </div>
 
                     {/* Error Message */}
                     {error && (

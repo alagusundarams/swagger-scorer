@@ -128,9 +128,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // FORCE MOCK login by default. 
     // To use real SSO, user MUST explicitly set VITE_USE_MOCK_AUTH to 'false'
     const envFlag = import.meta.env.VITE_USE_MOCK_AUTH;
-    const useMock = (envFlag === undefined || envFlag === '' || envFlag === 'true' || envFlag !== 'false');
+    const dataMockFlag = import.meta.env.VITE_USE_MOCKS;
 
-    console.log(`[SYS] Identity Provider Check:`, { envFlag, useMock });
+    // Aggressive Mock Logic: 
+    // Default to mock if:
+    // 1. Auth flag is NOT 'false' (undefined, '', 'true', etc)
+    // 2. OR Data flag is explicitly 'true'
+    const useMock = (envFlag !== 'false') || (dataMockFlag === 'true');
+
+    console.log(`[SYS] Identity Provider Check:`, { envFlag, dataMockFlag, useMock });
     console.log(`[SYS] Identity Provider: ${useMock ? 'LOCAL MOCK' : 'AZURE AD SSO'}`);
 
     if (useMock) {
