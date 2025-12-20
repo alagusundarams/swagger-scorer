@@ -159,7 +159,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     id TEXT PRIMARY KEY,
     product_id TEXT REFERENCES products(id) ON DELETE CASCADE NOT NULL,
     subscriber_team_id TEXT REFERENCES teams(id) NOT NULL,
-    state TEXT NOT NULL CHECK (state IN ('active', 'suspended', 'pending', 'rejected', 'cancelled', 'expired')),
+    state TEXT NOT NULL CHECK (state IN ('active', 'suspended', 'submitted', 'pending', 'rejected', 'cancelled', 'expired')),
     
     -- Keys
     primary_key_name TEXT,
