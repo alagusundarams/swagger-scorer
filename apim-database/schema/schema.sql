@@ -1,24 +1,17 @@
+-- =============================================================================
+-- NUCLEAR RESET (DROP EVERYTHING)
+-- =============================================================================
+
+DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public;
+GRANT ALL ON SCHEMA public TO postgres;
+GRANT ALL ON SCHEMA public TO public;
+
 -- Design principles:
 -- 1. Golden records - authoritative source of truth
 -- 2. Denormalized where needed for query performance
 -- 3. JSONB for flexible metadata
 -- 4. Environment-scoped where applicable
-
--- =============================================================================
--- CLEAN SLATE (DROP EVERYTHING)
--- =============================================================================
-
-DROP VIEW IF EXISTS subscriptions_with_details CASCADE;
-DROP VIEW IF EXISTS products_with_teams CASCADE;
-DROP TABLE IF EXISTS audit_log CASCADE;
-DROP TABLE IF EXISTS approval_requests CASCADE;
-DROP TABLE IF EXISTS subscriptions CASCADE;
-DROP TABLE IF EXISTS operations CASCADE;
-DROP TABLE IF EXISTS apis CASCADE;
-DROP TABLE IF EXISTS products CASCADE;
-DROP TABLE IF EXISTS user_teams CASCADE;
-DROP TABLE IF EXISTS users CASCADE;
-DROP TABLE IF EXISTS teams CASCADE;
 
 -- =============================================================================
 -- TEAMS
