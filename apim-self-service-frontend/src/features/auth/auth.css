@@ -1,0 +1,48 @@
+/* Shared form element styling to ensure perfect alignment */
+.login-form-element {
+    width: 100% !important;
+    border-radius: 0.75rem !important;
+    border-width: 2px !important;
+    border-style: solid !important;
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+    padding-top: 0.625rem !important;
+    padding-bottom: 0.625rem !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    box-sizing: border-box !important;
+    margin-bottom: 0 !important;
+}
+
+.login-form-element+.login-form-element {
+    margin-top: 1.25rem !important;
+}
+
+.login-card {
+    padding: 3rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05),
+        0 20px 40px -10px rgba(0, 0, 0, 0.4),
+        0 10px 20px -5px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    transform: translateY(-4px);
+    background-color: white;
+}
+
+.login-error-banner {
+    margin-bottom: 1.5rem;
+    padding: 0.75rem;
+    background-color: #fef2f2;
+    /* red-50 */
+    border-radius: 0.5rem;
+    color: #b91c1c;
+    /* red-700 */
+    font-size: 0.875rem;
+    text-align: center;
+    border: 1px solid #fecaca;
+}
+
+.password-form {
+    margin-top: 1.25rem;
+}

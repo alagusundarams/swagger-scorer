@@ -3,6 +3,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import type { Product, User, Subscription, API } from '../../../types/entities';
 import { useStore } from '../../../store/useStore';
 import { ManageProductModal } from '../components/ManageProductModal';
+import { SubscriberCard } from '../components/SubscriberCard';
+import { ProducerHeader } from '../components/ProducerHeader';
+import { ProducerMetrics } from '../components/ProducerMetrics';
+import { ProducerAuditLog } from '../components/ProducerAuditLog';
+import { RevokeAccessModal } from '../components/RevokeAccessModal';
 
 // Lazy load Contract Editor (only loads Monaco when needed)
 const ContractEditorModal = lazy(() =>
@@ -69,13 +74,13 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
     const [isManageModalOpen, setIsManageModalOpen] = useState(false);
     const [isEditorOpen, setIsEditorOpen] = useState(false);
     const [selectedApi, setSelectedApi] = useState<API | null>(null);
-    const [selectedSubscriberMenu, setSelectedSubscriberMenu] = useState<string | null>(null);
+
     const [revokeModalOpen, setRevokeModalOpen] = useState(false);
     const [selectedSubscription, setSelectedSubscription] = useState<string | null>(null);
     const [revocationReason, setRevocationReason] = useState('');
     const [activeTab, setActiveTab] = useState<'subscribers' | 'apis' | 'audit'>('subscribers');
     const [localToast, setLocalToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
-    const [revealedKeys, setRevealedKeys] = useState<Set<string>>(new Set());
+
     const [isOutOfSync, setIsOutOfSync] = useState(false);
 
     const location = useLocation();
@@ -127,18 +132,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
         return 'text-red-500';
     }, []);
 
-    const maskKey = useCallback((key: string) =>
-        key.substring(0, 4) + '••••••••' + key.substring(key.length - 4),
-        []);
 
-    const toggleKeyReveal = (subscriptionId: string) => {
-        setRevealedKeys(prev => {
-            const next = new Set(prev);
-            if (next.has(subscriptionId)) next.delete(subscriptionId);
-            else next.add(subscriptionId);
-            return next;
-        });
-    };
 
     const score = product.qualityScore || 0;
 
@@ -157,7 +151,6 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
     const handleRevokeAccess = useCallback((subscriptionId: string) => {
         setSelectedSubscription(subscriptionId);
         setRevokeModalOpen(true);
-        setSelectedSubscriberMenu(null);
     }, []);
 
     /**
@@ -257,8 +250,30 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
 
             setLocalToast({ message: `Successfully promoted to ${nextStage}`, type: 'success' });
             setTimeout(() => setLocalToast(null), 3000);
+        } else {
+            setLocalToast({ message: `Already at PROD. No further promotion possible.`, type: 'warning' });
+            setTimeout(() => setLocalToast(null), 3000);
         }
     }, [product.id, product.displayName, product.environment, updateProduct, addNotification]);
+
+    /**
+     * Handle product deprecation
+     */
+    const handleDeprecate = useCallback(() => {
+        if (confirm(`Are you sure you want to deprecate ${product.displayName}? This will prevent new subscriptions.`)) {
+            updateProduct(product.id, { visibility: 'private' }); // Or a specific 'deprecated' state if available
+
+            addNotification({
+                type: 'warning',
+                title: 'Product Deprecated',
+                message: `${product.displayName} is now deprecated.`,
+                navigateTo: `/products/${product.id}`
+            });
+
+            setLocalToast({ message: 'Product marked as Deprecated', type: 'warning' });
+            setTimeout(() => setLocalToast(null), 3000);
+        }
+    }, [product.id, product.displayName, updateProduct, addNotification]);
 
     /**
      * Navigate to API detail page
@@ -274,165 +289,25 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
 
     return (
         <div className="max-w-7xl mx-auto px-6 py-8">
-            {/* Out of Sync Banner */}
-            {isOutOfSync && (
-                <div className="mb-6 p-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6 animate-slide-up">
-                    <div className="flex items-center gap-4">
-                        <span className="text-3xl">🔄</span>
-                        <div>
-                            <p className="text-sm font-black text-amber-700 dark:text-amber-500 uppercase tracking-widest">Environment Out of Sync</p>
-                            <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                                The current draft has unpromoted changes. To reflect these in Production, you must initiate a new deployment cycle.
-                            </p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={() => {
-                            updateProduct(product.id, { environment: 'DEV' });
-                            setIsOutOfSync(false);
-                            setLocalToast({ message: 'Product returned to DEV for re-promotion.', type: 'success' });
-                        }}
-                        className="px-6 py-3 bg-amber-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-amber-500/20 hover:bg-amber-700 transition-all flex items-center gap-2"
-                    >
-                        <span>Initiate Re-Deployment (DEV)</span>
-                        <span>→</span>
-                    </button>
-                </div>
-            )}
+            <ProducerHeader
+                product={product}
+                isOutOfSync={isOutOfSync}
+                onInitiateRedeploy={() => {
+                    updateProduct(product.id, { environment: 'DEV' });
+                    setIsOutOfSync(false);
+                    setLocalToast({ message: 'Product returned to DEV for re-promotion.', type: 'success' });
+                }}
+                onManageClick={() => setIsManageModalOpen(true)}
+                onPromoteClick={handlePromote}
+                onDeprecateClick={handleDeprecate}
+            />
 
-            {/* Terraform Management Mode Banner */}
-            {product.management_mode === 'TERRAFORM_MANAGED' && (
-                <div className="mb-6 p-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-3xl flex items-center gap-4 animate-slide-up">
-                    <span className="text-3xl">🔧</span>
-                    <div className="flex-1">
-                        <p className="text-sm font-black text-blue-700 dark:text-blue-500 uppercase tracking-widest">Terraform Managed</p>
-                        <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                            This product is currently managed via Terraform. Changes must be made through the Azure DevOps pipeline.
-                        </p>
-                    </div>
-                </div>
-            )}
-
-            {/* ============================================
-                HEADER: Product Info & Management Actions
-                ============================================ */}
-            <div className="mb-8">
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-3xl shadow-xl shadow-blue-500/10">
-                            📦
-                        </div>
-                        <div>
-                            <div className="flex items-center gap-3">
-                                <h1 className="text-3xl font-black text-gray-900 dark:text-white">
-                                    {product.displayName}
-                                </h1>
-                                <span className="bg-gray-100 dark:bg-slate-900 px-2 py-1 rounded text-[10px] font-black text-gray-400 uppercase tracking-widest border border-gray-100 dark:border-slate-800">
-                                    V{product.version}
-                                </span>
-                                {/* Visibility Badge */}
-                                <span className={`px-2 py-1 text-[10px] font-black rounded-lg border uppercase ${product.visibility === 'private'
-                                    ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-                                    : product.visibility === 'owner-only'
-                                        ? 'bg-red-500/10 text-red-500 border-red-500/20'
-                                        : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                                    }`}>
-                                    {product.visibility || 'public'}
-                                </span>
-                            </div>
-                            <p className="text-gray-600 dark:text-slate-400 mt-1">{product.description}</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                        {/* Environment Badge */}
-                        <span className={`px-3 py-1 text-xs font-black rounded-lg border uppercase ${product.environment === 'PROD'
-                            ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                            : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
-                            }`}>
-                            {product.environment}
-                        </span>
-                    </div>
-                </div>
-
-                {/* Management Actions */}
-                <div className="flex gap-3">
-                    <button
-                        onClick={() => setIsManageModalOpen(true)}
-                        className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold text-sm transition"
-                        aria-label="Manage product settings"
-                    >
-                        Manage Product
-                    </button>
-                    <button
-                        onClick={() => {
-                            const mode = product.management_mode || 'PORTAL_MANAGED';
-
-                            if (mode === 'TERRAFORM_MANAGED' && product.terraform_pipeline_url) {
-                                // Open Azure DevOps pipeline in new tab
-                                window.open(product.terraform_pipeline_url, '_blank');
-                            } else if (mode === 'HYBRID') {
-                                // Trigger Terraform pipeline via webhook (placeholder)
-                                console.log('[Hybrid Mode] Would trigger Terraform pipeline');
-                                setLocalToast({ message: 'Terraform pipeline triggered', type: 'success' });
-                                setTimeout(() => setLocalToast(null), 3000);
-                            } else {
-                                //  Portal managed - open modal (existing behavior)
-                                setIsManageModalOpen(true);
-                            }
-                        }}
-                        className="px-4 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-900 dark:text-white rounded-lg font-semibold text-sm transition"
-                        aria-label="Deploy product"
-                    >
-                        {product.management_mode === 'TERRAFORM_MANAGED' ? 'View Pipeline' : 'Deploy'}
-                    </button>
-                    {product.state === 'published' && (
-                        <button
-                            className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg font-semibold text-sm transition"
-                            aria-label="Mark product as deprecated"
-                        >
-                            Mark as Deprecated
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            {/* ============================================
-                METRICS DASHBOARD: Quality, Adoption, APIs
-                ============================================ */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                {/* Quality Score Card */}
-                <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-slate-700">
-                    <div className="text-sm font-bold text-gray-500 dark:text-slate-400 mb-4">Quality Score</div>
-                    <div className={`text-5xl font-black ${getScoreColor(score)} mb-2`}>
-                        {score}%
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-slate-500">
-                        {score >= 90 ? 'Excellent' : score >= 70 ? 'Good' : 'Needs Improvement'}
-                    </div>
-                </div>
-
-                {/* Subscribers Card - Real-time count */}
-                <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-slate-700">
-                    <div className="text-sm font-bold text-gray-500 dark:text-slate-400 mb-4">Subscribers</div>
-                    <div className="text-5xl font-black text-blue-500 mb-2">
-                        {productSubscriptions.length}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-slate-500">
-                        Active teams using this API
-                    </div>
-                </div>
-
-                {/* APIs Card */}
-                <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-slate-700">
-                    <div className="text-sm font-bold text-gray-500 dark:text-slate-400 mb-4">Interfaces</div>
-                    <div className="text-5xl font-black text-gray-900 dark:text-white mb-2">
-                        {product.apis.length}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-slate-500">
-                        APIs in this product
-                    </div>
-                </div>
-            </div>
+            <ProducerMetrics
+                qualityScore={score}
+                subscriberCount={productSubscriptions.length}
+                apiCount={product.apis.length}
+                getScoreColor={getScoreColor}
+            />
 
             {/* Tab Navigation */}
             <div className="flex border-b border-gray-100 dark:border-slate-800 mb-8">
@@ -463,99 +338,15 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                     {productSubscriptions.length > 0 ? (
                         <div className="space-y-3">
                             {productSubscriptions.map((subscription) => {
-                                // Join with teams data for display
                                 const team = allTeams.find(t => t.id === subscription.subscriberTeamId);
-                                const isMenuOpen = selectedSubscriberMenu === subscription.id;
-
                                 return (
-                                    <div key={subscription.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-900 rounded-lg">
-                                        {/* Team Info */}
-                                        <div className="flex-1">
-                                            <div className="font-semibold text-gray-900 dark:text-white">
-                                                {team?.name || subscription.subscriberTeamId}
-                                            </div>
-                                            <div className="text-xs text-gray-500 dark:text-slate-500">
-                                                {team?.description || 'Team'} • Subscribed {new Date(subscription.createdAt).toLocaleDateString()}
-                                            </div>
-
-                                            {/* Security Credentials Reveal */}
-                                            <div className="mt-4 flex flex-wrap gap-4">
-                                                <div className="flex flex-col">
-                                                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">{subscription.primaryKey.name} Key</span>
-                                                    <div className="flex items-center gap-2">
-                                                        <code className="bg-slate-100 dark:bg-slate-900 px-3 py-1 rounded text-[10px] font-mono text-slate-600 dark:text-emerald-400">
-                                                            {revealedKeys.has(subscription.id) ? subscription.primaryKey.value : maskKey(subscription.primaryKey.value)}
-                                                        </code>
-                                                        <button
-                                                            onClick={() => toggleKeyReveal(subscription.id)}
-                                                            className="text-[10px] text-blue-600 font-bold hover:underline"
-                                                        >
-                                                            {revealedKeys.has(subscription.id) ? 'Hide' : 'Reveal'}
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                {subscription.secondaryKey && (
-                                                    <div className="flex flex-col border-l border-gray-100 dark:border-slate-800 pl-4">
-                                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">{subscription.secondaryKey.name} Key</span>
-                                                        <code className="bg-slate-50 dark:bg-slate-950 px-3 py-1 rounded text-[10px] font-mono text-slate-400 dark:text-slate-600">
-                                                            {revealedKeys.has(subscription.id) ? subscription.secondaryKey.value : maskKey(subscription.secondaryKey.value)}
-                                                        </code>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* Status Badge & Actions */}
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-xs font-semibold px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
-                                                {subscription.state}
-                                            </span>
-
-                                            {/* Actions Dropdown */}
-                                            <div className="relative">
-                                                <button
-                                                    onClick={() => setSelectedSubscriberMenu(isMenuOpen ? null : subscription.id)}
-                                                    className="p-2 hover:bg-gray-200 dark:hover:bg-slate-700 rounded transition"
-                                                    aria-label="Subscriber actions menu"
-                                                    aria-haspopup="true"
-                                                    aria-expanded={isMenuOpen}
-                                                >
-                                                    <svg className="w-5 h-5 text-gray-600 dark:text-slate-400" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                                                    </svg>
-                                                </button>
-
-                                                {/* Dropdown Menu - Only real actions */}
-                                                {isMenuOpen && (
-                                                    <div
-                                                        className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-gray-200 dark:border-slate-700 z-10"
-                                                        role="menu"
-                                                    >
-                                                        {isOwnerLead ? (
-                                                            <>
-                                                                <button
-                                                                    onClick={() => handleRevokeAccess(subscription.id)}
-                                                                    className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
-                                                                    role="menuitem"
-                                                                >
-                                                                    Revoke Access
-                                                                </button>
-                                                            </>
-                                                        ) : (
-                                                            <div className="px-4 py-3 bg-gray-50 dark:bg-slate-900 rounded-lg">
-                                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-relaxed">
-                                                                    🔒 Governance Locked
-                                                                </p>
-                                                                <p className="text-[9px] text-gray-500 font-medium mt-1 leading-relaxed">
-                                                                    Only Team Leads can modify subscriptions.
-                                                                </p>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <SubscriberCard
+                                        key={subscription.id}
+                                        subscription={subscription}
+                                        team={team}
+                                        isOwnerLead={isOwnerLead}
+                                        onRevokeAccess={handleRevokeAccess}
+                                    />
                                 );
                             })}
                         </div>
@@ -581,7 +372,6 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                                 onKeyPress={(e) => e.key === 'Enter' && navigateToAPI(api.id)}
                                 aria-label={`View details for ${api.displayName}`}
                             >
-                                {/* API Info */}
                                 <div className="flex-1">
                                     <div className="font-semibold text-gray-900 dark:text-white">{api.displayName}</div>
                                     <div className="text-xs text-gray-500 dark:text-slate-500">{api.description}</div>
@@ -590,14 +380,12 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                                     </div>
                                 </div>
 
-                                {/* Quality Score & Analyze Button */}
                                 <div className="flex items-center gap-3">
                                     {api.qualityScore && (
                                         <div className={`text-sm font-bold ${getScoreColor(api.qualityScore)}`}>
                                             {api.qualityScore}%
                                         </div>
                                     )}
-                                    {/* Unified Edit & Analyze Button - ALL PRODUCTS */}
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -611,7 +399,8 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                                             <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
                                         </svg>
                                         Edit & Analyze
-                                    </button>    </div>
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -619,89 +408,10 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
             )}
 
             {activeTab === 'audit' && (
-                <div className="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-lg border border-gray-100 dark:border-slate-700 animate-fade-in">
-                    <div className="flex items-center justify-between mb-8">
-                        <div>
-                            <h2 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-widest">Governance Audit Log</h2>
-                            <p className="text-xs text-slate-500 font-medium mt-1">Immutable record of all access and lifecycle events</p>
-                        </div>
-                        <button className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:underline">Export CSV</button>
-                    </div>
-
-                    <div className="space-y-4">
-                        {/* PENDING VETTING SECTION */}
-                        <div className="mb-12">
-                            <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
-                                Pending Review Decisions
-                            </h3>
-                            <div className="space-y-4">
-                                {/* Mocking a pending request for context if we're in audit tab */}
-                                <div className="p-6 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/20 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <span className="bg-blue-600 text-white px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest">Visibility Change</span>
-                                            <span className="text-[10px] font-mono text-slate-400">#REQ-9921</span>
-                                        </div>
-                                        <div className="font-black text-slate-900 dark:text-white text-sm mb-1">PROD Exposure Request</div>
-                                        <p className="text-xs text-slate-500 font-medium leading-relaxed">Requested by <span className="text-blue-600 font-bold">Identity Team</span> to enable cross-region discovery for internal clients.</p>
-                                    </div>
-                                    <div className="flex gap-2 shrink-0">
-                                        <button
-                                            onClick={() => {
-                                                setLocalToast({ message: 'Request Approved. Access updated successfully.', type: 'success' });
-                                                setTimeout(() => setLocalToast(null), 3000);
-                                            }}
-                                            className="px-6 py-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
-                                        >
-                                            Approve
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setLocalToast({ message: 'Request Rejected. Feedback sent to requester.', type: 'warning' });
-                                                setTimeout(() => setLocalToast(null), 3000);
-                                            }}
-                                            className="px-6 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-red-100 dark:hover:bg-red-900/40 transition-all"
-                                        >
-                                            Reject
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">Historical Audit Logs</h3>
-                            <div className="space-y-4">
-                                {[
-                                    { date: '2025-12-18 14:30', user: 'Admin User', event: 'Visibility Changed', details: 'Public → Private', impact: 'Medium' },
-                                    { date: '2025-12-17 09:15', user: 'System', event: 'Team Authorized', details: 'CloudOps added to PROD', impact: 'Low' },
-                                    { date: '2025-12-16 16:45', user: 'Product Owner', event: 'Access Revoked', details: 'Team-Alpha revoked (Breach of terms)', impact: 'High' }
-                                ].map((log, i) => (
-                                    <div key={i} className="flex items-center gap-6 p-4 bg-gray-50 dark:bg-slate-900/50 rounded-xl border border-gray-100 dark:border-slate-800 group hover:border-blue-500/30 transition-all">
-                                        <div className="text-[10px] font-mono text-slate-400 w-32 shrink-0">{log.date}</div>
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-3 mb-1">
-                                                <span className="text-[10px] font-black text-gray-900 dark:text-white uppercase tracking-wider">{log.event}</span>
-                                                <span className={`px-2 py-0.5 rounded-[4px] text-[8px] font-black uppercase tracking-widest ${log.impact === 'High' ? 'bg-red-500/10 text-red-500' : log.impact === 'Medium' ? 'bg-amber-500/10 text-amber-500' : 'bg-blue-500/10 text-blue-500'
-                                                    }`}>
-                                                    {log.impact} Impact
-                                                </span>
-                                            </div>
-                                            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                                                {log.details} • Modified by <span className="text-slate-900 dark:text-slate-200 font-bold">{log.user}</span>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-blue-500 transition-colors">📄</button>
-                                            <button className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:underline">Details</button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <ProducerAuditLog onAction={(msg, type) => {
+                    setLocalToast({ message: msg, type });
+                    setTimeout(() => setLocalToast(null), 3000);
+                }} />
             )}
 
             {/* Floating Local Toast */}
@@ -720,51 +430,14 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                 MODALS: Revoke, Modify Permissions, Manage Product
                 ============================================ */}
 
-            {/* Revoke Access Confirmation Modal */}
-            {
-                revokeModalOpen && (
-                    <div
-                        className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="revoke-modal-title"
-                    >
-                        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
-                            <h3 id="revoke-modal-title" className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-                                Revoke Access?
-                            </h3>
-                            <p className="text-gray-600 dark:text-slate-400 mb-6">
-                                This will immediately disable API keys and remove access to all {product.apis.length} APIs in this product.
-                                The team will be notified.
-                            </p>
-                            <div className="mb-6">
-                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Reason for Revocation</label>
-                                <textarea
-                                    value={revocationReason}
-                                    onChange={(e) => setRevocationReason(e.target.value)}
-                                    placeholder="e.g., Compliance breach, Project termination..."
-                                    className="w-full p-4 rounded-xl bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 text-sm focus:ring-2 focus:ring-red-500/20 outline-none h-24 resize-none"
-                                />
-                            </div>
-                            <div className="flex gap-3 justify-end">
-                                <button
-                                    onClick={() => setRevokeModalOpen(false)}
-                                    className="px-4 py-2 bg-gray-100 dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600 transition font-bold text-xs"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={confirmRevoke}
-                                    disabled={!revocationReason.trim()}
-                                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-bold text-xs disabled:opacity-50"
-                                >
-                                    Revoke Access
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
+            <RevokeAccessModal
+                isOpen={revokeModalOpen}
+                onClose={() => setRevokeModalOpen(false)}
+                onConfirm={confirmRevoke}
+                revocationReason={revocationReason}
+                setRevocationReason={setRevocationReason}
+                apiCount={product.apis.length}
+            />
 
             {/* Manage Product Modal */}
             {

@@ -10,6 +10,7 @@
  * OpenTelemetry instrumentation is handled separately (see below)
  */
 
+import 'dotenv/config';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { resolve } from 'path';

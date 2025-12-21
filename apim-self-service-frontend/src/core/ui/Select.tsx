@@ -35,7 +35,7 @@ export const Select: React.FC<SelectProps> = ({
                         </option>
                     ))}
                 </select>
-                <div className="absolute inset-y-0 right-0 flex items-center pr-4" style={{ pointerEvents: 'none', zIndex: 50 }}>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none z-50">
                     <svg className="h-6 w-6 text-slate-100" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                     </svg>

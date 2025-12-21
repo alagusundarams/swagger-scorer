@@ -61,7 +61,7 @@ describe('useAuth', () => {
 
         expect(result.current.isAuthenticated).toBe(true);
         expect(result.current.user).not.toBeNull();
-        expect(result.current.user?.name).toBe('Mock Developer');
+        expect(result.current.user?.name).toBe('Portal Admin');
     });
 
     it('logout clears authenticated state in mock mode', () => {

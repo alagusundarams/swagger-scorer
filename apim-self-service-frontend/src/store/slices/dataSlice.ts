@@ -1,6 +1,7 @@
 import { StateCreator } from 'zustand';
-import { type Product, type Subscription, type Team, type ApprovalRequest } from '../../types/entities';
-import { getProducts, getTeams, getSubscriptions, requestProductAccess, updateSubscription as apiUpdateSubscription, getApprovals, updateApproval } from '../../features/analyzer/api/client';
+import { type Product, type Subscription, type Team } from '../../types/entities';
+import { type ApprovalRequest, type AuditLog } from '../../types/workflow';
+import { getProducts, getTeams, getSubscriptions, requestProductAccess, updateSubscription as apiUpdateSubscription, getApprovals, updateApproval, getAuditLogs } from '../../features/inventory/api/inventoryClient';
 import { AuthSlice } from './authSlice';
 
 export interface DataSlice {
@@ -8,8 +9,10 @@ export interface DataSlice {
     subscriptions: Subscription[];
     teams: Team[];
     approvalRequests: ApprovalRequest[];
+    auditLogs: AuditLog[];
 
     fetchInitialData: (getToken?: () => Promise<string | null>) => Promise<void>;
+    fetchAuditLogs: (entityId?: string) => Promise<void>;
     updateSubscription: (id: string, updates: Partial<Subscription>, getToken?: () => Promise<string | null>) => Promise<void>;
     addSubscription: (productId: string, teamId: string, getToken?: () => Promise<string | null>) => Promise<void>;
     processApproval: (id: string, decision: 'APPROVE' | 'REJECT', getToken?: () => Promise<string | null>) => Promise<void>;
@@ -21,13 +24,15 @@ export const createDataSlice: StateCreator<DataSlice & AuthSlice, [], [], DataSl
     subscriptions: [],
     teams: [],
     approvalRequests: [],
+    auditLogs: [],
 
     fetchInitialData: async (getToken) => {
         try {
-            const [productsRes, teamsRes, approvalsRes] = await Promise.all([
+            const [productsRes, teamsRes, approvalsRes, auditRes] = await Promise.all([
                 getProducts(),
                 getTeams(),
-                getApprovals()
+                getApprovals(''),
+                getAuditLogs()
             ]);
 
             const allTeams = teamsRes.data;
@@ -36,6 +41,7 @@ export const createDataSlice: StateCreator<DataSlice & AuthSlice, [], [], DataSl
                 products: productsRes.data,
                 teams: allTeams,
                 approvalRequests: approvalsRes.data,
+                auditLogs: auditRes.data
             });
 
             // Mock notifications for testing (following notification strategy)
@@ -79,7 +85,6 @@ export const createDataSlice: StateCreator<DataSlice & AuthSlice, [], [], DataSl
             ];
 
             // Note: We need to cast to any or use the UISlice specifically to set notifications
-            // Since we are using the combined store pattern, this set call works if slices are combined correctly
             (set as any)({ notifications: mockNotifications });
 
             // Map user teams (Group IDs) to Team Entity IDs
@@ -152,6 +157,15 @@ export const createDataSlice: StateCreator<DataSlice & AuthSlice, [], [], DataSl
             } catch (error) {
                 console.error("Failed to process approval", error);
             }
+        }
+    },
+
+    fetchAuditLogs: async (entityId) => {
+        try {
+            const response = await getAuditLogs(entityId);
+            set({ auditLogs: response.data });
+        } catch (error) {
+            console.error("Failed to fetch audit logs", error);
         }
     },
 

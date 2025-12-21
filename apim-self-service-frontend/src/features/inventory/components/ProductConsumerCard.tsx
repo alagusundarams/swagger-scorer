@@ -1,5 +1,6 @@
 import React from 'react';
 import { type Product, type Subscription } from '../../../types/entities';
+import '../inventory.css';
 
 interface ProductConsumerCardProps {
     product: Product & { subscription: Subscription };
@@ -85,8 +86,8 @@ export const ProductConsumerCard: React.FC<ProductConsumerCardProps> = ({
                     <div className="flex flex-col gap-1">
                         <div className="text-[9px] uppercase font-black text-gray-400 dark:text-slate-500 tracking-widest">Avg Latency</div>
                         <div className="flex items-center gap-2">
-                            <div className="w-full h-1.5 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                                <div className="h-full bg-emerald-500 rounded-full" style={{ width: '85%' }} />
+                            <div className="health-meter-container">
+                                <div className="health-meter-fill latency" style={{ width: '85%' }} />
                             </div>
                             <span className="text-[10px] font-black text-emerald-500">124ms</span>
                         </div>
@@ -94,8 +95,8 @@ export const ProductConsumerCard: React.FC<ProductConsumerCardProps> = ({
                     <div className="flex flex-col gap-1">
                         <div className="text-[9px] uppercase font-black text-gray-400 dark:text-slate-500 tracking-widest">SLA Uptime</div>
                         <div className="flex items-center gap-2">
-                            <div className="w-full h-1.5 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                                <div className="h-full bg-blue-500 rounded-full" style={{ width: '99%' }} />
+                            <div className="health-meter-container">
+                                <div className="health-meter-fill uptime" style={{ width: '99%' }} />
                             </div>
                             <span className="text-[10px] font-black text-blue-500">99.9%</span>
                         </div>

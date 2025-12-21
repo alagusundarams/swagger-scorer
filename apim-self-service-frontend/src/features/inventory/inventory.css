@@ -1,0 +1,32 @@
+/* Feature-specific styles for the Inventory module */
+
+.health-meter-container {
+  width: 100%;
+  height: 6px;
+  /* 1.5 in original Tailwind classes */
+  background-color: #f3f4f6;
+  /* gray-100 fallback */
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+:is(.dark .health-meter-container) {
+  background-color: #334155;
+  /* slate-700 fallback */
+}
+
+.health-meter-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.5s ease-out;
+}
+
+.health-meter-fill.latency {
+  background-color: #10b981;
+  /* emerald-500 */
+}
+
+.health-meter-fill.uptime {
+  background-color: #3b82f6;
+  /* blue-500 */
+}

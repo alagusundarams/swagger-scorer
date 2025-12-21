@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAnalysis } from '../store/useAnalysis';
+import '../analyzer.css';
 
 export const ViolationsTable: React.FC = () => {
     const { result, selectLine } = useAnalysis();
@@ -134,11 +135,11 @@ export const ViolationsTable: React.FC = () => {
 
                                     {/* Category Color Dot with Glow */}
                                     <div
-                                        className="w-3 h-3 rounded-full"
+                                        className="category-dot"
                                         style={{
-                                            backgroundColor: categoryColor,
-                                            boxShadow: `0 0 8px ${categoryColor}`
-                                        }}
+                                            '--dot-color': categoryColor,
+                                            '--dot-glow': categoryColor
+                                        } as React.CSSProperties}
                                     />
 
                                     {/* Category Name */}

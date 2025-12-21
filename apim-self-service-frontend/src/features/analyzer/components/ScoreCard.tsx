@@ -15,6 +15,7 @@
 
 import React from 'react';
 import { useAnalysis } from '../store/useAnalysis';
+import '../analyzer.css';
 
 export const ScoreCard: React.FC = () => {
     const { result } = useAnalysis();
@@ -161,14 +162,14 @@ export const ScoreCard: React.FC = () => {
                                 </div>
 
                                 {/* Progress Bar */}
-                                <div className="flex-grow h-2.5 bg-slate-700 rounded-full overflow-hidden relative">
+                                <div className="score-bar-container">
                                     <div
-                                        className="absolute left-0 top-0 h-full rounded-full transition-all duration-1000 ease-out"
+                                        className="score-bar-fill"
                                         style={{
-                                            width: `${category.score}%`,
-                                            backgroundColor: barColor,
-                                            boxShadow: `0 0 10px ${barColor}50`
-                                        }}
+                                            '--score-width': `${category.score}%`,
+                                            '--score-color': barColor,
+                                            '--score-glow': `${barColor}50`
+                                        } as React.CSSProperties}
                                     />
                                 </div>
 

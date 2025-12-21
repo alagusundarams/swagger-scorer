@@ -15,7 +15,7 @@ vi.mock('../../../layouts/Header/LoginButton', () => ({
     ),
 }));
 
-vi.mock('../../analyzer/api/client', () => ({
+vi.mock('../../inventory/api/inventoryClient', () => ({
     getProducts: vi.fn(),
     getTeams: vi.fn(),
     getSubscriptions: vi.fn(),

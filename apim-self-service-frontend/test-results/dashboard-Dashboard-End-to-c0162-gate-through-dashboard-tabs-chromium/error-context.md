@@ -1,0 +1,85 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e7]:
+        - img "Everest Re" [ref=e9]
+        - generic [ref=e10]:
+          - img [ref=e12]:
+            - generic [ref=e14]: A
+          - generic [ref=e15]: APIM Self Service
+      - generic [ref=e16]:
+        - generic [ref=e17]: 🌐 Live Database
+        - generic [ref=e18]: Dashboard
+      - button "P" [ref=e21] [cursor=pointer]:
+        - generic [ref=e22]: P
+  - generic [ref=e24]:
+    - generic [ref=e27]:
+      - heading "Your Provider Portfolio" [level=1] [ref=e28]
+      - paragraph [ref=e29]: Manage your team's API lifecycle, monitor quality scores, and oversee consumer access guardrails.
+    - generic [ref=e30]:
+      - generic [ref=e31]:
+        - generic [ref=e32]: Universal Search
+        - textbox "Find an interface..." [ref=e35]
+      - generic [ref=e36]:
+        - generic [ref=e37]: Environment Context
+        - generic [ref=e39]:
+          - combobox [ref=e40]:
+            - option "All Environments" [selected]
+            - option "⚪ Development"
+            - option "🔵 Quality Assurance"
+            - option "🟣 Staging"
+            - option "🟢 Production"
+          - generic:
+            - img
+      - generic [ref=e41]:
+        - generic [ref=e42]: Team Ownership
+        - generic [ref=e44]:
+          - combobox [ref=e45]:
+            - option "Cross-Team Overview" [selected]
+          - generic:
+            - img
+    - generic [ref=e46]:
+      - generic [ref=e47]:
+        - generic [ref=e49]:
+          - generic [ref=e50]: Total Products
+          - generic [ref=e51]: 📦
+        - generic [ref=e54]: "0"
+      - generic [ref=e55]:
+        - generic [ref=e57]:
+          - generic [ref=e58]: Avg Quality Score
+          - generic [ref=e59]: 📈
+        - generic [ref=e62]: 0%
+      - generic [ref=e63]:
+        - generic [ref=e65]:
+          - generic [ref=e66]: Active Subscribers
+          - generic [ref=e67]: 👥
+        - generic [ref=e70]: "0"
+    - generic [ref=e71]:
+      - navigation "Tabs" [ref=e72]:
+        - button "MANAGED PRODUCTS" [ref=e73]
+        - button "ACTIVE SUBSCRIPTIONS" [ref=e74]
+        - button "🌐 GLOBAL INVENTORY" [ref=e75]
+      - link "+ REGISTER NEW API" [ref=e77] [cursor=pointer]:
+        - /url: /onboard
+        - generic [ref=e78]: +
+        - text: REGISTER NEW API
+    - generic [ref=e80]:
+      - generic [ref=e81]: 👻
+      - paragraph [ref=e82]: No Records Encountered
+      - paragraph [ref=e83]: Verify your search criteria or team context.
+  - contentinfo [ref=e84]:
+    - generic [ref=e85]:
+      - generic [ref=e86]:
+        - img [ref=e88]:
+          - generic [ref=e90]: A
+        - paragraph [ref=e91]: © 2024 APIM Self Service. All rights reserved.
+      - generic [ref=e92]:
+        - img [ref=e94]
+        - generic [ref=e96]:
+          - paragraph [ref=e97]: Contact
+          - link "apim-admin@company.com" [ref=e98] [cursor=pointer]:
+            - /url: mailto:apim-admin@company.com
+```

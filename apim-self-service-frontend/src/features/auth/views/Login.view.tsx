@@ -1,16 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useStore } from '../../../store/useStore';
 import { LoginButton } from '../../../layouts/Header/LoginButton';
+import { SSO_DOMAINS } from '../../../config/env';
+import '../auth.css';
 
 // Configure SSO domains - emails with these domains go to SSO
-const SSO_DOMAINS = ['company.com', 'example.org'];
+// Moved to src/config/env.ts
 
 type LoginStep = 'email' | 'password';
 
 export const LoginPage: React.FC = () => {
     const { isAuthenticated, login, isMock } = useAuth();
     const navigate = useNavigate();
+    const { setPageTitle } = useStore();
+
+    useEffect(() => {
+        setPageTitle('Sign In');
+    }, [setPageTitle]);
 
     const [step, setStep] = useState<LoginStep>('email');
     const [email, setEmail] = useState('');
@@ -95,16 +103,7 @@ export const LoginPage: React.FC = () => {
                 </div>
 
                 {/* Login Card - Emulsified Floating Tile */}
-                <div
-                    className="w-full bg-white rounded-2xl"
-                    style={{
-                        padding: '3rem',
-                        borderRadius: '1rem',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.05), 0 20px 40px -10px rgba(0, 0, 0, 0.4), 0 10px 20px -5px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                        transform: 'translateY(-4px)'
-                    }}
-                >
+                <div className="w-full max-w-[560px] login-card">
                     <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">Sign in</h2>
                     <div className="flex justify-center mb-6">
                         <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest ${isMock ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>
@@ -114,13 +113,44 @@ export const LoginPage: React.FC = () => {
 
                     {/* Error Message */}
                     {error && (
-                        <div className="mb-6 p-3 bg-red-50 rounded-lg text-red-700 text-sm text-center" style={{ border: '1px solid #fecaca', borderStyle: 'solid' }}>
+                        <div className="login-error-banner">
                             {error}
                         </div>
                     )}
 
                     {step === 'email' ? (
                         <>
+                            {/* User Selection */}
+                            <div className="mb-6">
+                                <label className="block text-sm font-bold text-gray-700 mb-3">Select User (Demo)</label>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setEmail('sarah@payments.dev'); login('producer'); }}
+                                        className="p-4 text-left border-2 border-blue-200 bg-blue-50 rounded-xl hover:border-blue-400 hover:bg-blue-100 transition-all"
+                                    >
+                                        <div className="font-black text-xs text-blue-900 mb-1">PRODUCER</div>
+                                        <div className="text-xs text-blue-700">Sarah (Payments)</div>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setEmail('mike@core.sys'); login('consumer'); }}
+                                        className="p-4 text-left border-2 border-green-200 bg-green-50 rounded-xl hover:border-green-400 hover:bg-green-100 transition-all"
+                                    >
+                                        <div className="font-black text-xs text-green-900 mb-1">CONSUMER</div>
+                                        <div className="text-xs text-green-700">Mike (Core Sys)</div>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setEmail('admin@apim.portal'); login('admin'); }}
+                                        className="p-4 text-left border-2 border-purple-200 bg-purple-50 rounded-xl hover:border-purple-400 hover:bg-purple-100 transition-all"
+                                    >
+                                        <div className="font-black text-xs text-purple-900 mb-1">ADMIN</div>
+                                        <div className="text-xs text-purple-700">Portal Admin</div>
+                                    </button>
+                                </div>
+                            </div>
+
                             <form className="space-y-5" onSubmit={handleEmailSubmit}>
                                 <input
                                     id="email"
@@ -176,7 +206,7 @@ export const LoginPage: React.FC = () => {
                                 </button>
                             </div>
 
-                            <form className="space-y-5" style={{ marginTop: '1.25rem' }} onSubmit={handlePasswordSubmit}>
+                            <form className="space-y-5 password-form" onSubmit={handlePasswordSubmit}>
                                 <input
                                     id="password"
                                     type="password"

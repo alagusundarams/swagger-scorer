@@ -5,14 +5,18 @@
  */
 
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
-import * as catalogService from '../services/catalog.service.js';
+import { getAllProducts } from '../services/products.service.js';
+import { getAllTeams } from '../services/teams.service.js';
+import { getAllSubscriptions, addSubscription, updateSubscriptionState } from '../services/subscriptions.service.js';
+import { getAllApprovals, updateApproval } from '../services/approvals.service.js';
+import { getAuditLogs } from '../services/audit.service.js';
 
 export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {
 
     // GET /api/v1/products
     fastify.get('/products', async (_request, reply) => {
         try {
-            const products = await catalogService.getAllProducts();
+            const products = await getAllProducts();
             return products;
         } catch (error) {
             fastify.log.error({ err: error }, 'Error fetching products');
@@ -23,7 +27,7 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     // GET /api/v1/api-teams (Matching frontend expected path)
     fastify.get('/api-teams', async (_request, reply) => {
         try {
-            const teams = await catalogService.getAllTeams();
+            const teams = await getAllTeams();
             return teams;
         } catch (error) {
             fastify.log.error({ err: error }, 'Error fetching teams');
@@ -34,7 +38,7 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     // GET /api/v1/subscriptions
     fastify.get('/subscriptions', async (_request, reply) => {
         try {
-            const subs = await catalogService.getAllSubscriptions();
+            const subs = await getAllSubscriptions();
             return subs;
         } catch (error) {
             fastify.log.error({ err: error }, 'Error fetching subscriptions');
@@ -48,7 +52,7 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         const { state } = request.body as any;
         try {
             // In a real app, this would update keys, expiry, etc.
-            await catalogService.updateSubscriptionState(id, state);
+            await updateSubscriptionState(id, state);
             return { success: true };
         } catch (error) {
             fastify.log.error({ err: error }, 'Error updating subscription');
@@ -58,10 +62,12 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
 
     // POST /api/v1/subscriptions (Request Access)
     fastify.post('/subscriptions', async (request, reply) => {
-        const { productId, teamId } = request.body as any;
+        const body = request.body as any;
+        const productId = body.productId;
+        const teamId = body.teamId || body.subscriberTeamId;
         try {
             const requester = { name: 'Portal User', email: 'user@portal.dev' };
-            const sub = await catalogService.addSubscription(productId, teamId, requester);
+            const sub = await addSubscription(productId, teamId, requester);
             return sub;
         } catch (error) {
             fastify.log.error({ err: error }, 'Error creating subscription');
@@ -72,7 +78,7 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     // GET /api/v1/approvals
     fastify.get('/approvals', async (_request, reply) => {
         try {
-            const approvals = await catalogService.getAllApprovals();
+            const approvals = await getAllApprovals();
             return approvals;
         } catch (error) {
             fastify.log.error({ err: error }, 'Error fetching approvals');
@@ -85,11 +91,23 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         const { id } = request.params as any;
         const { status } = request.body as any;
         try {
-            const approval = await catalogService.updateApproval(id, status, 'Admin User');
+            const approval = await updateApproval(id, status, 'Admin User');
             return approval;
         } catch (error) {
             fastify.log.error({ err: error }, 'Error processing approval');
             return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to process approval' });
+        }
+    });
+
+    // GET /api/v1/audit-logs
+    fastify.get('/audit-logs', async (request, reply) => {
+        const { entityId } = request.query as any;
+        try {
+            const logs = await getAuditLogs(entityId);
+            return logs;
+        } catch (error) {
+            fastify.log.error({ err: error }, 'Error fetching audit logs');
+            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to fetch audit logs' });
         }
     });
 }

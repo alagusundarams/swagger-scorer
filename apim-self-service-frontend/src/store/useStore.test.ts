@@ -1,15 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useStore } from './useStore';
-import * as client from '../features/analyzer/api/client';
+import * as client from '../features/inventory/api/inventoryClient';
 import { Product, Team, Subscription } from '../types/entities';
 
 // Mock the API client
-vi.mock('../features/analyzer/api/client', () => ({
+vi.mock('../features/inventory/api/inventoryClient', () => ({
     getProducts: vi.fn(),
     getTeams: vi.fn(),
     getSubscriptions: vi.fn(),
     requestProductAccess: vi.fn(),
     updateSubscription: vi.fn(),
+    getApprovals: vi.fn(),
+    getAuditLogs: vi.fn(),
 }));
 
 describe('useStore', () => {
@@ -36,6 +38,8 @@ describe('useStore', () => {
 
         (client.getProducts as any).mockResolvedValue({ data: mockProducts });
         (client.getTeams as any).mockResolvedValue({ data: mockTeams });
+        (client.getApprovals as any).mockResolvedValue({ data: [] });
+        (client.getAuditLogs as any).mockResolvedValue({ data: [] });
 
         await useStore.getState().fetchInitialData();
 
@@ -51,6 +55,8 @@ describe('useStore', () => {
         (client.getProducts as any).mockResolvedValue({ data: mockProducts });
         (client.getTeams as any).mockResolvedValue({ data: mockTeams });
         (client.getSubscriptions as any).mockResolvedValue({ data: mockSubs });
+        (client.getApprovals as any).mockResolvedValue({ data: [] });
+        (client.getAuditLogs as any).mockResolvedValue({ data: [] });
 
         const getToken = vi.fn().mockResolvedValue('fake-token');
 

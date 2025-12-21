@@ -1,0 +1,84 @@
+.app-footer {
+    background-color: #1e293b;
+    border-top: 2px solid #64748b;
+    margin-top: auto;
+    box-shadow: 0 -2px 4px 0 rgba(0, 0, 0, 0.2);
+}
+
+.footer-container {
+    max-width: 1920px;
+    margin: 0 auto;
+    padding: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.footer-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.footer-icon-box {
+    width: 28px;
+    height: 28px;
+    background: linear-gradient(to bottom right, #3b82f6, #2563eb);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.footer-icon {
+    width: 20px;
+    height: 20px;
+    color: white;
+}
+
+.copyright-text {
+    font-size: 14px;
+    color: #94a3b8;
+    margin: 0;
+}
+
+.footer-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.contact-icon-box {
+    width: 32px;
+    height: 32px;
+    background-color: #334155;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.contact-icon {
+    width: 16px;
+    height: 16px;
+    color: #60a5fa;
+}
+
+.contact-label {
+    font-size: 11px;
+    color: #94a3b8;
+    margin: 0 0 2px 0;
+}
+
+.contact-email {
+    font-size: 14px;
+    color: #cbd5e1;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.contact-email:hover {
+    color: #60a5fa;
+}

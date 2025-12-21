@@ -3,7 +3,9 @@ import type { Notification } from '../../types/notifications';
 
 export interface UISlice {
     notifications: Notification[];
+    pageTitle: string;
     setNotifications: (notifications: Notification[]) => void;
+    setPageTitle: (title: string) => void;
     markNotificationAsRead: (id: string) => void;
     markAllNotificationsAsRead: () => void;
     addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => void;
@@ -11,8 +13,10 @@ export interface UISlice {
 
 export const createUISlice: StateCreator<UISlice> = (set) => ({
     notifications: [],
+    pageTitle: 'Dashboard',
 
     setNotifications: (notifications: Notification[]) => set({ notifications }),
+    setPageTitle: (pageTitle: string) => set({ pageTitle }),
 
     markNotificationAsRead: (id: string) => set((state) => ({
         notifications: state.notifications.map((n: Notification) =>

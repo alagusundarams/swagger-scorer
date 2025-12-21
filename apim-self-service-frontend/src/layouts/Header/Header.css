@@ -1,0 +1,237 @@
+.app-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background-color: #1e293b;
+    border-bottom: 2px solid #64748b;
+    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.4);
+}
+
+.header-container {
+    max-width: 1920px;
+    margin: 0 auto;
+    padding: 0 24px;
+    height: 64px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 16px;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+}
+
+.brand-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.everest-logo-container {
+    width: 120px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    padding: 8px;
+}
+
+.everest-logo {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: brightness(0) invert(1);
+}
+
+.apim-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.apim-icon-box {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(to bottom right, #3b82f6, #2563eb);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+.apim-icon {
+    width: 22px;
+    height: 22px;
+    color: white;
+}
+
+.apim-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #cbd5e1;
+}
+
+.header-center {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+}
+
+.status-badge {
+    font-size: 9px;
+    font-weight: 900;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.status-badge.mock {
+    background-color: rgba(251, 191, 36, 0.1);
+    color: #fbbf24;
+    border: 1px solid #fbbf2433;
+}
+
+.status-badge.live {
+    background-color: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+    border: 1px solid #22c55e33;
+}
+
+.page-title {
+    font-size: 18px;
+    font-weight: bold;
+    color: #f1f5f9;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    justify-content: flex-end;
+}
+
+.user-menu-wrapper {
+    position: relative;
+}
+
+.user-menu-trigger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: transparent;
+    border: none;
+    border-radius: 8px;
+    padding: 6px;
+    cursor: pointer;
+}
+
+.user-menu-trigger.active {
+    background-color: #334155;
+}
+
+.user-initial-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(to bottom right, #3b82f6, #2563eb);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+.user-dropdown {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    margin-top: 8px;
+    width: 240px;
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    z-index: 50;
+}
+
+.user-info-section {
+    padding: 16px;
+    border-bottom: 1px solid #334155;
+}
+
+.user-name {
+    font-size: 14px;
+    font-weight: bold;
+    color: #f1f5f9;
+    margin: 0 0 4px 0;
+}
+
+.user-email {
+    font-size: 12px;
+    color: #94a3b8;
+    margin: 0;
+}
+
+.menu-items-section {
+    padding: 8px;
+}
+
+.menu-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background-color: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #cbd5e1;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: left;
+    transition: all 0.2s;
+}
+
+.menu-item:hover {
+    background-color: #334155;
+    color: #3b82f6;
+}
+
+.sign-out-section {
+    padding: 8px;
+    border-top: 1px solid #334155;
+}
+
+.sign-out-button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background-color: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #f87171;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: left;
+    transition: all 0.2s;
+}
+
+.sign-out-button:hover {
+    background-color: #7f1d1d;
+}

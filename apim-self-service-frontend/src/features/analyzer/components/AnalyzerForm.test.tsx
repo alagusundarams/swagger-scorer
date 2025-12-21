@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 // import '@testing-library/jest-dom'; // incompatible with happy-dom without setup
 import { AnalyzerForm } from '../components/AnalyzerForm';
+import { BrowserRouter } from 'react-router-dom';
 import * as client from '../api/client';
 import { useAnalysis } from '../store/useAnalysis';
 
@@ -58,7 +59,11 @@ describe('AnalyzerForm', () => {
 
 
     it('renders the editor and run button', () => {
-        render(<AnalyzerForm />);
+        render(
+            <BrowserRouter>
+                <AnalyzerForm />
+            </BrowserRouter>
+        );
         screen.debug();
         expect(screen.getByTestId('monaco-editor-mock')).toBeTruthy();
         expect(screen.getByText('Run')).toBeTruthy();
@@ -66,14 +71,22 @@ describe('AnalyzerForm', () => {
 
 
     it('disables Run button when editor is empty', () => {
-        render(<AnalyzerForm />);
+        render(
+            <BrowserRouter>
+                <AnalyzerForm />
+            </BrowserRouter>
+        );
         const runSpan = screen.getByText('Run');
         const button = runSpan.closest('button');
         expect(button?.disabled).toBe(true);
     });
 
     it('enables Run button when editor has content', () => {
-        render(<AnalyzerForm />);
+        render(
+            <BrowserRouter>
+                <AnalyzerForm />
+            </BrowserRouter>
+        );
 
         const textarea = screen.getByTestId('monaco-editor-mock');
         fireEvent.change(textarea, { target: { value: 'openapi: 3.0.0' } });
@@ -87,7 +100,11 @@ describe('AnalyzerForm', () => {
         useAnalysis.setState({ spec: 'openapi: 3.0.0' });
         (client.postAnalyze as any).mockImplementation(() => new Promise(() => { }));
 
-        render(<AnalyzerForm />);
+        render(
+            <BrowserRouter>
+                <AnalyzerForm />
+            </BrowserRouter>
+        );
 
         const runSpan = screen.getByText('Run');
         const button = runSpan.closest('button');
@@ -102,7 +119,11 @@ describe('AnalyzerForm', () => {
         useAnalysis.setState({ spec: 'openapi: 3.0.0' });
         (client.postAnalyze as any).mockRejectedValue(new Error('Network Error'));
 
-        render(<AnalyzerForm />);
+        render(
+            <BrowserRouter>
+                <AnalyzerForm />
+            </BrowserRouter>
+        );
 
         const runSpan = screen.getByText('Run');
         const button = runSpan.closest('button');

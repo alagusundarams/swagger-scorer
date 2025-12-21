@@ -9,7 +9,7 @@ import { type User } from '../../../types/entities';
 interface AuthContextType {
     isAuthenticated: boolean;
     user: User | null;
-    login: () => void;
+    login: (userType?: string) => void;
     logout: () => void;
     getToken: () => Promise<string | null>;
     isMock: boolean;
@@ -18,24 +18,58 @@ interface AuthContextType {
 // === CONTEXT ===
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// === MOCK USERS ===
+const MOCK_USERS = {
+    producer: {
+        id: "user-payments-lead",
+        email: "sarah@payments.dev",
+        name: "Sarah (Payments Team)",
+        azureAdObjectId: "oid-002",
+        teams: ['team-payments'],
+        leadsTeams: ['team-payments'],
+        defaultTeamId: 'team-payments',
+        role: 'user' as const,
+        username: "sarah@payments.dev"
+    },
+    consumer: {
+        id: "user-core-dev",
+        email: "mike@core.sys",
+        name: "Mike (Core Systems)",
+        azureAdObjectId: "oid-003",
+        teams: ['team-core'],
+        leadsTeams: [],
+        defaultTeamId: 'team-core',
+        role: 'user' as const,
+        username: "mike@core.sys"
+    },
+    admin: {
+        id: "admin-001",
+        email: "admin@apim.portal",
+        name: "Portal Admin",
+        azureAdObjectId: "oid-001",
+        teams: ['team-platform', 'team-payments', 'team-core', 'team-cloudops'],
+        leadsTeams: ['team-platform'],
+        defaultTeamId: 'team-platform',
+        role: 'admin' as const,
+        username: "admin@apim.portal"
+    }
+};
+
 // === MOCK IMPLEMENTATION ===
 const MockAuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [selectedUser, setSelectedUser] = useState<keyof typeof MOCK_USERS>('admin');
 
-    const user: User = {
-        id: "mock-user-id",
-        email: "mock@local.dev",
-        name: "Mock Developer",
-        azureAdObjectId: "mock-azure-ad-id",
-        teams: ['team-platform', 'team-payments', 'team-data'],
-        leadsTeams: ['team-platform', 'team-payments'], // Mocking lead status for these teams
-        defaultTeamId: 'team-platform',
-        role: 'admin', // Default to admin for easier dev testing of all features
-        username: "mock@local.dev"
-    };
+    // Get current user based on selection
+    const user: User = MOCK_USERS[selectedUser];
 
-    const login = () => {
-        console.log("[Mock Auth] Login triggered. Setting isAuthenticated to true.");
+    const login = (userType?: string) => {
+        if (userType && userType in MOCK_USERS) {
+            const validUserType = userType as keyof typeof MOCK_USERS;
+            setSelectedUser(validUserType);
+            localStorage.setItem('mockUserType', validUserType);
+        }
+        console.log(`[Mock Auth] Login triggered as ${user.name}. Setting isAuthenticated to true.`);
         setIsAuthenticated(true);
     };
 
@@ -48,6 +82,14 @@ const MockAuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
         if (!isAuthenticated) return null;
         return "mock-token-xyz";
     };
+
+    // Load saved user selection on mount
+    React.useEffect(() => {
+        const saved = localStorage.getItem('mockUserType');
+        if (saved && saved in MOCK_USERS) {
+            setSelectedUser(saved as keyof typeof MOCK_USERS);
+        }
+    }, []);
 
     return (
         <AuthContext.Provider value={{ isAuthenticated, user: isAuthenticated ? user : null, login, logout, getToken, isMock: true }}>

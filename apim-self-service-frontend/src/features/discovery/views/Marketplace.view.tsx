@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
 import { useStore } from '../../../store/useStore';
@@ -13,8 +13,12 @@ import { useStore } from '../../../store/useStore';
  */
 export const MarketplacePage = () => {
     const navigate = useNavigate();
-    const { user, products } = useStore();
+    const { user, products, setPageTitle } = useStore();
     const [searchTerm, setSearchTerm] = useState('');
+
+    useEffect(() => {
+        setPageTitle('Marketplace');
+    }, [setPageTitle]);
 
     // --- Entitlement Logic ---
     const accessibleProducts = useMemo(() => {
@@ -89,8 +93,8 @@ export const MarketplacePage = () => {
                                         📦
                                     </div>
                                     <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border ${product.visibility === 'public' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                            product.visibility === 'private' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                                                'bg-slate-100 text-slate-600 border-slate-200'
+                                        product.visibility === 'private' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                            'bg-slate-100 text-slate-600 border-slate-200'
                                         }`}>
                                         {product.visibility || 'Public'}
                                     </span>

@@ -90,46 +90,15 @@ export interface Subscription {
     createdAt: string;
     updatedAt?: string;
     expirationDate?: string;
-}
-
-export type ApprovalType =
-    | 'PRODUCT_ONBOARDING'
-    | 'API_ONBOARDING'
-    | 'MODIFICATION'
-    | 'SUBSCRIPTION'
-    | 'PROMOTION_REQUEST'
-    | 'QUOTA_EXTENSION'
-    | 'DEPRECATION_REQUEST';
-
-export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
-
-export type ModificationType = 'CONTRACT_UPDATE' | 'HOTFIX' | 'VERSION_BUMP';
-
-export interface ApprovalRequest {
-    id: string;
-    type: ApprovalType;
-    status: ApprovalStatus;
-    requester: {
-        name: string;
-        email: string;
-        teamId: string;
-        teamName: string;
-    };
-    submittedAt: string;
-    details: {
-        targetName: string; // Product or API name
-        targetVersion?: string;
-        targetId?: string;
-
-        // Context specific
-        environment?: Environment; // Target Env
-        promotionPath?: { source: Environment; target: Environment };
-
-        modificationType?: ModificationType;
-        diffSummary?: string;
-
-        requestedQuota?: string; // For Quota Extension
-        reason?: string;
+    keysGeneratedAt?: string;
+    lastSyncedAt?: string;
+    appRegistration?: {
+        id: string;
+        displayName: string;
+        clientId: string;
+        environment: string;
+        secretExpiryDate?: string;
     };
 }
+
 

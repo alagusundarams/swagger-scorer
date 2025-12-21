@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
 import { Header } from '../Header/Header.view';
 import { Footer } from '../Footer/Footer.view';
 import { Breadcrumbs } from './Breadcrumbs';
-import { useAuth } from '../../features/auth/hooks/useAuth';
+import { useAuth } from '../../hooks/useAuth';
 import { useStore } from '../../store/useStore';
+import './MainLayout.css';
 
 interface MainLayoutProps {
     children: React.ReactNode;
@@ -13,7 +13,6 @@ interface MainLayoutProps {
 export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     const { user: authUser, isAuthenticated, getToken } = useAuth();
     const { setUser, fetchInitialData } = useStore();
-    const location = useLocation();
 
     useEffect(() => {
         // Fetch public data (products/teams) always
@@ -27,23 +26,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         }
     }, [isAuthenticated, authUser, setUser]);
 
-    // Determine page name from route
-    const getPageName = () => {
-        const path = location.pathname;
-        if (path === '/') return 'Dashboard';
-        if (path.startsWith('/products/')) return 'Product Details';
-        if (path.startsWith('/browse')) return 'Browse APIs';
-        if (path.startsWith('/onboard')) return 'Onboard Product';
-        if (path.startsWith('/analyzer')) return 'API Analyzer';
-        if (path.startsWith('/catalog')) return 'Marketplace';
-        return 'Dashboard';
-    };
-
     return (
-        <div className="min-h-screen flex flex-col bg-gray-50 text-gray-900">
-            <Header pageName={getPageName()} />
+        <div className="main-layout">
+            <Header />
             <Breadcrumbs />
-            <div className="flex-1 bg-gray-50">
+            <div className="main-content">
                 {children}
             </div>
             <Footer />
