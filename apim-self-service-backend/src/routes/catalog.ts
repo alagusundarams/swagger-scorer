@@ -13,10 +13,11 @@ import { getAuditLogs } from '../services/audit.service.js';
 
 export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {
 
-    // GET /api/v1/products
-    fastify.get('/products', async (_request, reply) => {
+    // GET /api/v1/products?environment=DEV (optional filter)
+    fastify.get('/products', async (request, reply) => {
         try {
-            const products = await getAllProducts();
+            const { environment } = request.query as any;
+            const products = await getAllProducts(environment);
             return products;
         } catch (error) {
             fastify.log.error({ err: error }, 'Error fetching products');
@@ -24,10 +25,11 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         }
     });
 
-    // GET /api/v1/admin/products (Admin view - same data for now)
-    fastify.get('/admin/products', async (_request, reply) => {
+    // GET /api/v1/admin/products?environment=DEV (Admin view with environment filter)
+    fastify.get('/admin/products', async (request, reply) => {
         try {
-            const products = await getAllProducts();
+            const { environment } = request.query as any;
+            const products = await getAllProducts(environment);
             return products;
         } catch (error) {
             fastify.log.error({ err: error }, 'Error fetching admin products');

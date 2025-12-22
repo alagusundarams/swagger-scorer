@@ -8,8 +8,13 @@ import { query } from './db.js';
 
 /**
  * Fetch all products with their associated APIs and calculated subscriber counts
+ * @param environment Optional environment filter (DEV, QA, STAGE, PROD)
  */
-export async function getAllProducts() {
+export async function getAllProducts(environment?: string) {
+    // Build WHERE clause for environment filter
+    const whereClause = environment ? `WHERE p.environment = $1` : '';
+    const queryParams = environment ? [environment] : [];
+
     // 1. Fetch products with calculated subscriber count
     const productRes = await query(`
         SELECT p.*, 
@@ -23,8 +28,9 @@ export async function getAllProducts() {
             WHERE subscriptions.product_id = p.id
             AND subscriptions.state = 'active'
         ) sub_counts ON true
+        ${whereClause}
         ORDER BY p.display_name ASC
-    `);
+    `, queryParams);
 
     // 2. Fetch all APIs
     const apiRes = await query(`
