@@ -47,7 +47,7 @@ export async function fetchSpecFromGit(repoUrl: string, filePath?: string): Prom
 /**
  * Fetch OpenAPI spec from Azure APIM live
  */
-export async function fetchSpecFromAPIM(productId: string, environment: string): Promise<string> {
+export async function fetchSpecFromAPIM(productId: string): Promise<string> {
     try {
         // Get Azure access token
         const token = execSync('az account get-access-token --resource https://management.azure.com --query accessToken -o tsv', {
@@ -143,5 +143,5 @@ export async function fetchSpecForProduct(productId: string): Promise<string> {
     }
 
     // Fallback to APIM
-    return await fetchSpecFromAPIM(product.id, product.environment);
+    return await fetchSpecFromAPIM(product.id);
 }

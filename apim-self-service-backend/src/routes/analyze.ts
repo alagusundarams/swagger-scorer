@@ -164,17 +164,17 @@ export async function analyzeRoutes(
 
                 // Detect format and parse
                 const format = specContent.trim().startsWith('{') ? 'json' : 'yaml';
-                const spec = await parseOpenAPI(specContent, format);
+                const spec = await parseOpenAPI(specContent, format as 'json' | 'yaml');
 
                 // Validate structure
                 const openapiVersion = detectOpenAPIVersion(spec);
                 validateOpenAPIStructure(spec, openapiVersion);
 
                 // Run Spectral analysis
-                const violations = await analyzeWithSpectral(spectral, spec);
+                const violations = await analyzeWithSpectral(spec, spectral);
 
                 // Calculate score
-                const analysis = calculateScore(violations, config);
+                const analysis = calculateScore(violations, config, openapiVersion);
 
                 return reply.send({
                     ...analysis,
