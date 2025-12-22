@@ -121,113 +121,124 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
             const createdAt = product.properties?.createdDate || product.createdDate || new Date().toISOString();
             const updatedAt = product.properties?.lastModifiedDate || product.updatedDate || createdAt;
 
+            console.log(`  📅 Timestamps - Created: ${createdAt.substring(0, 10)}, Updated: ${updatedAt.substring(0, 10)}`);
+
             // Calculate quality score by calling backend scoring API
             let qualityScore = null;
             try {
                 // Fetch OpenAPI spec from Git if available
                 if (product.gitInfo?.repoUrl) {
-                    console.log(`  📊 Scoring product: ${name}...`);
+                    console.log(`  📊 Scoring product: ${name} (skipped for performance - will calculate on-demand)`);
                     // For now, we'll skip actual scoring during migration to keep it fast
                     // Quality scores will be calculated on-demand or via a separate job
                     qualityScore = null;
+                } else {
+                    console.log(`  ⚠️ No Git repo found for ${name}, quality score will be null`);
                 }
             } catch (err) {
-                console.warn(`  ⚠️ Failed to score ${name}`);
+                console.error(`  ❌ Failed to score ${name}:`, err);
             }
 
-            await pool.query(`
-                INSERT INTO products (
-                    id, name, display_name, version, description, state, type,
-                    owner_team_id, environment, visibility, management_mode,
-                    git_repo_url, git_file_path, terraform_pipeline_url, last_deployed_commit_hash,
-                    subscriber_count, quality_score, apim_raw_data, created_at, updated_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-                ON CONFLICT (id) DO UPDATE SET
-                    display_name = EXCLUDED.display_name,
-                    description = EXCLUDED.description,
-                    type = EXCLUDED.type,
-                    subscriber_count = EXCLUDED.subscriber_count,
-                    updated_at = NOW()
-            `, [
-                productId,
-                name,
-                props.displayName || name,
-                '1.0.0', // Default version
-                props.description || '',
-                props.state === 'published' ? 'published' : 'notPublished',
-                productType,
-                null, // owner_team_id
-                targetEnv, // Normalized environment (UPPERCASE for check constraint)
-                'internal',
-                'TERRAFORM_MANAGED',
-                product.gitInfo?.repoUrl || gitRepoUrl,
-                `contracts/${name}/openapi.yaml`,
-                product.pipelineInfo?.url || null,
-                product.gitInfo?.lastCommit || null,
-                0,
-                qualityScore,
-                JSON.stringify(product),
-                createdAt,
-                updatedAt
-            ]);
+            console.log(`  💾 Inserting product: ${productId}`);
+            console.log(`     - Display Name: ${props.displayName || name}`);
+            console.log(`     - State: ${props.state}`);
+            console.log(`     - Git Repo: ${product.gitInfo?.repoUrl || gitRepoUrl || 'none'}`);
+            console.log(`     - Last Commit: ${product.gitInfo?.lastCommit || 'none'}`);
 
-            inserted++;
-        } catch (error: any) {
-            console.error(`  ❌ Failed to migrate product ${product.name || 'Unknown'}:`, error.message);
-            skipped++;
+            try {
+                await pool.query(`
+                    INSERT INTO products (
+                        id, name, display_name, version, description, state, type,
+                        owner_team_id, environment, visibility, management_mode,
+                        git_repo_url, git_file_path, terraform_pipeline_url, last_deployed_commit_hash,
+                        subscriber_count, quality_score, apim_raw_data, created_at, updated_at
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+                    ON CONFLICT (id) DO UPDATE SET
+                        display_name = EXCLUDED.display_name,
+                        description = EXCLUDED.description,
+                        type = EXCLUDED.type,
+                        subscriber_count = EXCLUDED.subscriber_count,
+                        updated_at = NOW()
+                `, [
+                    productId,
+                    name,
+                    props.displayName || name,
+                    '1.0.0', // Default version
+                    props.description || '',
+                    props.state === 'published' ? 'published' : 'notPublished',
+                    productType,
+                    null, // owner_team_id
+                    targetEnv, // Normalized environment (UPPERCASE for check constraint)
+                    'internal',
+                    'TERRAFORM_MANAGED',
+                    product.gitInfo?.repoUrl || gitRepoUrl,
+                    `contracts/${name}/openapi.yaml`,
+                    product.pipelineInfo?.url || null,
+                    product.gitInfo?.lastCommit || null,
+                    0,
+                    qualityScore,
+                    JSON.stringify(product),
+                    createdAt,
+                    updatedAt
+                ]);
+
+                inserted++;
+            } catch (error: any) {
+                console.error(`  ❌ Failed to migrate product ${product.name || 'Unknown'}:`, error.message);
+                skipped++;
+            }
         }
-    }
 
     console.log(`✅ Finished product migration: ${inserted} inserted, ${skipped} skipped.`);
 
-    // Return all valid product IDs for this environment to help lookup
-    const res = await pool.query('SELECT id, name FROM products WHERE environment = $1', [targetEnv]);
-    return new Map<string, string>(res.rows.map(r => [r.name.toLowerCase(), r.id]));
-}
+        // Return all valid product IDs for this environment to help lookup
+        const res = await pool.query('SELECT id, name FROM products WHERE environment = $1', [targetEnv]);
+        return new Map<string, string>(res.rows.map(r => [r.name.toLowerCase(), r.id]));
+    }
 
-/**
- * Transform and insert APIs
- */
-async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEnv: string) {
-    const targetEnv = mapEnv(importEnv);
-    console.log(`\n🔌 Migrating ${apis.length} APIs to ${targetEnv}...`);
-    let inserted = 0;
-    let skipped = 0;
+    /**
+     * Transform and insert APIs
+     */
+    async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEnv: string) {
+        const targetEnv = mapEnv(importEnv);
+        console.log(`\n🔌 Migrating ${apis.length} APIs to ${targetEnv}...`);
+        let inserted = 0;
+        let skipped = 0;
 
-    const productMap = new Map<string, string>();
-    products.forEach(p => {
-        const name = p.name || 'unnamed';
-        productMap.set(name.toLowerCase(), `${targetEnv}-${name}`.toLowerCase());
-    });
+        const productMap = new Map<string, string>();
+        products.forEach(p => {
+            const name = p.name || 'unnamed';
+            productMap.set(name.toLowerCase(), `${targetEnv}-${name}`.toLowerCase());
+        });
 
-    for (const api of apis) {
-        try {
-            const props = api.properties;
+        for (const api of apis) {
+            try {
+                const props = api.properties;
 
-            // Try to find parent product from API name/path
-            let productId = null;
-            const apiName = api.name || 'unnamed-api';
-            const apiPath = props.path || '/';
+                // Try to find parent product from API name/path
+                let productId = null;
+                const apiName = api.name || 'unnamed-api';
+                const apiPath = props.path || '/';
 
-            for (const [productName, prodId] of productMap.entries()) {
-                if (apiName.toLowerCase().includes(productName.toLowerCase()) ||
-                    apiPath.toLowerCase().includes(productName.toLowerCase())) {
-                    productId = prodId;
-                    break;
+                for (const [productName, prodId] of productMap.entries()) {
+                    if (apiName.toLowerCase().includes(productName.toLowerCase()) ||
+                        apiPath.toLowerCase().includes(productName.toLowerCase())) {
+                        productId = prodId;
+                        break;
+                    }
                 }
-            }
 
-            if (!productId && products.length > 0) {
-                productId = `${targetEnv}-${products[0].id || products[0].name}`;
-            }
+                if (!productId && products.length > 0) {
+                    productId = `${targetEnv}-${products[0].id || products[0].name}`;
+                }
 
-            if (!productId) {
-                console.warn(`  ⚠️  No product found for API ${apiName}, skipping`);
-                skipped++;
-                continue;
-            }
+                if (!productId) {
+                    console.warn(`  ⚠️  No product found for API ${apiName}, skipping`);
+                    skipped++;
+                    continue;
+                }
 
-            await pool.query(`
+                await pool.query(`
                 INSERT INTO apis (
                     id, product_id, origin_team_id, name, display_name, description, path,
                     apim_raw_data, created_at, updated_at
@@ -238,69 +249,69 @@ async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEn
                     path = EXCLUDED.path,
                     updated_at = NOW()
             `, [
-                `${targetEnv}-${api.id || apiName}`.toLowerCase(),
-                productId,
-                null, // origin_team_id populated later by admin mapping
-                apiName,
-                props.displayName || apiName,
-                props.description || '',
-                apiPath,
-                JSON.stringify(api)
-            ]);
+                    `${targetEnv}-${api.id || apiName}`.toLowerCase(),
+                    productId,
+                    null, // origin_team_id populated later by admin mapping
+                    apiName,
+                    props.displayName || apiName,
+                    props.description || '',
+                    apiPath,
+                    JSON.stringify(api)
+                ]);
 
-            inserted++;
-        } catch (error) {
-            console.error(`  ❌ Failed to migrate API ${api.name}:`, error);
-            skipped++;
+                inserted++;
+            } catch (error) {
+                console.error(`  ❌ Failed to migrate API ${api.name}:`, error);
+                skipped++;
+            }
         }
+
+        console.log(`✅ Finished API migration: ${inserted} inserted, ${skipped} skipped.`);
     }
 
-    console.log(`✅ Finished API migration: ${inserted} inserted, ${skipped} skipped.`);
-}
+    /**
+     * Transform and insert subscriptions
+     */
+    async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importEnv: string, productRegistry?: Map<string, string>) {
+        const targetEnv = mapEnv(importEnv);
+        console.log(`\n🔑 Migrating ${subscriptions.length} subscriptions to ${targetEnv}...`);
+        let inserted = 0;
+        let skipped = 0;
 
-/**
- * Transform and insert subscriptions
- */
-async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importEnv: string, productRegistry?: Map<string, string>) {
-    const targetEnv = mapEnv(importEnv);
-    console.log(`\n🔑 Migrating ${subscriptions.length} subscriptions to ${targetEnv}...`);
-    let inserted = 0;
-    let skipped = 0;
+        for (const sub of subscriptions) {
+            try {
+                const props = sub.properties || {};
+                const scope = props.scope || '';
+                const scopeMatch = scope.match(/\/products\/([^\/\s]+)/);
+                const apimProductId = scopeMatch ? scopeMatch[1] : null;
 
-    for (const sub of subscriptions) {
-        try {
-            const props = sub.properties || {};
-            const scope = props.scope || '';
-            const scopeMatch = scope.match(/\/products\/([^\/\s]+)/);
-            const apimProductId = scopeMatch ? scopeMatch[1] : null;
-
-            if (!apimProductId) {
-                skipped++;
-                continue;
-            }
-
-            // Robust Lookup: Use registry first, fallback to construction
-            let productId = productRegistry?.get(apimProductId.toLowerCase());
-
-            if (!productId) {
-                productId = `${targetEnv}-${apimProductId}`.toLowerCase();
-            }
-
-            // ⚠️ Final Verification: Check if product actually exists
-            const prodCheck = await pool.query('SELECT id FROM products WHERE id = $1', [productId]);
-            if (prodCheck.rowCount === 0) {
-                // One last try: Check if we have it by name (Case-insensitive)
-                const fuzzyCheck = await pool.query('SELECT id FROM products WHERE name ILIKE $1 AND environment = $2', [apimProductId, targetEnv]);
-                if (fuzzyCheck.rowCount && fuzzyCheck.rowCount > 0) {
-                    productId = fuzzyCheck.rows[0].id;
-                } else {
-                    console.warn(`  ⚠️  Skipping subscription ${sub.name}: Product ID '${productId}' or Name '${apimProductId}' not found in database.`);
+                if (!apimProductId) {
                     skipped++;
                     continue;
                 }
-            }
 
-            await pool.query(`
+                // Robust Lookup: Use registry first, fallback to construction
+                let productId = productRegistry?.get(apimProductId.toLowerCase());
+
+                if (!productId) {
+                    productId = `${targetEnv}-${apimProductId}`.toLowerCase();
+                }
+
+                // ⚠️ Final Verification: Check if product actually exists
+                const prodCheck = await pool.query('SELECT id FROM products WHERE id = $1', [productId]);
+                if (prodCheck.rowCount === 0) {
+                    // One last try: Check if we have it by name (Case-insensitive)
+                    const fuzzyCheck = await pool.query('SELECT id FROM products WHERE name ILIKE $1 AND environment = $2', [apimProductId, targetEnv]);
+                    if (fuzzyCheck.rowCount && fuzzyCheck.rowCount > 0) {
+                        productId = fuzzyCheck.rows[0].id;
+                    } else {
+                        console.warn(`  ⚠️  Skipping subscription ${sub.name}: Product ID '${productId}' or Name '${apimProductId}' not found in database.`);
+                        skipped++;
+                        continue;
+                    }
+                }
+
+                await pool.query(`
                 INSERT INTO subscriptions (
                     id, product_id, subscriber_team_id, state,
                     primary_key_name, primary_key_value,
@@ -311,99 +322,99 @@ async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importE
                     state = EXCLUDED.state,
                     updated_at = NOW()
             `, [
-                `${targetEnv}-${sub.id || sub.name}`.toLowerCase(),
-                productId,
-                'default-team',
-                props.state === 'active' ? 'active' : 'suspended',
-                'primary', 'redacted-sync',
-                'secondary', 'redacted-sync',
-                props.createdDate || new Date().toISOString()
-            ]);
+                    `${targetEnv}-${sub.id || sub.name}`.toLowerCase(),
+                    productId,
+                    'default-team',
+                    props.state === 'active' ? 'active' : 'suspended',
+                    'primary', 'redacted-sync',
+                    'secondary', 'redacted-sync',
+                    props.createdDate || new Date().toISOString()
+                ]);
 
-            inserted++;
-        } catch (error: any) {
-            console.error(`  ❌ FK Constraint Failure on sub ${sub.name}: ${error.message}`);
-            skipped++;
+                inserted++;
+            } catch (error: any) {
+                console.error(`  ❌ FK Constraint Failure on sub ${sub.name}: ${error.message}`);
+                skipped++;
+            }
         }
+
+        console.log(`✅ Finished subscription migration: ${inserted} inserted, ${skipped} skipped.`);
     }
 
-    console.log(`✅ Finished subscription migration: ${inserted} inserted, ${skipped} skipped.`);
-}
-
-/**
- * Update product statistics
- */
-async function updateProductStats(pool: pg.Pool) {
-    console.log('\n📊 Updating product statistics...');
-    await pool.query(`
+    /**
+     * Update product statistics
+     */
+    async function updateProductStats(pool: pg.Pool) {
+        console.log('\n📊 Updating product statistics...');
+        await pool.query(`
         UPDATE products p
         SET subscriber_count = (
             SELECT COUNT(*) FROM subscriptions s WHERE s.product_id = p.id
         )
     `);
-    console.log('✅ Product statistics updated.');
-}
+        console.log('✅ Product statistics updated.');
+    }
 
-/**
- * Main execution
- */
-async function main() {
-    const args = process.argv.slice(2);
-    let filesToProcess: string[] = [];
+    /**
+     * Main execution
+     */
+    async function main() {
+        const args = process.argv.slice(2);
+        let filesToProcess: string[] = [];
 
-    // Priority data directory discovery
-    const rootData = join(process.cwd(), 'apim-database', 'data');
-    const localData = join(process.cwd(), 'data');
-    const relativeData = join(__dirname, '..', 'data');
+        // Priority data directory discovery
+        const rootData = join(process.cwd(), 'apim-database', 'data');
+        const localData = join(process.cwd(), 'data');
+        const relativeData = join(__dirname, '..', 'data');
 
-    let dataDir = '';
-    if (existsSync(rootData)) dataDir = rootData;
-    else if (existsSync(localData)) dataDir = localData;
-    else if (existsSync(relativeData)) dataDir = relativeData;
+        let dataDir = '';
+        if (existsSync(rootData)) dataDir = rootData;
+        else if (existsSync(localData)) dataDir = localData;
+        else if (existsSync(relativeData)) dataDir = relativeData;
 
-    if (args.length > 0) {
-        const target = args[0];
-        if (existsSync(target) && statSync(target).isDirectory()) {
-            filesToProcess = readdirSync(target)
+        if (args.length > 0) {
+            const target = args[0];
+            if (existsSync(target) && statSync(target).isDirectory()) {
+                filesToProcess = readdirSync(target)
+                    .filter(f => f.startsWith('apim-data-') && f.endsWith('.json'))
+                    .map(f => join(target, f));
+            } else if (existsSync(target)) {
+                filesToProcess = [target];
+            }
+        } else if (existsSync(dataDir)) {
+            filesToProcess = readdirSync(dataDir)
                 .filter(f => f.startsWith('apim-data-') && f.endsWith('.json'))
-                .map(f => join(target, f));
-        } else if (existsSync(target)) {
-            filesToProcess = [target];
-        }
-    } else if (existsSync(dataDir)) {
-        filesToProcess = readdirSync(dataDir)
-            .filter(f => f.startsWith('apim-data-') && f.endsWith('.json'))
-            .map(f => join(dataDir, f));
-    }
-
-    if (filesToProcess.length === 0) {
-        console.error('❌ Error: No APIM JSON data files found.');
-        console.log('Either provide a file path or ensure files exist in apim-database/data/');
-        process.exit(1);
-    }
-
-    console.log(`🚀 Found ${filesToProcess.length} snapshots to migrate.`);
-    const pool = createDbPool();
-
-    try {
-        await createDefaultTeam(pool);
-
-        for (const dataPath of filesToProcess) {
-            console.log(`\n--- Processing: ${dataPath} ---`);
-            const data = JSON.parse(readFileSync(dataPath, 'utf8')) as APIMData;
-
-            const registry = await migrateProducts(pool, data.products, data.environment);
-            await migrateAPIs(pool, data.apis, data.products, data.environment);
-            await migrateSubscriptions(pool, data.subscriptions, data.environment, registry);
+                .map(f => join(dataDir, f));
         }
 
-        await updateProductStats(pool);
-        console.log(`\n✨ Batch migration complete!`);
-    } catch (error) {
-        console.error('\n❌ Migration failed:', error);
-    } finally {
-        await pool.end();
-    }
-}
+        if (filesToProcess.length === 0) {
+            console.error('❌ Error: No APIM JSON data files found.');
+            console.log('Either provide a file path or ensure files exist in apim-database/data/');
+            process.exit(1);
+        }
 
-main();
+        console.log(`🚀 Found ${filesToProcess.length} snapshots to migrate.`);
+        const pool = createDbPool();
+
+        try {
+            await createDefaultTeam(pool);
+
+            for (const dataPath of filesToProcess) {
+                console.log(`\n--- Processing: ${dataPath} ---`);
+                const data = JSON.parse(readFileSync(dataPath, 'utf8')) as APIMData;
+
+                const registry = await migrateProducts(pool, data.products, data.environment);
+                await migrateAPIs(pool, data.apis, data.products, data.environment);
+                await migrateSubscriptions(pool, data.subscriptions, data.environment, registry);
+            }
+
+            await updateProductStats(pool);
+            console.log(`\n✨ Batch migration complete!`);
+        } catch (error) {
+            console.error('\n❌ Migration failed:', error);
+        } finally {
+            await pool.end();
+        }
+    }
+
+    main();
