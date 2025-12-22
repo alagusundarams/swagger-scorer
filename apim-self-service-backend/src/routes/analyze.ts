@@ -144,4 +144,54 @@ export async function analyzeRoutes(
             }
         }
     );
+
+    /**
+     * POST /api/v1/analyze/:productId
+     * Fetch OpenAPI spec from product's Git repo or APIM and analyze it
+     */
+    fastify.post<{ Params: { productId: string } }>(
+        '/analyze/:productId',
+        async (request, reply) => {
+            const { productId } = request.params;
+
+            try {
+                // Import spec fetcher service
+                const { fetchSpecForProduct } = await import('../services/spec-fetcher.service.js');
+
+                // Fetch spec from Git or APIM
+                fastify.log.info({ productId }, 'Fetching OpenAPI spec for product');
+                const specContent = await fetchSpecForProduct(productId);
+
+                // Detect format and parse
+                const format = specContent.trim().startsWith('{') ? 'json' : 'yaml';
+                const spec = await parseOpenAPI(specContent, format);
+
+                // Validate structure
+                const openapiVersion = detectOpenAPIVersion(spec);
+                validateOpenAPIStructure(spec, openapiVersion);
+
+                // Run Spectral analysis
+                const violations = await analyzeWithSpectral(spectral, spec);
+
+                // Calculate score
+                const analysis = calculateScore(violations, config);
+
+                return reply.send({
+                    ...analysis,
+                    productId,
+                    metadata: {
+                        version: openapiVersion,
+                        format,
+                        ...analysis.metadata,
+                    },
+                });
+            } catch (error: any) {
+                fastify.log.error({ err: error, productId }, 'Error analyzing product');
+                return reply.status(500).send({
+                    error: 'Internal Server Error',
+                    message: `Failed to analyze product: ${error.message}`,
+                });
+            }
+        }
+    );
 }
