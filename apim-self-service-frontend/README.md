@@ -25,21 +25,24 @@ Modern React application for analyzing, scoring, and managing OpenAPI (Swagger) 
 - **Access Management**: Request/approve API access with team-based permissions
 - **Subscription Tracking**: Monitor active API subscriptions
 
-### 🎨 Premium UX
-- **Dark Mode**: Full dark theme support
-- **Glassmorphism Design**: Modern, translucent UI elements
-- **Micro-animations**: Smooth transitions and hover effects
-- **Responsive Layout**: Mobile-first design
-- **Production-ready**: Clean code, no debug logs
+### 👑 Admin Governance
+- **Orphan Mapping**: Reconcile unassigned legacy resources with Teams
+- **Smart Assignment**: Differentiates between Standard Products (cascading app) and GRP Bundles (container only)
+- **Control Plane**: Centralized view of all managed assets
 
-## 🛠️ Tech Stack
+### 🛡️ Approval Workflows
+- **OBO Justification**: Require reason for Admin overrides/emergency approvals
+- **Audit Logging**: Immutable record of all decisions with "Resolved By" tracking
+- **Environment Promotion**: Gated workflows from DEV → PROD
 
-- **Framework**: React 18 + TypeScript + Vite
-- **Styling**: Tailwind CSS v4
-- **State**: Zustand (analyzer) + React Context (auth)
-- **Routing**: React Router v7 with protected routes
-- **HTTP**: Axios
-- **Testing**: Vitest + Playwright (E2E)
+## 📜 Scripts & Utilities
+
+### Data Extraction (Day 1 Onboarding)
+Simulate extracting existing APIM resources into the portal's inventory.
+```bash
+# Run extraction (Skips PROD by default)
+npx ts-node scripts/sync-apim-to-db.ts
+```
 
 ## 🚀 Getting Started
 
@@ -89,6 +92,7 @@ docker run -p 8080:80 swagger-scorer-ui
 - `/products/:id/apis/:id` - API detail
 - `/analyzer` - OpenAPI analyzer
 - `/discovery` - API marketplace
+- `/admin/mapping` - Admin Governance & Assignment
 
 ### State Management
 - `useAnalysis`: Analyzer state (Zustand)
@@ -99,17 +103,6 @@ docker run -p 8080:80 swagger-scorer-ui
 - **URI-based breadcrumbs**: For hierarchical routes (`/products/:id/apis/:id`)
 - **State-based breadcrumbs**: For flat routes (`/analyzer`) with context
 - **sessionStorage fallback**: Preserves breadcrumbs on refresh
-
-## 🔜 Coming Soon
-
-### Deployment Pipeline (In Progress)
-- 4-tier environments: DEV → QA → STAGE → PROD
-- Full audit trail (who promoted, when, approvals)
-- Git commit tracking
-- Deployment history timeline
-- Rollback functionality
-
-See [implementation_plan.md](./.gemini/antigravity/brain/234d4628-b0ec-498c-ba71-a88033b0e34f/implementation_plan.md) for details.
 
 ## 📝 License
 MIT

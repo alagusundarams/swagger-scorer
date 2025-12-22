@@ -16,7 +16,6 @@ import { DashboardStatsGrid } from '../components/DashboardStatsGrid';
 import { DashboardTabs } from '../components/DashboardTabs';
 import { DashboardContent } from '../components/DashboardContent';
 import { useEffect } from 'react';
-import { USE_MOCKS } from '../../../config/env';
 
 export const DashboardPage = () => {
     const navigate = useNavigate();
@@ -33,7 +32,8 @@ export const DashboardPage = () => {
         products: allProducts,
         subscriptions: allSubscriptions,
         teams: allTeams,
-        approvalRequests: enhancedApprovals
+        approvalRequests: enhancedApprovals,
+        error
     } = useStore();
 
     const [searchParams] = useSearchParams();
@@ -53,25 +53,15 @@ export const DashboardPage = () => {
     const [toast, setToast] = useState<{ message: string; show: boolean }>({ message: '', show: false });
     const pageSize = 9;
 
-    const adminMockData = useMemo(() => {
-        if (!USE_MOCKS) return [];
-        return Array.from({ length: 112 }).map((_, i) => ({
-            id: `admin-api-${i}`,
-            name: `ent-api-${i}`,
-            displayName: `Enterprise ${['Core', 'Security', 'Data', 'Audit', 'Finance'][i % 5]} API ${i + 1}`,
-            description: `Global administrative endpoint for ${['identity management', 'transaction auditing', 'real-time analytics', 'ledger synchronization', 'policy enforcement'][i % 5]} across all production gateways.`,
-            version: `v${(i % 3) + 1}.0.${i % 10}`,
-            state: (i % 15 === 0 ? 'Review' : 'Published'),
-            ownerTeamId: i % 2 === 0 ? 'team-cloudops' : 'team-security',
-            apis: Array.from({ length: (i % 8) + 1 }),
-            qualityScore: 70 + (i % 30),
-            subscriberCount: (i * 12) % 200,
-            environments: ['Dev', 'QA', 'Prod'],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            isMock: true
-        } as unknown as Product));
-    }, []);
+    const [adminProducts, setAdminProducts] = useState<Product[]>([]);
+
+    useEffect(() => {
+        if (activeTab === 'admin') {
+            import('../api/inventoryClient').then(({ getAdminProducts }) => {
+                getAdminProducts().then(res => setAdminProducts(res.data));
+            });
+        }
+    }, [activeTab]);
 
     const userTeams = useMemo(() => allTeams.filter(t => user?.teams.includes(t.id)), [allTeams, user]);
 
@@ -100,7 +90,20 @@ export const DashboardPage = () => {
 
     const pendingApprovals = useMemo(() => {
         if (!user) return [];
-        return enhancedApprovals.filter(req => req.status === 'PENDING');
+        return enhancedApprovals.filter(req => {
+            if (req.status !== 'PENDING') return false;
+
+            // 1. Admins see everything (Safety Net)
+            if (user.role === 'admin') return true;
+
+            // 2. Team Leads see requests assigned to their teams
+            // req.approverTeamId is now populated by the smart routing logic
+            if (req.approverTeamId && user.leadsTeams.includes(req.approverTeamId)) {
+                return true;
+            }
+
+            return false;
+        });
     }, [enhancedApprovals, user]);
 
     const accessibleEnvironments = useMemo(() => {
@@ -126,9 +129,9 @@ export const DashboardPage = () => {
         if (activeTab === 'produced') return myProducts;
         if (activeTab === 'consumed') return subscribedProducts;
         if (activeTab === 'approvals') return pendingApprovals;
-        if (!USE_MOCKS && activeTab === 'admin') return allProducts;
-        return adminMockData;
-    }, [activeTab, myProducts, subscribedProducts, adminMockData, pendingApprovals, allProducts]);
+        if (activeTab === 'admin') return adminProducts;
+        return [];
+    }, [activeTab, myProducts, subscribedProducts, adminProducts, pendingApprovals]);
 
     const filteredData = useMemo(() => {
         if (!searchQuery) return baseData;
@@ -172,10 +175,10 @@ export const DashboardPage = () => {
         }
         if (activeTab === 'admin') {
             return [
-                { label: 'Global Inventory', value: allProducts.length, icon: '🌐' },
-                { label: 'Avg Quality', value: `${Math.round(allProducts.reduce((acc, p) => acc + (p.qualityScore || 0), 0) / (allProducts.length || 1))}%`, icon: '⚖️' },
-                { label: 'Production APIs', value: allProducts.filter(p => p.environment === 'PROD').length, icon: '🚀' },
-                { label: 'Draft APIs', value: allProducts.filter(p => p.state === 'draft').length, icon: '📝' }
+                { label: 'Global Inventory', value: adminProducts.length, icon: '🌐' },
+                { label: 'Avg Quality', value: `${Math.round(adminProducts.reduce((acc, p) => acc + (p.qualityScore || 0), 0) / (adminProducts.length || 1))}%`, icon: '⚖️' },
+                { label: 'Production APIs', value: adminProducts.filter(p => p.environment === 'PROD').length, icon: '🚀' },
+                { label: 'Draft APIs', value: adminProducts.filter(p => p.state === 'draft').length, icon: '📝' }
             ];
         }
         if (activeTab === 'approvals') {
@@ -194,7 +197,7 @@ export const DashboardPage = () => {
             { label: 'Provider Diversity', value: new Set(subscribedProducts.map((p: ProductWithSubscription) => p.ownerTeamId)).size, icon: '🌐' },
             { label: 'Environment Mix', value: 'PROD / DEV', icon: '🏗️' }
         ];
-    }, [activeTab, myProducts, subscribedProducts, adminMockData, pendingApprovals, allProducts]);
+    }, [activeTab, myProducts, subscribedProducts, adminProducts, pendingApprovals]);
 
     const showToast = (message: string) => {
         setToast({ message, show: true });
@@ -225,6 +228,35 @@ export const DashboardPage = () => {
 
             <div className="max-w-7xl mx-auto px-6 w-full pt-16 pb-24">
                 <DashboardHero activeTab={activeTab} />
+
+                {user?.role === 'admin' && (
+                    <div className="flex justify-end mb-4 animate-fade-in">
+                        <button
+                            onClick={() => navigate('/admin/mapping')}
+                            className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-widest hover:scale-105 transition shadow-lg flex items-center gap-2"
+                        >
+                            <span>⚡</span> Admin Mapping
+                        </button>
+                    </div>
+                )}
+
+                {error && (
+                    <div className="mb-8 p-6 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center justify-between text-red-500 animate-fade-in backdrop-blur-sm">
+                        <div className="flex items-center gap-4">
+                            <span className="text-2xl">⚠️</span>
+                            <div>
+                                <h3 className="font-bold text-lg">System Alert</h3>
+                                <p className="text-sm opacity-80">{error}</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition font-bold text-xs uppercase tracking-widest"
+                        >
+                            Reconnect
+                        </button>
+                    </div>
+                )}
 
                 <DashboardFilters
                     searchQuery={searchQuery}

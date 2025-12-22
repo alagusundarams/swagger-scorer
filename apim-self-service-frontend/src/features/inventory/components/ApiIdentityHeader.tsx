@@ -59,6 +59,29 @@ paths: {}
                         )}
                     </div>
 
+                    {/* Invocation URL Display */}
+                    <div className="mt-8 mb-2">
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Base Invocation URL</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 uppercase">{product.environment || 'DEV'}</span>
+                        </div>
+                        <div className="flex items-center gap-2 group">
+                            <code className="text-sm font-mono bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 select-all">
+                                {`https://api-${(product.environment || 'dev').toLowerCase()}.contoso.com${api.path}`}
+                            </code>
+                            <button
+                                onClick={() => {
+                                    navigator.clipboard.writeText(`https://api-${(product.environment || 'dev').toLowerCase()}.contoso.com${api.path}`);
+                                    alert('URL copied!');
+                                }}
+                                className="p-2 text-gray-400 hover:text-blue-600 transition opacity-0 group-hover:opacity-100"
+                                title="Copy to clipboard"
+                            >
+                                📋
+                            </button>
+                        </div>
+                    </div>
+
                     {/* Deployment Context */}
                     <div className="flex flex-wrap items-center gap-8 mt-10 p-6 bg-gray-50/50 dark:bg-slate-800/40 rounded-[2rem] border border-gray-100 dark:border-slate-700/30">
                         <div className="flex flex-col gap-1">

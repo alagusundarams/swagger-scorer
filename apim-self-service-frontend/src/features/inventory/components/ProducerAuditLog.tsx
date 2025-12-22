@@ -1,9 +1,33 @@
+import { useState } from 'react';
 
 interface ProducerAuditLogProps {
     onAction: (message: string, type: 'success' | 'warning') => void;
+    onDecide?: (decision: 'APPROVE' | 'REJECT', justification: string) => Promise<void>;
 }
 
-export function ProducerAuditLog({ onAction }: ProducerAuditLogProps) {
+export function ProducerAuditLog({ onAction, onDecide }: ProducerAuditLogProps) {
+    const [justifiction, setJustification] = useState('');
+    const [decisionMode, setDecisionMode] = useState<'APPROVE' | 'REJECT' | null>(null);
+
+    const handleConfirmDecision = async () => {
+        if (!decisionMode) return;
+        if (!justifiction.trim()) {
+            onAction('Justification is required for this decision.', 'warning');
+            return;
+        }
+
+        if (onDecide) {
+            await onDecide(decisionMode, justifiction);
+            setDecisionMode(null);
+            setJustification('');
+        } else {
+            // Fallback for demo/mock mode if no handler provided
+            onAction(`Request ${decisionMode}D. Justification logged.`, decisionMode === 'APPROVE' ? 'success' : 'warning');
+            setDecisionMode(null);
+            setJustification('');
+        }
+    };
+
     return (
         <div className="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-lg border border-gray-100 dark:border-slate-700 animate-fade-in">
             <div className="flex items-center justify-between mb-8">
@@ -30,21 +54,55 @@ export function ProducerAuditLog({ onAction }: ProducerAuditLogProps) {
                                 </div>
                                 <div className="font-black text-slate-900 dark:text-white text-sm mb-1">PROD Exposure Request</div>
                                 <p className="text-xs text-slate-500 font-medium leading-relaxed">Requested by <span className="text-blue-600 font-bold">Identity Team</span> to enable cross-region discovery for internal clients.</p>
+
+                                {decisionMode && (
+                                    <div className="mt-4 animate-fade-in">
+                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
+                                            {decisionMode} Justification (Required)
+                                        </label>
+                                        <textarea
+                                            value={justifiction}
+                                            onChange={e => setJustification(e.target.value)}
+                                            placeholder={`Please explain why you are ${decisionMode.toLowerCase()}ing this request...`}
+                                            className="w-full text-sm p-3 rounded-xl border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                                            rows={2}
+                                            autoFocus
+                                        />
+                                        <div className="flex items-center gap-2 mt-2 justify-end">
+                                            <button
+                                                onClick={() => setDecisionMode(null)}
+                                                className="text-xs text-slate-500 font-bold hover:underline px-3"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={handleConfirmDecision}
+                                                className={`px-4 py-2 text-white text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${decisionMode === 'APPROVE' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'
+                                                    }`}
+                                            >
+                                                Confirm {decisionMode}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                            <div className="flex gap-2 shrink-0">
-                                <button
-                                    onClick={() => onAction('Request Approved. Access updated successfully.', 'success')}
-                                    className="px-6 py-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
-                                >
-                                    Approve
-                                </button>
-                                <button
-                                    onClick={() => onAction('Request Rejected. Feedback sent to requester.', 'warning')}
-                                    className="px-6 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-red-100 dark:hover:bg-red-900/40 transition-all"
-                                >
-                                    Reject
-                                </button>
-                            </div>
+
+                            {!decisionMode && (
+                                <div className="flex gap-2 shrink-0">
+                                    <button
+                                        onClick={() => setDecisionMode('APPROVE')}
+                                        className="px-6 py-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+                                    >
+                                        Approve
+                                    </button>
+                                    <button
+                                        onClick={() => setDecisionMode('REJECT')}
+                                        className="px-6 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-red-100 dark:hover:bg-red-900/40 transition-all"
+                                    >
+                                        Reject
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

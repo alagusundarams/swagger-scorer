@@ -29,6 +29,7 @@ export interface ApprovalRequest {
         teamId: string;
         teamName: string;
     };
+    approverTeamId: string; // Team responsible for approval (e.g. Owner or Admin)
     submittedAt: string;
     productId?: string; // Optional context linking to a product
     details: {
@@ -46,6 +47,8 @@ export interface ApprovalRequest {
         requestedQuota?: string; // For Quota Extension
         reason?: string;
     };
+    justification?: string; // Approver's OBO reason or feedback
+    answeredBy?: string; // User ID/Email of the actual approver
 }
 
 export interface AuditLog {

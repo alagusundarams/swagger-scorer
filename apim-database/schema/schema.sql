@@ -210,9 +210,11 @@ CREATE TABLE IF NOT EXISTS approval_requests (
     -- Request details (flexible JSONB for different request types)
     details JSONB NOT NULL,
     
+    justification TEXT, -- OBO reason or rejection feedback
+    
     submitted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     resolved_at TIMESTAMP WITH TIME ZONE,
-    resolved_by TEXT
+    resolved_by TEXT -- User ID/Email of the actual approver (OBO)
 );
 
 CREATE INDEX idx_approvals_status ON approval_requests(status);

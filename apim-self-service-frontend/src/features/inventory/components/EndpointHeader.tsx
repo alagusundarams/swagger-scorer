@@ -25,10 +25,30 @@ export function EndpointHeader({ operation }: EndpointHeaderProps) {
                             <span className="text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest bg-gray-50 dark:bg-slate-800/50 px-3 py-1 rounded-lg">
                                 Managed Operation
                             </span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 uppercase">DEV</span>
                         </div>
-                        <h1 className="text-4xl font-mono font-black text-gray-900 dark:text-white tracking-tight mb-4">
-                            {operation.urlTemplate}
-                        </h1>
+
+                        {/* Interactive Full URL */}
+                        <div className="flex items-center gap-3 mb-4 group">
+                            <div className="flex items-center font-mono text-2xl lg:text-3xl font-black tracking-tight bg-white dark:bg-slate-800 p-2 rounded-xl border border-transparent hover:border-gray-200 dark:hover:border-slate-700 transition cursor-text select-all">
+                                <span className={`mr-3 px-2 py-0.5 rounded text-lg ${methodTheme[operation.method as keyof typeof methodTheme]}`}>
+                                    {operation.method}
+                                </span>
+                                <span className="text-gray-400 dark:text-slate-600 select-none">https://api-dev.contoso.com/pay</span>
+                                <span className="text-gray-900 dark:text-white">{operation.urlTemplate}</span>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    navigator.clipboard.writeText(`https://api-dev.contoso.com/pay${operation.urlTemplate}`);
+                                    alert('Full Operation URL copied!');
+                                }}
+                                className="p-3 bg-gray-100 dark:bg-slate-800 text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition shadow-sm opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 duration-300"
+                                title="Copy Full Invocation URL"
+                            >
+                                📋
+                            </button>
+                        </div>
+
                         <p className="text-gray-500 dark:text-slate-400 text-lg font-medium max-w-3xl leading-relaxed">
                             {operation.description}
                         </p>

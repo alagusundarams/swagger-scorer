@@ -39,7 +39,9 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
         subscriptions: allSubscriptions,
         teams: allTeams,
         updateProduct,
-        addNotification
+        addNotification,
+        requestProductPromotion,
+        approvalRequests
     } = useStore();
     const navigate = useNavigate();
 
@@ -133,28 +135,51 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
         }
     }, [product.id, product.displayName, product.environment, updateProduct, addNotification]);
 
-    const handlePromote = useCallback(() => {
+    const handlePromote = useCallback(async () => {
         const stages: Product['environment'][] = ['DEV', 'QA', 'STAGE', 'PROD'];
         const currentIndex = stages.indexOf(product.environment || 'DEV');
 
         if (currentIndex < stages.length - 1) {
             const nextStage = stages[currentIndex + 1];
-            updateProduct(product.id, { environment: nextStage });
 
-            addNotification({
-                type: 'success',
-                title: 'Product Promoted',
-                message: `${product.displayName} has been successfully promoted to ${nextStage}.`,
-                navigateTo: `/products/${product.id}`
-            });
+            if (!nextStage) return; // Should not happen due to check above but TS safety
 
-            setLocalToast({ message: `Successfully promoted to ${nextStage}`, type: 'success' });
-            setTimeout(() => setLocalToast(null), 3000);
+            // 1. Check for Pending Request
+            // Note: approvalRequests comes from store, need to add it to destructuring first
+            const hasPending = approvalRequests.some(r =>
+                r.productId === product.id &&
+                r.type === 'PROMOTION_REQUEST' &&
+                r.status === 'PENDING'
+            );
+
+            if (hasPending) {
+                setLocalToast({ message: `Promotion to ${nextStage} is already pending approval.`, type: 'warning' });
+                return;
+            }
+
+            try {
+                // 2. Submit Request
+                // Note: assuming useAuth provide getToken is available in scope or added to store destructuring
+                await requestProductPromotion(product.id, nextStage, (() => Promise.resolve('mock-token')) as any); // Mock token for now or use useAuth
+
+                addNotification({
+                    type: 'info',
+                    title: 'Promotion Requested',
+                    message: `Request to promote ${product.displayName} to ${nextStage} submitted for approval.`,
+                    navigateTo: `/products/${product.id}`
+                });
+
+                setLocalToast({ message: `Promotion Request Submitted: ${nextStage}`, type: 'success' });
+                setTimeout(() => setLocalToast(null), 3000);
+
+            } catch (error: any) {
+                setLocalToast({ message: error.message || 'Failed to request promotion', type: 'warning' });
+            }
         } else {
             setLocalToast({ message: `Already at PROD. No further promotion possible.`, type: 'warning' });
             setTimeout(() => setLocalToast(null), 3000);
         }
-    }, [product.id, product.displayName, product.environment, updateProduct, addNotification]);
+    }, [product.id, product.displayName, product.environment, requestProductPromotion, addNotification, approvalRequests]);
 
     const handleDeprecate = useCallback(() => {
         if (confirm(`Are you sure you want to deprecate ${product.displayName}? This will prevent new subscriptions.`)) {
@@ -176,11 +201,21 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
         navigate(`/products/${product.id}/apis/${apiId}`);
     }, [navigate, product.id]);
 
+    // === Derived State ===
+    const isPromotionPending = useMemo(() => {
+        return approvalRequests.some(r =>
+            r.productId === product.id &&
+            r.type === 'PROMOTION_REQUEST' &&
+            r.status === 'PENDING'
+        );
+    }, [approvalRequests, product.id]);
+
     return (
         <div className="max-w-7xl mx-auto px-6 py-8">
             <ProducerHeader
                 product={product}
                 isOutOfSync={isOutOfSync}
+                isPromotionPending={isPromotionPending}
                 onInitiateRedeploy={() => {
                     updateProduct(product.id, { environment: 'DEV' });
                     setIsOutOfSync(false);
@@ -190,6 +225,76 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                 onPromoteClick={handlePromote}
                 onDeprecateClick={handleDeprecate}
             />
+
+            {/* Reconciliation & Data Integrity Alerts */}
+            <div className="mb-8 space-y-4">
+                {/* 1. Orphaned Product Check */}
+                {!allTeams.find(t => t.id === product.ownerTeamId) && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-6 rounded-r-xl shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-fade-in">
+                        <div>
+                            <h3 className="text-lg font-black text-red-800 dark:text-red-400 flex items-center gap-2">
+                                <span>⚠️</span> Orphaned Product Detected
+                            </h3>
+                            <p className="text-red-600 dark:text-red-300 text-sm mt-1">
+                                This product is linked to a non-existent team ID (`{product.ownerTeamId}`). It cannot be managed effectively.
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setIsManageModalOpen(true)}
+                            className="px-5 py-2.5 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/60 font-bold text-xs uppercase tracking-widest transition-colors whitespace-nowrap"
+                        >
+                            Claim Ownership
+                        </button>
+                    </div>
+                )}
+
+                {/* 2. Critical Governance Violations */}
+                {(product.qualityScore || 0) < 50 && (
+                    <div className="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-500 p-6 rounded-r-xl shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-fade-in">
+                        <div>
+                            <h3 className="text-lg font-black text-amber-800 dark:text-amber-400 flex items-center gap-2">
+                                <span>🛡️</span> Critical Governance Violations
+                            </h3>
+                            <p className="text-amber-700 dark:text-amber-300 text-sm mt-1">
+                                This product's quality score is critical ({product.qualityScore}%). It may be blocked from promotion to PROD.
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => {
+                                if (product.apis.length > 0) {
+                                    setSelectedApi(product.apis[0]);
+                                    setIsEditorOpen(true); // Open Analyzer for first API
+                                } else {
+                                    setLocalToast({ message: 'No APIs to analyze.', type: 'warning' });
+                                }
+                            }}
+                            className="px-5 py-2.5 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/60 font-bold text-xs uppercase tracking-widest transition-colors whitespace-nowrap"
+                        >
+                            Fix Violations
+                        </button>
+                    </div>
+                )}
+
+                {/* 3. Draft Mode Warning */}
+                {(product.state === 'draft' || product.state === 'notPublished') && (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-6 rounded-r-xl shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-fade-in">
+                        <div>
+                            <h3 className="text-lg font-black text-blue-800 dark:text-blue-400 flex items-center gap-2">
+                                <span>📝</span> Draft Mode
+                            </h3>
+                            <p className="text-blue-700 dark:text-blue-300 text-sm mt-1">
+                                This product is not visible to consumers. Publish it to make it discoverable.
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => handleUpdateProduct({ state: 'published' })}
+                            className="px-5 py-2.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/60 font-bold text-xs uppercase tracking-widest transition-colors whitespace-nowrap"
+                        >
+                            Publish Now
+                        </button>
+                    </div>
+                )}
+            </div>
 
             <ProducerMetrics
                 qualityScore={score}
@@ -320,10 +425,35 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
             )}
 
             {activeTab === 'audit' && (
-                <ProducerAuditLog onAction={(msg, type) => {
-                    setLocalToast({ message: msg, type });
-                    setTimeout(() => setLocalToast(null), 3000);
-                }} />
+                <ProducerAuditLog
+                    onAction={(msg, type) => {
+                        setLocalToast({ message: msg, type });
+                        setTimeout(() => setLocalToast(null), 3000);
+                    }}
+                    onDecide={async (decision, justification) => {
+                        console.log(`[ProducerAuditLog] Decision: ${decision}, Justification: ${justification}`);
+
+                        // Find the pending request for this product (assuming single active request for demo)
+                        const pendingReq = approvalRequests.find(r =>
+                            r.productId === product.id && r.status === 'PENDING'
+                        );
+
+                        if (pendingReq) {
+                            console.log(`[ProducerAuditLog] Found pending request ${pendingReq.id}. Processing...`);
+                            // Call store action
+                            const { processApproval } = useStore.getState();
+                            await processApproval(pendingReq.id, decision, justification, (() => Promise.resolve('mock-token')) as any);
+
+                            setLocalToast({
+                                message: `Request ${decision}D successfully.`,
+                                type: decision === 'APPROVE' ? 'success' : 'warning'
+                            });
+                        } else {
+                            console.warn(`[ProducerAuditLog] No PENDING request found for product ${product.id}`);
+                            setLocalToast({ message: 'No pending request found to act on.', type: 'warning' });
+                        }
+                    }}
+                />
             )}
 
             {/* Floating Local Toast */}
@@ -414,6 +544,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                                 setSelectedApi(null);
                             }}
                             apiName={selectedApi.displayName}
+                            productName={product.displayName}
                             // [DEMO MAGICAL MOMENT]: We inject a known Legacy API Policy XML to show off the Parser.
                             // In a real app, this comes from selectedApi.apim_raw_data.policyXml
                             initialXml={`

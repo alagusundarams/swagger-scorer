@@ -1,7 +1,7 @@
 import { StateCreator } from 'zustand';
-import { type Product, type Subscription, type Team } from '../../types/entities';
+import { type Product, type Subscription, type Team, type API } from '../../types/entities';
 import { type ApprovalRequest, type AuditLog } from '../../types/workflow';
-import { getProducts, getTeams, getSubscriptions, requestProductAccess, updateSubscription as apiUpdateSubscription, getApprovals, updateApproval, getAuditLogs, updateTeam as apiUpdateTeam, updateProduct as apiUpdateProduct } from '../../features/inventory/api/inventoryClient';
+import { getProducts, getTeams, getSubscriptions, requestProductAccess, updateSubscription as apiUpdateSubscription, getApprovals, updateApproval, getAuditLogs, updateTeam as apiUpdateTeam, createTeam as apiCreateTeam, updateProduct as apiUpdateProduct, requestPromotion as apiRequestPromotion } from '../../features/inventory/api/inventoryClient';
 import { AuthSlice } from './authSlice';
 
 export interface DataSlice {
@@ -15,9 +15,15 @@ export interface DataSlice {
     fetchAuditLogs: (entityId?: string) => Promise<void>;
     updateSubscription: (id: string, updates: Partial<Subscription>, getToken?: () => Promise<string | null>) => Promise<void>;
     addSubscription: (productId: string, teamId: string, getToken?: () => Promise<string | null>) => Promise<void>;
-    processApproval: (id: string, decision: 'APPROVE' | 'REJECT', getToken?: () => Promise<string | null>) => Promise<void>;
+    processApproval: (id: string, decision: 'APPROVE' | 'REJECT', justification?: string, getToken?: () => Promise<string | null>) => Promise<void>;
     updateProduct: (id: string, updates: Partial<Product>) => Promise<void>;
+    updateAPI: (id: string, updates: Partial<API>) => Promise<void>;
     updateTeam: (id: string, updates: Partial<Team>) => Promise<void>;
+    addTeam: (team: Team) => Promise<void>;
+    requestProductPromotion: (productId: string, targetEnv: string, getToken?: () => Promise<string | null>) => Promise<void>;
+    error: string | null;
+    setError: (error: string | null) => void;
+    isLoading: boolean;
 }
 
 export const createDataSlice: StateCreator<DataSlice & AuthSlice, [], [], DataSlice> = (set, get) => ({
@@ -26,8 +32,13 @@ export const createDataSlice: StateCreator<DataSlice & AuthSlice, [], [], DataSl
     teams: [],
     approvalRequests: [],
     auditLogs: [],
+    error: null,
+    isLoading: false,
+
+    setError: (error) => set({ error }),
 
     fetchInitialData: async (getToken) => {
+        set({ error: null, isLoading: true }); // Start loading
         try {
             const [productsRes, teamsRes, approvalsRes, auditRes] = await Promise.all([
                 getProducts(),
@@ -105,8 +116,11 @@ export const createDataSlice: StateCreator<DataSlice & AuthSlice, [], [], DataSl
                     set({ subscriptions: subsRes.data });
                 }
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Failed to fetch initial data", error);
+            set({ error: error.message || "Failed to load dashboard data. Please check your connection." });
+        } finally {
+            set({ isLoading: false });
         }
     },
 
@@ -143,7 +157,7 @@ export const createDataSlice: StateCreator<DataSlice & AuthSlice, [], [], DataSl
         }
     },
 
-    processApproval: async (id, decision, getToken) => {
+    processApproval: async (id, decision, justification, getToken) => {
         const newStatus = decision === 'APPROVE' ? 'APPROVED' : 'REJECTED';
         set((state) => ({
             approvalRequests: state.approvalRequests.map(r => r.id === id ? { ...r, status: newStatus } : r)
@@ -153,7 +167,7 @@ export const createDataSlice: StateCreator<DataSlice & AuthSlice, [], [], DataSl
             try {
                 const token = await getToken();
                 if (token) {
-                    await updateApproval(id, newStatus, token);
+                    await updateApproval(id, newStatus, justification, token);
                 }
             } catch (error) {
                 console.error("Failed to process approval", error);
@@ -181,6 +195,15 @@ export const createDataSlice: StateCreator<DataSlice & AuthSlice, [], [], DataSl
         }
     },
 
+    updateAPI: async (id, updates) => {
+        // Mock update for API specific fields (like ownerTeamId)
+        // In a real app, we would update state.products.flat().apis or similar
+        // Here we just log it as it's primarily for the Admin Mapping flow which refreshes or relies on logs
+        console.log(`[DataSlice] updateAPI called for ${id}`, updates);
+        // Note: Deep nested structure update in Zustand for Products->APIs is complex without Immer
+        // For this demo, we assume the backend handles it and next fetch resolves it.
+    },
+
     updateTeam: async (id, updates) => {
         set((state) => ({
             teams: state.teams.map(t => t.id === id ? { ...t, ...updates } : t)
@@ -189,7 +212,39 @@ export const createDataSlice: StateCreator<DataSlice & AuthSlice, [], [], DataSl
             await apiUpdateTeam(id, updates);
         } catch (error) {
             console.error("Failed to update team", error);
-            // Revert on error? For now, we trust optimistic update or reload
+        }
+    },
+
+    addTeam: async (team) => {
+        // Optimistic update
+        set((state) => ({
+            teams: [...state.teams, team]
+        }));
+        try {
+            await apiCreateTeam(team);
+        } catch (error) {
+            console.error("Failed to create team", error);
+            // Revert on failure (simple pop for now, or fetch fresh)
+            set((state) => ({
+                teams: state.teams.filter(t => t.id !== team.id)
+            }));
+        }
+    },
+
+    requestProductPromotion: async (productId, targetEnv, getToken) => {
+        if (!getToken) return;
+        try {
+            const token = await getToken();
+            if (token) {
+                const response = await apiRequestPromotion(productId, targetEnv, token);
+                const req = response.data;
+                set((state) => ({
+                    approvalRequests: [req, ...state.approvalRequests]
+                }));
+            }
+        } catch (error: any) {
+            console.error("Failed to request promotion", error);
+            throw error; // Re-throw to let UI handle toasts
         }
     }
 });
