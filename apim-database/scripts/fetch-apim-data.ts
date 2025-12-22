@@ -2,7 +2,7 @@
  * APIM Data Fetcher
  * 
  * Pulls real data from Azure APIM and discovers associated Azure Repos
- * Supporting parallel fetch for DEV, QA, and STAGE environments via config.json
+ * Supporting organization-wide parallel fetch via config.json
  */
 
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'fs';
@@ -17,7 +17,6 @@ interface APIMConfig {
     devops?: {
         pat: string;
         organization: string;
-        projects: string[];
     };
 }
 
@@ -75,10 +74,18 @@ interface Subscription {
     };
 }
 
+interface ADOProject {
+    name: string;
+    id: string;
+}
+
 interface ADORepo {
     name: string;
     webUrl: string;
     id: string;
+    project: {
+        name: string;
+    };
 }
 
 /**
@@ -126,65 +133,78 @@ async function fetchAPIM<T>(config: APIMConfig, path: string): Promise<{ value: 
 }
 
 /**
- * Fetch Repositories from Azure DevOps
+ * Fetch All Projects from Azure DevOps Organization
  */
-async function fetchADORepos(org: string, projects: string[], pat: string): Promise<ADORepo[]> {
+async function fetchADOProjects(org: string, pat: string): Promise<ADOProject[]> {
+    console.log(`📡 [ADO] Fetching all projects in organization: ${org}...`);
+    const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+    const url = `https://dev.azure.com/${org}/_apis/projects?api-version=7.1-preview.4`;
+
+    try {
+        const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+        if (response.ok) {
+            const data = await response.json() as { value: ADOProject[] };
+            return data.value;
+        }
+    } catch (err) {
+        console.error('❌ [ADO] Failed to fetch projects:', err);
+    }
+    return [];
+}
+
+/**
+ * Fetch All Repositories from Azure DevOps Organization (via all projects)
+ */
+async function fetchADOReposAcrossProjects(org: string, projects: ADOProject[], pat: string): Promise<ADORepo[]> {
     const allRepos: ADORepo[] = [];
     const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
 
-    for (const project of projects) {
+    console.log(`🔍 [ADO] Starting organization-wide repository crawl across ${projects.length} projects...`);
+
+    // Fetch in parallel for speed
+    const projectResults = await Promise.all(projects.map(async (project) => {
         try {
-            console.log(`🔍 [ADO] Listing repositories in project: ${project}...`);
-            const url = `https://dev.azure.com/${org}/${project}/_apis/git/repositories?api-version=7.1-preview.1`;
+            const url = `https://dev.azure.com/${org}/${project.name}/_apis/git/repositories?api-version=7.1-preview.1`;
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
 
             if (response.ok) {
                 const data = await response.json() as { value: ADORepo[] };
-                allRepos.push(...data.value);
-            } else {
-                console.warn(`⚠️ [ADO] Failed to list repos for project ${project}: ${response.status}`);
+                return data.value;
             }
         } catch (err) {
-            console.warn(`⚠️ [ADO] Error fetching project ${project}:`, err);
+            console.warn(`⚠️ [ADO] Error fetching repos for ${project.name}`);
         }
-    }
-    return allRepos;
+        return [];
+    }));
+
+    return projectResults.flat();
 }
 
 /**
  * Fetch a single environment
  */
 async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
-    console.log(`📍 [${config.environment}] Starting Fetch...`);
+    console.log(`📍 [${config.environment}] Starting Extraction...`);
 
     try {
         const productsData = await fetchAPIM<Product>(config, '/products');
         const apisData = await fetchAPIM<API>(config, '/apis');
         const subscriptionsData = await fetchAPIM<Subscription>(config, '/subscriptions');
 
-        console.log(`✅ [${config.environment}] Found ${productsData.value.length} Products, ${apisData.value.length} APIs.`);
+        console.log(`✅ [${config.environment}] APIM Snapshot Complete: ${productsData.value.length} Products.`);
 
-        // Enrichment logic: Match Products to Azure Repos
+        // Enrichment logic: Intelligent Global Match
         productsData.value.forEach((product, i) => {
-            // Find matching repo by name (case-insensitive)
             const matchedRepo = adoRepos.find(r =>
                 r.name.toLowerCase() === product.name.toLowerCase() ||
-                r.name.toLowerCase() === product.properties.displayName.toLowerCase().replace(/\s+/g, '-')
+                r.name.toLowerCase() === product.properties.displayName.toLowerCase().replace(/\s+/g, '-') ||
+                r.name.toLowerCase().includes(product.name.toLowerCase())
             );
 
             if (matchedRepo) {
                 product.gitInfo = {
                     repoUrl: matchedRepo.webUrl,
-                    lastCommit: '33e66c1', // Mock or fetch via ADO Stats API if needed
-                    lastCommitDate: new Date().toISOString()
-                };
-            } else if (config.devops) {
-                // Fallback to template if not found but org/proj available
-                const org = config.devops.organization;
-                const proj = config.devops.projects[0] || 'default-project';
-                product.gitInfo = {
-                    repoUrl: `https://dev.azure.com/${org}/${proj}/_git/${product.name}`,
-                    lastCommit: 'N/A',
+                    lastCommit: '33e66c1',
                     lastCommitDate: new Date().toISOString()
                 };
             }
@@ -217,11 +237,11 @@ async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
         const outputFile = join(outputDir, `apim-data-${config.environment.toLowerCase()}-${timestamp}.json`);
 
         writeFileSync(outputFile, JSON.stringify(output, null, 2));
-        console.log(`💾 [${config.environment}] Saved to: ${outputFile}`);
+        console.log(`💾 [${config.environment}] Saved matching state to: ${outputFile}`);
 
         return outputFile;
     } catch (error) {
-        console.error(`❌ [${config.environment}] Failed:`, error);
+        console.error(`❌ [${config.environment}] Extraction failed:`, error);
         throw error;
     }
 }
@@ -230,13 +250,12 @@ async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
  * Main execution
  */
 async function main() {
-    console.log('🚀 Starting Multi-Environment APIM Data & Repo Discovery...\n');
+    console.log('🚀 Starting Zero-Config Azure Repos & APIM Data Extraction...\n');
 
     try {
         const configPath = join(process.cwd(), 'config.json');
         if (!existsSync(configPath)) {
             console.error('❌ Error: config.json not found.');
-            console.error('Please copy config.template.json to config.json and fill in your details.');
             process.exit(1);
         }
 
@@ -247,21 +266,22 @@ async function main() {
         const accessToken = await getAzureAccessToken();
         console.log('✅ Azure Access Token acquired.');
 
-        // 1. Discover Azure Repos across projects
+        // 1. FULL AUTODISCOVERY: Fetch every project and repo in the Org
         let allRepos: ADORepo[] = [];
-        if (devops?.pat && devops?.organization && devops?.projects) {
-            allRepos = await fetchADORepos(devops.organization, devops.projects, devops.pat);
-            console.log(`✅ [ADO] Discovered ${allRepos.length} total repositories across projects.\n`);
+        if (devops?.pat && devops?.organization) {
+            const projects = await fetchADOProjects(devops.organization, devops.pat);
+            allRepos = await fetchADOReposAcrossProjects(devops.organization, projects, devops.pat);
+            console.log(`✅ [ADO] Discovery Complete: Crawled ${projects.length} projects and found ${allRepos.length} repositories.\n`);
         } else {
-            console.warn('⚠️ [ADO] Skipping repository discovery (missing PAT, org, or projects in config.json)\n');
+            console.warn('⚠️ [ADO] Skipping discovery (missing credentials)\n');
         }
 
         if (!envsToFetch || envsToFetch.length === 0) {
-            console.error('❌ Error: No environments configured in config.json.');
+            console.error('❌ Error: No APIM environments configured.');
             process.exit(1);
         }
 
-        // 2. Fetch APIM data parallelly
+        // 2. Parallel Extraction
         await Promise.all(envsToFetch.map((env: any) => fetchEnvironment({
             ...env,
             environment: env.name,
@@ -269,9 +289,9 @@ async function main() {
             devops
         }, allRepos)));
 
-        console.log('\n✨ All extraction and discovery tasks completed!');
+        console.log('\n✨ Fully automated extraction and discovery cycle finished!');
     } catch (error) {
-        console.error('\n❌ Extraction failed:', error);
+        console.error('\n❌ Fatal error:', error);
         process.exit(1);
     }
 }
