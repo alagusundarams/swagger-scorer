@@ -192,21 +192,28 @@ async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
         const apisData = await fetchAPIM<API>(config, '/apis');
         const subscriptionsData = await fetchAPIM<Subscription>(config, '/subscriptions');
 
+
         console.log(`✅ [${config.environment}] APIM Snapshot Complete: ${productsData.value.length} Products.`);
 
-        // Enrichment logic: Intelligent Global Match + GRP Identification
+        // Import Git repo helpers
+        const { extractProductGitInfo } = await import('./git-repo-helper.js');
+        const { findProductInTfvars, findAPIInTfvars, getAPIContractPath, getAPIPolicyPath } = await import('./tfvars-parser.js');
+
+        // Enrichment: Reconcile APIM actual state with Git/tfvars declared state
         for (let i = 0; i < productsData.value.length; i++) {
             const product = productsData.value[i];
             const prodName = product.name.toLowerCase();
             const displayName = product.properties.displayName.toLowerCase();
 
-            // Identifying Consumer GRP Products (Isolation for mapping, but still discovering links)
-            const isGrp = prodName.includes('grp') || displayName.includes('grp');
-            if (isGrp) {
+            console.log(`\n📦 Processing product: ${product.properties.displayName}`);
+
+            // Identify GRP products
+            const isGrpByName = prodName.includes('grp') || displayName.includes('grp');
+            if (isGrpByName) {
                 (product as any).type = 'grp';
             }
 
-            // Normal Product Matching (All products, including GRP, have repos according to latest guidance)
+            // Step 1: Find Git repo by name matching (initial heuristic)
             const stripGRP = (s: string) => s.replace(/^grp_/i, '').replace(/_grp$/i, '').replace(/-grp$/i, '');
             const prodBase = stripGRP(prodName);
             const displayBase = stripGRP(displayName.replace(/\s+/g, '-'));
@@ -220,82 +227,100 @@ async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
                     repoBase === displayBase;
             });
 
-            if (matchedRepo) {
-                // Fetch real latest commit from ADO API
-                let lastCommit = 'unknown';
-                let lastCommitDate = new Date().toISOString();
-
-                try {
-                    const commitsUrl = `https://dev.azure.com/${config.devops!.organization}/${matchedRepo.project.name}/_apis/git/repositories/${matchedRepo.id}/commits?api-version=7.1-preview.1&$top=1`;
-                    const authHeader = `Basic ${Buffer.from(`:${config.devops!.pat}`).toString('base64')}`;
-                    const commitsResponse = await fetch(commitsUrl, { headers: { 'Authorization': authHeader } });
-
-                    if (commitsResponse.ok) {
-                        const commitsData = await commitsResponse.json() as { value: Array<{ commitId: string; author: { date: string } }> };
-                        if (commitsData.value.length > 0) {
-                            lastCommit = commitsData.value[0].commitId.substring(0, 7);
-                            lastCommitDate = commitsData.value[0].author.date;
-                        }
-                    }
-                } catch (err) {
-                    console.warn(`⚠️ [Git] Failed to fetch commit for ${matchedRepo.name}`);
-                }
-
-                product.gitInfo = {
-                    repoUrl: matchedRepo.webUrl,
-                    lastCommit,
-                    lastCommitDate
-                };
+            if (!matchedRepo) {
+                console.log(`  ⚠️  No Git repo matched for ${product.properties.displayName}`);
+                continue;
             }
 
+            console.log(`  ✅ Matched repo: ${matchedRepo.name}`);
+
+            // Step 2: Clone repo and parse tfvars
+            const repoData = await extractProductGitInfo(product.name, matchedRepo.webUrl);
+
+            if (!repoData) {
+                console.log(`  ⚠️  Failed to extract tfvars data from repo`);
+                continue;
+            }
+
+            const { gitInfo, tfvarsData } = repoData;
+
+            // Step 3: Reconcile - Find this product in tfvars by name
+            const tfvarsProduct = findProductInTfvars(product.name, tfvarsData);
+
+            if (!tfvarsProduct) {
+                console.log(`  ⚠️  Product "${product.name}" not found in tfvars (manual deployment?)`);
+                // Still store Git info, but no precise paths
+                product.gitInfo = gitInfo;
+                continue;
+            }
+
+            console.log(`  ✅ Reconciled with tfvars product: ${tfvarsProduct.name}`);
+
+            // Store enhanced Git info with tfvars metadata
+            product.gitInfo = {
+                ...gitInfo,
+                productPolicyPath: tfvarsProduct.product_policy_path,
+                productPolicyFile: tfvarsProduct.product_policy,
+                managedByTfvars: true
+            };
+
+            // Step 4: Reconcile APIs for this product
+            if (tfvarsProduct.api_name && tfvarsProduct.api_name.length > 0) {
+                console.log(`  📋 Product has ${tfvarsProduct.api_name.length} APIs in tfvars`);
+
+                // Store API mappings for later use when processing APIs
+                (product as any).tfvarsAPIs = tfvarsProduct.api_name;
+                (product as any).tfvarsData = tfvarsData;
+            }
+
+            // Mock pipeline info (can be enhanced later with real ADO pipeline data)
             product.pipelineInfo = {
                 name: `${product.properties.displayName} Deploy`,
                 lastRunStatus: i % 2 === 0 ? 'succeeded' : 'failed',
                 lastRunDate: new Date().toISOString(),
-                url: matchedRepo ? matchedRepo.webUrl.replace('_git', '_build') : '#'
+                url: matchedRepo.webUrl.replace('_git', '_build')
             };
         }
 
-        // Enrich APIs with Git info (similar logic to products)
+        // Enrich APIs: Reconcile with tfvars
+        console.log(`\n🔗 Reconciling ${apisData.value.length} APIs with tfvars...`);
+
         for (const api of apisData.value) {
             const apiName = (api.name || '').toLowerCase();
-            const displayName = (api.properties?.displayName || '').toLowerCase();
 
-            // Match API to Git repo
-            const matchedRepo = adoRepos.find(r => {
-                const repoName = r.name.toLowerCase();
-                return repoName === apiName ||
-                    repoName.includes(apiName) ||
-                    apiName.includes(repoName) ||
-                    repoName === displayName.replace(/\s+/g, '-');
-            });
+            // Find which product(s) this API belongs to in APIM
+            // We'll use the first product that has this API in its tfvars
+            let matchedProduct: Product | undefined;
+            let tfvarsAPI: any = null;
 
-            if (matchedRepo) {
-                // Fetch latest commit
-                let lastCommit = 'unknown';
-                let lastCommitDate = new Date().toISOString();
+            for (const product of productsData.value) {
+                const tfvarsAPIs = (product as any).tfvarsAPIs;
+                const tfvarsData = (product as any).tfvarsData;
 
-                try {
-                    const commitsUrl = `https://dev.azure.com/${config.devops!.organization}/${matchedRepo.project.name}/_apis/git/repositories/${matchedRepo.id}/commits?api-version=7.1-preview.1&$top=1`;
-                    const authHeader = `Basic ${Buffer.from(`:${config.devops!.pat}`).toString('base64')}`;
-                    const commitsResponse = await fetch(commitsUrl, { headers: { 'Authorization': authHeader } });
-
-                    if (commitsResponse.ok) {
-                        const commitsData = await commitsResponse.json() as { value: Array<{ commitId: string; author: { date: string } }> };
-                        if (commitsData.value.length > 0) {
-                            lastCommit = commitsData.value[0].commitId.substring(0, 7);
-                            lastCommitDate = commitsData.value[0].author.date;
-                        }
-                    }
-                } catch (err) {
-                    console.warn(`⚠️ [Git] Failed to fetch commit for API ${api.name}`);
+                if (tfvarsAPIs && tfvarsAPIs.includes(api.name)) {
+                    matchedProduct = product;
+                    tfvarsAPI = findAPIInTfvars(api.name, tfvarsData);
+                    break;
                 }
+            }
+
+            if (matchedProduct && tfvarsAPI) {
+                console.log(`  ✅ API "${api.name}" reconciled with product "${matchedProduct.properties.displayName}"`);
+
+                // Store Git info with precise paths from tfvars
+                const contractPath = getAPIContractPath(tfvarsAPI);
+                const policyPath = getAPIPolicyPath(tfvarsAPI);
 
                 (api as any).gitInfo = {
-                    repoUrl: matchedRepo.webUrl,
-                    lastCommit,
-                    lastCommitDate
+                    repoUrl: matchedProduct.gitInfo?.repoUrl,
+                    lastCommit: matchedProduct.gitInfo?.lastCommit,
+                    lastCommitDate: matchedProduct.gitInfo?.lastCommitDate,
+                    contractPath: contractPath,  // Full path from tfvars
+                    policyPath: policyPath,
+                    managedByTfvars: true
                 };
+            } else {
+                console.log(`  ⚠️  API "${api.name}" not found in any tfvars (manual deployment?)`);
             }
         }
 
