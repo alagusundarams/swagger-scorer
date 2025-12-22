@@ -168,6 +168,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     id TEXT PRIMARY KEY,
     product_id TEXT REFERENCES products(id) ON DELETE CASCADE NOT NULL,
     subscriber_team_id TEXT REFERENCES teams(id) NOT NULL,
+    app_registration_id TEXT, -- References app_registrations(id), added for day 2
     state TEXT NOT NULL CHECK (state IN ('active', 'suspended', 'submitted', 'pending', 'rejected', 'cancelled', 'expired')),
     
     -- Keys
@@ -179,6 +180,8 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     expiration_date TIMESTAMP WITH TIME ZONE,
+    keys_generated_at TIMESTAMP WITH TIME ZONE,
+    last_synced_at TIMESTAMP WITH TIME ZONE,
     
     -- APIM source data
     apim_raw_data JSONB
@@ -187,6 +190,38 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 CREATE INDEX idx_subscriptions_product ON subscriptions(product_id);
 CREATE INDEX idx_subscriptions_team ON subscriptions(subscriber_team_id);
 CREATE INDEX idx_subscriptions_state ON subscriptions(state);
+CREATE INDEX idx_subscriptions_app_reg ON subscriptions(app_registration_id);
+
+-- =============================================================================
+-- APP REGISTRATIONS (Day 2 Feature)
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS app_registrations (
+    id TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    client_id TEXT UNIQUE NOT NULL,
+    environment TEXT NOT NULL CHECK (environment IN ('DEV', 'QA', 'STAGE', 'PROD')),
+    product_id TEXT REFERENCES products(id) ON DELETE CASCADE,
+    
+    -- App details
+    app_id_uri TEXT,
+    secret_expiry_date TIMESTAMP WITH TIME ZONE,
+    
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- Azure AD source data
+    azure_ad_raw_data JSONB
+);
+
+CREATE INDEX idx_app_registrations_product ON app_registrations(product_id);
+CREATE INDEX idx_app_registrations_environment ON app_registrations(environment);
+CREATE INDEX idx_app_registrations_client_id ON app_registrations(client_id);
+
+-- Now add the foreign key constraint for subscriptions -> app_registrations
+ALTER TABLE subscriptions 
+ADD CONSTRAINT fk_subscriptions_app_registration 
+FOREIGN KEY (app_registration_id) REFERENCES app_registrations(id) ON DELETE SET NULL;
 
 -- =============================================================================
 -- APPROVAL REQUESTS
