@@ -37,21 +37,54 @@ export async function getAllProducts() {
         ) o ON true
     `);
 
-    // 3. Assemble
+    // 3. Assemble with complete field mapping
     const products = productRes.rows.map(p => ({
-        ...p,
+        // Core fields
+        id: p.id,
+        name: p.name,
         displayName: p.display_name,
+        version: p.version,
+        description: p.description,
+        state: p.state,
+        type: p.type,
+        environment: p.environment,
+
+        // Team ownership
         ownerTeamId: p.owner_team_id,
         ownerTeamName: p.owner_team_name,
+
+        // Metrics
         subscriberCount: p.calculated_subscriber_count,
         qualityScore: p.quality_score,
-        managementMode: p.management_mode,
-        terraformPipelineUrl: p.terraform_pipeline_url,
+
+        // Management
+        management_mode: p.management_mode,
+        terraform_pipeline_url: p.terraform_pipeline_url,
+        git_repo_url: p.git_repo_url,
+        lastDeployedCommitHash: p.last_deployed_commit_hash,
+
+        // Identity (App Registration)
+        identity: p.identity_client_id ? {
+            clientId: p.identity_client_id,
+            displayName: p.identity_display_name,
+            appIdUri: p.identity_app_id_uri
+        } : undefined,
+
+        // Timestamps
+        createdAt: p.created_at,
+        updatedAt: p.updated_at,
+
+        // APIs
         apis: apiRes.rows
             .filter(a => a.product_id === p.id)
             .map(a => ({
-                ...a,
+                id: a.id,
+                name: a.name,
                 displayName: a.display_name,
+                description: a.description,
+                path: a.path,
+                qualityScore: a.quality_score,
+                originTeamId: a.origin_team_id,
                 operations: a.operations_json || []
             }))
     }));
