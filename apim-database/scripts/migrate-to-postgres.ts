@@ -252,7 +252,8 @@ async function migrateAPIs(pool: Pool, apis: any[], products: any[], importEnv: 
             }
 
             if (!productId && products.length > 0) {
-                productId = `${targetEnv}-${products[0].id || products[0].name}`;
+                const fallbackName = products[0].name || 'unnamed';
+                productId = `${targetEnv}-${fallbackName}`.toLowerCase();
             }
 
             if (!productId) {
