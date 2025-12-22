@@ -182,9 +182,10 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
                     updatedAt
                 ]);
 
+                console.log(`  ✅ Successfully inserted/updated ${productId}`);
                 inserted++;
-            } catch (error: any) {
-                console.error(`  ❌ Failed to migrate product ${product.name || 'Unknown'}:`, error.message);
+            } catch (dbErr) {
+                console.error(`  ❌ Database error for product ${name}:`);
                 skipped++;
             }
         }
