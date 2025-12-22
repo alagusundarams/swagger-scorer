@@ -39,7 +39,11 @@ function createDbPool(): pg.Pool {
 
     // Fallback to config.json
     if (!connectionString) {
-        const configPath = join(process.cwd(), 'apim-database', 'config.json');
+        let configPath = join(process.cwd(), 'config.json');
+        if (!existsSync(configPath)) {
+            configPath = join(process.cwd(), 'apim-database', 'config.json');
+        }
+
         if (existsSync(configPath)) {
             const config = JSON.parse(readFileSync(configPath, 'utf8'));
             connectionString = config.database?.url;
@@ -274,7 +278,10 @@ async function main() {
     const args = process.argv.slice(2);
     let filesToProcess: string[] = [];
 
-    const dataDir = join(process.cwd(), 'apim-database', 'data');
+    let dataDir = join(process.cwd(), 'data');
+    if (!existsSync(dataDir)) {
+        dataDir = join(process.cwd(), 'apim-database', 'data');
+    }
 
     if (args.length > 0) {
         const target = args[0];

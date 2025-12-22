@@ -10,8 +10,14 @@ import pg from 'pg';
 const { Client } = pg;
 
 async function main() {
-    const configPath = join(process.cwd(), 'apim-database', 'config.json');
-    const schemaPath = join(process.cwd(), 'apim-database', 'schema', 'schema.sql');
+    // Robust Path Resolution: Check local dir first, then project root construction
+    let configPath = join(process.cwd(), 'config.json');
+    let schemaPath = join(process.cwd(), 'schema', 'schema.sql');
+
+    if (!existsSync(configPath)) {
+        configPath = join(process.cwd(), 'apim-database', 'config.json');
+        schemaPath = join(process.cwd(), 'apim-database', 'schema', 'schema.sql');
+    }
 
     if (!existsSync(configPath)) {
         console.error('❌ Error: config.json not found in apim-database directory.');
