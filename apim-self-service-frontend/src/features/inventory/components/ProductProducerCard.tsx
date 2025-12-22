@@ -127,8 +127,8 @@ export const ProductProducerCard: React.FC<ProductProducerCardProps> = ({
                     </div>
 
                     <div className="flex items-center gap-3">
-                        {/* Git Repo Link - Only for Producers */}
-                        {product.type !== 'grp' && product.git_repo_url && (
+                        {/* Git Repo Link */}
+                        {product.git_repo_url && (
                             <a
                                 href={product.git_repo_url}
                                 target="_blank"
@@ -144,8 +144,8 @@ export const ProductProducerCard: React.FC<ProductProducerCardProps> = ({
                             </a>
                         )}
 
-                        {/* Pipeline Link - Only for Producers */}
-                        {product.type !== 'grp' && product.terraform_pipeline_url && (
+                        {/* Pipeline Link */}
+                        {product.terraform_pipeline_url && (
                             <a
                                 href={product.terraform_pipeline_url}
                                 target="_blank"

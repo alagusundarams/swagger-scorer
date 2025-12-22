@@ -193,23 +193,18 @@ async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
 
         console.log(`✅ [${config.environment}] APIM Snapshot Complete: ${productsData.value.length} Products.`);
 
-        // Enrichment logic: Intelligent Global Match + GRP Isolation
+        // Enrichment logic: Intelligent Global Match + GRP Identification
         productsData.value.forEach((product, i) => {
             const prodName = product.name.toLowerCase();
             const displayName = product.properties.displayName.toLowerCase();
 
-            // Identifying "false +ve" Consumer GRP Products (Isolation Logic)
+            // Identifying Consumer GRP Products (Isolation for mapping, but still discovering links)
             const isGrp = prodName.includes('grp') || displayName.includes('grp');
-
             if (isGrp) {
                 (product as any).type = 'grp';
-                console.log(`🛡️ [GRP] Isolated Consumer Bundle: ${product.name}`);
-                // [POLICY] GRP products aggregate APIs from other producers. 
-                // They do NOT have their own Terraform/Policy source repo.
-                return;
             }
 
-            // Normal Producer Matching
+            // Normal Product Matching (All products, including GRP, have repos according to latest guidance)
             const stripGRP = (s: string) => s.replace(/^grp_/i, '').replace(/_grp$/i, '').replace(/-grp$/i, '');
             const prodBase = stripGRP(prodName);
             const displayBase = stripGRP(displayName.replace(/\s+/g, '-'));
