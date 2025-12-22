@@ -155,6 +155,10 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
     }
 
     console.log(`✅ Finished product migration: ${inserted} inserted, ${skipped} skipped.`);
+
+    // Return all valid product IDs for this environment to help lookup
+    const res = await pool.query('SELECT id, name FROM products WHERE environment = $1', [targetEnv]);
+    return new Map<string, string>(res.rows.map(r => [r.name.toLowerCase(), r.id]));
 }
 
 /**
@@ -233,7 +237,7 @@ async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEn
 /**
  * Transform and insert subscriptions
  */
-async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importEnv: string) {
+async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importEnv: string, productRegistry?: Map<string, string>) {
     const targetEnv = mapEnv(importEnv);
     console.log(`\n🔑 Migrating ${subscriptions.length} subscriptions to ${targetEnv}...`);
     let inserted = 0;
@@ -243,28 +247,33 @@ async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importE
         try {
             const props = sub.properties || {};
             const scope = props.scope || '';
-
-            // Handle different scope patterns
-            // Format: /subscriptions/.../resourceGroups/.../providers/Microsoft.ApiManagement/service/.../products/productName
             const scopeMatch = scope.match(/\/products\/([^\/\s]+)/);
             const apimProductId = scopeMatch ? scopeMatch[1] : null;
 
             if (!apimProductId) {
-                // If it's a service-level or api-level sub, we log but skip for now
-                // (Our data model primarily targets Product-level subs)
-                // console.warn(`  ⚠️  Skipping non-product subscription ${sub.name} (Scope: ${scope})`);
                 skipped++;
                 continue;
             }
 
-            const productId = `${targetEnv}-${apimProductId}`.toLowerCase();
+            // Robust Lookup: Use registry first, fallback to construction
+            let productId = productRegistry?.get(apimProductId.toLowerCase());
 
-            // ⚠️ Verification: Check if product actually exists
+            if (!productId) {
+                productId = `${targetEnv}-${apimProductId}`.toLowerCase();
+            }
+
+            // ⚠️ Final Verification: Check if product actually exists
             const prodCheck = await pool.query('SELECT id FROM products WHERE id = $1', [productId]);
             if (prodCheck.rowCount === 0) {
-                console.warn(`  ⚠️  Skipping subscription ${sub.name}: Product ${productId} not found in database.`);
-                skipped++;
-                continue;
+                // One last try: Check if we have it by name (Case-insensitive)
+                const fuzzyCheck = await pool.query('SELECT id FROM products WHERE name ILIKE $1 AND environment = $2', [apimProductId, targetEnv]);
+                if (fuzzyCheck.rowCount && fuzzyCheck.rowCount > 0) {
+                    productId = fuzzyCheck.rows[0].id;
+                } else {
+                    console.warn(`  ⚠️  Skipping subscription ${sub.name}: Product ID '${productId}' or Name '${apimProductId}' not found in database.`);
+                    skipped++;
+                    continue;
+                }
             }
 
             await pool.query(`
@@ -289,7 +298,7 @@ async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importE
 
             inserted++;
         } catch (error: any) {
-            console.error(`  ❌ Failed to migrate subscription ${sub.name}:`, error.message);
+            console.error(`  ❌ FK Constraint Failure on sub ${sub.name}: ${error.message}`);
             skipped++;
         }
     }
@@ -359,9 +368,9 @@ async function main() {
             console.log(`\n--- Processing: ${dataPath} ---`);
             const data = JSON.parse(readFileSync(dataPath, 'utf8')) as APIMData;
 
-            await migrateProducts(pool, data.products, data.environment);
+            const registry = await migrateProducts(pool, data.products, data.environment);
             await migrateAPIs(pool, data.apis, data.products, data.environment);
-            await migrateSubscriptions(pool, data.subscriptions, data.environment);
+            await migrateSubscriptions(pool, data.subscriptions, data.environment, registry);
         }
 
         await updateProductStats(pool);
