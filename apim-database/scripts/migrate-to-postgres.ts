@@ -278,11 +278,11 @@ async function main() {
 
     if (args.length > 0) {
         const target = args[0];
-        if (statSync(target).isDirectory()) {
+        if (existsSync(target) && statSync(target).isDirectory()) {
             filesToProcess = readdirSync(target)
                 .filter(f => f.startsWith('apim-data-') && f.endsWith('.json'))
                 .map(f => join(target, f));
-        } else {
+        } else if (existsSync(target)) {
             filesToProcess = [target];
         }
     } else if (existsSync(dataDir)) {
