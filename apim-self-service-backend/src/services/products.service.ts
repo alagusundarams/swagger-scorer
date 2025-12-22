@@ -9,11 +9,29 @@ import { query } from './db.js';
 /**
  * Fetch all products with their associated APIs and calculated subscriber counts
  * @param environment Optional environment filter (DEV, QA, STAGE, PROD)
+ * @param userRole Optional user role (admin sees all, others see team-filtered)
+ * @param teamId Optional team ID filter (ignored if userRole is 'admin')
  */
-export async function getAllProducts(environment?: string) {
-    // Build WHERE clause for environment filter
-    const whereClause = environment ? `WHERE p.environment = $1` : '';
-    const queryParams = environment ? [environment] : [];
+export async function getAllProducts(environment?: string, userRole?: string, teamId?: string) {
+    // Build WHERE clauses
+    const whereConditions: string[] = [];
+    const queryParams: any[] = [];
+    let paramIndex = 1;
+
+    if (environment) {
+        whereConditions.push(`p.environment = $${paramIndex++}`);
+        queryParams.push(environment);
+    }
+
+    // Only filter by team if user is NOT admin
+    if (teamId && userRole !== 'admin') {
+        whereConditions.push(`p.owner_team_id = $${paramIndex++}`);
+        queryParams.push(teamId);
+    }
+
+    const whereClause = whereConditions.length > 0
+        ? `WHERE ${whereConditions.join(' AND ')}`
+        : '';
 
     // 1. Fetch products with calculated subscriber count
     const productRes = await query(`

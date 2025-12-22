@@ -8,8 +8,23 @@ import { query } from './db.js';
 
 /**
  * Fetch all subscriptions with app registration data
+ * @param userRole Optional user role (admin sees all)
+ * @param teamId Optional team ID filter (ignored if userRole is 'admin')
  */
-export async function getAllSubscriptions() {
+export async function getAllSubscriptions(userRole?: string, teamId?: string) {
+    // Build WHERE clause - admin sees all, regular users see only their team's subscriptions
+    const whereConditions: string[] = [];
+    const queryParams: any[] = [];
+
+    if (teamId && userRole !== 'admin') {
+        whereConditions.push('s.subscriber_team_id = $1');
+        queryParams.push(teamId);
+    }
+
+    const whereClause = whereConditions.length > 0
+        ? `WHERE ${whereConditions.join(' AND ')}`
+        : '';
+
     const res = await query(`
         SELECT s.*, 
                p.display_name as product_name, 
@@ -23,8 +38,9 @@ export async function getAllSubscriptions() {
         JOIN products p ON s.product_id = p.id
         JOIN teams t ON s.subscriber_team_id = t.id
         LEFT JOIN app_registrations ar ON s.app_registration_id = ar.id
+        ${whereClause}
         ORDER BY s.created_at DESC
-    `);
+    `, queryParams);
 
     return res.rows.map(s => ({
         ...s,
