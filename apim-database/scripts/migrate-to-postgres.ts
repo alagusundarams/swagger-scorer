@@ -150,7 +150,9 @@ async function migrateProducts(pool: Pool, products: any[], importEnv: string) {
 
             // Extract version from product name (Azure APIM products don't have native version field)
             const version = extractVersion(name);
-            console.log(`  📝 Product "${name}" → version ${version}`); \n\n            // Quality scores will be calculated by background job
+            console.log(`  📝 Product "${name}" → version ${version}`);
+
+            // Quality scores will be calculated by background job
             const qualityScore = null;
 
             console.log(`  💾 Inserting product: ${productId}`);
