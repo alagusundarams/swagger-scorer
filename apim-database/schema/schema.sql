@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS products (
     version TEXT NOT NULL,
     description TEXT,
     state TEXT NOT NULL CHECK (state IN ('published', 'notPublished')),
+    type TEXT CHECK (type IN ('standard', 'grp')) DEFAULT 'standard',
     
     -- Owner team (NULLABLE - no teams initially)
     owner_team_id TEXT REFERENCES teams(id),  -- Removed NOT NULL
@@ -123,6 +124,7 @@ CREATE INDEX idx_products_git_repo ON products(git_repo_url);
 CREATE TABLE IF NOT EXISTS apis (
     id TEXT PRIMARY KEY,
     product_id TEXT REFERENCES products(id) ON DELETE CASCADE NOT NULL,
+    origin_team_id TEXT REFERENCES teams(id),
     name TEXT NOT NULL,
     display_name TEXT NOT NULL,
     description TEXT,

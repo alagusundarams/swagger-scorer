@@ -545,6 +545,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                             }}
                             apiName={selectedApi.displayName}
                             productName={product.displayName}
+                            isReadOnly={product.type === 'grp'}
                             // [DEMO MAGICAL MOMENT]: We inject a known Legacy API Policy XML to show off the Parser.
                             // In a real app, this comes from selectedApi.apim_raw_data.policyXml
                             initialXml={`

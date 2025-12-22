@@ -26,9 +26,10 @@ interface Props {
     initialXml?: string;
     resourceName?: string;
     resourceId?: string;
+    isReadOnly?: boolean;
 }
 
-export const PolicyStudioContainer = ({ initialXml, resourceName = 'Unknown Policy', resourceId = 'legacy-policy' }: Props) => {
+export const PolicyStudioContainer = ({ initialXml, resourceName = 'Unknown Policy', resourceId = 'legacy-policy', isReadOnly = false }: Props) => {
     const [selectedScope, setSelectedScope] = useState<PolicyScope>('api');
     const { addNotification } = useStore();
 
@@ -160,12 +161,18 @@ export const PolicyStudioContainer = ({ initialXml, resourceName = 'Unknown Poli
                         </div>
                     </div>
                     <div className="flex gap-2">
-                        <button
-                            onClick={() => setIsDeployModalOpen(true)}
-                            className="px-6 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition transform hover:scale-105 active:scale-95 flex items-center gap-2"
-                        >
-                            <span>🚀</span> Save & Deploy
-                        </button>
+                        {!isReadOnly ? (
+                            <button
+                                onClick={() => setIsDeployModalOpen(true)}
+                                className="px-6 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition transform hover:scale-105 active:scale-95 flex items-center gap-2"
+                            >
+                                <span>🚀</span> Save & Deploy
+                            </button>
+                        ) : (
+                            <div className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-xl text-[10px] font-black uppercase border border-slate-200 dark:border-slate-700 flex items-center gap-2">
+                                <span>🔒</span> Read-Only View
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -183,7 +190,7 @@ export const PolicyStudioContainer = ({ initialXml, resourceName = 'Unknown Poli
                                         {flow.inbound.map((step: PolicyStep, idx: number) => (
                                             <div
                                                 key={step.id}
-                                                onClick={() => !step.isLocked && setSelectedStepId(step.id)}
+                                                onClick={() => !step.isLocked && !isReadOnly && setSelectedStepId(step.id)}
                                                 className={`relative p-5 rounded-3xl border-2 flex items-center justify-between group transition-all cursor-pointer ${step.isLocked
                                                     ? 'bg-slate-100 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-75 cursor-not-allowed'
                                                     : selectedStepId === step.id
@@ -219,8 +226,9 @@ export const PolicyStudioContainer = ({ initialXml, resourceName = 'Unknown Poli
                                 defaultLanguage="xml"
                                 theme="vs-dark"
                                 value={rawXml}
-                                onChange={(val) => setRawXml(val || '')}
+                                onChange={(val) => !isReadOnly && setRawXml(val || '')}
                                 options={{
+                                    readOnly: isReadOnly,
                                     minimap: { enabled: false },
                                     fontSize: 14,
                                     lineNumbers: 'on',

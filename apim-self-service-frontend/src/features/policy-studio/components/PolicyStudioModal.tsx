@@ -4,11 +4,12 @@ interface Props {
     isOpen: boolean;
     onClose: () => void;
     apiName: string;
-    productName: string; // ADDED
+    productName: string;
     initialXml?: string;
+    isReadOnly?: boolean; // ADDED
 }
 
-export const PolicyStudioModal = ({ isOpen, onClose, apiName, productName, initialXml }: Props) => {
+export const PolicyStudioModal = ({ isOpen, onClose, apiName, productName, initialXml, isReadOnly = false }: Props) => {
     if (!isOpen) return null;
 
     return (
@@ -52,7 +53,12 @@ export const PolicyStudioModal = ({ isOpen, onClose, apiName, productName, initi
 
             {/* Modal Content - The Studio */}
             <div className="flex-1 overflow-hidden">
-                <PolicyStudioContainer initialXml={initialXml} resourceName={apiName} resourceId={apiName} />
+                <PolicyStudioContainer
+                    initialXml={initialXml}
+                    resourceName={apiName}
+                    resourceId={apiName}
+                    isReadOnly={isReadOnly}
+                />
             </div>
         </div>
     );

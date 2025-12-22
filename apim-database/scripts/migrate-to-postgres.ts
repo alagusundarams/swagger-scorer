@@ -85,14 +85,15 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
 
             await pool.query(`
                 INSERT INTO products (
-                    id, name, display_name, version, description, state,
+                    id, name, display_name, version, description, state, type,
                     owner_team_id, environment, visibility, management_mode,
                     git_repo_url, git_file_path, terraform_pipeline_url, last_deployed_commit_hash,
                     subscriber_count, apim_raw_data, created_at, updated_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), NOW())
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW())
                 ON CONFLICT (id) DO UPDATE SET
                     display_name = EXCLUDED.display_name,
                     description = EXCLUDED.description,
+                    type = EXCLUDED.type,
                     subscriber_count = EXCLUDED.subscriber_count,
                     updated_at = NOW()
             `, [
@@ -102,15 +103,16 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
                 '1.0.0', // Default version
                 props.description || '',
                 props.state === 'published' ? 'published' : 'notPublished',
-                null, // owner_team_id = NULL (no teams yet)
+                product.type || 'standard',
+                null, // owner_team_id
                 importEnv,
-                'internal', // Default visibility
-                'TERRAFORM_MANAGED', // All existing products start as Terraform-managed
+                'internal',
+                'TERRAFORM_MANAGED',
                 product.gitInfo?.repoUrl || gitRepoUrl,
-                `contracts/${product.name}/openapi.yaml`, // Default path guess
+                `contracts/${product.name}/openapi.yaml`,
                 product.pipelineInfo?.url || null,
                 product.gitInfo?.lastCommit || null,
-                0, // Will update from subscriptions
+                0,
                 JSON.stringify(product)
             ]);
 
@@ -121,27 +123,25 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
         }
     }
 
-    console.log(`  ✅ Inserted/Updated: ${inserted}`);
-    console.log(`  ⚠️  Skipped: ${skipped}`);
+    console.log(`✅ Finished product migration: ${inserted} inserted, ${skipped} skipped.`);
 }
 
 /**
  * Transform and insert APIs
  */
 async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEnv: string) {
-    console.log(`\n📡 Migrating ${apis.length} APIs for ${importEnv}...`);
+    console.log(`\n🔌 Migrating ${apis.length} APIs to ${importEnv}...`);
     let inserted = 0;
     let skipped = 0;
 
-    // Create a map of product names to IDs
-    const productMap = new Map(products.map(p => [p.name, `${importEnv}-${p.id || p.name}`]));
+    const productMap = new Map<string, string>();
+    products.forEach(p => productMap.set(p.name, `${importEnv}-${p.id || p.name}`));
 
     for (const api of apis) {
         try {
             const props = api.properties;
 
             // Try to find parent product from API name/path
-            // APIM API names often include product name
             let productId = null;
             for (const [productName, prodId] of productMap.entries()) {
                 if (api.name.toLowerCase().includes(productName.toLowerCase()) ||
@@ -151,7 +151,6 @@ async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEn
                 }
             }
 
-            // If no product found, use first product as fallback (with prefix)
             if (!productId && products.length > 0) {
                 productId = `${importEnv}-${products[0].id || products[0].name}`;
             }
@@ -164,9 +163,9 @@ async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEn
 
             await pool.query(`
                 INSERT INTO apis (
-                    id, product_id, name, display_name, description, path,
+                    id, product_id, origin_team_id, name, display_name, description, path,
                     apim_raw_data, created_at, updated_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
                 ON CONFLICT (id) DO UPDATE SET
                     display_name = EXCLUDED.display_name,
                     description = EXCLUDED.description,
@@ -175,6 +174,7 @@ async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEn
             `, [
                 `${importEnv}-${api.id || api.name}`,
                 productId,
+                null, // origin_team_id populated later by admin mapping
                 api.name,
                 props.displayName || api.name,
                 props.description || '',
@@ -189,168 +189,98 @@ async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEn
         }
     }
 
-    console.log(`  ✅ Inserted/Updated: ${inserted}`);
-    console.log(`  ⚠️  Skipped: ${skipped}`);
+    console.log(`✅ Finished API migration: ${inserted} inserted, ${skipped} skipped.`);
 }
 
 /**
  * Transform and insert subscriptions
  */
-async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], products: any[], defaultTeamId: string, importEnv: string) {
-    console.log(`\n🔑 Migrating ${subscriptions.length} subscriptions for ${importEnv}...`);
+async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importEnv: string) {
+    console.log(`\n🔑 Migrating ${subscriptions.length} subscriptions to ${importEnv}...`);
     let inserted = 0;
     let skipped = 0;
 
-    // For API-scoped subscriptions, we need to know which product an API belongs to
-    const apiToProductRes = await pool.query('SELECT name, product_id FROM apis');
-    const apiToProductMap = new Map(apiToProductRes.rows.map(r => [r.name.toLowerCase(), r.product_id]));
-
-    const productMap = new Map(products.map(p => [p.name.toLowerCase(), `${importEnv}-${p.id || p.name}`]));
-
-    for (const subscription of subscriptions) {
+    for (const sub of subscriptions) {
         try {
-            const props = subscription.properties;
+            const props = sub.properties;
+            const scope = props.scope || '';
+            const scopeMatch = scope.match(/\/products\/([^\/\s]+)/);
+            const apimProductId = scopeMatch ? scopeMatch[1] : null;
 
-            // Extract product ID from scope
-            // Scope format: /products/{productName} or /apis/{apiId}
-            let productId = null;
-            if (props.scope) {
-                const scopeParts = props.scope.split('/');
-
-                // 1. Try Product Match
-                const productIdx = scopeParts.indexOf('products');
-                if (productIdx >= 0 && scopeParts[productIdx + 1]) {
-                    const productName = scopeParts[productIdx + 1].toLowerCase();
-                    productId = productMap.get(productName);
-                }
-
-                // 2. Try API Match (fallback)
-                if (!productId) {
-                    const apiIdx = scopeParts.indexOf('apis');
-                    if (apiIdx >= 0 && scopeParts[apiIdx + 1]) {
-                        const apiName = scopeParts[apiIdx + 1].toLowerCase();
-                        productId = apiToProductMap.get(apiName);
-                    }
-                }
-            }
-
-            if (!productId) {
-                if (props.scope === '/' || !props.scope) {
-                    console.warn(`  ℹ️  Service-level subscription skipped (No specific product): ${subscription.name}`);
-                } else {
-                    console.warn(`  ⚠️  Unmatched scope for subscription ${subscription.name}: ${props.scope}`);
-                }
+            if (!apimProductId) {
                 skipped++;
                 continue;
             }
 
+            const productId = `${importEnv}-${apimProductId}`;
+
             await pool.query(`
                 INSERT INTO subscriptions (
                     id, product_id, subscriber_team_id, state,
-                    primary_key_name, secondary_key_name,
-                    apim_raw_data, created_at, updated_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+                    primary_key_name, primary_key_value,
+                    secondary_key_name, secondary_key_value,
+                    created_at, updated_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
                 ON CONFLICT (id) DO UPDATE SET
                     state = EXCLUDED.state,
                     updated_at = NOW()
             `, [
-                subscription.id || subscription.name,
+                `${importEnv}-${sub.id || sub.name}`,
                 productId,
-                defaultTeamId, // Assign to default team for now
-                props.state || 'active',
-                'primary',
-                'secondary',
-                JSON.stringify(subscription),
+                'default-team',
+                props.state === 'active' ? 'active' : 'suspended',
+                'primary', 'redacted-sync',
+                'secondary', 'redacted-sync',
                 props.createdDate || new Date().toISOString()
             ]);
 
             inserted++;
         } catch (error) {
-            console.error(`  ❌ Failed to migrate subscription ${subscription.name}:`, error);
             skipped++;
         }
     }
 
-    console.log(`  ✅ Inserted/Updated: ${inserted}`);
-    console.log(`  ⚠️  Skipped: ${skipped}`);
+    console.log(`✅ Finished subscription migration: ${inserted} inserted, ${skipped} skipped.`);
 }
 
 /**
- * Update product subscriber counts
+ * Update product statistics
  */
 async function updateProductStats(pool: pg.Pool) {
     console.log('\n📊 Updating product statistics...');
-
     await pool.query(`
         UPDATE products p
         SET subscriber_count = (
-            SELECT COUNT(*) 
-            FROM subscriptions s 
-            WHERE s.product_id = p.id AND s.state = 'active'
+            SELECT COUNT(*) FROM subscriptions s WHERE s.product_id = p.id
         )
     `);
-
-    console.log('  ✅ Product stats updated');
+    console.log('✅ Product statistics updated.');
 }
 
 /**
- * Main migration
+ * Main execution
  */
 async function main() {
     const args = process.argv.slice(2);
-
     if (args.length === 0) {
-        console.error('❌ Usage: npx tsx scripts/migrate-to-postgres.ts <path-to-apim-data.json>');
-        console.error('Example: npx tsx scripts/migrate-to-postgres.ts data/apim-data-2024-12-19.json');
+        console.error('❌ Error: Path to APIM JSON data file is required.');
         process.exit(1);
     }
 
-    const dataFilePath = args[0];
-
-    console.log('🔄 APIM to PostgreSQL Migration');
-    console.log('='.repeat(50));
-
-    // Load APIM data
-    console.log(`\n📂 Loading data from: ${dataFilePath}`);
-    const apimData: APIMData = JSON.parse(readFileSync(dataFilePath, 'utf-8'));
-
-    console.log(`  ✅ Loaded data from ${apimData.instance}`);
-    console.log(`  📊 Summary:`);
-    console.log(`     - Products: ${apimData.products.length}`);
-    console.log(`     - APIs: ${apimData.apis.length}`);
-    console.log(`     - Subscriptions: ${apimData.subscriptions.length}`);
-
-    // Connect to database
-    console.log('\n🔌 Connecting to PostgreSQL...');
+    const dataPath = args[0];
+    const data = JSON.parse(readFileSync(dataPath, 'utf8')) as APIMData;
     const pool = createDbPool();
 
     try {
-        await pool.query('SELECT NOW()');
-        console.log('  ✅ Connected successfully');
-
-        // Create default team
-        console.log('\n👥 Setting up default team...');
-        const defaultTeamId = await createDefaultTeam(pool);
-        console.log(`  ✅ Default team ready: ${defaultTeamId}`);
-
-        // Migrate data
-        const importEnv = apimData.environment || 'DEV';
-        await migrateProducts(pool, apimData.products, importEnv);
-        await migrateAPIs(pool, apimData.apis, apimData.products, importEnv);
-        await migrateSubscriptions(pool, apimData.subscriptions, apimData.products, defaultTeamId, importEnv);
-
-        // Update stats
+        await createDefaultTeam(pool);
+        await migrateProducts(pool, data.products, data.environment);
+        await migrateAPIs(pool, data.apis, data.products, data.environment);
+        await migrateSubscriptions(pool, data.subscriptions, data.environment);
         await updateProductStats(pool);
 
-        console.log('\n✅ Migration complete!');
-        console.log('\nNext steps:');
-        console.log('1. Review migrated data: SELECT * FROM products_with_teams;');
-        console.log('2. Assign products to actual teams');
-        console.log('3. Update backend to read from PostgreSQL');
-
+        console.log(`\n✨ Migration of ${data.environment} snapshot complete!`);
     } catch (error) {
         console.error('\n❌ Migration failed:', error);
-        process.exit(1);
     } finally {
         await pool.end();
     }
