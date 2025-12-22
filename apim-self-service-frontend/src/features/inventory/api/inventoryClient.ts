@@ -5,8 +5,34 @@ import { type ApprovalRequest, type ApprovalStatus, type AuditLog } from '../../
 
 // === MOCK DATA ===
 const MOCK_TEAMS: Team[] = [
-    { id: 'team-platform', name: 'Platform Engineering', azureAdGroupId: 'group-platform', type: 'producer', description: 'Core platform services and gateway management.', memberCount: 12 },
-    { id: 'team-payments', name: 'Payments Squad', azureAdGroupId: 'group-payments', type: 'both', description: 'Payment processing and financial ledger services.', memberCount: 8 },
+    {
+        id: 'team-platform',
+        name: 'Platform Engineering',
+        azureAdGroupId: 'group-platform',
+        type: 'producer',
+        description: 'Core platform services and gateway management.',
+        memberCount: 12,
+        adGroupMapping: {
+            DEV: 'group-platform-dev',
+            QA: 'group-platform-qa',
+            STAGE: 'group-platform-stage',
+            PROD: 'group-platform-prod'
+        }
+    },
+    {
+        id: 'team-payments',
+        name: 'Payments Squad',
+        azureAdGroupId: 'group-payments',
+        type: 'both',
+        description: 'Payment processing and financial ledger services.',
+        memberCount: 8,
+        additionalAdGroups: ['group-payments-legacy-v1', 'group-payments-modern'],
+        adGroupMapping: {
+            DEV: 'group-payments-dev',
+            QA: 'group-payments-qa',
+            PROD: 'group-payments-prod'
+        }
+    },
 ];
 
 const MOCK_PRODUCTS: Product[] = [
@@ -24,9 +50,33 @@ export const getProducts = async () => {
     return api.get<Product[]>('/products');
 };
 
+export const updateProduct = async (id: string, updates: Partial<Product>) => {
+    if (USE_MOCKS) {
+        const index = MOCK_PRODUCTS.findIndex(p => p.id === id);
+        if (index > -1) {
+            MOCK_PRODUCTS[index] = { ...MOCK_PRODUCTS[index], ...updates };
+            return Promise.resolve({ data: MOCK_PRODUCTS[index] });
+        }
+        return Promise.reject(new Error('Product not found'));
+    }
+    return api.patch<Product>(`/products/${id}`, updates);
+};
+
 export const getTeams = async () => {
     if (USE_MOCKS) return Promise.resolve({ data: MOCK_TEAMS });
     return api.get<Team[]>('/api-teams');
+};
+
+export const updateTeam = async (teamId: string, updates: Partial<Team>) => {
+    if (USE_MOCKS) {
+        const teamIndex = MOCK_TEAMS.findIndex(t => t.id === teamId);
+        if (teamIndex > -1) {
+            MOCK_TEAMS[teamIndex] = { ...MOCK_TEAMS[teamIndex], ...updates };
+            return Promise.resolve({ data: MOCK_TEAMS[teamIndex] });
+        }
+        return Promise.reject(new Error('Team not found'));
+    }
+    return api.patch<Team>(`/api-teams/${teamId}`, updates);
 };
 
 export const getSubscriptions = async (token: string) => {

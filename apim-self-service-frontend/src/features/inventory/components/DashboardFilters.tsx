@@ -10,6 +10,7 @@ interface DashboardFiltersProps {
     activeTeamId: string;
     onTeamChange: (teamId: string) => void;
     userTeams: Team[];
+    accessibleEnvironments: Environment[];
     isFiltersDisabled?: {
         environment?: boolean;
         team?: boolean;
@@ -24,6 +25,7 @@ export function DashboardFilters({
     activeTeamId,
     onTeamChange,
     userTeams,
+    accessibleEnvironments,
     isFiltersDisabled
 }: DashboardFiltersProps) {
     return (
@@ -47,10 +49,11 @@ export function DashboardFilters({
                     onChange={(e) => onEnvironmentChange(e.target.value as Environment)}
                     options={[
                         { value: 'ALL', label: 'All Environments' },
-                        { value: 'DEV', label: '⚪ Development' },
-                        { value: 'QA', label: '🔵 Quality Assurance' },
-                        { value: 'STAGE', label: '🟣 Staging' },
-                        { value: 'PROD', label: '🟢 Production' }
+
+                        ...(accessibleEnvironments.includes('DEV') ? [{ value: 'DEV', label: '⚪ Development' }] : []),
+                        ...(accessibleEnvironments.includes('QA') ? [{ value: 'QA', label: '🔵 Quality Assurance' }] : []),
+                        ...(accessibleEnvironments.includes('STAGE') ? [{ value: 'STAGE', label: '🟣 Staging' }] : []),
+                        ...(accessibleEnvironments.includes('PROD') ? [{ value: 'PROD', label: '🟢 Production' }] : [])
                     ]}
                     fullWidth
                 />

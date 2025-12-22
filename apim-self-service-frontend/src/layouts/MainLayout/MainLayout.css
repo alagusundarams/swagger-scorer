@@ -11,4 +11,10 @@
 .main-content {
     flex: 1;
     background-color: #f8fafc;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    /* Crucial for nested scroll */
+    position: relative;
+    /* Enables absolute children (Analyzer) */
 }

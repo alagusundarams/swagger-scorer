@@ -9,6 +9,7 @@ interface ContractEditorModalProps {
     isOpen: boolean;
     onClose: () => void;
     onCommit?: (message: string, description: string) => Promise<void>;
+    readOnly?: boolean;
 }
 
 /**
@@ -30,7 +31,8 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
     api,
     isOpen,
     onClose,
-    onCommit
+    onCommit,
+    readOnly = false
 }) => {
     const [content, setContent] = useState('');
     const [commitMessage, setCommitMessage] = useState('');
@@ -152,27 +154,48 @@ ${api.operations.map(op => `  ${op.urlTemplate}:
                     isModified={isModified}
                 />
 
-                <div className="flex-1 overflow-hidden p-6">
+                <div className="flex-1 min-h-0 bg-[#1e1e1e] relative">
                     <MonacoEditor
                         value={content}
                         language={language}
                         onChange={handleContentChange}
-                        readOnly={false}
+                        readOnly={readOnly}
                         height="100%"
                     />
                 </div>
 
-                <ContractCommitForm
-                    product={product}
-                    commitMessage={commitMessage}
-                    setCommitMessage={setCommitMessage}
-                    commitDescription={commitDescription}
-                    setCommitDescription={setCommitDescription}
-                    storageUsage={storageUsage}
-                    isSaving={isSaving}
-                    onCancel={handleClose}
-                    onCommit={handleCommit}
-                />
+                {!readOnly ? (
+                    <ContractCommitForm
+                        product={product}
+                        commitMessage={commitMessage}
+                        setCommitMessage={setCommitMessage}
+                        commitDescription={commitDescription}
+                        setCommitDescription={setCommitDescription}
+                        storageUsage={storageUsage}
+                        isSaving={isSaving}
+                        onCancel={handleClose}
+                        onCommit={handleCommit}
+                    />
+                ) : (
+                    <div className="p-6 border-t border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-800 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <span className="text-2xl">🔒</span>
+                            <div>
+                                <p className="text-sm font-bold text-gray-700 dark:text-gray-300">Read-Only Mode</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    This contract is managed by {product.management_mode === 'HYBRID' ? 'Terraform (Hybrid)' : 'Terraform'}.
+                                    Edits must be made via the IaC pipeline.
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={onClose}
+                            className="px-6 py-3 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl text-sm font-bold text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-slate-600 transition"
+                        >
+                            Close Viewer
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

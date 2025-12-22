@@ -1,7 +1,7 @@
 import { StateCreator } from 'zustand';
 import { type Product, type Subscription, type Team } from '../../types/entities';
 import { type ApprovalRequest, type AuditLog } from '../../types/workflow';
-import { getProducts, getTeams, getSubscriptions, requestProductAccess, updateSubscription as apiUpdateSubscription, getApprovals, updateApproval, getAuditLogs } from '../../features/inventory/api/inventoryClient';
+import { getProducts, getTeams, getSubscriptions, requestProductAccess, updateSubscription as apiUpdateSubscription, getApprovals, updateApproval, getAuditLogs, updateTeam as apiUpdateTeam, updateProduct as apiUpdateProduct } from '../../features/inventory/api/inventoryClient';
 import { AuthSlice } from './authSlice';
 
 export interface DataSlice {
@@ -16,7 +16,8 @@ export interface DataSlice {
     updateSubscription: (id: string, updates: Partial<Subscription>, getToken?: () => Promise<string | null>) => Promise<void>;
     addSubscription: (productId: string, teamId: string, getToken?: () => Promise<string | null>) => Promise<void>;
     processApproval: (id: string, decision: 'APPROVE' | 'REJECT', getToken?: () => Promise<string | null>) => Promise<void>;
-    updateProduct: (id: string, updates: Partial<Product>) => void;
+    updateProduct: (id: string, updates: Partial<Product>) => Promise<void>;
+    updateTeam: (id: string, updates: Partial<Team>) => Promise<void>;
 }
 
 export const createDataSlice: StateCreator<DataSlice & AuthSlice, [], [], DataSlice> = (set, get) => ({
@@ -169,7 +170,26 @@ export const createDataSlice: StateCreator<DataSlice & AuthSlice, [], [], DataSl
         }
     },
 
-    updateProduct: (id, updates) => set((state) => ({
-        products: state.products.map(p => p.id === id ? { ...p, ...updates } : p)
-    })),
+    updateProduct: async (id, updates) => {
+        set((state) => ({
+            products: state.products.map(p => p.id === id ? { ...p, ...updates } : p)
+        }));
+        try {
+            await apiUpdateProduct(id, updates);
+        } catch (error) {
+            console.error("Failed to update product", error);
+        }
+    },
+
+    updateTeam: async (id, updates) => {
+        set((state) => ({
+            teams: state.teams.map(t => t.id === id ? { ...t, ...updates } : t)
+        }));
+        try {
+            await apiUpdateTeam(id, updates);
+        } catch (error) {
+            console.error("Failed to update team", error);
+            // Revert on error? For now, we trust optimistic update or reload
+        }
+    }
 });

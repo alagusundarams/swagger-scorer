@@ -29,7 +29,8 @@ const MOCK_USERS = {
         leadsTeams: ['team-payments'],
         defaultTeamId: 'team-payments',
         role: 'user' as const,
-        username: "sarah@payments.dev"
+        username: "sarah@payments.dev",
+        adGroups: ['group-payments-dev', 'group-payments-prod', 'group-platform-dev']
     },
     consumer: {
         id: "user-core-dev",
@@ -40,7 +41,8 @@ const MOCK_USERS = {
         leadsTeams: [],
         defaultTeamId: 'team-core',
         role: 'user' as const,
-        username: "mike@core.sys"
+        username: "mike@core.sys",
+        adGroups: ['group-core-dev']
     },
     admin: {
         id: "admin-001",
@@ -51,7 +53,8 @@ const MOCK_USERS = {
         leadsTeams: ['team-platform'],
         defaultTeamId: 'team-platform',
         role: 'admin' as const,
-        username: "admin@apim.portal"
+        username: "admin@apim.portal",
+        adGroups: [] // Admin role overrides this anyway
     }
 };
 

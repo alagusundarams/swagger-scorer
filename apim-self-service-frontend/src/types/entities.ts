@@ -12,6 +12,13 @@ export interface Team {
     type: 'producer' | 'consumer' | 'both';
     description: string;
     memberCount: number;
+    additionalAdGroups?: string[]; // Secondary AD Groups (e.g. Legacy identities)
+    adGroupMapping?: {
+        DEV?: string; // AD Group ID for Dev access
+        QA?: string;
+        STAGE?: string;
+        PROD?: string;
+    };
 }
 
 export interface User {
@@ -24,6 +31,7 @@ export interface User {
     defaultTeamId: string;
     role: 'user' | 'admin';
     username?: string; // Compatibility for MSAL
+    adGroups?: string[]; // Groups the user belongs to (Mock for RBAC)
 }
 
 export interface Operation {
@@ -51,8 +59,9 @@ export interface Product {
     displayName: string;
     version: string;
     description: string;
-    state: 'published' | 'notPublished';
+    state: 'published' | 'notPublished' | 'draft';
     ownerTeamId: string;
+    ownerAdGroupId?: string; // Specific AD Group that owns this (if team has multiple)
     apis: API[];
     subscriberCount?: number;
     qualityScore?: number;
@@ -71,6 +80,14 @@ export interface Product {
     // Migration support: Track product management mode
     management_mode?: 'TERRAFORM_MANAGED' | 'HYBRID' | 'PORTAL_MANAGED';
     terraform_pipeline_url?: string; // Link to Azure DevOps pipeline for Terraform products
+    git_repo_url?: string; // Main Repo URL
+
+    // Git Sync
+    lastDeployedCommitHash?: string;
+    lastDeployedAt?: string;
+
+    // Governance
+    detectedAnomalies?: string[];
 }
 
 export type Environment = 'ALL' | 'DEV' | 'QA' | 'STAGE' | 'PROD';

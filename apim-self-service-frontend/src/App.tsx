@@ -15,6 +15,8 @@ const BrowsePage = lazy(() => import('./features/discovery/views/Browse.view').t
 const MarketplacePage = lazy(() => import('./features/discovery/views/Marketplace.view').then(module => ({ default: module.MarketplacePage })));
 const AnalyzerPage = lazy(() => import('./features/analyzer/views/Analyzer.view').then(module => ({ default: module.AnalyzerPage })));
 const HeaderFooterTest = lazy(() => import('./core/ui/HeaderFooterTest.view').then(module => ({ default: module.HeaderFooterTest })));
+const AdminGovernancePage = lazy(() => import('./features/admin/views/AdminGovernance.view').then(module => ({ default: module.AdminGovernancePage })));
+const PolicyStudioContainer = lazy(() => import('./features/policy-studio/PolicyStudio.container').then(module => ({ default: module.PolicyStudioContainer })));
 
 import { ProtectedRoute } from './core/routing/ProtectedRoute';
 
@@ -91,7 +93,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* Moved catch-all to end */}
           <Route
             path="/catalog"
             element={
@@ -100,9 +102,23 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/admin/governance"
+            element={
+              <ProtectedRoute>
+                <AdminGovernancePage />
+              </ProtectedRoute>
+            }
+          />
+
+
+          {/* New Policy Studio Demo */}
+          <Route path="/policy-studio-demo" element={<PolicyStudioContainer />} />
+
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
-    </Router>
+    </Router >
   );
 }
 

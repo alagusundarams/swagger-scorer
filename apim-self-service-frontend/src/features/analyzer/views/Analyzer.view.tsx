@@ -17,8 +17,8 @@ export function AnalyzerPage() {
 
     return (
         <MainLayout>
-            <main className="h-[calc(100vh-130px)] flex flex-col overflow-hidden relative">
-                <div className="flex h-full">
+            <div className="absolute inset-0 flex flex-col overflow-hidden bg-[#1e1e1e]">
+                <main className="flex-1 flex overflow-hidden relative">
                     {/* Left: Input (Standard/Monaco) */}
                     <div className={`h-full flex flex-col border-r-2 border-[#1e1e1e] transition-all duration-300 ${isMaximized ? 'w-full' : 'w-1/2'}`}>
                         <AnalyzerForm />
@@ -31,10 +31,10 @@ export function AnalyzerPage() {
                             <ViolationsTable />
                         </div>
                     )}
+                </main>
+                <div className="bg-slate-900 border-t border-slate-700 p-2 z-50 shrink-0">
+                    <p className="text-center text-[10px] text-slate-500 uppercase tracking-widest">Analyzer Mode</p>
                 </div>
-            </main>
-            <div className="bg-slate-900 border-t border-slate-700 p-2 z-50">
-                <p className="text-center text-[10px] text-slate-500 uppercase tracking-widest">Analyzer Mode</p>
             </div>
         </MainLayout>
     );

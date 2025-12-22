@@ -8,7 +8,7 @@ import { useStore } from '../../../store/useStore';
 import { DashboardPagination } from '../components/DashboardPagination';
 import { DashboardHero } from '../components/DashboardHero';
 import { DashboardFilters } from '../components/DashboardFilters';
-import { canAccessProduct } from '../../../utils/productRoleDetection';
+import { canAccessProduct, getAccessibleEnvironments } from '../../../utils/productRoleDetection';
 
 type ProductWithSubscription = Product & { subscription: Subscription };
 
@@ -103,6 +103,11 @@ export const DashboardPage = () => {
         return enhancedApprovals.filter(req => req.status === 'PENDING');
     }, [enhancedApprovals, user]);
 
+    const accessibleEnvironments = useMemo(() => {
+        const currentActiveTeam = allTeams.find(t => t.id === activeTeamId);
+        return getAccessibleEnvironments(user, currentActiveTeam || null);
+    }, [user, activeTeamId, allTeams]);
+
     const handleTabChange = (tab: 'produced' | 'consumed' | 'admin' | 'approvals') => {
         setIsLoading(true);
         setActiveTab(tab);
@@ -167,10 +172,10 @@ export const DashboardPage = () => {
         }
         if (activeTab === 'admin') {
             return [
-                { label: 'Global Inventory', value: USE_MOCKS ? adminMockData.length : allProducts.length, icon: '🌐' },
-                { label: 'Deployments (Demo)', value: '342', icon: '🚀' },
-                { label: 'Compliance (Demo)', value: '94%', icon: '⚖️' },
-                { label: 'Load (Demo)', value: '12%', icon: '📉' }
+                { label: 'Global Inventory', value: allProducts.length, icon: '🌐' },
+                { label: 'Avg Quality', value: `${Math.round(allProducts.reduce((acc, p) => acc + (p.qualityScore || 0), 0) / (allProducts.length || 1))}%`, icon: '⚖️' },
+                { label: 'Production APIs', value: allProducts.filter(p => p.environment === 'PROD').length, icon: '🚀' },
+                { label: 'Draft APIs', value: allProducts.filter(p => p.state === 'draft').length, icon: '📝' }
             ];
         }
         if (activeTab === 'approvals') {
@@ -229,6 +234,7 @@ export const DashboardPage = () => {
                     activeTeamId={activeTeamId}
                     onTeamChange={(t) => { setActiveTeamId(t); setCurrentPage(1); }}
                     userTeams={userTeams}
+                    accessibleEnvironments={accessibleEnvironments}
                     isFiltersDisabled={{
                         environment: activeTab === 'admin' || activeTab === 'approvals',
                         team: activeTab === 'admin'

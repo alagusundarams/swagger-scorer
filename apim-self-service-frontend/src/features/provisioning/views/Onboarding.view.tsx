@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
 import { useStore } from '../../../store/useStore';
 import { OnboardingProgressBar } from '../components/OnboardingProgressBar';
-import { OnboardingStepIdentity } from '../components/OnboardingStepIdentity';
-import { OnboardingStepVisibility } from '../components/OnboardingStepVisibility';
-import { OnboardingStepReview } from '../components/OnboardingStepReview';
+import { OnboardingPhase1Definition } from '../components/OnboardingPhase1Definition';
+import { PolicyStudioContainer } from '../../policy-studio/PolicyStudio.container';
+import { OnboardingPhase3Fulfillment } from '../components/OnboardingPhase3Fulfillment';
 import '../provisioning.css';
 
 
@@ -49,30 +49,39 @@ export const OnboardingWizard = () => {
                 <div className="max-w-3xl mx-auto px-6">
                     <OnboardingProgressBar currentStep={step} totalSteps={3} />
 
-                    <div className="bg-white dark:bg-slate-800 rounded-[3rem] p-12 md:p-16 shadow-premium border border-gray-100 dark:border-slate-700/40 relative overflow-hidden">
+                    <div className="bg-white dark:bg-slate-800 rounded-[3rem] shadow-premium border border-gray-100 dark:border-slate-700/40 relative overflow-hidden min-h-[600px] flex flex-col">
+
+                        {/* Phase 1: Definition */}
                         {step === 1 && (
-                            <OnboardingStepIdentity
-                                formData={formData}
-                                onChange={setFormData}
-                                onNext={handleNext}
-                                userTeams={userTeams}
+                            <OnboardingPhase1Definition
+                                onNext={() => setStep(2)}
                             />
                         )}
 
+                        {/* Phase 2: Policy Studio (Visualizer) */}
                         {step === 2 && (
-                            <OnboardingStepVisibility
-                                formData={formData}
-                                onChange={setFormData}
-                                onNext={handleNext}
-                                onBack={handleBack}
-                                allTeams={allTeams}
-                            />
+                            <div className="flex-1 flex flex-col h-[800px]"> {/* Fixed height for visualizer */}
+                                <PolicyStudioContainer />
+                                <div className="p-4 border-t border-gray-200 dark:border-slate-700 flex justify-between bg-white dark:bg-slate-800">
+                                    <button
+                                        onClick={handleBack}
+                                        className="px-6 py-2 text-gray-500 font-bold hover:text-gray-900"
+                                    >
+                                        Back to Definition
+                                    </button>
+                                    <button
+                                        onClick={() => setStep(3)}
+                                        className="px-6 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700"
+                                    >
+                                        Continue to Review →
+                                    </button>
+                                </div>
+                            </div>
                         )}
 
+                        {/* Phase 3: Fulfillment */}
                         {step === 3 && (
-                            <OnboardingStepReview
-                                formData={formData}
-                                userTeams={userTeams}
+                            <OnboardingPhase3Fulfillment
                                 onBack={handleBack}
                                 onSubmit={handleSubmit}
                             />

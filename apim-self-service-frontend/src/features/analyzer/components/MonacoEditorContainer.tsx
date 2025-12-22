@@ -13,7 +13,7 @@ export const MonacoEditorContainer: React.FC<MonacoEditorContainerProps> = ({
     onMount
 }) => {
     return (
-        <div className="flex-grow relative w-full bg-[#1e1e1e] flex flex-col overflow-hidden">
+        <div className="flex-grow relative w-full bg-[#1e1e1e] flex flex-col overflow-hidden min-h-0">
             <Editor
                 height="100%"
                 defaultLanguage={spec.trim().startsWith('{') ? 'json' : 'yaml'}

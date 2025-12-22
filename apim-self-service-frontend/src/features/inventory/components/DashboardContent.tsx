@@ -41,11 +41,26 @@ export const DashboardContent: React.FC<DashboardContentProps> = ({
     }
 
     if (paginatedItems.length === 0) {
+        // Distinguish between "No Search Results" and "Zero State"
+        // This is a simplified check; ideally we check 'totalItems' before filtering.
+        // For now, we assume if filter is empty, it's a search issue, but we can make it friendlier.
         return (
-            <div className="flex flex-col items-center justify-center py-48 bg-slate-50/30 dark:bg-slate-800/20 rounded-[4rem] border-2 border-dashed border-gray-100 dark:border-slate-800">
-                <div className="w-24 h-24 bg-white dark:bg-slate-800 rounded-full shadow-premium flex items-center justify-center text-4xl mb-8">👻</div>
-                <p className="text-slate-300 dark:text-slate-600 text-2xl font-black uppercase tracking-widest mb-4">No Records Encountered</p>
-                <p className="text-slate-400 dark:text-slate-500 text-sm font-medium">Verify your search criteria or team context.</p>
+            <div className="flex flex-col items-center justify-center py-32 bg-slate-50/50 dark:bg-slate-800/30 rounded-[3rem] border-2 border-dashed border-gray-200 dark:border-slate-700/50">
+                <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-3xl shadow-lg flex items-center justify-center text-4xl mb-6">✨</div>
+                <h3 className="text-gray-900 dark:text-white text-xl font-bold mb-2">No APIs Found</h3>
+                <p className="text-gray-500 dark:text-slate-400 text-sm mb-8 text-center max-w-sm">
+                    {activeTab === 'produced'
+                        ? "You haven't onboarded any products yet. Start your journey by defining your first API."
+                        : "No matching records found. Try adjusting your filters."}
+                </p>
+                {activeTab === 'produced' && (
+                    <button
+                        onClick={() => navigate('/onboard')}
+                        className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 transition-all hover:scale-105"
+                    >
+                        + Onboard New Product
+                    </button>
+                )}
             </div>
         );
     }

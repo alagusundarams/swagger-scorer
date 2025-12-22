@@ -18,7 +18,7 @@
  * @module productRoleDetection
  */
 
-import type { Product, User } from '../types/entities';
+import type { Product, User, Team, Environment } from '../types/entities';
 
 /**
  * User's role in relation to a specific product
@@ -233,5 +233,65 @@ export function filterAccessibleProducts(
     return products.filter(product =>
         canAccessProduct(product, user)
     );
+}
+
+/**
+ * Get accessible environments for a user within a team context
+ * 
+ * **Logic**:
+ * 1. **Admin Override**: Admins see all environments
+ * 2. **Lead Override**: Team Leads see all environments for their team
+ * 3. **AD Group Mapping**: If configured, checks user's adGroups against team's mapping
+ * 4. **Member Default**: Falls back to DEV/QA if no specific mapping
+ * 
+ * @param {User | null} user - Current user
+ * @param {Team | null} team - Current active team
+ * @returns {Environment[]} List of accessible environments
+ */
+export function getAccessibleEnvironments(
+    user: User | null,
+    team: Team | null
+): Environment[] {
+    if (!user) return [];
+
+    // 2. Global Admin -> Full Access
+    if (user.role === 'admin') {
+        return ['ALL', 'DEV', 'QA', 'STAGE', 'PROD'];
+    }
+
+    // 3. No Team Context -> Default to specific user logic or none?
+    if (!team) {
+        return ['DEV', 'QA']; // Safe default for cross-team view if not admin
+    }
+
+    // 4. Team Lead -> Full Access
+    if (user.leadsTeams.includes(team.id)) {
+        return ['ALL', 'DEV', 'QA', 'STAGE', 'PROD'];
+    }
+
+    // 5. AD Group Mapping (Advanced RBAC)
+    if (team.adGroupMapping && user.adGroups) {
+        const allowed: Environment[] = ['DEV', 'QA']; // Base access
+
+        // Add STAGE/PROD if user is in the mapped group
+        if (team.adGroupMapping.STAGE && user.adGroups.includes(team.adGroupMapping.STAGE)) {
+            allowed.push('STAGE');
+        }
+        if (team.adGroupMapping.PROD && user.adGroups.includes(team.adGroupMapping.PROD)) {
+            allowed.push('PROD');
+        }
+
+        if (allowed.includes('STAGE') || allowed.includes('PROD')) {
+            allowed.unshift('ALL');
+        } else {
+            allowed.unshift('ALL');
+        }
+
+        const standardOrder: Environment[] = ['ALL', 'DEV', 'QA', 'STAGE', 'PROD'];
+        return standardOrder.filter(e => allowed.includes(e));
+    }
+
+    // 6. Standard Member Fallback
+    return ['ALL', 'DEV', 'QA'];
 }
 

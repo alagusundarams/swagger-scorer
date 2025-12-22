@@ -55,8 +55,11 @@ export const Breadcrumbs: React.FC = () => {
             }
         }
 
-        // 3. Fallback to Page Title if we haven't added anything specific yet (and not at Home)
-        if (items.length === 1 && location.pathname !== '/') {
+        // 3. Fallback to Page Title:
+        // If the last item is NOT current (meaning we have context or are just at root but not home),
+        // we should append the generic Page Title to show where we are.
+        const lastItem = items[items.length - 1];
+        if (!lastItem.current && location.pathname !== '/') {
             items.push({
                 label: pageTitle,
                 href: location.pathname,

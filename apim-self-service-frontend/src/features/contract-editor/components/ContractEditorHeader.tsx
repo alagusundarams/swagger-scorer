@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { API, Product } from '../../../types/entities';
+import { ContractBreadcrumb } from './ContractBreadcrumb';
 
 interface ContractEditorHeaderProps {
     api: API;
@@ -21,21 +22,24 @@ export const ContractEditorHeader: React.FC<ContractEditorHeaderProps> = ({
 
     return (
         <div className="flex items-center justify-between px-8 py-6 border-b border-gray-200 dark:border-slate-700">
-            <div className="flex items-center gap-4">
-                <h2 className="text-2xl font-black text-gray-900 dark:text-white">
-                    ⚙️ Edit Contract: {api.displayName}
-                </h2>
-                <span className={`px-3 py-1 text-xs font-black rounded-lg ${product.environment === 'PROD'
-                    ? 'bg-emerald-500/10 text-emerald-500'
-                    : 'bg-blue-500/10 text-blue-500'
-                    }`}>
-                    {product.environment}
-                </span>
-                {isModified && (
-                    <span className="px-3 py-1 text-xs font-black rounded-lg bg-yellow-100 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400">
-                        ● Modified
+            <div>
+                <ContractBreadcrumb productName={product.displayName} apiName={api.displayName} />
+                <div className="flex items-center gap-4 mt-2">
+                    <h2 className="text-2xl font-black text-gray-900 dark:text-white">
+                        ⚙️ Edit Contract
+                    </h2>
+                    <span className={`px-3 py-1 text-xs font-black rounded-lg ${product.environment === 'PROD'
+                        ? 'bg-emerald-500/10 text-emerald-500'
+                        : 'bg-blue-500/10 text-blue-500'
+                        }`}>
+                        {product.environment}
                     </span>
-                )}
+                    {isModified && (
+                        <span className="px-3 py-1 text-xs font-black rounded-lg bg-yellow-100 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400">
+                            ● Modified
+                        </span>
+                    )}
+                </div>
             </div>
             <div className="flex items-center gap-3">
                 <button

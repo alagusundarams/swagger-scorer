@@ -8,20 +8,23 @@ import { ProducerHeader } from '../components/ProducerHeader';
 import { ProducerMetrics } from '../components/ProducerMetrics';
 import { ProducerAuditLog } from '../components/ProducerAuditLog';
 import { RevokeAccessModal } from '../components/RevokeAccessModal';
+import { ConfigurationTab } from '../components/ConfigurationTab'; // ADDED
 
 // Lazy load Contract Editor (only loads Monaco when needed)
 const ContractEditorModal = lazy(() =>
-    import('../../../modules/contract-editor').then(module => ({
+    import('../../contract-editor').then(module => ({
         default: module.ContractEditorModal
+    }))
+);
+
+const PolicyStudioModal = lazy(() =>
+    import('../../policy-studio/components/PolicyStudioModal').then(module => ({
+        default: module.PolicyStudioModal
     }))
 );
 
 /**
  * Props for the ProductDetailProducer component
- * 
- * @interface ProductDetailProducerProps
- * @property {Product} product - The product being displayed
- * @property {User} user - Current authenticated user (reserved for future use)
  */
 interface ProductDetailProducerProps {
     product: Product;
@@ -30,36 +33,6 @@ interface ProductDetailProducerProps {
 
 /**
  * ProductDetailProducer Component
- * 
- * **Purpose**: Producer-specific view for product owners to manage their API products.
- * 
- * **Key Features**:
- * - Real-time quality metrics dashboard
- * - Complete subscriber list with management controls
- * - Access management (revoke)
- * - API catalog with quality scores and analyzer integration
- * - Product lifecycle actions (deploy, deprecate)
- * **Performance Optimizations**:
- * - `useMemo` for filtering product subscriptions
- * - `useCallback` for event handlers to prevent child re-renders
- * 
- * ** Data Flow **:
- * ```
- * Zustand Store → Filter Subscriptions → Join with Teams → Render List
- *      ↓
- * User Action (Revoke) → Confirmation Modal → API Call → Store Update
- * ```
-    * 
- * **Accessibility**:
- * - ARIA labels on interactive elements
- * - Keyboard navigation support
- * - Screen reader friendly role attributes
- * 
- * **Future Backend Integration Points**:
- * - `confirmRevoke()`: POST /subscriptions/{id}/revoke
- * - Real-time updates via WebSocket when subscribers change
- * 
- * @component
  */
 export const ProductDetailProducer = ({ product, user }: ProductDetailProducerProps) => {
     const {
@@ -73,12 +46,13 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
     // === Modal State ===
     const [isManageModalOpen, setIsManageModalOpen] = useState(false);
     const [isEditorOpen, setIsEditorOpen] = useState(false);
+    const [isPolicyStudioOpen, setIsPolicyStudioOpen] = useState(false);
     const [selectedApi, setSelectedApi] = useState<API | null>(null);
 
     const [revokeModalOpen, setRevokeModalOpen] = useState(false);
     const [selectedSubscription, setSelectedSubscription] = useState<string | null>(null);
     const [revocationReason, setRevocationReason] = useState('');
-    const [activeTab, setActiveTab] = useState<'subscribers' | 'apis' | 'audit'>('subscribers');
+    const [activeTab, setActiveTab] = useState<'subscribers' | 'apis' | 'audit' | 'configuration'>('subscribers');
     const [localToast, setLocalToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
 
     const [isOutOfSync, setIsOutOfSync] = useState(false);
@@ -89,24 +63,16 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
     useEffect(() => {
         const params = new URLSearchParams(location.search);
         const tab = params.get('tab');
-        if (tab === 'audit' || tab === 'apis' || tab === 'subscribers') {
+        if (tab === 'audit' || tab === 'apis' || tab === 'subscribers' || tab === 'configuration') {
             setActiveTab(tab as any);
         }
     }, [location]);
 
     // === Governance / Role Logic ===
     const isOwnerLead = user?.leadsTeams.includes(product.ownerTeamId) || user?.role === 'admin';
+    const isInfraLocked = product.management_mode === 'TERRAFORM_MANAGED' || product.management_mode === 'HYBRID';
 
     // === Memoized Computations ===
-
-    /**
-     * Filter and memoize subscriptions for this product
-     * 
-     * **Performance**: Only recomputes when dependencies change
-     * **Filter Logic**: productId match + active state only
-     * 
-     * @returns {Subscription[]} Active subscriptions for this product
-     */
     const productSubscriptions = useMemo<Subscription[]>(() =>
         allSubscriptions.filter(sub =>
             sub.productId === product.id && sub.state === 'active'
@@ -114,79 +80,28 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
         [allSubscriptions, product.id]
     );
 
-    /**
-     * Calculate color coding for quality scores
-     * 
-     * **Memoized**: Prevents recreation on every render
-     * **Color Scale**:
-     * - 90%+: Green (Excellent)
-     * - 70-89%: Amber (Good)
-     * - <70%: Red (Needs Improvement)
-     * 
-     * @param {number} score - Quality score (0-100)
-     * @returns {string} Tailwind CSS color class
-     */
     const getScoreColor = useCallback((score: number): string => {
         if (score >= 90) return 'text-green-500';
         if (score >= 70) return 'text-amber-500';
         return 'text-red-500';
     }, []);
 
-
-
     const score = product.qualityScore || 0;
 
     // === Event Handlers ===
-
-    /**
-     * Handle revoke access action
-     * 
-     * **Flow**:
-     * 1. Store subscription ID
-     * 2. Show confirmation modal
-     * 3. Close dropdown menu
-     * 
-     * @param {string} subscriptionId - ID of subscription to revoke
-     */
     const handleRevokeAccess = useCallback((subscriptionId: string) => {
         setSelectedSubscription(subscriptionId);
         setRevokeModalOpen(true);
     }, []);
 
-    /**
-     * Confirm and execute revocation
-     * 
-     * **TODO [BACKEND]**: Replace console.log with actual API call
-     * 
-     * **Expected API**:
-     * ```typescript
-     * POST /api/subscriptions/{id}/revoke
-     * Body: {
-     *   reason: string;
-     *   notifyTeam: boolean;
-     * }
-     * Response: {
-     *   success: boolean;
-     *   message: string;
-     * }
-     * ```
-     * 
-     * **Side Effects**:
-     * - Updates subscription.state to 'revoked'
-     * - Disables API keys immediately
-     * - Sends email notification to subscriber team
-     * - Creates audit log entry
-     */
     const confirmRevoke = useCallback(() => {
         if (!isOwnerLead) {
             setLocalToast({ message: 'Authorization Denied: Only Team Leads can revoke access.', type: 'warning' });
             return;
         }
 
-        // TODO [BACKEND]: Implement actual revocation API call
         console.log('[TODO] Revoking subscription:', selectedSubscription, 'Reason:', revocationReason);
 
-        // Proactive Intimation
         addNotification({
             type: 'governance',
             title: 'Critical: Access Revoked',
@@ -194,7 +109,6 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
             navigateTo: '/'
         });
 
-        // Show local feedback
         setLocalToast({ message: `Access Revoked. Governance audit entry created.`, type: 'warning' });
         setTimeout(() => setLocalToast(null), 3000);
 
@@ -204,21 +118,10 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
     }, [selectedSubscription, revocationReason, isOwnerLead, user.name, product.displayName, addNotification]);
 
 
-    /**
-     * Handle product metadata and governance updates
-     * 
-     * **Flow**:
-     * 1. Receive updated data from ManageProductModal
-     * 2. Dispatch updateProduct to store
-     * 3. Close modal
-     * 
-     * @param {Partial<Product>} data - Updated product data
-     */
     const handleUpdateProduct = useCallback((data: Partial<Product>) => {
         updateProduct(product.id, data);
         setIsManageModalOpen(false);
 
-        // If product is in PROD/STAGE, metadata changes trigger an "Out of Sync" state
         if (product.environment === 'PROD' || product.environment === 'STAGE') {
             setIsOutOfSync(true);
             addNotification({
@@ -230,9 +133,6 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
         }
     }, [product.id, product.displayName, product.environment, updateProduct, addNotification]);
 
-    /**
-     * Handle product promotion between environments
-     */
     const handlePromote = useCallback(() => {
         const stages: Product['environment'][] = ['DEV', 'QA', 'STAGE', 'PROD'];
         const currentIndex = stages.indexOf(product.environment || 'DEV');
@@ -256,12 +156,9 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
         }
     }, [product.id, product.displayName, product.environment, updateProduct, addNotification]);
 
-    /**
-     * Handle product deprecation
-     */
     const handleDeprecate = useCallback(() => {
         if (confirm(`Are you sure you want to deprecate ${product.displayName}? This will prevent new subscriptions.`)) {
-            updateProduct(product.id, { visibility: 'private' }); // Or a specific 'deprecated' state if available
+            updateProduct(product.id, { visibility: 'private' });
 
             addNotification({
                 type: 'warning',
@@ -275,14 +172,6 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
         }
     }, [product.id, product.displayName, updateProduct, addNotification]);
 
-    /**
-     * Navigate to API detail page
-     * 
-     * **Memoized**: Prevents recreation on every render
-     * **Route**: /products/:productId/apis/:apiId
-     * 
-     * @param {string} apiId - ID of the API
-     */
     const navigateToAPI = useCallback((apiId: string) => {
         navigate(`/products/${product.id}/apis/${apiId}`);
     }, [navigate, product.id]);
@@ -314,6 +203,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                 {[
                     { id: 'subscribers', label: 'Subscribers' },
                     { id: 'apis', label: 'API Inventory' },
+                    { id: 'configuration', label: 'Configuration' }, // ADDED
                     { id: 'audit', label: 'Audit Log' }
                 ].map(tab => (
                     <button
@@ -370,7 +260,6 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                                 role="button"
                                 tabIndex={0}
                                 onKeyPress={(e) => e.key === 'Enter' && navigateToAPI(api.id)}
-                                aria-label={`View details for ${api.displayName}`}
                             >
                                 <div className="flex-1">
                                     <div className="font-semibold text-gray-900 dark:text-white">{api.displayName}</div>
@@ -392,19 +281,42 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                                             setSelectedApi(api);
                                             setIsEditorOpen(true);
                                         }}
-                                        className="px-3 py-1.5 text-xs font-semibold bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition flex items-center gap-1.5"
-                                        aria-label={`Edit and analyze contract for ${api.displayName}`}
+                                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${isInfraLocked
+                                            ? 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                                            : 'bg-blue-500 text-white hover:bg-blue-600'
+                                            }`}
                                     >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                                        </svg>
-                                        Edit & Analyze
+                                        {isInfraLocked ? (
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                                            </svg>
+                                        ) : (
+                                            <span>✏️</span>
+                                        )}
+                                        {isInfraLocked ? 'View Contract' : 'Edit & Analyze'}
+                                    </button>
+
+                                    {/* NEW: Policy Visualizer Button */}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedApi(api);
+                                            setIsPolicyStudioOpen(true);
+                                        }}
+                                        className="px-3 py-1.5 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 bg-purple-50 text-purple-600 hover:bg-purple-100 dark:bg-purple-900/20 dark:text-purple-300 dark:hover:bg-purple-900/40"
+                                    >
+                                        <span className="text-lg">👓</span>
+                                        Visual Policy
                                     </button>
                                 </div>
                             </div>
                         ))}
                     </div>
                 </div>
+            )}
+
+            {activeTab === 'configuration' && (
+                <ConfigurationTab product={product} />
             )}
 
             {activeTab === 'audit' && (
@@ -465,6 +377,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                             product={product}
                             api={selectedApi}
                             isOpen={isEditorOpen}
+                            readOnly={isInfraLocked}
                             onClose={() => {
                                 setIsEditorOpen(false);
                                 setSelectedApi(null);
@@ -485,6 +398,57 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                                     navigateTo: `/products/${product.id}`
                                 });
                             }}
+                        />
+                    </Suspense>
+                )
+            }
+
+            {/* Policy Studio Modal (Legacy Lens) */}
+            {
+                selectedApi && (
+                    <Suspense fallback={null}>
+                        <PolicyStudioModal
+                            isOpen={isPolicyStudioOpen}
+                            onClose={() => {
+                                setIsPolicyStudioOpen(false);
+                                setSelectedApi(null);
+                            }}
+                            apiName={selectedApi.displayName}
+                            // [DEMO MAGICAL MOMENT]: We inject a known Legacy API Policy XML to show off the Parser.
+                            // In a real app, this comes from selectedApi.apim_raw_data.policyXml
+                            initialXml={`
+<policies>
+    <inbound>
+        <base />
+        <rate-limit calls="50" renewal-period="60" />
+        <validate-jwt header-name="Authorization" failed-validation-error-message="Access token is missing or invalid.">
+            <openid-config url="https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration" />
+            <required-claims>
+                <claim name="aud">
+                    <value>api://my-api</value>
+                </claim>
+            </required-claims>
+        </validate-jwt>
+        <set-header name="X-Legacy-Header" exists-action="override">
+            <value>LegacyValue</value>
+        </set-header>
+        <choose>
+            <when condition="@(context.Request.Headers.GetValueOrDefault("Environment") == "Beta")">
+                <set-backend-service base-url="https://beta-api.contoso.com" />
+            </when>
+        </choose>
+    </inbound>
+    <backend>
+        <base />
+    </backend>
+    <outbound>
+        <base />
+    </outbound>
+    <on-error>
+        <base />
+    </on-error>
+</policies>
+                            `}
                         />
                     </Suspense>
                 )
