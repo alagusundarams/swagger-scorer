@@ -2,6 +2,11 @@
     "name": "apim-database",
     "version": "1.0.0",
     "description": "Database scripts and schema for APIM Portal",
+    "scripts": {
+        "setup-db": "psql $DATABASE_URL -f schema/schema.sql",
+        "migrate": "tsx scripts/migrate-to-postgres.ts",
+        "fetch": "tsx scripts/fetch-apim-data.ts"
+    },
     "main": "index.js",
     "dependencies": {
         "pg": "^8.16.3"
