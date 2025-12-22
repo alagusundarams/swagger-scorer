@@ -18,13 +18,14 @@ To pull real state from your Azure environment into the database:
    ```
 2. **Configure (JSON Mode)**:
    - Copy `config.template.json` to `config.json`.
-   - Add your Azure environment IDs and your **Read-Only ADO PAT** to `config.json`.
+   - Add your Azure environment IDs.
+   - Add your **Read-Only ADO PAT**, your **Organization**, and a list of **Projects** to scan for repositories to `config.json`.
 3. **Fetch Data parallelly**:
    ```powershell
    az login
    npx tsx scripts/fetch-apim-data.ts
    ```
-   *This generates parallel JSON files in `apim-database/data/`.*
+   *This script will now crawl your ADO Projects to find matching repositories for each APIM product automatically.*
 
 4. **Migrate to Postgres**:
    ```powershell
