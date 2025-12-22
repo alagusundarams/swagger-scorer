@@ -42,8 +42,9 @@ async function main() {
     const client = new Client({ connectionString: dbUrl });
 
     try {
+        console.log('📡 Attempting to connect to PostgreSQL...');
         await client.connect();
-        console.log('✅ Connected to PostgreSQL.');
+        console.log('✅ Connected to PostgreSQL successfully.');
 
         // 2. Read and apply schema
         if (!existsSync(schemaPath)) {
@@ -52,19 +53,23 @@ async function main() {
         }
 
         const schema = readFileSync(schemaPath, 'utf8');
-        console.log('📜 Applying schema.sql...');
+        console.log(`📜 Read schema.sql (${schema.length} bytes).`);
+        console.log('🛠️ Applying schema to database...');
 
-        // Split schema into individual commands for better error reporting
-        // Note: Simple split by semicolon might break on functions/triggers, but schema.sql is simple
         await client.query(schema);
 
         console.log('✨ Database initialized successfully!');
     } catch (error: any) {
-        console.error('❌ Initialization failed:', error.message);
+        console.error('❌ FAILED at stage:', error.code ? `Postgres Error (${error.code})` : 'Connection/Internal Error');
+        console.error('📝 Error Message:', error.message);
 
         if (error.code === '3D000') {
             console.log('\n💡 Tip: The database specified in the URL does not exist.');
             console.log('Please create it first (e.g., "CREATE DATABASE apim;") or update the URL.');
+        } else if (error.code === '28P01') {
+            console.log('\n💡 Tip: Password authentication failed. Check your password in config.json.');
+        } else if (error.code === 'ECONNREFUSED' || error.message.includes('ECONNREFUSED')) {
+            console.log('\n💡 Tip: Connection refused. Is your Docker container running and port 5432 mapped?');
         }
     } finally {
         await client.end();
