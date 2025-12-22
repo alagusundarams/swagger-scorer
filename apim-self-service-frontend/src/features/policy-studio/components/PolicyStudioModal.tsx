@@ -52,7 +52,7 @@ export const PolicyStudioModal = ({ isOpen, onClose, apiName, productName, initi
 
             {/* Modal Content - The Studio */}
             <div className="flex-1 overflow-hidden">
-                <PolicyStudioContainer initialXml={initialXml} />
+                <PolicyStudioContainer initialXml={initialXml} resourceName={apiName} resourceId={apiName} />
             </div>
         </div>
     );

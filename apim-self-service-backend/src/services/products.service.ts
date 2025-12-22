@@ -58,3 +58,25 @@ export async function getAllProducts() {
 
     return products;
 }
+
+/**
+ * Helper to fetch the Git repository URL for a given resource (API or Product).
+ * Since APIs are children of Products, we lookup via the parent product.
+ */
+export async function getRepoUrlForResource(resourceId: string): Promise<string | null> {
+    // 1. Try if resourceId is a Product
+    const productRes = await query('SELECT git_repo_url FROM products WHERE id = $1', [resourceId]);
+    if (productRes.rows[0]?.git_repo_url) {
+        return productRes.rows[0].git_repo_url;
+    }
+
+    // 2. Try if resourceId is an API (lookup parent product)
+    const apiRes = await query(`
+        SELECT p.git_repo_url 
+        FROM products p
+        JOIN apis a ON a.product_id = p.id
+        WHERE a.id = $1
+    `, [resourceId]);
+
+    return apiRes.rows[0]?.git_repo_url || null;
+}

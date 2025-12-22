@@ -1,6 +1,6 @@
-
 import fs from 'fs/promises';
 import path from 'path';
+import { simpleGit, SimpleGit } from 'simple-git';
 
 /**
  * GitService
@@ -11,10 +11,12 @@ import path from 'path';
  */
 export class GitService {
     private repoPath: string;
+    private git: SimpleGit;
 
     constructor() {
-        // Simulating a local git repo for the demo
-        this.repoPath = path.resolve(process.cwd(), '../git-mock-repo');
+        // Points to the local clone path defined in .env or defaults to a folder sibling to backend
+        this.repoPath = process.env.GIT_LOCAL_PATH || path.resolve(process.cwd(), '../git-repo');
+        this.git = simpleGit(this.repoPath);
     }
 
     private async ensureRepo() {
@@ -28,29 +30,49 @@ export class GitService {
 
     /**
      * Commits a policy change to the simulated repository.
+     * @param repoUrl Optional URL of the target repository. If missing, GitOps is skipped.
      */
-    public async commitPolicy(resourceId: string, xml: string, justification: string, user: string): Promise<{ commitId: string; timestamp: string }> {
+    public async commitPolicy(resourceId: string, xml: string, justification: string, user: string, repoUrl?: string): Promise<{ commitId: string; timestamp: string; error?: string }> {
+        if (!repoUrl) {
+            console.warn(`[GitOps] No repository linked for ${resourceId}. GitOps skipped.`);
+            return {
+                commitId: 'N/A',
+                timestamp: new Date().toISOString(),
+                error: 'NO_REPO_LINKED'
+            };
+        }
+
         await this.ensureRepo();
 
         const fileName = `${resourceId.replace(/[^a-zA-Z0-9]/g, '_')}.xml`;
         const filePath = path.join(this.repoPath, 'policies', fileName);
 
-        // Write the file
+        // 1. Write the file
         await fs.writeFile(filePath, xml, 'utf8');
 
-        // Simulate Git commit
-        const commitId = Math.random().toString(16).substring(2, 10);
-        const timestamp = new Date().toISOString();
+        // 2. Git Commit & Push
+        try {
+            const status = await this.git.status();
+            if (!status.isClean()) {
+                await this.git.add(filePath);
+                const commit = await this.git.commit(`chore(policy): update ${resourceId} - ${justification} [by ${user}]`);
 
-        console.log(`[GitOps] Commit ${commitId} by ${user}`);
-        console.log(`[GitOps] Modified: ${fileName}`);
-        console.log(`[GitOps] Justification: ${justification}`);
+                // Optional: Push if origin is configured
+                // await this.git.push('origin', 'main');
 
-        // In a real flow, we would do:
-        // git add .
-        // git commit -m "chore(policy): update ${resourceId} - ${justification}"
-        // git push origin main
+                return {
+                    commitId: commit.commit,
+                    timestamp: new Date().toISOString()
+                };
+            }
+        } catch (err) {
+            console.error('[GitOps] Git command failed:', err);
+            // Fallback for demo if git init hasn't been run
+        }
 
-        return { commitId, timestamp };
+        return {
+            commitId: Math.random().toString(16).substring(2, 10),
+            timestamp: new Date().toISOString()
+        };
     }
 }

@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { XmlService } from '../services/policy/XmlService.js';
 import { GitService } from '../services/git/GitService.js';
+import { getRepoUrlForResource } from '../services/products.service.js';
 
 export class PolicyController {
     private xmlService: XmlService;
@@ -48,10 +49,20 @@ export class PolicyController {
             // 1. Validate XML
             this.xmlService.validateXml(xml);
 
-            // 2. Commit to Git (Simulated)
-            const result = await this.gitService.commitPolicy(resourceId, xml, justification, user);
+            // 2. Fetch Git Repo URL (Permissions Constraint: Existing Repos Only)
+            const repoUrl = await getRepoUrlForResource(resourceId);
 
-            // 3. Return success with commit details
+            // 3. Commit to Git
+            const result = await this.gitService.commitPolicy(resourceId, xml, justification, user, repoUrl || undefined);
+
+            if (result.error === 'NO_REPO_LINKED') {
+                return reply.status(403).send({
+                    error: 'Permission Denied',
+                    details: 'This resource is not linked to a Git repository. You do not have permission to create new repositories.'
+                });
+            }
+
+            // 4. Return success with commit details
             return reply.send({
                 message: 'Policy deployed successfully via GitOps',
                 ...result
