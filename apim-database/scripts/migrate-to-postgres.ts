@@ -31,20 +31,22 @@ interface APIMData {
     subscriptions: any[];
 }
 
-/**
- * Initialize database connection
- */
 function createDbPool(): pg.Pool {
     let connectionString = process.env.DATABASE_URL;
 
-    // Fallback to config.json
+    // Fallback to config.json with priority-based discovery
     if (!connectionString) {
-        let configPath = join(process.cwd(), 'config.json');
-        if (!existsSync(configPath)) {
-            configPath = join(process.cwd(), 'apim-database', 'config.json');
-        }
+        const rootConfig = join(process.cwd(), 'apim-database', 'config.json');
+        const localConfig = join(process.cwd(), 'config.json');
+        const relativeConfig = join(__dirname, '..', 'config.json');
 
-        if (existsSync(configPath)) {
+        let configPath = '';
+        if (existsSync(rootConfig)) configPath = rootConfig;
+        else if (existsSync(localConfig)) configPath = localConfig;
+        else if (existsSync(relativeConfig)) configPath = relativeConfig;
+
+        if (configPath) {
+            console.log(`📂 Using config from: ${configPath}`);
             const config = JSON.parse(readFileSync(configPath, 'utf8'));
             connectionString = config.database?.url;
         }
@@ -278,10 +280,15 @@ async function main() {
     const args = process.argv.slice(2);
     let filesToProcess: string[] = [];
 
-    let dataDir = join(process.cwd(), 'data');
-    if (!existsSync(dataDir)) {
-        dataDir = join(process.cwd(), 'apim-database', 'data');
-    }
+    // Priority data directory discovery
+    const rootData = join(process.cwd(), 'apim-database', 'data');
+    const localData = join(process.cwd(), 'data');
+    const relativeData = join(__dirname, '..', 'data');
+
+    let dataDir = '';
+    if (existsSync(rootData)) dataDir = rootData;
+    else if (existsSync(localData)) dataDir = localData;
+    else if (existsSync(relativeData)) dataDir = relativeData;
 
     if (args.length > 0) {
         const target = args[0];
