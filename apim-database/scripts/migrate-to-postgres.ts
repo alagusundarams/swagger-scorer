@@ -12,7 +12,8 @@
  * DATABASE_URL=postgresql://user:pass@localhost:5432/apim npx tsx scripts/migrate-to-postgres.ts data/apim-data-2024-12-19.json
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
+import { join } from 'path';
 import pg from 'pg';
 const { Pool } = pg;
 
@@ -34,10 +35,19 @@ interface APIMData {
  * Initialize database connection
  */
 function createDbPool(): pg.Pool {
-    const connectionString = process.env.DATABASE_URL;
+    let connectionString = process.env.DATABASE_URL;
+
+    // Fallback to config.json
+    if (!connectionString) {
+        const configPath = join(process.cwd(), 'apim-database', 'config.json');
+        if (existsSync(configPath)) {
+            const config = JSON.parse(readFileSync(configPath, 'utf8'));
+            connectionString = config.database?.url;
+        }
+    }
 
     if (!connectionString) {
-        throw new Error('DATABASE_URL environment variable is required');
+        throw new Error('DATABASE_URL environment variable or database.url in config.json is required');
     }
 
     return new Pool({ connectionString });
@@ -262,23 +272,48 @@ async function updateProductStats(pool: pg.Pool) {
  */
 async function main() {
     const args = process.argv.slice(2);
-    if (args.length === 0) {
-        console.error('❌ Error: Path to APIM JSON data file is required.');
+    let filesToProcess: string[] = [];
+
+    const dataDir = join(process.cwd(), 'apim-database', 'data');
+
+    if (args.length > 0) {
+        const target = args[0];
+        if (statSync(target).isDirectory()) {
+            filesToProcess = readdirSync(target)
+                .filter(f => f.startsWith('apim-data-') && f.endsWith('.json'))
+                .map(f => join(target, f));
+        } else {
+            filesToProcess = [target];
+        }
+    } else if (existsSync(dataDir)) {
+        filesToProcess = readdirSync(dataDir)
+            .filter(f => f.startsWith('apim-data-') && f.endsWith('.json'))
+            .map(f => join(dataDir, f));
+    }
+
+    if (filesToProcess.length === 0) {
+        console.error('❌ Error: No APIM JSON data files found.');
+        console.log('Either provide a file path or ensure files exist in apim-database/data/');
         process.exit(1);
     }
 
-    const dataPath = args[0];
-    const data = JSON.parse(readFileSync(dataPath, 'utf8')) as APIMData;
+    console.log(`🚀 Found ${filesToProcess.length} snapshots to migrate.`);
     const pool = createDbPool();
 
     try {
         await createDefaultTeam(pool);
-        await migrateProducts(pool, data.products, data.environment);
-        await migrateAPIs(pool, data.apis, data.products, data.environment);
-        await migrateSubscriptions(pool, data.subscriptions, data.environment);
-        await updateProductStats(pool);
 
-        console.log(`\n✨ Migration of ${data.environment} snapshot complete!`);
+        for (const dataPath of filesToProcess) {
+            console.log(`\n--- Processing: ${dataPath} ---`);
+            const data = JSON.parse(readFileSync(dataPath, 'utf8')) as APIMData;
+
+            await migrateProducts(pool, data.products, data.environment);
+            await migrateAPIs(pool, data.apis, data.products, data.environment);
+            await migrateSubscriptions(pool, data.subscriptions, data.environment);
+        }
+
+        await updateProductStats(pool);
+        console.log(`\n✨ Batch migration complete!`);
     } catch (error) {
         console.error('\n❌ Migration failed:', error);
     } finally {
