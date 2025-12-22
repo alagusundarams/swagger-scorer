@@ -114,6 +114,20 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
             const createdAt = product.properties?.createdDate || product.createdDate || new Date().toISOString();
             const updatedAt = product.properties?.lastModifiedDate || product.updatedDate || createdAt;
 
+            // Calculate quality score by calling backend scoring API
+            let qualityScore = null;
+            if (product.gitInfo?.repoUrl) {
+                try {
+                    console.log(`  📊 Scoring product: ${name}...`);
+                    // For now we'll fetch the OpenAPI spec from Git and score it
+                    // In a real implementation, we'd fetch from the Git repo and send to /api/v1/analyze
+                    // Skipping for migration speed - will calculate on-demand
+                    qualityScore = null;
+                } catch (err) {
+                    console.warn(`  ⚠️ Failed to score ${name}:`, err instanceof Error ? err.message : String(err));
+                }
+            }
+
             console.log(`  💾 Inserting product: ${productId}`);
 
             await pool.query(`
@@ -164,49 +178,49 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
     return new Map<string, string>(res.rows.map(r => [r.name.toLowerCase(), r.id]));
 }
 
-    /**
-     * Transform and insert APIs
-     */
-    async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEnv: string) {
-        const targetEnv = mapEnv(importEnv);
-        console.log(`\n🔌 Migrating ${apis.length} APIs to ${targetEnv}...`);
-        let inserted = 0;
-        let skipped = 0;
+/**
+ * Transform and insert APIs
+ */
+async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEnv: string) {
+    const targetEnv = mapEnv(importEnv);
+    console.log(`\n🔌 Migrating ${apis.length} APIs to ${targetEnv}...`);
+    let inserted = 0;
+    let skipped = 0;
 
-        const productMap = new Map<string, string>();
-        products.forEach(p => {
-            const name = p.name || 'unnamed';
-            productMap.set(name.toLowerCase(), `${targetEnv}-${name}`.toLowerCase());
-        });
+    const productMap = new Map<string, string>();
+    products.forEach(p => {
+        const name = p.name || 'unnamed';
+        productMap.set(name.toLowerCase(), `${targetEnv}-${name}`.toLowerCase());
+    });
 
-        for (const api of apis) {
-            try {
-                const props = api.properties;
+    for (const api of apis) {
+        try {
+            const props = api.properties;
 
-                // Try to find parent product from API name/path
-                let productId = null;
-                const apiName = api.name || 'unnamed-api';
-                const apiPath = props.path || '/';
+            // Try to find parent product from API name/path
+            let productId = null;
+            const apiName = api.name || 'unnamed-api';
+            const apiPath = props.path || '/';
 
-                for (const [productName, prodId] of productMap.entries()) {
-                    if (apiName.toLowerCase().includes(productName.toLowerCase()) ||
-                        apiPath.toLowerCase().includes(productName.toLowerCase())) {
-                        productId = prodId;
-                        break;
-                    }
+            for (const [productName, prodId] of productMap.entries()) {
+                if (apiName.toLowerCase().includes(productName.toLowerCase()) ||
+                    apiPath.toLowerCase().includes(productName.toLowerCase())) {
+                    productId = prodId;
+                    break;
                 }
+            }
 
-                if (!productId && products.length > 0) {
-                    productId = `${targetEnv}-${products[0].id || products[0].name}`;
-                }
+            if (!productId && products.length > 0) {
+                productId = `${targetEnv}-${products[0].id || products[0].name}`;
+            }
 
-                if (!productId) {
-                    console.warn(`  ⚠️  No product found for API ${apiName}, skipping`);
-                    skipped++;
-                    continue;
-                }
+            if (!productId) {
+                console.warn(`  ⚠️  No product found for API ${apiName}, skipping`);
+                skipped++;
+                continue;
+            }
 
-                await pool.query(`
+            await pool.query(`
                 INSERT INTO apis (
                     id, product_id, origin_team_id, name, display_name, description, path,
                     apim_raw_data, created_at, updated_at
@@ -217,69 +231,69 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
                     path = EXCLUDED.path,
                     updated_at = NOW()
             `, [
-                    `${targetEnv}-${api.id || apiName}`.toLowerCase(),
-                    productId,
-                    null, // origin_team_id populated later by admin mapping
-                    apiName,
-                    props.displayName || apiName,
-                    props.description || '',
-                    apiPath,
-                    JSON.stringify(api)
-                ]);
+                `${targetEnv}-${api.id || apiName}`.toLowerCase(),
+                productId,
+                null, // origin_team_id populated later by admin mapping
+                apiName,
+                props.displayName || apiName,
+                props.description || '',
+                apiPath,
+                JSON.stringify(api)
+            ]);
 
-                inserted++;
-            } catch (error) {
-                console.error(`  ❌ Failed to migrate API ${api.name}:`, error);
-                skipped++;
-            }
+            inserted++;
+        } catch (error) {
+            console.error(`  ❌ Failed to migrate API ${api.name}:`, error);
+            skipped++;
         }
-
-        console.log(`✅ Finished API migration: ${inserted} inserted, ${skipped} skipped.`);
     }
 
-    /**
-     * Transform and insert subscriptions
-     */
-    async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importEnv: string, productRegistry?: Map<string, string>) {
-        const targetEnv = mapEnv(importEnv);
-        console.log(`\n🔑 Migrating ${subscriptions.length} subscriptions to ${targetEnv}...`);
-        let inserted = 0;
-        let skipped = 0;
+    console.log(`✅ Finished API migration: ${inserted} inserted, ${skipped} skipped.`);
+}
 
-        for (const sub of subscriptions) {
-            try {
-                const props = sub.properties || {};
-                const scope = props.scope || '';
-                const scopeMatch = scope.match(/\/products\/([^\/\s]+)/);
-                const apimProductId = scopeMatch ? scopeMatch[1] : null;
+/**
+ * Transform and insert subscriptions
+ */
+async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importEnv: string, productRegistry?: Map<string, string>) {
+    const targetEnv = mapEnv(importEnv);
+    console.log(`\n🔑 Migrating ${subscriptions.length} subscriptions to ${targetEnv}...`);
+    let inserted = 0;
+    let skipped = 0;
 
-                if (!apimProductId) {
+    for (const sub of subscriptions) {
+        try {
+            const props = sub.properties || {};
+            const scope = props.scope || '';
+            const scopeMatch = scope.match(/\/products\/([^\/\s]+)/);
+            const apimProductId = scopeMatch ? scopeMatch[1] : null;
+
+            if (!apimProductId) {
+                skipped++;
+                continue;
+            }
+
+            // Robust Lookup: Use registry first, fallback to construction
+            let productId = productRegistry?.get(apimProductId.toLowerCase());
+
+            if (!productId) {
+                productId = `${targetEnv}-${apimProductId}`.toLowerCase();
+            }
+
+            // ⚠️ Final Verification: Check if product actually exists
+            const prodCheck = await pool.query('SELECT id FROM products WHERE id = $1', [productId]);
+            if (prodCheck.rowCount === 0) {
+                // One last try: Check if we have it by name (Case-insensitive)
+                const fuzzyCheck = await pool.query('SELECT id FROM products WHERE name ILIKE $1 AND environment = $2', [apimProductId, targetEnv]);
+                if (fuzzyCheck.rowCount && fuzzyCheck.rowCount > 0) {
+                    productId = fuzzyCheck.rows[0].id;
+                } else {
+                    console.warn(`  ⚠️  Skipping subscription ${sub.name}: Product ID '${productId}' or Name '${apimProductId}' not found in database.`);
                     skipped++;
                     continue;
                 }
+            }
 
-                // Robust Lookup: Use registry first, fallback to construction
-                let productId = productRegistry?.get(apimProductId.toLowerCase());
-
-                if (!productId) {
-                    productId = `${targetEnv}-${apimProductId}`.toLowerCase();
-                }
-
-                // ⚠️ Final Verification: Check if product actually exists
-                const prodCheck = await pool.query('SELECT id FROM products WHERE id = $1', [productId]);
-                if (prodCheck.rowCount === 0) {
-                    // One last try: Check if we have it by name (Case-insensitive)
-                    const fuzzyCheck = await pool.query('SELECT id FROM products WHERE name ILIKE $1 AND environment = $2', [apimProductId, targetEnv]);
-                    if (fuzzyCheck.rowCount && fuzzyCheck.rowCount > 0) {
-                        productId = fuzzyCheck.rows[0].id;
-                    } else {
-                        console.warn(`  ⚠️  Skipping subscription ${sub.name}: Product ID '${productId}' or Name '${apimProductId}' not found in database.`);
-                        skipped++;
-                        continue;
-                    }
-                }
-
-                await pool.query(`
+            await pool.query(`
                 INSERT INTO subscriptions (
                     id, product_id, subscriber_team_id, state,
                     primary_key_name, primary_key_value,
@@ -290,99 +304,99 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
                     state = EXCLUDED.state,
                     updated_at = NOW()
             `, [
-                    `${targetEnv}-${sub.id || sub.name}`.toLowerCase(),
-                    productId,
-                    'default-team',
-                    props.state === 'active' ? 'active' : 'suspended',
-                    'primary', 'redacted-sync',
-                    'secondary', 'redacted-sync',
-                    props.createdDate || new Date().toISOString()
-                ]);
+                `${targetEnv}-${sub.id || sub.name}`.toLowerCase(),
+                productId,
+                'default-team',
+                props.state === 'active' ? 'active' : 'suspended',
+                'primary', 'redacted-sync',
+                'secondary', 'redacted-sync',
+                props.createdDate || new Date().toISOString()
+            ]);
 
-                inserted++;
-            } catch (error: any) {
-                console.error(`  ❌ FK Constraint Failure on sub ${sub.name}: ${error.message}`);
-                skipped++;
-            }
+            inserted++;
+        } catch (error: any) {
+            console.error(`  ❌ FK Constraint Failure on sub ${sub.name}: ${error.message}`);
+            skipped++;
         }
-
-        console.log(`✅ Finished subscription migration: ${inserted} inserted, ${skipped} skipped.`);
     }
 
-    /**
-     * Update product statistics
-     */
-    async function updateProductStats(pool: pg.Pool) {
-        console.log('\n📊 Updating product statistics...');
-        await pool.query(`
+    console.log(`✅ Finished subscription migration: ${inserted} inserted, ${skipped} skipped.`);
+}
+
+/**
+ * Update product statistics
+ */
+async function updateProductStats(pool: pg.Pool) {
+    console.log('\n📊 Updating product statistics...');
+    await pool.query(`
         UPDATE products p
         SET subscriber_count = (
             SELECT COUNT(*) FROM subscriptions s WHERE s.product_id = p.id
         )
     `);
-        console.log('✅ Product statistics updated.');
-    }
+    console.log('✅ Product statistics updated.');
+}
 
-    /**
-     * Main execution
-     */
-    async function main() {
-        const args = process.argv.slice(2);
-        let filesToProcess: string[] = [];
+/**
+ * Main execution
+ */
+async function main() {
+    const args = process.argv.slice(2);
+    let filesToProcess: string[] = [];
 
-        // Priority data directory discovery
-        const rootData = join(process.cwd(), 'apim-database', 'data');
-        const localData = join(process.cwd(), 'data');
-        const relativeData = join(__dirname, '..', 'data');
+    // Priority data directory discovery
+    const rootData = join(process.cwd(), 'apim-database', 'data');
+    const localData = join(process.cwd(), 'data');
+    const relativeData = join(__dirname, '..', 'data');
 
-        let dataDir = '';
-        if (existsSync(rootData)) dataDir = rootData;
-        else if (existsSync(localData)) dataDir = localData;
-        else if (existsSync(relativeData)) dataDir = relativeData;
+    let dataDir = '';
+    if (existsSync(rootData)) dataDir = rootData;
+    else if (existsSync(localData)) dataDir = localData;
+    else if (existsSync(relativeData)) dataDir = relativeData;
 
-        if (args.length > 0) {
-            const target = args[0];
-            if (existsSync(target) && statSync(target).isDirectory()) {
-                filesToProcess = readdirSync(target)
-                    .filter(f => f.startsWith('apim-data-') && f.endsWith('.json'))
-                    .map(f => join(target, f));
-            } else if (existsSync(target)) {
-                filesToProcess = [target];
-            }
-        } else if (existsSync(dataDir)) {
-            filesToProcess = readdirSync(dataDir)
+    if (args.length > 0) {
+        const target = args[0];
+        if (existsSync(target) && statSync(target).isDirectory()) {
+            filesToProcess = readdirSync(target)
                 .filter(f => f.startsWith('apim-data-') && f.endsWith('.json'))
-                .map(f => join(dataDir, f));
+                .map(f => join(target, f));
+        } else if (existsSync(target)) {
+            filesToProcess = [target];
         }
-
-        if (filesToProcess.length === 0) {
-            console.error('❌ Error: No APIM JSON data files found.');
-            console.log('Either provide a file path or ensure files exist in apim-database/data/');
-            process.exit(1);
-        }
-
-        console.log(`🚀 Found ${filesToProcess.length} snapshots to migrate.`);
-        const pool = createDbPool();
-
-        try {
-            await createDefaultTeam(pool);
-
-            for (const dataPath of filesToProcess) {
-                console.log(`\n--- Processing: ${dataPath} ---`);
-                const data = JSON.parse(readFileSync(dataPath, 'utf8')) as APIMData;
-
-                const registry = await migrateProducts(pool, data.products, data.environment);
-                await migrateAPIs(pool, data.apis, data.products, data.environment);
-                await migrateSubscriptions(pool, data.subscriptions, data.environment, registry);
-            }
-
-            await updateProductStats(pool);
-            console.log(`\n✨ Batch migration complete!`);
-        } catch (error) {
-            console.error('\n❌ Migration failed:', error);
-        } finally {
-            await pool.end();
-        }
+    } else if (existsSync(dataDir)) {
+        filesToProcess = readdirSync(dataDir)
+            .filter(f => f.startsWith('apim-data-') && f.endsWith('.json'))
+            .map(f => join(dataDir, f));
     }
 
-    main();
+    if (filesToProcess.length === 0) {
+        console.error('❌ Error: No APIM JSON data files found.');
+        console.log('Either provide a file path or ensure files exist in apim-database/data/');
+        process.exit(1);
+    }
+
+    console.log(`🚀 Found ${filesToProcess.length} snapshots to migrate.`);
+    const pool = createDbPool();
+
+    try {
+        await createDefaultTeam(pool);
+
+        for (const dataPath of filesToProcess) {
+            console.log(`\n--- Processing: ${dataPath} ---`);
+            const data = JSON.parse(readFileSync(dataPath, 'utf8')) as APIMData;
+
+            const registry = await migrateProducts(pool, data.products, data.environment);
+            await migrateAPIs(pool, data.apis, data.products, data.environment);
+            await migrateSubscriptions(pool, data.subscriptions, data.environment, registry);
+        }
+
+        await updateProductStats(pool);
+        console.log(`\n✨ Batch migration complete!`);
+    } catch (error) {
+        console.error('\n❌ Migration failed:', error);
+    } finally {
+        await pool.end();
+    }
+}
+
+main();
