@@ -263,24 +263,43 @@ async function migrateAPIs(pool: Pool, apis: any[], products: any[], importEnv: 
             // Debug: log the product_id we're about to use
             console.log(`  🔍 API "${apiName}" → product_id: "${productId}"`);
 
+            // Extract Git info if available
+            const gitRepoUrl = (api as any).gitInfo?.repoUrl || null;
+            const gitFilePath = (api as any).gitInfo?.filePath || 'openapi.yaml';
+            const apiId = `${targetEnv}-${api.id || apiName}`.toLowerCase();
+
+            console.log(`  💾 Inserting API: ${apiName}`);
             await pool.query(`
                 INSERT INTO apis (
                     id, product_id, origin_team_id, name, display_name, description, path,
+                    service_url, protocols, subscription_required, git_repo_url, git_file_path,
                     apim_raw_data, created_at, updated_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
                 ON CONFLICT (id) DO UPDATE SET
+                    product_id = EXCLUDED.product_id,
+                    name = EXCLUDED.name,
                     display_name = EXCLUDED.display_name,
                     description = EXCLUDED.description,
                     path = EXCLUDED.path,
+                    service_url = EXCLUDED.service_url,
+                    protocols = EXCLUDED.protocols,
+                    subscription_required = EXCLUDED.subscription_required,
+                    git_repo_url = EXCLUDED.git_repo_url,
+                    git_file_path = EXCLUDED.git_file_path,
                     updated_at = NOW()
             `, [
-                `${targetEnv}-${api.id || apiName}`.toLowerCase(),
+                apiId,
                 productId,
                 null, // origin_team_id populated later by admin mapping
                 apiName,
                 props.displayName || apiName,
-                props.description || '',
+                props.description || null,
                 apiPath,
+                props.serviceUrl || null,
+                props.protocols ? props.protocols.join(',') : 'https',
+                props.subscriptionRequired !== false,
+                gitRepoUrl,
+                gitFilePath,
                 JSON.stringify(api)
             ]);
 

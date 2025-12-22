@@ -256,6 +256,49 @@ async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
             };
         }
 
+        // Enrich APIs with Git info (similar logic to products)
+        for (const api of apisData.value) {
+            const apiName = (api.name || '').toLowerCase();
+            const displayName = (api.properties?.displayName || '').toLowerCase();
+
+            // Match API to Git repo
+            const matchedRepo = adoRepos.find(r => {
+                const repoName = r.name.toLowerCase();
+                return repoName === apiName ||
+                    repoName.includes(apiName) ||
+                    apiName.includes(repoName) ||
+                    repoName === displayName.replace(/\s+/g, '-');
+            });
+
+            if (matchedRepo) {
+                // Fetch latest commit
+                let lastCommit = 'unknown';
+                let lastCommitDate = new Date().toISOString();
+
+                try {
+                    const commitsUrl = `https://dev.azure.com/${config.devops!.organization}/${matchedRepo.project.name}/_apis/git/repositories/${matchedRepo.id}/commits?api-version=7.1-preview.1&$top=1`;
+                    const authHeader = `Basic ${Buffer.from(`:${config.devops!.pat}`).toString('base64')}`;
+                    const commitsResponse = await fetch(commitsUrl, { headers: { 'Authorization': authHeader } });
+
+                    if (commitsResponse.ok) {
+                        const commitsData = await commitsResponse.json() as { value: Array<{ commitId: string; author: { date: string } }> };
+                        if (commitsData.value.length > 0) {
+                            lastCommit = commitsData.value[0].commitId.substring(0, 7);
+                            lastCommitDate = commitsData.value[0].author.date;
+                        }
+                    }
+                } catch (err) {
+                    console.warn(`⚠️ [Git] Failed to fetch commit for API ${api.name}`);
+                }
+
+                (api as any).gitInfo = {
+                    repoUrl: matchedRepo.webUrl,
+                    lastCommit,
+                    lastCommitDate
+                };
+            }
+        }
+
         const output = {
             fetchedAt: new Date().toISOString(),
             instance: config.instance,
