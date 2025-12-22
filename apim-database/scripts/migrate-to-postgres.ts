@@ -155,7 +155,14 @@ async function migrateProducts(pool: Pool, products: any[], importEnv: string) {
             // Quality scores will be calculated by background job
             const qualityScore = null;
 
-            console.log(`  💾 Inserting product: ${productId}`);
+            // Extract Git info with tfvars-enhanced paths
+            const gitRepoUrl = (product as any).gitInfo?.repoUrl || null;
+            const gitFilePath = (product as any).gitInfo?.contractPath ||
+                ((product as any).gitInfo?.productPolicyPath && (product as any).gitInfo?.productPolicyFile
+                    ? `${(product as any).gitInfo.productPolicyPath}${(product as any).gitInfo.productPolicyFile}`
+                    : null);
+
+            console.log(`  💾 Inserting product: ${productId}${gitFilePath ? ` [tfvars path: ${gitFilePath}]` : ''}`);
 
             await pool.query(`
                 INSERT INTO products (
@@ -180,8 +187,8 @@ async function migrateProducts(pool: Pool, products: any[], importEnv: string) {
                 targetEnv,
                 'internal',
                 'TERRAFORM_MANAGED',
-                product.gitInfo?.repoUrl || gitRepoUrl,
-                `contracts/${name}/openapi.yaml`,
+                gitRepoUrl,
+                gitFilePath,
                 product.pipelineInfo?.url || null,
                 product.gitInfo?.lastCommit || null,
                 0,
@@ -263,12 +270,13 @@ async function migrateAPIs(pool: Pool, apis: any[], products: any[], importEnv: 
             // Debug: log the product_id we're about to use
             console.log(`  🔍 API "${apiName}" → product_id: "${productId}"`);
 
-            // Extract Git info if available
-            const gitRepoUrl = (api as any).gitInfo?.repoUrl || null;
-            const gitFilePath = (api as any).gitInfo?.filePath || 'openapi.yaml';
+            // Extract Git info with tfvars-enhanced paths (contractPath from tfvars)
+            const apiGitRepoUrl = (api as any).gitInfo?.repoUrl || null;
+            const apiGitFilePath = (api as any).gitInfo?.contractPath || null;  // Precise path from tfvars
+
             const apiId = `${targetEnv}-${api.id || apiName}`.toLowerCase();
 
-            console.log(`  💾 Inserting API: ${apiName}`);
+            console.log(`  💾 Inserting API: ${apiName}${apiGitFilePath ? ` [tfvars contract: ${apiGitFilePath}]` : ''}`);
             await pool.query(`
                 INSERT INTO apis (
                     id, product_id, origin_team_id, name, display_name, description, path,
@@ -298,8 +306,8 @@ async function migrateAPIs(pool: Pool, apis: any[], products: any[], importEnv: 
                 props.serviceUrl || null,
                 props.protocols ? props.protocols.join(',') : 'https',
                 props.subscriptionRequired !== false,
-                gitRepoUrl,
-                gitFilePath,
+                apiGitRepoUrl,
+                apiGitFilePath,
                 JSON.stringify(api)
             ]);
 
