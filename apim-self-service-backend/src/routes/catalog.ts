@@ -24,6 +24,17 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         }
     });
 
+    // GET /api/v1/admin/products (Admin view - same data for now)
+    fastify.get('/admin/products', async (_request, reply) => {
+        try {
+            const products = await getAllProducts();
+            return products;
+        } catch (error) {
+            fastify.log.error({ err: error }, 'Error fetching admin products');
+            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to fetch products' });
+        }
+    });
+
     // GET /api/v1/api-teams (Matching frontend expected path)
     fastify.get('/api-teams', async (_request, reply) => {
         try {
