@@ -2,10 +2,10 @@
  * APIM Data Fetcher
  * 
  * Pulls real data from Azure APIM to understand actual structure
- * Supporting parallel fetch for DEV, QA, and STAGE environments.
+ * Supporting parallel fetch for DEV, QA, and STAGE environments via config.json
  */
 
-import { writeFileSync, mkdirSync } from 'fs';
+import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
 interface APIMConfig {
@@ -14,6 +14,11 @@ interface APIMConfig {
     subscriptionId: string;
     environment: string;
     accessToken?: string;
+    devops?: {
+        pat: string;
+        organization: string;
+        project: string;
+    };
 }
 
 interface EnvConfig {
@@ -129,9 +134,11 @@ async function fetchEnvironment(config: APIMConfig) {
 
         // Enrichment logic for Azure Repos & Pipelines
         productsData.value.forEach((product, i) => {
-            // Placeholder: In production, this would use az repos list or ADO REST API
+            const org = config.devops?.organization || 'your-org';
+            const proj = config.devops?.project || 'your-project';
+
             product.gitInfo = {
-                repoUrl: `https://dev.azure.com/org/project/_git/${product.name}`,
+                repoUrl: `https://dev.azure.com/${org}/${proj}/_git/${product.name}`,
                 lastCommit: '33e66c1', // Mocking last commit from master
                 lastCommitDate: new Date().toISOString()
             };
@@ -140,7 +147,7 @@ async function fetchEnvironment(config: APIMConfig) {
                 name: `${product.properties.displayName} Deploy`,
                 lastRunStatus: i % 2 === 0 ? 'succeeded' : 'failed',
                 lastRunDate: new Date().toISOString(),
-                url: `https://dev.azure.com/org/project/_build?definitionId=${i + 100}`
+                url: `https://dev.azure.com/${org}/${proj}/_build?definitionId=${i + 100}`
             };
         });
 
@@ -177,47 +184,38 @@ async function fetchEnvironment(config: APIMConfig) {
  * Main execution
  */
 async function main() {
-    console.log('🚀 Starting Multi-Environment APIM Data Extraction (Azure Repos Focus)...\n');
+    console.log('🚀 Starting Multi-Environment APIM Data Extraction (JSON Config mode)...\n');
 
     try {
-        const accessToken = await getAzureAccessToken();
-        console.log('✅ Azure Access Token acquired.\n');
-
-        const envsToFetch: EnvConfig[] = [
-            {
-                name: 'DEV',
-                instance: process.env.DEV_APIM_INSTANCE || '',
-                resourceGroup: process.env.DEV_RESOURCE_GROUP || '',
-                subscriptionId: process.env.DEV_SUBSCRIPTION_ID || ''
-            },
-            {
-                name: 'QA',
-                instance: process.env.QA_APIM_INSTANCE || '',
-                resourceGroup: process.env.QA_RESOURCE_GROUP || '',
-                subscriptionId: process.env.QA_SUBSCRIPTION_ID || ''
-            },
-            {
-                name: 'STAGE',
-                instance: process.env.STAGE_APIM_INSTANCE || '',
-                resourceGroup: process.env.STAGE_RESOURCE_GROUP || '',
-                subscriptionId: process.env.STAGE_SUBSCRIPTION_ID || ''
-            }
-        ].filter(e => e.instance && e.resourceGroup && e.subscriptionId);
-
-        if (envsToFetch.length === 0) {
-            console.error('❌ Error: No environments configured. Please set DEV_APIM_INSTANCE, etc.');
+        const configPath = join(process.cwd(), 'config.json');
+        if (!existsSync(configPath)) {
+            console.error('❌ Error: config.json not found.');
+            console.error('Please copy config.template.json to config.json and fill in your details.');
             process.exit(1);
         }
 
-        await Promise.all(envsToFetch.map(env => fetchEnvironment({
+        const configFile = JSON.parse(readFileSync(configPath, 'utf8'));
+        const envsToFetch = configFile.azure.environments;
+        const devops = configFile.devops;
+
+        const accessToken = await getAzureAccessToken();
+        console.log('✅ Azure Access Token acquired.\n');
+
+        if (!envsToFetch || envsToFetch.length === 0) {
+            console.error('❌ Error: No environments configured in config.json.');
+            process.exit(1);
+        }
+
+        await Promise.all(envsToFetch.map((env: any) => fetchEnvironment({
             ...env,
             environment: env.name,
-            accessToken
+            accessToken,
+            devops
         })));
 
         console.log('\n✨ All parallel extraction tasks completed!');
     } catch (error) {
-        console.error('\n❌ extraction failed:', error);
+        console.error('\n❌ Extraction failed:', error);
         process.exit(1);
     }
 }

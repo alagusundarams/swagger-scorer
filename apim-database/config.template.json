@@ -1,0 +1,32 @@
+{
+  "azure": {
+    "environments": [
+      {
+        "name": "DEV",
+        "instance": "your-dev-apim",
+        "resourceGroup": "your-dev-rg",
+        "subscriptionId": "your-dev-sub"
+      },
+      {
+        "name": "QA",
+        "instance": "your-qa-apim",
+        "resourceGroup": "your-qa-rg",
+        "subscriptionId": "your-qa-sub"
+      },
+      {
+        "name": "STAGE",
+        "instance": "your-stage-apim",
+        "resourceGroup": "your-stage-rg",
+        "subscriptionId": "your-stage-sub"
+      }
+    ]
+  },
+  "devops": {
+    "pat": "your-read-only-pat",
+    "organization": "your-org",
+    "project": "your-project"
+  },
+  "database": {
+    "url": "postgresql://postgres:password@localhost:5432/apim"
+  }
+}
