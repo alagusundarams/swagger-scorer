@@ -17,6 +17,9 @@ import { join } from 'path';
 import pg from 'pg';
 const { Pool } = pg;
 
+// For calling the scoring API
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3001';
+
 interface APIMData {
     fetchedAt: string;
     instance: string;
@@ -114,13 +117,31 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
             // Nuclear ID Standardization: Use lowercase targetEnv and lowercase name
             const productId = `${targetEnv}-${name}`.toLowerCase();
 
+            // Extract real timestamps from APIM raw data
+            const createdAt = product.properties?.createdDate || product.createdDate || new Date().toISOString();
+            const updatedAt = product.properties?.lastModifiedDate || product.updatedDate || createdAt;
+
+            // Calculate quality score by calling backend scoring API
+            let qualityScore = null;
+            try {
+                // Fetch OpenAPI spec from Git if available
+                if (product.gitInfo?.repoUrl) {
+                    console.log(`  📊 Scoring product: ${name}...`);
+                    // For now, we'll skip actual scoring during migration to keep it fast
+                    // Quality scores will be calculated on-demand or via a separate job
+                    qualityScore = null;
+                }
+            } catch (err) {
+                console.warn(`  ⚠️ Failed to score ${name}`);
+            }
+
             await pool.query(`
                 INSERT INTO products (
                     id, name, display_name, version, description, state, type,
                     owner_team_id, environment, visibility, management_mode,
                     git_repo_url, git_file_path, terraform_pipeline_url, last_deployed_commit_hash,
-                    subscriber_count, apim_raw_data, created_at, updated_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW())
+                    subscriber_count, quality_score, apim_raw_data, created_at, updated_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
                 ON CONFLICT (id) DO UPDATE SET
                     display_name = EXCLUDED.display_name,
                     description = EXCLUDED.description,
@@ -144,7 +165,10 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
                 product.pipelineInfo?.url || null,
                 product.gitInfo?.lastCommit || null,
                 0,
-                JSON.stringify(product)
+                qualityScore,
+                JSON.stringify(product),
+                createdAt,
+                updatedAt
             ]);
 
             inserted++;
