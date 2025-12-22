@@ -193,13 +193,26 @@ async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
 
         console.log(`✅ [${config.environment}] APIM Snapshot Complete: ${productsData.value.length} Products.`);
 
-        // Enrichment logic: Intelligent Global Match
+        // Enrichment logic: Intelligent Global Match (including GRP patterns)
         productsData.value.forEach((product, i) => {
-            const matchedRepo = adoRepos.find(r =>
-                r.name.toLowerCase() === product.name.toLowerCase() ||
-                r.name.toLowerCase() === product.properties.displayName.toLowerCase().replace(/\s+/g, '-') ||
-                r.name.toLowerCase().includes(product.name.toLowerCase())
-            );
+            const prodName = product.name.toLowerCase();
+            const displayName = product.properties.displayName.toLowerCase().replace(/\s+/g, '-');
+
+            // Generate GRP-agnostic versions for fuzzy matching
+            const stripGRP = (s: string) => s.replace(/^grp_/i, '').replace(/_grp$/i, '').replace(/-grp$/i, '');
+            const prodBase = stripGRP(prodName);
+            const displayBase = stripGRP(displayName);
+
+            const matchedRepo = adoRepos.find(r => {
+                const repoName = r.name.toLowerCase();
+                const repoBase = stripGRP(repoName);
+
+                return repoName === prodName ||
+                    repoName === displayName ||
+                    repoBase === prodBase ||
+                    repoBase === displayBase ||
+                    repoName.includes(prodBase);
+            });
 
             if (matchedRepo) {
                 product.gitInfo = {
