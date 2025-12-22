@@ -54,7 +54,7 @@ async function fetchUserGroups(token: string): Promise<ADGroup[]> {
             throw new Error(`Graph API error: ${response.status} ${response.statusText}`);
         }
 
-        const data = await response.json() as { value: ADGroup[] };
+        const data = await response.json() as { value: Array<ADGroup & { '@odata.type': string }> };
         return data.value.filter(g => g['@odata.type'] === '#microsoft.graph.group');
     } catch (err) {
         throw new Error(`Failed to fetch AD groups: ${err instanceof Error ? err.message : String(err)}`);
