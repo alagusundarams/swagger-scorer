@@ -111,6 +111,9 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
             // Normalize type to satisfy products_type_check (standard | grp)
             const productType = product.type === 'grp' ? 'grp' : 'standard';
 
+            // Nuclear ID Standardization: Use lowercase targetEnv and lowercase name
+            const productId = `${targetEnv}-${name}`.toLowerCase();
+
             await pool.query(`
                 INSERT INTO products (
                     id, name, display_name, version, description, state, type,
@@ -125,7 +128,7 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
                     subscriber_count = EXCLUDED.subscriber_count,
                     updated_at = NOW()
             `, [
-                `${targetEnv}-${product.id || name}`,
+                productId,
                 name,
                 props.displayName || name,
                 '1.0.0', // Default version
@@ -133,7 +136,7 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
                 props.state === 'published' ? 'published' : 'notPublished',
                 productType,
                 null, // owner_team_id
-                targetEnv, // Normalized environment
+                targetEnv, // Normalized environment (UPPERCASE for check constraint)
                 'internal',
                 'TERRAFORM_MANAGED',
                 product.gitInfo?.repoUrl || gitRepoUrl,
@@ -164,7 +167,10 @@ async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEn
     let skipped = 0;
 
     const productMap = new Map<string, string>();
-    products.forEach(p => productMap.set(p.name, `${targetEnv}-${p.id || p.name}`));
+    products.forEach(p => {
+        const name = p.name || 'unnamed';
+        productMap.set(name.toLowerCase(), `${targetEnv}-${name}`.toLowerCase());
+    });
 
     for (const api of apis) {
         try {
@@ -204,7 +210,7 @@ async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEn
                     path = EXCLUDED.path,
                     updated_at = NOW()
             `, [
-                `${targetEnv}-${api.id || apiName}`,
+                `${targetEnv}-${api.id || apiName}`.toLowerCase(),
                 productId,
                 null, // origin_team_id populated later by admin mapping
                 apiName,
@@ -251,7 +257,15 @@ async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importE
                 continue;
             }
 
-            const productId = `${targetEnv}-${apimProductId}`;
+            const productId = `${targetEnv}-${apimProductId}`.toLowerCase();
+
+            // ⚠️ Verification: Check if product actually exists
+            const prodCheck = await pool.query('SELECT id FROM products WHERE id = $1', [productId]);
+            if (prodCheck.rowCount === 0) {
+                console.warn(`  ⚠️  Skipping subscription ${sub.name}: Product ${productId} not found in database.`);
+                skipped++;
+                continue;
+            }
 
             await pool.query(`
                 INSERT INTO subscriptions (
@@ -264,7 +278,7 @@ async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importE
                     state = EXCLUDED.state,
                     updated_at = NOW()
             `, [
-                `${targetEnv}-${sub.id || sub.name}`,
+                `${targetEnv}-${sub.id || sub.name}`.toLowerCase(),
                 productId,
                 'default-team',
                 props.state === 'active' ? 'active' : 'suspended',
