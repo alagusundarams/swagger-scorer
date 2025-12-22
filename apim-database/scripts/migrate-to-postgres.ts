@@ -138,7 +138,7 @@ async function migrateProducts(pool: Pool, products: any[], importEnv: string) {
             const name = product.name || 'unnamed-product';
             const environment = targetEnv;
 
-            const gitRepoUrl = environment === 'PROD'
+            const envGitRepoUrl = environment === 'PROD'
                 ? process.env.GIT_PROD_REPO_URL || process.env.GIT_REPO_URL || null
                 : process.env.GIT_REPO_URL || null;
 
@@ -156,7 +156,7 @@ async function migrateProducts(pool: Pool, products: any[], importEnv: string) {
             const qualityScore = null;
 
             // Extract Git info with tfvars-enhanced paths
-            const gitRepoUrl = (product as any).gitInfo?.repoUrl || null;
+            const gitRepoUrl = (product as any).gitInfo?.repoUrl || envGitRepoUrl;
             const gitFilePath = (product as any).gitInfo?.contractPath ||
                 ((product as any).gitInfo?.productPolicyPath && (product as any).gitInfo?.productPolicyFile
                     ? `${(product as any).gitInfo.productPolicyPath}${(product as any).gitInfo.productPolicyFile}`
