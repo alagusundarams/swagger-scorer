@@ -1,0 +1,24 @@
+{
+  "azure": {
+    "environments": [
+      {
+        "name": "DEV",
+        "instance": "your-dev-apim",
+        "resourceGroup": "your-dev-rg",
+        "subscriptionId": "your-dev-sub"
+      }
+    ]
+  },
+  "devops": {
+    "pat": "your-read-only-pat",
+    "organization": "your-org"
+  },
+  "database": {
+    "url": "postgresql://postgres:postgres@127.0.0.1:5432/apim"
+  },
+  "server": {
+    "port": 3001,
+    "logLevel": "info",
+    "host": "0.0.0.0"
+  }
+}
