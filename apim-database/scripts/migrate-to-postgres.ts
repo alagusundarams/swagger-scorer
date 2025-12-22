@@ -78,28 +78,36 @@ async function createDefaultTeam(pool: pg.Pool): Promise<string> {
  * Transform and insert products
  */
 async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string) {
-    const normalizedEnv = importEnv.toUpperCase();
-    console.log(`\n📦 Migrating ${products.length} products to ${normalizedEnv}...`);
+    // Robust Environment Mapping to satisfy DB Constraints
+    const mapEnv = (env: string): string => {
+        const e = env.toUpperCase();
+        if (e.includes('PROD')) return 'PROD';
+        if (e.includes('STG') || e.includes('STAGE')) return 'STAGE';
+        if (e.includes('QA') || e.includes('TEST')) return 'QA';
+        if (e.includes('DEV')) return 'DEV';
+        return 'DEV'; // Fallback to DEV
+    };
+
+    const targetEnv = mapEnv(importEnv);
+    console.log(`\n📦 Migrating ${products.length} products to ${targetEnv} (Source: ${importEnv})...`);
     let inserted = 0;
     let skipped = 0;
 
     for (const product of products) {
         try {
-            // Extract product properties with safety
             const props = product.properties || {};
             const name = product.name || 'unnamed-product';
 
-            // Determine environment from product name or default to current import env
-            let environment = normalizedEnv;
-            const nameLower = name.toLowerCase();
-            if (nameLower.includes('prod')) environment = 'PROD';
-            else if (nameLower.includes('qa') || nameLower.includes('test')) environment = 'QA';
-            else if (nameLower.includes('stage') || nameLower.includes('stg')) environment = 'STAGE';
+            // Environment is pinned to the file's target env
+            const environment = targetEnv;
 
-            // Set Git repo (DEV/QA/STAGE use same repo, PROD might be different)
+            // Set Git repo
             const gitRepoUrl = environment === 'PROD'
                 ? process.env.GIT_PROD_REPO_URL || process.env.GIT_REPO_URL || null
                 : process.env.GIT_REPO_URL || null;
+
+            // Normalize type to satisfy products_type_check (standard | grp)
+            const productType = product.type === 'grp' ? 'grp' : 'standard';
 
             await pool.query(`
                 INSERT INTO products (
@@ -115,15 +123,15 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
                     subscriber_count = EXCLUDED.subscriber_count,
                     updated_at = NOW()
             `, [
-                `${normalizedEnv}-${product.id || name}`,
+                `${targetEnv}-${product.id || name}`,
                 name,
                 props.displayName || name,
                 '1.0.0', // Default version
                 props.description || '',
                 props.state === 'published' ? 'published' : 'notPublished',
-                product.type || 'standard',
+                productType,
                 null, // owner_team_id
-                normalizedEnv, // Use the import env directly as mandated by the data file
+                targetEnv, // Normalized environment
                 'internal',
                 'TERRAFORM_MANAGED',
                 product.gitInfo?.repoUrl || gitRepoUrl,
