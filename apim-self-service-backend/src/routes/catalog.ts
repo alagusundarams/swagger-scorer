@@ -131,7 +131,7 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
             // Trigger background job (don't await - return immediately)
             scoreAllProducts()
                 .then(result => {
-                    fastify.log.info('Background scoring completed', result);
+                    fastify.log.info({ result }, 'Background scoring completed');
                 })
                 .catch(err => {
                     fastify.log.error({ err }, 'Background scoring failed');

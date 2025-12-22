@@ -5,11 +5,12 @@
  */
 
 import { query } from './db.js';
-import { analyzeOpenAPI } from './analyzer.service.js';
-import simpleGit from 'simple-git';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import simpleGit from 'simple-git';
+import * as yaml from 'yamljs';
+import SwaggerParser from '@apidevtools/swagger-parser';
 
 /**
  * Score all products that don't have quality scores yet
@@ -99,18 +100,79 @@ async function scoreProduct(
         const specPath = join(repoPath, gitFilePath || 'openapi.yaml');
         const specContent = await readFile(specPath, 'utf-8');
 
-        // Analyze and get score
-        const analysis = await analyzeOpenAPI(specContent);
+        // Parse and validate OpenAPI spec
+        const spec = specContent.trim().startsWith('{')
+            ? JSON.parse(specContent)
+            : yaml.parse(specContent);
+
+        // Validate with swagger-parser
+        await SwaggerParser.validate(spec as any);
+
+        // Calculate quality score (simplified - can be enhanced)
+        const score = calculateQualityScore(spec);
 
         // Clean up repo
         await cleanupRepo(repoPath);
 
-        return analysis.qualityScore;
+        return score;
     } catch (err) {
         // Clean up on error
         await cleanupRepo(repoPath);
         throw err;
     }
+}
+
+/**
+ * Calculate quality score from OpenAPI spec
+ */
+function calculateQualityScore(spec: any): number {
+    let score = 0;
+    let maxScore = 0;
+
+    // Info section (30 points)
+    maxScore += 30;
+    if (spec.info) {
+        if (spec.info.title) score += 5;
+        if (spec.info.description && spec.info.description.length > 20) score += 10;
+        if (spec.info.version) score += 5;
+        if (spec.info.contact) score += 5;
+        if (spec.info.license) score += 5;
+    }
+
+    // Paths (40 points)
+    maxScore += 40;
+    const paths = spec.paths || {};
+    const pathCount = Object.keys(paths).length;
+    if (pathCount > 0) score += 10;
+    if (pathCount >= 5) score += 10;
+
+    // Check for descriptions and examples in paths
+    let hasDescriptions = 0;
+    let hasExamples = 0;
+    Object.values(paths).forEach((pathItem: any) => {
+        Object.values(pathItem).forEach((operation: any) => {
+            if (operation.description) hasDescriptions++;
+            if (operation.responses) {
+                Object.values(operation.responses).forEach((response: any) => {
+                    if (response.content) hasExamples++;
+                });
+            }
+        });
+    });
+    if (hasDescriptions > 0) score += 10;
+    if (hasExamples > 0) score += 10;
+
+    // Components/Schemas (30 points)
+    maxScore += 30;
+    const components = spec.components || {};
+    const schemas = components.schemas || {};
+    const schemaCount = Object.keys(schemas).length;
+    if (schemaCount > 0) score += 10;
+    if (schemaCount >= 5) score += 10;
+    if (components.securitySchemes) score += 10;
+
+    // Normalize to 0-100
+    return Math.round((score / maxScore) * 100);
 }
 
 /**

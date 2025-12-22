@@ -24,6 +24,7 @@
     "author": "",
     "license": "MIT",
     "dependencies": {
+        "@apidevtools/swagger-parser": "^12.1.0",
         "@fastify/cors": "^8.5.0",
         "@opentelemetry/auto-instrumentations-node": "^0.40.0",
         "@opentelemetry/exporter-trace-otlp-http": "^0.45.0",
@@ -41,7 +42,8 @@
         "pg": "^8.16.3",
         "pino": "^8.17.0",
         "pino-pretty": "^10.3.1",
-        "simple-git": "^3.30.0"
+        "simple-git": "^3.30.0",
+        "yamljs": "^0.3.0"
     },
     "devDependencies": {
         "@types/js-yaml": "^4.0.9",
