@@ -194,7 +194,8 @@ async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
         console.log(`✅ [${config.environment}] APIM Snapshot Complete: ${productsData.value.length} Products.`);
 
         // Enrichment logic: Intelligent Global Match + GRP Identification
-        productsData.value.forEach((product, i) => {
+        for (let i = 0; i < productsData.value.length; i++) {
+            const product = productsData.value[i];
             const prodName = product.name.toLowerCase();
             const displayName = product.properties.displayName.toLowerCase();
 
@@ -219,10 +220,30 @@ async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
             });
 
             if (matchedRepo) {
+                // Fetch real latest commit from ADO API
+                let lastCommit = 'unknown';
+                let lastCommitDate = new Date().toISOString();
+
+                try {
+                    const commitsUrl = `https://dev.azure.com/${config.devops!.organization}/${matchedRepo.project.name}/_apis/git/repositories/${matchedRepo.id}/commits?api-version=7.1-preview.1&$top=1`;
+                    const authHeader = `Basic ${Buffer.from(`:${config.devops!.pat}`).toString('base64')}`;
+                    const commitsResponse = await fetch(commitsUrl, { headers: { 'Authorization': authHeader } });
+
+                    if (commitsResponse.ok) {
+                        const commitsData = await commitsResponse.json() as { value: Array<{ commitId: string; author: { date: string } }> };
+                        if (commitsData.value.length > 0) {
+                            lastCommit = commitsData.value[0].commitId.substring(0, 7);
+                            lastCommitDate = commitsData.value[0].author.date;
+                        }
+                    }
+                } catch (err) {
+                    console.warn(`⚠️ [Git] Failed to fetch commit for ${matchedRepo.name}`);
+                }
+
                 product.gitInfo = {
                     repoUrl: matchedRepo.webUrl,
-                    lastCommit: '33e66c1',
-                    lastCommitDate: new Date().toISOString()
+                    lastCommit,
+                    lastCommitDate
                 };
             }
 
@@ -232,7 +253,7 @@ async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
                 lastRunDate: new Date().toISOString(),
                 url: matchedRepo ? matchedRepo.webUrl.replace('_git', '_build') : '#'
             };
-        });
+        }
 
         const output = {
             fetchedAt: new Date().toISOString(),
