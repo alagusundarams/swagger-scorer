@@ -28,11 +28,7 @@ async function main() {
     const config = JSON.parse(readFileSync(configPath, 'utf8'));
     const dbUrl = config.database?.url;
 
-    if (!dbUrl) {
-        console.error('❌ Error: database.url not found in config.json');
-        process.exit(1);
-    }
-
+    console.log(`📂 Using config from: ${configPath}`);
     console.log('🔄 Initializing Database...');
     console.log(`📡 Target: ${dbUrl.split('@')[1]}`); // Mask credentials
 
