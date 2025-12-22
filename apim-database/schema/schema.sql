@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS products (
     -- Management mode (ALL start as TERRAFORM_MANAGED)
     management_mode TEXT CHECK (management_mode IN ('TERRAFORM_MANAGED', 'HYBRID', 'PORTAL_MANAGED')) DEFAULT 'TERRAFORM_MANAGED',
     terraform_pipeline_url TEXT,
+    last_deployed_commit_hash TEXT,
     
     -- Git repository (varies by environment)
     git_repo_url TEXT,  -- Main repo URL (DEV/QA/STAGE share one)

@@ -87,9 +87,9 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
                 INSERT INTO products (
                     id, name, display_name, version, description, state,
                     owner_team_id, environment, visibility, management_mode,
-                    git_repo_url, git_file_path,
+                    git_repo_url, git_file_path, terraform_pipeline_url, last_deployed_commit_hash,
                     subscriber_count, apim_raw_data, created_at, updated_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), NOW())
                 ON CONFLICT (id) DO UPDATE SET
                     display_name = EXCLUDED.display_name,
                     description = EXCLUDED.description,
@@ -106,8 +106,10 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
                 importEnv,
                 'internal', // Default visibility
                 'TERRAFORM_MANAGED', // All existing products start as Terraform-managed
-                gitRepoUrl,
+                product.gitInfo?.repoUrl || gitRepoUrl,
                 `contracts/${product.name}/openapi.yaml`, // Default path guess
+                product.pipelineInfo?.url || null,
+                product.gitInfo?.lastCommit || null,
                 0, // Will update from subscriptions
                 JSON.stringify(product)
             ]);

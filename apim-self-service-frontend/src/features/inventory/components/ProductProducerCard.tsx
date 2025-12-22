@@ -118,6 +118,43 @@ export const ProductProducerCard: React.FC<ProductProducerCardProps> = ({
                             </span>
                         )}
                     </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                        {/* Git Repo Link */}
+                        {product.git_repo_url && (
+                            <a
+                                href={product.git_repo_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="p-1.5 rounded-lg bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-700 hover:border-blue-500/50 hover:text-blue-500 transition-all group/git flex items-center gap-1.5"
+                                title={`Last Commit: ${product.lastDeployedCommitHash || 'Unknown'}`}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                                </svg>
+                                <span className="text-[10px] font-bold hidden group-hover/git:inline">Repo</span>
+                            </a>
+                        )}
+
+                        {/* Pipeline Link */}
+                        {product.terraform_pipeline_url && (
+                            <a
+                                href={product.terraform_pipeline_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="p-1.5 rounded-lg bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-700 hover:border-emerald-500/50 hover:text-emerald-500 transition-all group/pipe flex items-center gap-1.5"
+                                title="View ADO Pipeline"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                </svg>
+                                <span className="text-[10px] font-bold hidden group-hover/pipe:inline">CI/CD</span>
+                            </a>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -129,6 +166,6 @@ export const ProductProducerCard: React.FC<ProductProducerCardProps> = ({
                     View Details
                 </button>
             </div>
-        </div>
+        </div >
     );
 };
