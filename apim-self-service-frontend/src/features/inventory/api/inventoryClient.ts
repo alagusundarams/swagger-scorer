@@ -55,9 +55,10 @@ const MOCK_PRODUCTS: Product[] = [
 ];
 
 // === API CALLS ===
-export const getProducts = async () => {
+export const getProducts = async (environment?: string) => {
     if (USE_MOCKS) return Promise.resolve({ data: MOCK_PRODUCTS });
-    return api.get<Product[]>('/products');
+    const params = environment ? { environment } : {};
+    return api.get<Product[]>('/products', { params });
 };
 
 export const updateProduct = async (id: string, updates: Partial<Product>) => {
@@ -235,7 +236,7 @@ export const requestPromotion = async (productId: string, targetEnv: string, tok
     });
 };
 
-export const getAdminProducts = async () => {
+export const getAdminProducts = async (environment?: string) => {
     if (USE_MOCKS) {
         const adminData = Array.from({ length: 42 }).map((_, i) => ({
             id: `admin-api-${i}`,
@@ -248,12 +249,12 @@ export const getAdminProducts = async () => {
             apis: Array.from({ length: (i % 8) + 1 }),
             qualityScore: 70 + (i % 30),
             subscriberCount: (i * 12) % 200,
-            environments: ['Dev', 'QA', 'Prod'],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            isMock: true
-        } as unknown as Product));
+            environment: ['DEV', 'QA', 'STAGE', 'PROD'][i % 4],
+            createdAt: '2023-03-01',
+            updatedAt: '2023-11-21'
+        }));
         return Promise.resolve({ data: adminData });
     }
-    return api.get<Product[]>('/admin/products');
+    const params = environment ? { environment } : {};
+    return api.get<Product[]>('/admin/products', { params });
 };
