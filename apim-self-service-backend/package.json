@@ -33,12 +33,15 @@
         "@stoplight/spectral-owasp-ruleset": "^1.0.0",
         "@stoplight/spectral-parsers": "^1.0.5",
         "@stoplight/spectral-rulesets": "^1.18.0",
+        "@xmldom/xmldom": "^0.8.11",
+        "axios": "^1.13.2",
         "dotenv": "^17.2.3",
         "fastify": "^4.25.0",
         "js-yaml": "^4.1.0",
         "pg": "^8.16.3",
         "pino": "^8.17.0",
-        "pino-pretty": "^10.3.1"
+        "pino-pretty": "^10.3.1",
+        "simple-git": "^3.30.0"
     },
     "devDependencies": {
         "@types/js-yaml": "^4.0.9",

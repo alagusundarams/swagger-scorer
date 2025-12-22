@@ -1,5 +1,6 @@
 import React from 'react';
 import { Team } from '../../../types/entities';
+import { Typeahead } from '../../../components/ui/Typeahead';
 
 interface OnboardingStepIdentityProps {
     formData: {
@@ -47,16 +48,13 @@ export const OnboardingStepIdentity: React.FC<OnboardingStepIdentityProps> = ({
                         />
                     </div>
                     <div>
-                        <label className="block text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-3 ml-1">Responsible Team *</label>
-                        <select
+                        <Typeahead
+                            label="Responsible Team *"
+                            placeholder="Select a Team..."
+                            options={userTeams.map(team => ({ id: team.id, label: team.name.toUpperCase() }))}
                             value={formData.ownerTeamId}
-                            onChange={e => onChange({ ...formData, ownerTeamId: e.target.value })}
-                            className="w-full px-6 py-5 bg-gray-50 dark:bg-slate-900 border border-transparent dark:border-slate-800 rounded-2xl focus:border-blue-500 focus:outline-none dark:text-white transition-all font-bold"
-                        >
-                            {userTeams.map(team => (
-                                <option key={team.id} value={team.id}>{team.name.toUpperCase()}</option>
-                            ))}
-                        </select>
+                            onChange={(val) => onChange({ ...formData, ownerTeamId: val })}
+                        />
                     </div>
                 </div>
                 <div>

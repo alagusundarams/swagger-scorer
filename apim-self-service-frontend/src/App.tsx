@@ -16,6 +16,7 @@ const MarketplacePage = lazy(() => import('./features/discovery/views/Marketplac
 const AnalyzerPage = lazy(() => import('./features/analyzer/views/Analyzer.view').then(module => ({ default: module.AnalyzerPage })));
 const HeaderFooterTest = lazy(() => import('./core/ui/HeaderFooterTest.view').then(module => ({ default: module.HeaderFooterTest })));
 const AdminGovernancePage = lazy(() => import('./features/admin/views/AdminGovernance.view').then(module => ({ default: module.AdminGovernancePage })));
+const AdminMappingView = lazy(() => import('./features/inventory/views/AdminMapping.view').then(module => ({ default: module.AdminMappingView })));
 const PolicyStudioContainer = lazy(() => import('./features/policy-studio/PolicyStudio.container').then(module => ({ default: module.PolicyStudioContainer })));
 
 import { ProtectedRoute } from './core/routing/ProtectedRoute';
@@ -103,10 +104,17 @@ function App() {
             }
           />
           <Route
-            path="/admin/governance"
             element={
               <ProtectedRoute>
                 <AdminGovernancePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/mapping"
+            element={
+              <ProtectedRoute>
+                <AdminMappingView />
               </ProtectedRoute>
             }
           />

@@ -5,7 +5,7 @@ import { Input } from '../../../core/ui/Input';
 import toast from 'react-hot-toast';
 
 export const TeamManager = () => {
-    const { teams, updateTeam, user } = useStore();
+    const { teams, updateTeam } = useStore();
     const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState<Partial<Team>>({});
 

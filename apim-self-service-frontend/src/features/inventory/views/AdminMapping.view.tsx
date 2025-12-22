@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
 import { MOCK_ORPHANED_DATA, ExtractedResource } from '../api/mockOrphanedData';
+import { Typeahead } from '../../../components/ui/Typeahead';
+import { MOCK_AD_GROUPS } from '../api/mockAdGroups';
 import { useStore } from '../../../store/useStore';
 import { toast } from 'react-hot-toast';
 
@@ -24,6 +26,17 @@ export const AdminMappingView = () => {
     const [isCreatingTeam, setIsCreatingTeam] = useState(false);
     const [newTeamName, setNewTeamName] = useState('');
     const [newAdGroup, setNewAdGroup] = useState('');
+
+    // Pre-fill AD Groups with User's groups to simulate "My Groups" realism
+    const adGroupOptions = useMemo(() => {
+        // In a real app, this would merge Directory Search results with User's Token Groups
+        // For demo, we prioritize MOCK items but could highlight if they matched user groups
+        return MOCK_AD_GROUPS.map(g => ({
+            id: g.id,
+            label: g.displayName,
+            subLabel: g.description
+        }));
+    }, []);
 
     const filteredOrphans = useMemo(() => {
         return orphans.filter(o =>
@@ -242,22 +255,20 @@ export const AdminMappingView = () => {
 
                     {/* RIGHT: Action Panel */}
                     <div className="space-y-6">
+
+
                         {/* Target Team Selector */}
                         <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700">
                             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Assign Ownership</h2>
 
                             <div className="mb-4">
-                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Target Team</label>
-                                <select
-                                    className="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                <Typeahead
+                                    label="Target Team"
+                                    placeholder="Search for a team..."
+                                    options={teams.map(t => ({ id: t.id, label: t.name, subLabel: t.azureAdGroupId }))}
                                     value={selectedTeamId}
-                                    onChange={e => setSelectedTeamId(e.target.value)}
-                                >
-                                    <option value="">Select a Team...</option>
-                                    {teams.map(t => (
-                                        <option key={t.id} value={t.id}>{t.name} ({t.id})</option>
-                                    ))}
-                                </select>
+                                    onChange={setSelectedTeamId}
+                                />
                             </div>
 
                             <button
@@ -298,12 +309,12 @@ export const AdminMappingView = () => {
                                         />
                                     </div>
                                     <div>
-                                        <input
-                                            type="text"
-                                            placeholder="AD Group Object ID"
-                                            className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-mono"
+                                        <Typeahead
+                                            label="AD Group (1000+ Items)"
+                                            placeholder="Search directory..."
+                                            options={adGroupOptions}
                                             value={newAdGroup}
-                                            onChange={e => setNewAdGroup(e.target.value)}
+                                            onChange={setNewAdGroup}
                                         />
                                     </div>
                                     <button

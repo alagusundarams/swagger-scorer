@@ -5,6 +5,13 @@ interface ApiInterfaceCatalogProps {
     product: Product;
 }
 
+/**
+ * ApiInterfaceCatalog Component
+ * 
+ * **Purpose**: Consumer-facing list of APIs.
+ * **Permission**: READ-ONLY. No edit buttons, no score analysis (Producer only).
+ * **Features**: Drill-down to operations, copy URL, view documentation.
+ */
 export function ApiInterfaceCatalog({ product }: ApiInterfaceCatalogProps) {
     const [expandedApi, setExpandedApi] = useState<string | null>(null);
 
@@ -59,8 +66,8 @@ export function ApiInterfaceCatalog({ product }: ApiInterfaceCatalogProps) {
                                         {api.operations.map((op, idx) => (
                                             <div key={idx} className="flex items-center gap-4 p-4 bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700/30">
                                                 <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter ${op.method === 'GET' ? 'bg-blue-100 text-blue-600' :
-                                                        op.method === 'POST' ? 'bg-green-100 text-green-600' :
-                                                            'bg-amber-100 text-amber-600'
+                                                    op.method === 'POST' ? 'bg-green-100 text-green-600' :
+                                                        'bg-amber-100 text-amber-600'
                                                     }`}>
                                                     {op.method}
                                                 </span>

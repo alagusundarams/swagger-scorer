@@ -26,7 +26,9 @@ export const ProductDetailPage = () => {
         user,
         products: allProducts,
         subscriptions: allSubscriptions,
-        addSubscription
+        addSubscription,
+        isLoading,
+        error
     } = useStore();
 
     // --- State ---
@@ -65,6 +67,38 @@ export const ProductDetailPage = () => {
 
     // --- Render Logic ---
 
+    // --- Render Logic ---
+
+    // 0. Loading State
+    if (isLoading) {
+        return (
+            <MainLayout>
+                <div className="max-w-7xl mx-auto px-6 py-12 animate-pulse">
+                    <div className="h-4 bg-gray-200 rounded w-1/4 mb-8"></div>
+                    <div className="h-8 bg-gray-200 rounded w-1/2 mb-4"></div>
+                    <div className="h-4 bg-gray-200 rounded w-1/3 mb-12"></div>
+                    <div className="grid grid-cols-3 gap-6">
+                        <div className="h-40 bg-gray-200 rounded-2xl col-span-2"></div>
+                        <div className="h-40 bg-gray-200 rounded-2xl"></div>
+                    </div>
+                </div>
+            </MainLayout>
+        );
+    }
+
+    // 0.5. Error State
+    if (error) {
+        return (
+            <MainLayout>
+                <div className="max-w-7xl mx-auto px-6 py-20 text-center">
+                    <h1 className="text-2xl font-bold text-red-500 mb-4">Connection Failed</h1>
+                    <p className="text-gray-500 mb-8">{error}</p>
+                    <button onClick={() => window.location.reload()} className="px-6 py-2 bg-blue-600 text-white rounded-lg">Retry</button>
+                </div>
+            </MainLayout>
+        );
+    }
+
     // 1. Loading / Access Enforcement
     if (!product || !canAccessProduct(product, user)) {
         return (
@@ -78,8 +112,8 @@ export const ProductDetailPage = () => {
         );
     }
 
-    // 2. Producer View
-    if (userRole === 'producer' && user) {
+    // 2. Producer View (or Admin)
+    if ((userRole === 'producer' || user?.role === 'admin') && user) {
         return (
             <MainLayout>
                 <ProductDetailProducer product={product} user={user} />

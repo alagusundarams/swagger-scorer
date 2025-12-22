@@ -4,10 +4,11 @@ interface Props {
     isOpen: boolean;
     onClose: () => void;
     apiName: string;
-    initialXml?: string; // ADDED
+    productName: string; // ADDED
+    initialXml?: string;
 }
 
-export const PolicyStudioModal = ({ isOpen, onClose, apiName, initialXml }: Props) => {
+export const PolicyStudioModal = ({ isOpen, onClose, apiName, productName, initialXml }: Props) => {
     if (!isOpen) return null;
 
     return (
@@ -15,10 +16,29 @@ export const PolicyStudioModal = ({ isOpen, onClose, apiName, initialXml }: Prop
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <div>
+                    {/* Breadcrumb Navigation */}
+                    <nav className="flex items-center text-xs font-medium text-gray-500 mb-1">
+                        <button
+                            onClick={onClose}
+                            className="hover:text-blue-600 hover:underline transition-colors flex items-center gap-1"
+                            title="Back to Inventory"
+                        >
+                            <span>🏠</span>
+                            <span>Inventory</span>
+                        </button>
+                        <span className="mx-2">/</span>
+                        <button
+                            onClick={onClose}
+                            className="hover:text-blue-600 hover:underline transition-colors text-gray-900 dark:text-white"
+                        >
+                            {productName}
+                        </button>
+                        <span className="mx-2">/</span>
+                        <span className="text-blue-600 font-bold">{apiName}</span>
+                    </nav>
                     <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                        <span>👓</span> Policy Lens: <span className="text-blue-600">{apiName}</span>
+                        <span>👓</span> Policy Studio
                     </h2>
-                    <p className="text-xs text-gray-500">Visualizing policy hierarchy and governance locks.</p>
                 </div>
                 <div className="flex items-center gap-4">
                     <button

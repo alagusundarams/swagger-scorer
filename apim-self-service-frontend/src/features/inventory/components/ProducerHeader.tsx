@@ -7,7 +7,15 @@ interface ProducerHeaderProps {
     onManageClick: () => void;
     onPromoteClick: () => void;
     onDeprecateClick: () => void;
+    isPromotionPending?: boolean;
 }
+
+// Helper to determine next stage
+const getNextStage = (current: string = 'DEV') => {
+    const stages = ['DEV', 'QA', 'STAGE', 'PROD'];
+    const idx = stages.indexOf(current);
+    return idx < stages.length - 1 ? stages[idx + 1] : 'PROD';
+};
 
 export function ProducerHeader({
     product,
@@ -15,7 +23,8 @@ export function ProducerHeader({
     onInitiateRedeploy,
     onManageClick,
     onPromoteClick,
-    onDeprecateClick
+    onDeprecateClick,
+    isPromotionPending = false
 }: ProducerHeaderProps) {
     return (
         <div className="mb-8">
@@ -97,6 +106,43 @@ export function ProducerHeader({
                     </div>
                 </div>
                 <div className="flex items-center gap-4">
+                    {/* Redeploy Button */}
+                    {isOutOfSync && (
+                        <button
+                            onClick={onInitiateRedeploy}
+                            className="bg-amber-100 hover:bg-amber-200 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 dark:hover:bg-amber-900/60 px-6 py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all"
+                            title="Reset to DEV to start a new promotion cycle"
+                        >
+                            <span className="mr-2">↺</span> Redeploy
+                        </button>
+                    )}
+
+                    {/* Promote Button */}
+                    {product.environment !== 'PROD' && (
+                        isPromotionPending ? (
+                            <button
+                                disabled
+                                className="bg-amber-50 text-amber-500 dark:bg-amber-900/10 dark:text-amber-500/50 cursor-wait px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest border border-amber-100 dark:border-amber-900/30 flex items-center gap-2 shadow-sm"
+                            >
+                                <span className="animate-spin text-lg">⏳</span> Awaiting Approval
+                            </button>
+                        ) : (
+                            <button
+                                onClick={onPromoteClick}
+                                disabled={isOutOfSync}
+                                className={`px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-xl flex items-center gap-2 border ${isOutOfSync
+                                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed dark:bg-slate-800 dark:text-slate-600 dark:border-slate-700'
+                                    : 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white border-emerald-400 hover:scale-105 hover:shadow-emerald-500/30 active:scale-95'
+                                    }`}
+                                title={isOutOfSync ? "Cannot promote modified product. Please redeploy." : "Promote to next environment"}
+                            >
+                                <span className="text-lg">🚀</span>
+                                <span className="mt-0.5">Promote to {getNextStage(product.environment)}</span>
+                            </button>
+                        )
+                    )}
+
+                    <div className="h-8 w-px bg-gray-200 dark:bg-slate-700 mx-2"></div>
                     <span className={`px-3 py-1 text-xs font-black rounded-lg border uppercase ${product.environment === 'PROD'
                         ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
                         : 'bg-blue-500/10 text-blue-500 border-blue-500/20'

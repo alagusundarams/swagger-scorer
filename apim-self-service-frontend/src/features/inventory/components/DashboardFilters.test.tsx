@@ -18,6 +18,7 @@ describe('DashboardFilters', () => {
                 activeTeamId="all"
                 onTeamChange={mockOnTeamChange}
                 userTeams={mockTeams}
+                accessibleEnvironments={['DEV', 'QA', 'STAGE', 'PROD']}
             />
         );
 
@@ -36,6 +37,7 @@ describe('DashboardFilters', () => {
                 activeTeamId="all"
                 onTeamChange={mockOnTeamChange}
                 userTeams={mockTeams}
+                accessibleEnvironments={['DEV', 'QA', 'STAGE', 'PROD']}
             />
         );
 
@@ -55,6 +57,7 @@ describe('DashboardFilters', () => {
                 activeTeamId="all"
                 onTeamChange={mockOnTeamChange}
                 userTeams={mockTeams}
+                accessibleEnvironments={['DEV', 'QA', 'STAGE', 'PROD']}
                 isFiltersDisabled={{ environment: true }}
             />
         );

@@ -51,12 +51,14 @@ export interface API {
     path: string;
     operations: Operation[];
     qualityScore?: number;
+    originTeamId?: string; // For GRP: Original owner of the API
 }
 
 export interface Product {
     id: string;
     name: string;
     displayName: string;
+    type?: 'standard' | 'grp'; // Default to 'standard' if undefined
     version: string;
     description: string;
     state: 'published' | 'notPublished' | 'draft';
@@ -118,4 +120,17 @@ export interface Subscription {
     };
 }
 
-
+export interface ConfigurationItem {
+    key: string;
+    values: Record<string, string>;
+    isSecret: boolean;
+    scope: 'API' | 'Global' | 'Product';
+    context: string;
+    lastEditedBy: string;
+    lastEditedAt: string;
+    certificate?: {
+        thumbprint: string;
+        expiryDate: string;
+        subject: string;
+    };
+}

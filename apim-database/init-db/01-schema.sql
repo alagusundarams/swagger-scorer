@@ -105,7 +105,14 @@ CREATE TABLE IF NOT EXISTS products (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     
     -- APIM source data (for audit/troubleshooting)
-    apim_raw_data JSONB
+    apim_raw_data JSONB,
+
+    -- Deployment Tracking (Git Sync)
+    last_deployed_commit_hash TEXT,
+    last_deployed_at TIMESTAMP WITH TIME ZONE,
+    
+    -- Governance Intelligence
+    detected_anomalies JSONB -- e.g. ["MANUAL_CREATION", "ENV_SKIP", "UNOWNED"]
 );
 
 CREATE INDEX idx_products_owner ON products(owner_team_id);

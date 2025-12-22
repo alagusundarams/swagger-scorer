@@ -1,7 +1,5 @@
 import { useState, useMemo } from 'react';
 import { useStore } from '../../../store/useStore';
-import { type Product } from '../../../types/entities';
-import { Select } from '../../../core/ui/Select';
 import toast from 'react-hot-toast';
 
 export const OrphanProductManager = () => {
@@ -29,11 +27,6 @@ export const OrphanProductManager = () => {
     }, [products, teams]);
 
     const targetTeam = useMemo(() => teams.find(t => t.id === targetTeamId), [teams, targetTeamId]);
-    const availableAdGroups = useMemo(() => {
-        if (!targetTeam) return [];
-        // Default group + any additional ones
-        return [targetTeam.azureAdGroupId, ...(targetTeam.additionalAdGroups || [])];
-    }, [targetTeam]);
 
     const handleSelect = (id: string) => {
         const next = new Set(selectedProductIds);
