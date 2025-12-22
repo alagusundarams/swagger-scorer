@@ -235,10 +235,16 @@ async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importE
         try {
             const props = sub.properties || {};
             const scope = props.scope || '';
+
+            // Handle different scope patterns
+            // Format: /subscriptions/.../resourceGroups/.../providers/Microsoft.ApiManagement/service/.../products/productName
             const scopeMatch = scope.match(/\/products\/([^\/\s]+)/);
             const apimProductId = scopeMatch ? scopeMatch[1] : null;
 
             if (!apimProductId) {
+                // If it's a service-level or api-level sub, we log but skip for now
+                // (Our data model primarily targets Product-level subs)
+                // console.warn(`  ⚠️  Skipping non-product subscription ${sub.name} (Scope: ${scope})`);
                 skipped++;
                 continue;
             }
@@ -266,7 +272,8 @@ async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importE
             ]);
 
             inserted++;
-        } catch (error) {
+        } catch (error: any) {
+            console.error(`  ❌ Failed to migrate subscription ${sub.name}:`, error.message);
             skipped++;
         }
     }
