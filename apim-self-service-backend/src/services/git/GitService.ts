@@ -1,4 +1,3 @@
-import { existsSync, mkdirSync } from 'fs';
 import fs from 'fs/promises';
 import path from 'path';
 import { simpleGit, SimpleGit } from 'simple-git';
@@ -20,11 +19,6 @@ export class GitService {
         const config = getAppConfig();
         // Points to the local clone path defined in config or defaults to a folder sibling to backend
         this.repoPath = process.env.GIT_LOCAL_PATH || path.resolve(process.cwd(), '../git-repo');
-
-        // Ensure the directory exists before initializing simple-git
-        if (!existsSync(this.repoPath)) {
-            mkdirSync(this.repoPath, { recursive: true });
-        }
 
         // Prepare PAT if available (Twelve-Factor App)
         const pat = config.devops.pat;
