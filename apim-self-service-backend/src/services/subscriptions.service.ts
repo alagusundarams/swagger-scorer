@@ -7,22 +7,16 @@
 import { query } from './db.js';
 
 /**
- * Fetch all subscriptions with app registration data
+ * Fetch all subscriptions with product data
+ * Day 1: Returns core APIM data (subscriptions + products)
+ * Day 2+: Will include teams and app registrations when those features are ready
  */
 export async function getAllSubscriptions() {
     const res = await query(`
         SELECT s.*, 
-               p.display_name as product_name, 
-               t.name as team_name,
-               ar.id as app_id,
-               ar.display_name as app_display_name,
-               ar.client_id as app_client_id,
-               ar.environment as app_environment,
-               ar.secret_expiry_date as app_secret_expiry
+               p.display_name as product_name
         FROM subscriptions s
         JOIN products p ON s.product_id = p.id
-        JOIN teams t ON s.subscriber_team_id = t.id
-        LEFT JOIN app_registrations ar ON s.app_registration_id = ar.id
         ORDER BY s.created_at DESC
     `);
 
@@ -36,13 +30,9 @@ export async function getAllSubscriptions() {
         lastSyncedAt: s.last_synced_at,
         primaryKey: { name: 'Primary', value: s.primary_key_value || '••••••••' },
         secondaryKey: { name: 'Secondary', value: s.secondary_key_value || '••••••••' },
-        appRegistration: s.app_id ? {
-            id: s.app_id,
-            displayName: s.app_display_name,
-            clientId: s.app_client_id,
-            environment: s.app_environment,
-            secretExpiryDate: s.app_secret_expiry
-        } : null
+        // Day 2: Will populate these when features are ready
+        teamName: null,
+        appRegistration: null
     }));
 }
 
