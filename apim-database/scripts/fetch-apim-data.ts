@@ -193,25 +193,34 @@ async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
 
         console.log(`✅ [${config.environment}] APIM Snapshot Complete: ${productsData.value.length} Products.`);
 
-        // Enrichment logic: Intelligent Global Match (including GRP patterns)
+        // Enrichment logic: Intelligent Global Match + GRP Isolation
         productsData.value.forEach((product, i) => {
             const prodName = product.name.toLowerCase();
-            const displayName = product.properties.displayName.toLowerCase().replace(/\s+/g, '-');
+            const displayName = product.properties.displayName.toLowerCase();
 
-            // Generate GRP-agnostic versions for fuzzy matching
+            // Identifying "false +ve" Consumer GRP Products (Isolation Logic)
+            const isGrp = prodName.includes('grp') || displayName.includes('grp');
+
+            if (isGrp) {
+                (product as any).type = 'grp';
+                console.log(`🛡️ [GRP] Isolated Consumer Bundle: ${product.name}`);
+                // [POLICY] GRP products aggregate APIs from other producers. 
+                // They do NOT have their own Terraform/Policy source repo.
+                return;
+            }
+
+            // Normal Producer Matching
             const stripGRP = (s: string) => s.replace(/^grp_/i, '').replace(/_grp$/i, '').replace(/-grp$/i, '');
             const prodBase = stripGRP(prodName);
-            const displayBase = stripGRP(displayName);
+            const displayBase = stripGRP(displayName.replace(/\s+/g, '-'));
 
             const matchedRepo = adoRepos.find(r => {
                 const repoName = r.name.toLowerCase();
                 const repoBase = stripGRP(repoName);
 
                 return repoName === prodName ||
-                    repoName === displayName ||
                     repoBase === prodBase ||
-                    repoBase === displayBase ||
-                    repoName.includes(prodBase);
+                    repoBase === displayBase;
             });
 
             if (matchedRepo) {

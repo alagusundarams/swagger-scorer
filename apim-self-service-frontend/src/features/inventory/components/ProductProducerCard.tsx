@@ -107,6 +107,13 @@ export const ProductProducerCard: React.FC<ProductProducerCardProps> = ({
                             {product.environment}
                         </span>
 
+                        {/* GRP Isolation Badge */}
+                        {product.type === 'grp' && (
+                            <span className="px-2 py-1 text-[8px] font-black rounded-md border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 uppercase tracking-wider flex items-center gap-1">
+                                📦 <span className="hidden sm:inline">Consumer Bundle</span>
+                            </span>
+                        )}
+
                         {/* Management Mode Badge */}
                         {product.management_mode && product.management_mode !== 'PORTAL_MANAGED' && (
                             <span className={`px-2 py-1 text-[8px] font-black rounded-md border uppercase tracking-wider flex items-center gap-1 ${product.management_mode === 'TERRAFORM_MANAGED'
@@ -120,8 +127,8 @@ export const ProductProducerCard: React.FC<ProductProducerCardProps> = ({
                     </div>
 
                     <div className="flex items-center gap-3">
-                        {/* Git Repo Link */}
-                        {product.git_repo_url && (
+                        {/* Git Repo Link - Only for Producers */}
+                        {product.type !== 'grp' && product.git_repo_url && (
                             <a
                                 href={product.git_repo_url}
                                 target="_blank"
@@ -137,8 +144,8 @@ export const ProductProducerCard: React.FC<ProductProducerCardProps> = ({
                             </a>
                         )}
 
-                        {/* Pipeline Link */}
-                        {product.terraform_pipeline_url && (
+                        {/* Pipeline Link - Only for Producers */}
+                        {product.type !== 'grp' && product.terraform_pipeline_url && (
                             <a
                                 href={product.terraform_pipeline_url}
                                 target="_blank"
