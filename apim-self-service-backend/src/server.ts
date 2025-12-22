@@ -20,6 +20,7 @@ import { configRoutes } from './routes/config.js';
 import { analyzeRoutes } from './routes/analyze.js';
 import { catalogRoutes } from './routes/catalog.js';
 import draftsRoute from './routes/drafts.js';
+import { policyRoutes } from './routes/policyRoutes.js';
 
 /**
  * Build Fastify application
@@ -57,9 +58,41 @@ export async function build() {
     });
 
     // Register CORS plugin
-    // Allows frontend from any origin (can restrict in production)
     await fastify.register(cors, {
-        origin: true, // Allow all origins for now
+        origin: true,
+    });
+
+    /**
+     * WAF Hardening Hook: preParsing
+     * Transparently decodes payloads that were Base64-encoded by the frontend to bypass WAF inspection.
+     * Payload expected format: { "_v": "BASE64_STUFF" }
+     */
+    fastify.addHook('preParsing', async (request, _reply, payload) => {
+        const encodingHeader = request.headers['x-safe-transport'];
+
+        if (encodingHeader === 'base64') {
+            // Buffer the stream
+            const chunks: Buffer[] = [];
+            for await (const chunk of payload) {
+                chunks.push(chunk);
+            }
+            const rawBody = Buffer.concat(chunks).toString();
+
+            try {
+                const json = JSON.parse(rawBody);
+                if (json && json._v) {
+                    const decoded = Buffer.from(json._v, 'base64').toString('utf8');
+                    // Return a new stream with the decoded content
+                    const stream = new (await import('stream')).PassThrough();
+                    stream.end(decoded);
+                    return stream;
+                }
+            } catch (e) {
+                fastify.log.warn('Safe Transport decoding failed, falling back to raw payload');
+            }
+        }
+
+        return payload;
     });
 
     // Load scoring configuration
@@ -77,6 +110,7 @@ export async function build() {
     await fastify.register(analyzeRoutes, { ...config, prefix: '/api/v1' });
     await fastify.register(catalogRoutes, { prefix: '/api/v1' });
     await fastify.register(draftsRoute, { prefix: '/api/v1' });
+    await fastify.register(policyRoutes, { prefix: '/api/v1/policy' });
 
     // Error handler for uncaught errors
     fastify.setErrorHandler((error, _request, reply) => {

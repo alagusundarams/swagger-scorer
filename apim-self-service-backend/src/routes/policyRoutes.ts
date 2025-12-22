@@ -1,0 +1,10 @@
+
+import { FastifyInstance } from 'fastify';
+import { PolicyController } from '../controllers/PolicyController.js';
+
+export async function policyRoutes(fastify: FastifyInstance) {
+    const controller = new PolicyController();
+
+    fastify.post('/analyze', controller.parsePolicy);
+    fastify.post('/deploy', controller.deployPolicy);
+}

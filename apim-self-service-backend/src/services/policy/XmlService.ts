@@ -34,6 +34,88 @@ export class XmlService {
     }
 
     /**
+     * Parses Policy XML into a structured JSON format for the Frontend Visualizer.
+     * Replaces the legacy client-side regex parser.
+     */
+    parsePolicyStructure(xmlString: string): any {
+        const parser = new DOMParser();
+        let doc: Document;
+
+        try {
+            doc = parser.parseFromString(xmlString, 'text/xml');
+        } catch (e) {
+            console.error('XML Parse Error:', e);
+            return { inbound: [], backend: [], outbound: [], onError: [] };
+        }
+
+        return {
+            inbound: this.parseSection(doc, 'inbound'),
+            backend: this.parseSection(doc, 'backend'),
+            outbound: this.parseSection(doc, 'outbound'),
+            onError: this.parseSection(doc, 'on-error')
+        };
+    }
+
+    private parseSection(doc: Document, sectionName: string): any[] {
+        const section = doc.getElementsByTagName(sectionName)[0];
+        if (!section) return [];
+
+        const nodes: any[] = [];
+        // Iterate over direct children only
+        // Note: xmldom's childNodes includes text nodes (whitespace), so we filter
+        for (let i = 0; i < section.childNodes.length; i++) {
+            const node = section.childNodes[i] as Element;
+            if (node.nodeType === 1) { // Element Node
+                nodes.push(this.mapNodeToPolicy(node));
+            }
+        }
+        return nodes;
+    }
+
+    private mapNodeToPolicy(node: Element): any {
+        const type = node.tagName;
+        const attributes: Record<string, string> = {};
+
+        if (node.attributes) {
+            for (let i = 0; i < node.attributes.length; i++) {
+                const attr = node.attributes[i];
+                attributes[attr.name] = attr.value;
+            }
+        }
+
+        // Auto-generate description based on known types (matching frontend logic)
+        let description = type;
+        if (type === 'rate-limit') {
+            description = `Limit to ${attributes['calls'] || '?'} calls per ${attributes['renewal-period'] || '?'}s`;
+        } else if (type === 'set-header') {
+            description = `Set header '${attributes['name']}'`;
+        } else if (type === 'validate-jwt') {
+            description = 'Validate JWT Token';
+        } else if (type === 'mock-response') {
+            description = 'Mock Response';
+        }
+
+        // Recursive parsing for container policies (like choose/when)
+        // For MVP parity, we just check if it has children that are elements
+        const children: any[] = [];
+        if (node.childNodes) {
+            for (let i = 0; i < node.childNodes.length; i++) {
+                const child = node.childNodes[i] as Element;
+                if (child.nodeType === 1) {
+                    children.push(this.mapNodeToPolicy(child));
+                }
+            }
+        }
+
+        return {
+            type,
+            description,
+            attributes,
+            children: children.length > 0 ? children : undefined
+        };
+    }
+
+    /**
      * Extracts deep insights from the XML (mirroring the Frontend Lens).
      * Useful for auditing policies without rendering them.
      */

@@ -51,7 +51,7 @@ describe('DashboardContent', () => {
             />
         );
 
-        expect(screen.getByText(/No Records Encountered/i)).toBeTruthy();
+        expect(screen.getByText(/No APIs Found/i)).toBeTruthy();
     });
 
     it('renders producer cards for "produced" tab', () => {
