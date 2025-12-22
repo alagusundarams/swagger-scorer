@@ -75,19 +75,21 @@ async function createDefaultTeam(pool: pg.Pool): Promise<string> {
 }
 
 /**
+ * Robust Environment Mapping to satisfy DB Constraints
+ */
+function mapEnv(env: string): string {
+    const e = env.toUpperCase();
+    if (e.includes('PROD')) return 'PROD';
+    if (e.includes('STG') || e.includes('STAGE')) return 'STAGE';
+    if (e.includes('QA') || e.includes('TEST')) return 'QA';
+    if (e.includes('DEV')) return 'DEV';
+    return 'DEV'; // Fallback to DEV
+}
+
+/**
  * Transform and insert products
  */
 async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string) {
-    // Robust Environment Mapping to satisfy DB Constraints
-    const mapEnv = (env: string): string => {
-        const e = env.toUpperCase();
-        if (e.includes('PROD')) return 'PROD';
-        if (e.includes('STG') || e.includes('STAGE')) return 'STAGE';
-        if (e.includes('QA') || e.includes('TEST')) return 'QA';
-        if (e.includes('DEV')) return 'DEV';
-        return 'DEV'; // Fallback to DEV
-    };
-
     const targetEnv = mapEnv(importEnv);
     console.log(`\n📦 Migrating ${products.length} products to ${targetEnv} (Source: ${importEnv})...`);
     let inserted = 0;
@@ -156,13 +158,13 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
  * Transform and insert APIs
  */
 async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEnv: string) {
-    const normalizedEnv = importEnv.toUpperCase();
-    console.log(`\n🔌 Migrating ${apis.length} APIs to ${normalizedEnv}...`);
+    const targetEnv = mapEnv(importEnv);
+    console.log(`\n🔌 Migrating ${apis.length} APIs to ${targetEnv}...`);
     let inserted = 0;
     let skipped = 0;
 
     const productMap = new Map<string, string>();
-    products.forEach(p => productMap.set(p.name, `${normalizedEnv}-${p.id || p.name}`));
+    products.forEach(p => productMap.set(p.name, `${targetEnv}-${p.id || p.name}`));
 
     for (const api of apis) {
         try {
@@ -182,7 +184,7 @@ async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEn
             }
 
             if (!productId && products.length > 0) {
-                productId = `${normalizedEnv}-${products[0].id || products[0].name}`;
+                productId = `${targetEnv}-${products[0].id || products[0].name}`;
             }
 
             if (!productId) {
@@ -202,7 +204,7 @@ async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEn
                     path = EXCLUDED.path,
                     updated_at = NOW()
             `, [
-                `${normalizedEnv}-${api.id || apiName}`,
+                `${targetEnv}-${api.id || apiName}`,
                 productId,
                 null, // origin_team_id populated later by admin mapping
                 apiName,
@@ -226,8 +228,8 @@ async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEn
  * Transform and insert subscriptions
  */
 async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importEnv: string) {
-    const normalizedEnv = importEnv.toUpperCase();
-    console.log(`\n🔑 Migrating ${subscriptions.length} subscriptions to ${normalizedEnv}...`);
+    const targetEnv = mapEnv(importEnv);
+    console.log(`\n🔑 Migrating ${subscriptions.length} subscriptions to ${targetEnv}...`);
     let inserted = 0;
     let skipped = 0;
 
@@ -249,7 +251,7 @@ async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importE
                 continue;
             }
 
-            const productId = `${normalizedEnv}-${apimProductId}`;
+            const productId = `${targetEnv}-${apimProductId}`;
 
             await pool.query(`
                 INSERT INTO subscriptions (
@@ -262,7 +264,7 @@ async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importE
                     state = EXCLUDED.state,
                     updated_at = NOW()
             `, [
-                `${normalizedEnv}-${sub.id || sub.name}`,
+                `${targetEnv}-${sub.id || sub.name}`,
                 productId,
                 'default-team',
                 props.state === 'active' ? 'active' : 'suspended',
