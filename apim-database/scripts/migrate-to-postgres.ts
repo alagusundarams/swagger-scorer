@@ -90,7 +90,7 @@ function mapEnv(env: string): string {
 }
 
 /**
- * Transform and insert products
+ * Migrate products - properly structured
  */
 async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string) {
     const targetEnv = mapEnv(importEnv);
@@ -102,100 +102,67 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
         try {
             const props = product.properties || {};
             const name = product.name || 'unnamed-product';
-
-            // Environment is pinned to the file's target env
             const environment = targetEnv;
 
-            // Set Git repo
             const gitRepoUrl = environment === 'PROD'
                 ? process.env.GIT_PROD_REPO_URL || process.env.GIT_REPO_URL || null
                 : process.env.GIT_REPO_URL || null;
 
-            // Normalize type to satisfy products_type_check (standard | grp)
             const productType = product.type === 'grp' ? 'grp' : 'standard';
-
-            // Nuclear ID Standardization: Use lowercase targetEnv and lowercase name
             const productId = `${targetEnv}-${name}`.toLowerCase();
 
-            // Extract real timestamps from APIM raw data
             const createdAt = product.properties?.createdDate || product.createdDate || new Date().toISOString();
             const updatedAt = product.properties?.lastModifiedDate || product.updatedDate || createdAt;
 
-            console.log(`  📅 Timestamps - Created: ${createdAt.substring(0, 10)}, Updated: ${updatedAt.substring(0, 10)}`);
-
-            // Calculate quality score by calling backend scoring API
-            let qualityScore = null;
-            try {
-                // Fetch OpenAPI spec from Git if available
-                if (product.gitInfo?.repoUrl) {
-                    console.log(`  📊 Scoring product: ${name} (skipped for performance - will calculate on-demand)`);
-                    // For now, we'll skip actual scoring during migration to keep it fast
-                    // Quality scores will be calculated on-demand or via a separate job
-                    qualityScore = null;
-                } else {
-                    console.log(`  ⚠️ No Git repo found for ${name}, quality score will be null`);
-                }
-            } catch (err) {
-                console.error(`  ❌ Failed to score ${name}:`, err);
-            }
-
             console.log(`  💾 Inserting product: ${productId}`);
-            console.log(`     - Display Name: ${props.displayName || name}`);
-            console.log(`     - State: ${props.state}`);
-            console.log(`     - Git Repo: ${product.gitInfo?.repoUrl || gitRepoUrl || 'none'}`);
-            console.log(`     - Last Commit: ${product.gitInfo?.lastCommit || 'none'}`);
 
-            try {
-                await pool.query(`
-                    INSERT INTO products (
-                        id, name, display_name, version, description, state, type,
-                        owner_team_id, environment, visibility, management_mode,
-                        git_repo_url, git_file_path, terraform_pipeline_url, last_deployed_commit_hash,
-                        subscriber_count, quality_score, apim_raw_data, created_at, updated_at
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-                    ON CONFLICT (id) DO UPDATE SET
-                        display_name = EXCLUDED.display_name,
-                        description = EXCLUDED.description,
-                        type = EXCLUDED.type,
-                        subscriber_count = EXCLUDED.subscriber_count,
-                        updated_at = NOW()
-                `, [
-                    productId,
-                    name,
-                    props.displayName || name,
-                    '1.0.0', // Default version
-                    props.description || '',
-                    props.state === 'published' ? 'published' : 'notPublished',
-                    productType,
-                    null, // owner_team_id
-                    targetEnv, // Normalized environment (UPPERCASE for check constraint)
-                    'internal',
-                    'TERRAFORM_MANAGED',
-                    product.gitInfo?.repoUrl || gitRepoUrl,
-                    `contracts/${name}/openapi.yaml`,
-                    product.pipelineInfo?.url || null,
-                    product.gitInfo?.lastCommit || null,
-                    0,
-                    qualityScore,
-                    JSON.stringify(product),
-                    createdAt,
-                    updatedAt
-                ]);
+            await pool.query(`
+                INSERT INTO products (
+                    id, name, display_name, version, description, state, type,
+                    owner_team_id, environment, visibility, management_mode,
+                    git_repo_url, git_file_path, terraform_pipeline_url, last_deployed_commit_hash,
+                    subscriber_count, quality_score, apim_raw_data, created_at, updated_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+                ON CONFLICT (id) DO UPDATE SET
+                    display_name = EXCLUDED.display_name,
+                    description = EXCLUDED.description,
+                    updated_at = NOW()
+            `, [
+                productId,
+                name,
+                props.displayName || name,
+                '1.0.0',
+                props.description || '',
+                props.state === 'published' ? 'published' : 'notPublished',
+                productType,
+                null,
+                targetEnv,
+                'internal',
+                'TERRAFORM_MANAGED',
+                product.gitInfo?.repoUrl || gitRepoUrl,
+                `contracts/${name}/openapi.yaml`,
+                product.pipelineInfo?.url || null,
+                product.gitInfo?.lastCommit || null,
+                0,
+                null,
+                JSON.stringify(product),
+                createdAt,
+                updatedAt
+            ]);
 
-                console.log(`  ✅ Successfully inserted/updated ${productId}`);
-                inserted++;
-            } catch (dbErr) {
-                console.error(`  ❌ Database error for product ${name}:`);
-                skipped++;
-            }
+            console.log(`  ✅ Successfully inserted ${productId}`);
+            inserted++;
+        } catch (err) {
+            console.error(`  ❌ Failed to migrate product ${product.name}:`, err instanceof Error ? err.message : String(err));
+            skipped++;
         }
+    }
 
     console.log(`✅ Finished product migration: ${inserted} inserted, ${skipped} skipped.`);
 
-        // Return all valid product IDs for this environment to help lookup
-        const res = await pool.query('SELECT id, name FROM products WHERE environment = $1', [targetEnv]);
-        return new Map<string, string>(res.rows.map(r => [r.name.toLowerCase(), r.id]));
-    }
+    const res = await pool.query('SELECT id, name FROM products WHERE environment = $1', [targetEnv]);
+    return new Map<string, string>(res.rows.map(r => [r.name.toLowerCase(), r.id]));
+}
 
     /**
      * Transform and insert APIs
