@@ -5,8 +5,7 @@
 
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import pg from 'pg';
-const { Pool } = pg;
+import { Pool } from 'pg';
 
 async function setupDatabase() {
     // Get database URL from environment or config

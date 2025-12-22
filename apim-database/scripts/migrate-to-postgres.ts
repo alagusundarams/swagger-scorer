@@ -14,8 +14,8 @@
 
 import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
-import pg from 'pg';
-const { Pool } = pg;
+import { Pool } from 'pg';
+import axios from 'axios';
 
 // For calling the scoring API
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3001';
@@ -34,7 +34,7 @@ interface APIMData {
     subscriptions: any[];
 }
 
-function createDbPool(): pg.Pool {
+function createDbPool(): Pool {
     let connectionString = process.env.DATABASE_URL;
 
     // Fallback to config.json with priority-based discovery
@@ -65,7 +65,7 @@ function createDbPool(): pg.Pool {
 /**
  * Create a default team for products without team assignment
  */
-async function createDefaultTeam(pool: pg.Pool): Promise<string> {
+async function createDefaultTeam(pool: Pool): Promise<string> {
     const teamId = 'default-team';
 
     await pool.query(`
@@ -90,9 +90,43 @@ function mapEnv(env: string): string {
 }
 
 /**
+ * Call the backend scoring API to get quality score for a product
+ */
+async function getQualityScore(productId: string, repoUrl?: string): Promise<number | null> {
+    try {
+        const response = await axios.post(`${BACKEND_URL}/api/v1/analyze`, {
+            productId,
+            repoUrl
+        }, {
+            timeout: 10000 // 10 second timeout
+        });
+
+        return response.data?.qualityScore || null;
+    } catch (error: any) {
+        console.warn(`⚠️  Could not fetch quality score for ${productId}: ${error.message}`);
+        return null;
+    }
+}
+
+/**
+ * Extract version from product name or default to 1.0.0
+ */
+function extractVersion(productName: string): string {
+    // Try to extract version patterns like v1, v2.0, v1.2.3, etc.
+    const versionMatch = productName.match(/v?(\d+)(?:\.(\d+))?(?:\.(\d+))?/i);
+    if (versionMatch) {
+        const major = versionMatch[1] || '1';
+        const minor = versionMatch[2] || '0';
+        const patch = versionMatch[3] || '0';
+        return `${major}.${minor}.${patch}`;
+    }
+    return '1.0.0';
+}
+
+/**
  * Migrate products - properly structured
  */
-async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string) {
+async function migrateProducts(pool: Pool, products: any[], importEnv: string) {
     const targetEnv = mapEnv(importEnv);
     console.log(`\n📦 Migrating ${products.length} products to ${targetEnv} (Source: ${importEnv})...`);
     let inserted = 0;
@@ -114,17 +148,24 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
             const createdAt = product.properties?.createdDate || product.createdDate || new Date().toISOString();
             const updatedAt = product.properties?.lastModifiedDate || product.updatedDate || createdAt;
 
+            // Extract version from product name (Azure APIM products don't have native version field)
+            const version = extractVersion(name);
+            console.log(`  📝 Product "${name}" → version ${version}`);
+
             // Calculate quality score by calling backend scoring API
-            let qualityScore = null;
+            let qualityScore: number | null = null;
             if (product.gitInfo?.repoUrl) {
                 try {
                     console.log(`  📊 Scoring product: ${name}...`);
-                    // For now we'll fetch the OpenAPI spec from Git and score it
-                    // In a real implementation, we'd fetch from the Git repo and send to /api/v1/analyze
-                    // Skipping for migration speed - will calculate on-demand
-                    qualityScore = null;
+                    qualityScore = await getQualityScore(productId, product.gitInfo.repoUrl);
+                    if (qualityScore !== null) {
+                        console.log(`     ✅ Quality score: ${qualityScore}`);
+                    } else {
+                        console.log(`     ℹ️  No quality score returned`);
+                    }
                 } catch (err) {
-                    console.warn(`  ⚠️ Failed to score ${name}:`, err instanceof Error ? err.message : String(err));
+                    console.warn(`     ⚠️  Scoring failed: ${err instanceof Error ? err.message : String(err)}`);
+                    qualityScore = null;
                 }
             }
 
@@ -145,7 +186,7 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
                 productId,
                 name,
                 props.displayName || name,
-                '1.0.0',
+                version,
                 props.description || '',
                 props.state === 'published' ? 'published' : 'notPublished',
                 productType,
@@ -158,7 +199,7 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
                 product.pipelineInfo?.url || null,
                 product.gitInfo?.lastCommit || null,
                 0,
-                null,
+                qualityScore,
                 JSON.stringify(product),
                 createdAt,
                 updatedAt
@@ -175,13 +216,13 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
     console.log(`✅ Finished product migration: ${inserted} inserted, ${skipped} skipped.`);
 
     const res = await pool.query('SELECT id, name FROM products WHERE environment = $1', [targetEnv]);
-    return new Map<string, string>(res.rows.map(r => [r.name.toLowerCase(), r.id]));
+    return new Map<string, string>(res.rows.map((r: any) => [r.name.toLowerCase(), r.id]));
 }
 
 /**
  * Transform and insert APIs
  */
-async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEnv: string) {
+async function migrateAPIs(pool: Pool, apis: any[], products: any[], importEnv: string) {
     const targetEnv = mapEnv(importEnv);
     console.log(`\n🔌 Migrating ${apis.length} APIs to ${targetEnv}...`);
     let inserted = 0;
@@ -202,7 +243,7 @@ async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEn
             const apiName = api.name || 'unnamed-api';
             const apiPath = props.path || '/';
 
-            for (const [productName, prodId] of productMap.entries()) {
+            for (const [productName, prodId] of Array.from(productMap.entries())) {
                 if (apiName.toLowerCase().includes(productName.toLowerCase()) ||
                     apiPath.toLowerCase().includes(productName.toLowerCase())) {
                     productId = prodId;
@@ -254,7 +295,7 @@ async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEn
 /**
  * Transform and insert subscriptions
  */
-async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importEnv: string, productRegistry?: Map<string, string>) {
+async function migrateSubscriptions(pool: Pool, subscriptions: any[], importEnv: string, productRegistry?: Map<string, string>) {
     const targetEnv = mapEnv(importEnv);
     console.log(`\n🔑 Migrating ${subscriptions.length} subscriptions to ${targetEnv}...`);
     let inserted = 0;
@@ -326,7 +367,7 @@ async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importE
 /**
  * Update product statistics
  */
-async function updateProductStats(pool: pg.Pool) {
+async function updateProductStats(pool: Pool) {
     console.log('\n📊 Updating product statistics...');
     await pool.query(`
         UPDATE products p
