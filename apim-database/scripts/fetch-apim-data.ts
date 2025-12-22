@@ -127,11 +127,12 @@ async function fetchEnvironment(config: APIMConfig) {
 
         console.log(`✅ [${config.environment}] Found ${productsData.value.length} Products, ${apisData.value.length} APIs.`);
 
-        // Enrichment logic for Git & Pipelines
+        // Enrichment logic for Azure Repos & Pipelines
         productsData.value.forEach((product, i) => {
+            // Placeholder: In production, this would use az repos list or ADO REST API
             product.gitInfo = {
                 repoUrl: `https://dev.azure.com/org/project/_git/${product.name}`,
-                lastCommit: 'a1b2c3d4',
+                lastCommit: '33e66c1', // Mocking last commit from master
                 lastCommitDate: new Date().toISOString()
             };
 
@@ -176,7 +177,7 @@ async function fetchEnvironment(config: APIMConfig) {
  * Main execution
  */
 async function main() {
-    console.log('🚀 Starting Multi-Environment APIM Data Extraction...\n');
+    console.log('🚀 Starting Multi-Environment APIM Data Extraction (Azure Repos Focus)...\n');
 
     try {
         const accessToken = await getAzureAccessToken();

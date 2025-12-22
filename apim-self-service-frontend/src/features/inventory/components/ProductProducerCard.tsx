@@ -110,16 +110,15 @@ export const ProductProducerCard: React.FC<ProductProducerCardProps> = ({
                         {/* Management Mode Badge */}
                         {product.management_mode && product.management_mode !== 'PORTAL_MANAGED' && (
                             <span className={`px-2 py-1 text-[8px] font-black rounded-md border uppercase tracking-wider flex items-center gap-1 ${product.management_mode === 'TERRAFORM_MANAGED'
-                                    ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800'
-                                    : 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800'
+                                ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800'
+                                : 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800'
                                 }`}>
                                 {product.management_mode === 'TERRAFORM_MANAGED' ? '🔴' : '🟡'}
                                 <span className="hidden sm:inline">{product.management_mode === 'TERRAFORM_MANAGED' ? 'TF' : 'Hybrid'}</span>
                             </span>
                         )}
                     </div>
-                    </div>
-                    
+
                     <div className="flex items-center gap-3">
                         {/* Git Repo Link */}
                         {product.git_repo_url && (
@@ -129,12 +128,12 @@ export const ProductProducerCard: React.FC<ProductProducerCardProps> = ({
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
                                 className="p-1.5 rounded-lg bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-700 hover:border-blue-500/50 hover:text-blue-500 transition-all group/git flex items-center gap-1.5"
-                                title={`Last Commit: ${product.lastDeployedCommitHash || 'Unknown'}`}
+                                title={`Azure Repos: master @ ${product.lastDeployedCommitHash || 'Unknown'}`}
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                                 </svg>
-                                <span className="text-[10px] font-bold hidden group-hover/git:inline">Repo</span>
+                                <span className="text-[10px] font-bold hidden group-hover/git:inline">Azure Repos</span>
                             </a>
                         )}
 
