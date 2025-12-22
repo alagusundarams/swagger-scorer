@@ -4,8 +4,9 @@
     "description": "Database scripts and schema for APIM Portal",
     "scripts": {
         "setup-db": "tsx scripts/setup-db.ts",
-        "migrate": "tsx scripts/migrate-to-postgres.ts",
-        "fetch": "tsx scripts/fetch-apim-data.ts"
+        "fetch": "tsx scripts/fetch-apim-data.ts",
+        "fetch-ad-groups": "tsx scripts/fetch-ad-groups.ts",
+        "migrate": "tsx scripts/migrate-to-postgres.ts"
     },
     "main": "index.js",
     "dependencies": {
