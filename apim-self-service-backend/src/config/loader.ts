@@ -120,3 +120,8 @@ export function getAppConfig(): AppConfig {
     }
     return globalAppConfig;
 }
+
+/**
+ * Alias for getAppConfig to handle case-sensitivity issues during migration
+ */
+export const getAppconfig = getAppConfig;
