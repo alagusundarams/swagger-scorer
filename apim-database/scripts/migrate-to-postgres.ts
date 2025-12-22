@@ -420,6 +420,11 @@ async function main() {
     const pool = createDbPool();
 
     try {
+        // Clear all existing data to prevent foreign key conflicts
+        console.log('\n🧹 Clearing existing data...');
+        await pool.query('TRUNCATE TABLE subscriptions, apis, products, teams CASCADE');
+        console.log('✅ Existing data cleared');
+
         await createDefaultTeam(pool);
 
         for (const dataPath of filesToProcess) {
