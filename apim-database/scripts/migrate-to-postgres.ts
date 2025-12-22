@@ -78,18 +78,20 @@ async function createDefaultTeam(pool: pg.Pool): Promise<string> {
  * Transform and insert products
  */
 async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string) {
-    console.log(`\n📦 Migrating ${products.length} products to ${importEnv}...`);
+    const normalizedEnv = importEnv.toUpperCase();
+    console.log(`\n📦 Migrating ${products.length} products to ${normalizedEnv}...`);
     let inserted = 0;
     let skipped = 0;
 
     for (const product of products) {
         try {
-            // Extract product properties
-            const props = product.properties;
+            // Extract product properties with safety
+            const props = product.properties || {};
+            const name = product.name || 'unnamed-product';
 
-            // Determine environment from product name or default to DEV
-            let environment = 'DEV';
-            const nameLower = product.name.toLowerCase();
+            // Determine environment from product name or default to current import env
+            let environment = normalizedEnv;
+            const nameLower = name.toLowerCase();
             if (nameLower.includes('prod')) environment = 'PROD';
             else if (nameLower.includes('qa') || nameLower.includes('test')) environment = 'QA';
             else if (nameLower.includes('stage') || nameLower.includes('stg')) environment = 'STAGE';
@@ -113,19 +115,19 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
                     subscriber_count = EXCLUDED.subscriber_count,
                     updated_at = NOW()
             `, [
-                `${importEnv}-${product.id || product.name}`,
-                product.name,
-                props.displayName || product.name,
+                `${normalizedEnv}-${product.id || name}`,
+                name,
+                props.displayName || name,
                 '1.0.0', // Default version
                 props.description || '',
                 props.state === 'published' ? 'published' : 'notPublished',
                 product.type || 'standard',
                 null, // owner_team_id
-                importEnv,
+                normalizedEnv, // Use the import env directly as mandated by the data file
                 'internal',
                 'TERRAFORM_MANAGED',
                 product.gitInfo?.repoUrl || gitRepoUrl,
-                `contracts/${product.name}/openapi.yaml`,
+                `contracts/${name}/openapi.yaml`,
                 product.pipelineInfo?.url || null,
                 product.gitInfo?.lastCommit || null,
                 0,
@@ -133,8 +135,8 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
             ]);
 
             inserted++;
-        } catch (error) {
-            console.error(`  ❌ Failed to migrate product ${product.name}:`, error);
+        } catch (error: any) {
+            console.error(`  ❌ Failed to migrate product ${product.name || 'Unknown'}:`, error.message);
             skipped++;
         }
     }
@@ -146,12 +148,13 @@ async function migrateProducts(pool: pg.Pool, products: any[], importEnv: string
  * Transform and insert APIs
  */
 async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEnv: string) {
-    console.log(`\n🔌 Migrating ${apis.length} APIs to ${importEnv}...`);
+    const normalizedEnv = importEnv.toUpperCase();
+    console.log(`\n🔌 Migrating ${apis.length} APIs to ${normalizedEnv}...`);
     let inserted = 0;
     let skipped = 0;
 
     const productMap = new Map<string, string>();
-    products.forEach(p => productMap.set(p.name, `${importEnv}-${p.id || p.name}`));
+    products.forEach(p => productMap.set(p.name, `${normalizedEnv}-${p.id || p.name}`));
 
     for (const api of apis) {
         try {
@@ -159,20 +162,23 @@ async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEn
 
             // Try to find parent product from API name/path
             let productId = null;
+            const apiName = api.name || 'unnamed-api';
+            const apiPath = props.path || '/';
+
             for (const [productName, prodId] of productMap.entries()) {
-                if (api.name.toLowerCase().includes(productName.toLowerCase()) ||
-                    props.path?.includes(productName.toLowerCase())) {
+                if (apiName.toLowerCase().includes(productName.toLowerCase()) ||
+                    apiPath.toLowerCase().includes(productName.toLowerCase())) {
                     productId = prodId;
                     break;
                 }
             }
 
             if (!productId && products.length > 0) {
-                productId = `${importEnv}-${products[0].id || products[0].name}`;
+                productId = `${normalizedEnv}-${products[0].id || products[0].name}`;
             }
 
             if (!productId) {
-                console.warn(`  ⚠️  No product found for API ${api.name}, skipping`);
+                console.warn(`  ⚠️  No product found for API ${apiName}, skipping`);
                 skipped++;
                 continue;
             }
@@ -188,13 +194,13 @@ async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEn
                     path = EXCLUDED.path,
                     updated_at = NOW()
             `, [
-                `${importEnv}-${api.id || api.name}`,
+                `${normalizedEnv}-${api.id || apiName}`,
                 productId,
                 null, // origin_team_id populated later by admin mapping
-                api.name,
-                props.displayName || api.name,
+                apiName,
+                props.displayName || apiName,
                 props.description || '',
-                props.path || '/',
+                apiPath,
                 JSON.stringify(api)
             ]);
 
@@ -212,13 +218,14 @@ async function migrateAPIs(pool: pg.Pool, apis: any[], products: any[], importEn
  * Transform and insert subscriptions
  */
 async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importEnv: string) {
-    console.log(`\n🔑 Migrating ${subscriptions.length} subscriptions to ${importEnv}...`);
+    const normalizedEnv = importEnv.toUpperCase();
+    console.log(`\n🔑 Migrating ${subscriptions.length} subscriptions to ${normalizedEnv}...`);
     let inserted = 0;
     let skipped = 0;
 
     for (const sub of subscriptions) {
         try {
-            const props = sub.properties;
+            const props = sub.properties || {};
             const scope = props.scope || '';
             const scopeMatch = scope.match(/\/products\/([^\/\s]+)/);
             const apimProductId = scopeMatch ? scopeMatch[1] : null;
@@ -228,7 +235,7 @@ async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importE
                 continue;
             }
 
-            const productId = `${importEnv}-${apimProductId}`;
+            const productId = `${normalizedEnv}-${apimProductId}`;
 
             await pool.query(`
                 INSERT INTO subscriptions (
@@ -241,7 +248,7 @@ async function migrateSubscriptions(pool: pg.Pool, subscriptions: any[], importE
                     state = EXCLUDED.state,
                     updated_at = NOW()
             `, [
-                `${importEnv}-${sub.id || sub.name}`,
+                `${normalizedEnv}-${sub.id || sub.name}`,
                 productId,
                 'default-team',
                 props.state === 'active' ? 'active' : 'suspended',
