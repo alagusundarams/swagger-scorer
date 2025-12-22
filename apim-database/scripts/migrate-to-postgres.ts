@@ -262,6 +262,9 @@ async function migrateAPIs(pool: Pool, apis: any[], products: any[], importEnv: 
                 continue;
             }
 
+            // Debug: log the product_id we're about to use
+            console.log(`  🔍 API "${apiName}" → product_id: "${productId}"`);
+
             await pool.query(`
                 INSERT INTO apis (
                     id, product_id, origin_team_id, name, display_name, description, path,
