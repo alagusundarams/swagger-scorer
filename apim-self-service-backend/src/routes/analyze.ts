@@ -168,7 +168,7 @@ export async function analyzeRoutes(
 
                 // Validate structure
                 const openapiVersion = detectOpenAPIVersion(spec);
-                validateOpenAPIStructure(spec, openapiVersion);
+                validateOpenAPIStructure(spec);
 
                 // Run Spectral analysis
                 const violations = await analyzeWithSpectral(spec, spectral);
