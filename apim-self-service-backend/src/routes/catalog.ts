@@ -10,6 +10,7 @@ import { getAllTeams } from '../services/teams.service.js';
 import { getAllSubscriptions, addSubscription, updateSubscriptionState } from '../services/subscriptions.service.js';
 import { getAllApprovals, updateApproval } from '../services/approvals.service.js';
 import { getAuditLogs } from '../services/audit.service.js';
+import { scoreAllProducts, scoreProductById } from '../services/scoring.service.js';
 
 export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {
 
@@ -121,6 +122,40 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         } catch (error) {
             fastify.log.error({ err: error }, 'Error fetching audit logs');
             return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to fetch audit logs' });
+        }
+    });
+
+    // POST /api/v1/admin/score-products (Trigger background scoring job)
+    fastify.post('/admin/score-products', async (_request, reply) => {
+        try {
+            // Trigger background job (don't await - return immediately)
+            scoreAllProducts()
+                .then(result => {
+                    fastify.log.info('Background scoring completed', result);
+                })
+                .catch(err => {
+                    fastify.log.error({ err }, 'Background scoring failed');
+                });
+
+            return { message: 'Scoring job started in background' };
+        } catch (error) {
+            fastify.log.error({ err: error }, 'Error starting scoring job');
+            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to start scoring job' });
+        }
+    });
+
+    // POST /api/v1/admin/score-product/:id (Score a specific product)
+    fastify.post('/admin/score-product/:id', async (request, reply) => {
+        const { id } = request.params as any;
+        try {
+            const score = await scoreProductById(id);
+            if (score === null) {
+                return reply.status(404).send({ error: 'Not Found', message: 'Product has no OpenAPI spec to score' });
+            }
+            return { productId: id, qualityScore: score };
+        } catch (error) {
+            fastify.log.error({ err: error }, 'Error scoring product');
+            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to score product' });
         }
     });
 }
