@@ -150,24 +150,8 @@ async function migrateProducts(pool: Pool, products: any[], importEnv: string) {
 
             // Extract version from product name (Azure APIM products don't have native version field)
             const version = extractVersion(name);
-            console.log(`  📝 Product "${name}" → version ${version}`);
-
-            // Calculate quality score by calling backend scoring API
-            let qualityScore: number | null = null;
-            if (product.gitInfo?.repoUrl) {
-                try {
-                    console.log(`  📊 Scoring product: ${name}...`);
-                    qualityScore = await getQualityScore(productId, product.gitInfo.repoUrl);
-                    if (qualityScore !== null) {
-                        console.log(`     ✅ Quality score: ${qualityScore}`);
-                    } else {
-                        console.log(`     ℹ️  No quality score returned`);
-                    }
-                } catch (err) {
-                    console.warn(`     ⚠️  Scoring failed: ${err instanceof Error ? err.message : String(err)}`);
-                    qualityScore = null;
-                }
-            }
+            console.log(`  📝 Product "${name}" → version ${version}`); \n\n            // Quality scores will be calculated by background job
+            const qualityScore = null;
 
             console.log(`  💾 Inserting product: ${productId}`);
 
@@ -238,19 +222,31 @@ async function migrateAPIs(pool: Pool, apis: any[], products: any[], importEnv: 
         try {
             const props = api.properties;
 
-            // Try to find parent product from API name/path
+            // Try to find parent product - improved matching logic
             let productId = null;
             const apiName = api.name || 'unnamed-api';
             const apiPath = props.path || '/';
 
+            // Strategy 1: Exact name match (case-insensitive)
             for (const [productName, prodId] of Array.from(productMap.entries())) {
-                if (apiName.toLowerCase().includes(productName.toLowerCase()) ||
-                    apiPath.toLowerCase().includes(productName.toLowerCase())) {
+                if (apiName.toLowerCase() === productName.toLowerCase()) {
                     productId = prodId;
                     break;
                 }
             }
 
+            // Strategy 2: API name starts with product name (e.g., payment-api-v2 → payment)
+            if (!productId) {
+                for (const [productName, prodId] of Array.from(productMap.entries())) {
+                    if (apiName.toLowerCase().startsWith(productName.toLowerCase() + '-') ||
+                        apiName.toLowerCase().startsWith(productName.toLowerCase() + '_')) {
+                        productId = prodId;
+                        break;
+                    }
+                }
+            }
+
+            // Strategy 3: Fallback to default product for environment
             if (!productId && products.length > 0) {
                 const fallbackName = products[0].name || 'unnamed';
                 productId = `${targetEnv}-${fallbackName}`.toLowerCase();

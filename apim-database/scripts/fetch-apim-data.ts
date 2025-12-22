@@ -61,6 +61,7 @@ interface API {
         protocols: string[];
         subscriptionRequired: boolean;
     };
+    productIds?: string[]; // Explicit product associations from APIM
 }
 
 interface Subscription {
