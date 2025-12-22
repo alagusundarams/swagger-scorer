@@ -8,7 +8,7 @@
 
 import { readFile } from 'fs/promises';
 import { load as parseYaml } from 'js-yaml';
-import { ScoringConfig } from '../types/index.js';
+import { ScoringConfig, AppConfig } from '../types/index.js';
 
 /**
  * Load scoring configuration from local YAML file
@@ -27,14 +27,63 @@ export async function loadConfig(configPath: string): Promise<ScoringConfig> {
 
         // Basic validation: ensure required fields exist
         if (!config.categories || !config.thresholds) {
-            throw new Error('Invalid config: missing required fields');
+            throw new Error('Invalid scoring config: missing required fields');
         }
 
         return config;
     } catch (error) {
         // Re-throw with more context for easier debugging
-        throw new Error(`Failed to load config from ${configPath}: ${error}`);
+        throw new Error(`Failed to load scoring config from ${configPath}: ${error}`);
     }
+}
+
+/**
+ * Load application configuration
+ * 
+ * STRATEGY (Twelve-Factor App):
+ * 1. Environment Variables (Highest Priority - for Containers/K8s)
+ * 2. Local config.json (Fallback - for Local Development)
+ * 3. Hardcoded Defaults (Sensible basics)
+ * 
+ * @param configPath - Path to the optional JSON configuration file
+ * @returns Merged application configuration
+ * @throws Error if critical configuration (database.url) is missing
+ */
+export async function loadAppConfig(configPath: string): Promise<AppConfig> {
+    let fileConfig: Partial<AppConfig> = {};
+
+    // 1. Try to load config.json (Optional)
+    try {
+        const fileContent = await readFile(configPath, 'utf-8');
+        fileConfig = JSON.parse(fileContent);
+    } catch (error) {
+        // Silently ignore if file is missing; we might have ENV vars
+        // console.log(`ℹ️ No config.json found at ${configPath}, relying on Environment Variables.`);
+    }
+
+    // 2. Build the final config with Environment Variable Precedence
+    const config: AppConfig = {
+        database: {
+            url: process.env.DATABASE_URL || fileConfig.database?.url || '',
+        },
+        devops: {
+            pat: process.env.ADO_PAT || fileConfig.devops?.pat || 'your-read-only-pat',
+            organization: process.env.ADO_ORG || fileConfig.devops?.organization || 'your-org',
+        },
+        server: {
+            port: parseInt(process.env.PORT || String(fileConfig.server?.port || 3001), 10),
+            logLevel: process.env.LOG_LEVEL || fileConfig.server?.logLevel || 'info',
+            host: process.env.HOST || fileConfig.server?.host || '0.0.0.0',
+        }
+    };
+
+    // 3. FAIL-FAST: Validate critical configuration
+    if (!config.database.url) {
+        console.error('❌ FATAL: DATABASE_URL is not set via environment or config.json');
+        throw new Error('Missing critical configuration: database.url');
+    }
+
+    return config;
 }
 
 /**
@@ -54,4 +103,20 @@ export function validateConfig(config: ScoringConfig): void {
             `Category weights must sum to 100, got ${totalWeight}`
         );
     }
+}
+
+/**
+ * Global application configuration state
+ */
+let globalAppConfig: AppConfig | null = null;
+
+export function setAppConfig(config: AppConfig): void {
+    globalAppConfig = config;
+}
+
+export function getAppConfig(): AppConfig {
+    if (!globalAppConfig) {
+        throw new Error('App config not initialized. Call setAppConfig first.');
+    }
+    return globalAppConfig;
 }

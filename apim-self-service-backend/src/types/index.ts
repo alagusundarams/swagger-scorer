@@ -113,3 +113,21 @@ export interface ErrorResponse {
     message: string;
     details?: unknown; // Optional additional details about the error
 }
+/**
+ * Global Application Configuration
+ * Loaded from config.json
+ */
+export interface AppConfig {
+    database: {
+        url: string;
+    };
+    devops: {
+        pat: string;
+        organization: string;
+    };
+    server: {
+        port: number;
+        logLevel: string;
+        host?: string;
+    };
+}

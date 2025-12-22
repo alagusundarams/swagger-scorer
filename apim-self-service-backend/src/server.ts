@@ -14,13 +14,15 @@ import 'dotenv/config';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { resolve } from 'path';
-import { loadConfig, validateConfig } from './config/loader.js';
+import { loadConfig, validateConfig, loadAppConfig, setAppConfig } from './config/loader.js';
+import { initDb } from './services/db.js';
 import { healthRoutes } from './routes/health.js';
 import { configRoutes } from './routes/config.js';
 import { analyzeRoutes } from './routes/analyze.js';
 import { catalogRoutes } from './routes/catalog.js';
 import draftsRoute from './routes/drafts.js';
 import { policyRoutes } from './routes/policyRoutes.js';
+import { AppConfig } from './types/index.js';
 
 /**
  * Build Fastify application
@@ -28,13 +30,24 @@ import { policyRoutes } from './routes/policyRoutes.js';
  * This creates the server instance and registers all routes and plugins.
  * We export this as a function so it can be used in tests.
  * 
- * @returns Configured Fastify instance
+ * @returns Configured Fastify instance and the loaded config
+ * @throws Error if configuration loading fails
  */
 export async function build() {
+    // 1. Load Application Configuration (JSON-first)
+    const appConfigPath = resolve(process.cwd(), 'config.json');
+    const appConfig = await loadAppConfig(appConfigPath);
+
+    // Store globally for services
+    setAppConfig(appConfig);
+
+    // 2. Initialize Database with URL from config
+    await initDb(appConfig.database.url);
+
     // Create Fastify instance with logging
     const fastify = Fastify({
         logger: {
-            level: process.env.LOG_LEVEL || 'info',
+            level: appConfig.server.logLevel || 'info',
             transport: {
                 targets: [
                     {
@@ -96,10 +109,10 @@ export async function build() {
     });
 
     // Load scoring configuration
-    const configPath = resolve(process.cwd(), 'config/scoring-config.yaml');
-    fastify.log.info({ path: configPath }, 'Loading scoring configuration');
+    const scoringConfigPath = resolve(process.cwd(), 'config/scoring-config.yaml');
+    fastify.log.info({ path: scoringConfigPath }, 'Loading scoring configuration');
 
-    const config = await loadConfig(configPath);
+    const config = await loadConfig(scoringConfigPath);
     validateConfig(config);
 
     fastify.log.info({ version: config.version }, 'Configuration loaded successfully');
@@ -122,22 +135,23 @@ export async function build() {
         });
     });
 
+    // Attach appConfig for use in start()
+    (fastify as any).appConfig = appConfig;
+
     return fastify;
 }
 
 /**
  * Start server
- * 
- * This is called when running the server directly (npm run dev or npm start).
- * Not called during tests.
  */
 async function start(): Promise<void> {
     try {
         const fastify = await build();
+        const appConfig = (fastify as any).appConfig as AppConfig;
 
-        // Get port from environment or default to 3001
-        const port = parseInt(process.env.PORT || '3001', 10);
-        const host = process.env.HOST || '0.0.0.0';
+        // Get port and host from config
+        const port = appConfig.server.port || 3001;
+        const host = appConfig.server.host || '0.0.0.0';
 
         // Start listening
         await fastify.listen({ port, host });

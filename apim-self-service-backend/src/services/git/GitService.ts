@@ -2,6 +2,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import { simpleGit, SimpleGit } from 'simple-git';
 
+import { getAppConfig } from '../../config/loader.js';
+
 /**
  * GitService
  * 
@@ -14,8 +16,16 @@ export class GitService {
     private git: SimpleGit;
 
     constructor() {
-        // Points to the local clone path defined in .env or defaults to a folder sibling to backend
+        const config = getAppConfig();
+        // Points to the local clone path defined in config or defaults to a folder sibling to backend
         this.repoPath = process.env.GIT_LOCAL_PATH || path.resolve(process.cwd(), '../git-repo');
+
+        // Prepare PAT if available (Twelve-Factor App)
+        const pat = config.devops.pat;
+        if (pat && pat !== 'your-read-only-pat') {
+            console.log(`[GitService] Initializing with ADO PAT for organization: ${config.devops.organization}`);
+        }
+
         this.git = simpleGit(this.repoPath);
     }
 

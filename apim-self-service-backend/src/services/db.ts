@@ -11,14 +11,8 @@ import pg from 'pg';
 const { Pool } = pg;
 
 // Use the environment variable or fallback to a local development default
-const connectionString = process.env.DATABASE_URL;
-
-if (!connectionString) {
-    console.warn('⚠️  DATABASE_URL environment variable is not set. Database features will be unavailable.');
-}
-
-export const pool = new Pool({
-    connectionString,
+let pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
     // Max connections in the pool
     max: 20,
     // Shutdown connection after 30s of inactivity
@@ -28,14 +22,31 @@ export const pool = new Pool({
 });
 
 /**
+ * Initialize the database connection with a specific URL.
+ * This should be called once the application configuration is loaded.
+ */
+export async function initDb(connectionString: string) {
+    console.log('🔌 Initializing Database Connection...');
+    const oldPool = pool;
+    pool = new Pool({
+        connectionString,
+        max: 20,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 2000,
+    });
+
+    // Close the old pool if it was active
+    if (oldPool) {
+        await oldPool.end();
+    }
+}
+
+/**
  * Helper to run a query with automatic logging and error handling
  */
 export async function query(text: string, params?: any[]) {
-    const start = Date.now();
     try {
         const res = await pool.query(text, params);
-        const duration = Date.now() - start;
-        // console.log('DEBUG: Query executed', { text, duration, rows: res.rowCount });
         return res;
     } catch (err) {
         console.error('❌ Database Query Error:', { text, error: err });
