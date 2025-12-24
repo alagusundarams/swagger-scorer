@@ -20,17 +20,9 @@ foreach ($env in $environments) {
     $job = Start-Job -Name "Sync-$env" -ScriptBlock {
         param($targetEnv, $cwd)
         
-        # Set Environment Variable for this session
-        $env:ENVIRONMENT = $targetEnv
-        
-        # Change to correct directory (PowerShell jobs start in user home by default)
-        Set-Location $cwd
-        
-        # Run the script
+        # Run the script with explicit Argument
         # Using npx tsx to run typescript directly
-        # Redirecting StdOut/StdErr is handled by the script itself logging to file, 
-        # but we capture output here for the Job object too.
-        npx tsx scripts/sync-apim-to-db.ts
+        npx tsx scripts/sync-apim-to-db.ts --env=$targetEnv
         
     } -ArgumentList $env, (Get-Location).Path
     

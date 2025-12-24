@@ -42,8 +42,19 @@ function loadConfig() {
 const config = loadConfig();
 
 // --- CONFIGURATION ---
-// STRICT RULE: Resolve Environment from ENV VAR, then load config FROM FILE.
-const targetEnvName = process.env.ENVIRONMENT || 'DEV'; // Default to first/DEV if not set
+// STRICT RULE: Resolve Environment from CLI ARGUMENT ONLY.
+// Usage: npx tsx scripts/sync-apim-to-db.ts --env=DEV
+
+const args = process.argv.slice(2);
+const envArg = args.find(arg => arg.startsWith('--env='));
+const targetEnvName = envArg ? envArg.split('=')[1] : null;
+
+if (!targetEnvName) {
+    console.error('❌ FATAL: Missing required argument "--env={ENV_NAME}"');
+    console.error('Usage: npx tsx scripts/sync-apim-to-db.ts --env=DEV');
+    process.exit(1);
+}
+
 const targetEnvConfig = config.azure?.environments?.find((e: any) => e.name === targetEnvName);
 
 if (!targetEnvConfig) {
@@ -53,7 +64,7 @@ if (!targetEnvConfig) {
 }
 
 const DB_CONFIG = {
-    connectionString: process.env.DATABASE_URL || config.database?.url || 'postgresql://postgres:password@localhost:5432/apim'
+    connectionString: targetEnvConfig.databaseUrl || config.database?.url || process.env.DATABASE_URL
 };
 
 const AZURE_CONFIG = {
