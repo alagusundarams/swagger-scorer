@@ -3,6 +3,8 @@ import { USE_MOCKS } from '../../../config/env';
 import { type Product, type Subscription, type Team, type API, type AppRegistration } from '../../../types/entities';
 import { type ApprovalRequest, type ApprovalStatus, type AuditLog } from '../../../types/workflow';
 
+// === CONFIG ===
+
 // === MOCK DATA ===
 const MOCK_TEAMS: Team[] = [
     {

@@ -1,14 +1,32 @@
 import { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
-import { type PolicyScope, type PolicyFlow, type PolicyStep } from './types/policyTypes';
+import { type PolicyScope, type PolicyFlow, type PolicyStep, type PolicySection, type PolicyStepType } from './types/policyTypes';
 import { PolicyPalette } from './components/PolicyPalette';
+import { PolicyStepCard } from './components/PolicyStepCard';
 import { RateLimitProperties } from './components/properties/RateLimitProperties';
 import { generatePolicyXml } from './utils/policyGenerator';
 import { DeploymentConfirmationModal } from './components/DeploymentConfirmationModal';
 import { useStore } from '../../store/useStore';
 import { api } from '../../api/baseClient';
+import { v4 as uuidv4 } from 'uuid';
 
-// Placeholder Mock Data (Only used if no initialXml)
+// DnD Imports
+import {
+    DndContext,
+    DragOverlay,
+    useSensor,
+    useSensors,
+    PointerSensor,
+    DragStartEvent,
+    DragEndEvent
+} from '@dnd-kit/core';
+import {
+    SortableContext,
+    verticalListSortingStrategy,
+    arrayMove
+} from '@dnd-kit/sortable';
+
+// Placeholder Mock Data
 const MOCK_FLOW: PolicyFlow = {
     inbound: [
         { id: '1', type: 'base', displayName: 'Global Policy', scope: 'global', isLocked: true, xmlSnippet: '<base />', properties: {} },
@@ -49,6 +67,17 @@ export const PolicyStudioContainer = ({
     const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
     const [isDeploying, setIsDeploying] = useState(false);
 
+    // DnD State
+    const [activeDragItem, setActiveDragItem] = useState<any | null>(null);
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8,
+            },
+        })
+    );
+
     // Fetch Parsed Policy from Backend when initialXml changes
     useEffect(() => {
         const fetchPolicy = async () => {
@@ -58,7 +87,9 @@ export const PolicyStudioContainer = ({
             setIsLoading(true);
             try {
                 const response = await api.post('/policy/analyze', { xml: xmlToParse });
-                setFlow(response.data);
+                if (response.data) {
+                    setFlow(response.data);
+                }
                 // If it was initial load, set rawXml too
                 if (!rawXml && initialXml) setRawXml(initialXml);
             } catch (error) {
@@ -68,28 +99,29 @@ export const PolicyStudioContainer = ({
             }
         };
 
-        // Only fetch if initial load or switching back to visual mode
         if (editMode === 'visual') {
             fetchPolicy();
         }
     }, [initialXml, editMode]);
 
     const activeStep = selectedStepId
-        ? flow.inbound.find(s => s.id === selectedStepId) || flow.backend.find(s => s.id === selectedStepId)
+        ? Object.values(flow).flat().find(s => s.id === selectedStepId)
         : null;
 
     const handleUpdateStep = (updates: Record<string, any>) => {
         if (!activeStep) return;
-        const updateList = (list: PolicyStep[]) =>
+
+        const updateSection = (list: PolicyStep[]) =>
             list.map(s => s.id === activeStep.id ? { ...s, properties: updates } : s);
 
-        const newFlow: PolicyFlow = {
-            ...flow,
-            inbound: updateList(flow.inbound),
-            backend: updateList(flow.backend)
-        };
+        const newFlow = { ...flow };
+
+        // Find which section the step belongs to
+        (Object.keys(newFlow) as PolicySection[]).forEach(section => {
+            newFlow[section] = updateSection(newFlow[section]);
+        });
+
         setFlow(newFlow);
-        // Sync rawXml
         setRawXml(generatePolicyXml(newFlow));
     };
 
@@ -120,170 +152,279 @@ export const PolicyStudioContainer = ({
         }
     };
 
+    // --- DnD Handlers ---
+
+    const handleDragStart = (event: DragStartEvent) => {
+        setActiveDragItem(event.active.data.current);
+    };
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+        setActiveDragItem(null);
+
+        if (!over) return;
+
+        // Case 1: Reordering within same list
+        // Case 2: Moving between lists (not implemented fully for simplification, assuming inbound mostly)
+        // Case 3: Dropping from Palette
+
+        const activeData = active.data.current;
+        const overData = over.data.current;
+
+        // Drop from Palette
+        if (activeData?.type === 'palette-item') {
+            const section = overData?.sortable?.containerId as PolicySection || 'inbound'; // Default to inbound if dropping on container
+
+            // Create new step
+            const newStep: PolicyStep = {
+                id: uuidv4(),
+                type: activeData.policyType as PolicyStepType,
+                displayName: activeData.template.label,
+                description: activeData.template.description,
+                scope: selectedScope,
+                isLocked: false,
+                properties: {}
+            };
+
+            const newFlow = { ...flow };
+
+            // Insert at index if over a specific item, or end of list
+            if (overData?.type === 'step') {
+                const overIndex = overData.sortable.index;
+                newFlow[section].splice(overIndex, 0, newStep);
+            } else {
+                newFlow[section].push(newStep);
+            }
+
+            setFlow(newFlow);
+            setSelectedStepId(newStep.id);
+            setRawXml(generatePolicyXml(newFlow));
+            return;
+        }
+
+        // Reordering
+        if (active.id !== over.id && activeData?.type === 'step') {
+            const section = activeData.sortable.containerId as PolicySection; // Assuming staying in same section for now
+            const oldIndex = flow[section].findIndex(s => s.id === active.id);
+            const newIndex = flow[section].findIndex(s => s.id === over.id);
+
+            if (oldIndex !== -1 && newIndex !== -1) {
+                const newFlow = {
+                    ...flow,
+                    [section]: arrayMove(flow[section], oldIndex, newIndex)
+                };
+                setFlow(newFlow);
+                setRawXml(generatePolicyXml(newFlow));
+            }
+        }
+    };
+
     return (
-        <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
-            <DeploymentConfirmationModal
-                isOpen={isDeployModalOpen}
-                onClose={() => setIsDeployModalOpen(false)}
-                onConfirm={handleDeploy}
-                isDeploying={isDeploying}
-                resourceName={resourceName}
-            />
-
-            {/* LEFT COLUMN: Palette */}
-            <div className="w-64 bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 flex flex-col">
-                <PolicyPalette />
-            </div>
-
-            <div className="flex-1 flex flex-col relative bg-slate-50 dark:bg-slate-900 bg-grid-slate-200/[0.04]">
+        <DndContext
+            sensors={sensors}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+        >
+            <div className="flex h-full bg-slate-50 dark:bg-slate-900 overflow-hidden">
                 {isLoading && (
                     <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
                     </div>
                 )}
-                <div className="p-4 flex justify-between items-center bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-b border-gray-100 dark:border-slate-800 z-10">
-                    <div className="flex items-center gap-4">
-                        <select
-                            value={selectedScope}
-                            onChange={(e) => setSelectedScope(e.target.value as any)}
-                            className="bg-transparent font-black text-lg text-gray-900 dark:text-white outline-none"
-                        >
-                            <option value="global">Global Scope</option>
-                            <option value="product">Product Scope</option>
-                            <option value="api">API Scope</option>
-                            <option value="operation">Operation Scope</option>
-                        </select>
-                        <div className="flex bg-slate-200 dark:bg-slate-800 rounded-full p-1">
-                            <button
-                                onClick={() => setEditMode('visual')}
-                                className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase transition ${editMode === 'visual' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                <DeploymentConfirmationModal
+                    isOpen={isDeployModalOpen}
+                    onClose={() => setIsDeployModalOpen(false)}
+                    onConfirm={handleDeploy}
+                    isDeploying={isDeploying}
+                    resourceName={resourceName}
+                />
+
+                {/* LEFT COLUMN: Palette */}
+                <div className="w-64 bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 flex flex-col z-20 shadow-xl">
+                    <PolicyPalette />
+                </div>
+
+                <div className="flex-1 flex flex-col relative bg-slate-50 dark:bg-slate-900 bg-grid-slate-200/[0.04] min-w-0">
+                    {/* Header Toolbar */}
+                    <div className="p-4 flex justify-between items-center bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-100 dark:border-slate-800 z-10 sticky top-0">
+                        <div className="flex items-center gap-4">
+                            <select
+                                value={selectedScope}
+                                onChange={(e) => setSelectedScope(e.target.value as any)}
+                                className="bg-transparent font-black text-lg text-gray-900 dark:text-white outline-none cursor-pointer hover:opacity-80 transition"
                             >
-                                Visual
-                            </button>
-                            <button
-                                onClick={() => setEditMode('code')}
-                                className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase transition ${editMode === 'code' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                            >
-                                XML Code
-                            </button>
+                                <option value="global">Global Scope</option>
+                                <option value="product">Product Scope</option>
+                                <option value="api">API Scope</option>
+                                <option value="operation">Operation Scope</option>
+                            </select>
+                            <div className="flex bg-slate-200 dark:bg-slate-800 rounded-full p-1">
+                                <button
+                                    onClick={() => setEditMode('visual')}
+                                    className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase transition ${editMode === 'visual' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                >
+                                    Visual
+                                </button>
+                                <button
+                                    onClick={() => setEditMode('code')}
+                                    className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase transition ${editMode === 'code' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                >
+                                    XML Code
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            {!isReadOnly ? (
+                                <button
+                                    onClick={() => setIsDeployModalOpen(true)}
+                                    className="px-6 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition transform hover:scale-105 active:scale-95 flex items-center gap-2"
+                                >
+                                    <span>🚀</span> Save & Deploy
+                                </button>
+                            ) : (
+                                <div className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-xl text-[10px] font-black uppercase border border-slate-200 dark:border-slate-700 flex items-center gap-2">
+                                    <span>🔒</span> Read-Only View
+                                </div>
+                            )}
                         </div>
                     </div>
-                    <div className="flex gap-2">
-                        {!isReadOnly ? (
-                            <button
-                                onClick={() => setIsDeployModalOpen(true)}
-                                className="px-6 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition transform hover:scale-105 active:scale-95 flex items-center gap-2"
-                            >
-                                <span>🚀</span> Save & Deploy
-                            </button>
+
+                    <div className="flex-1 overflow-y-auto relative custom-scrollbar">
+                        {editMode === 'visual' ? (
+                            <div className="min-h-full p-12 flex flex-col items-center animate-in fade-in zoom-in-95 duration-300">
+
+                                {/* INBOUND SECTION */}
+                                <div className="w-full max-w-2xl space-y-4 mb-12">
+                                    <div className="flex items-center gap-4 mb-4">
+                                        <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
+                                        <h3 className="font-black text-xs uppercase tracking-widest text-slate-400 bg-slate-50 dark:bg-slate-900 px-4">Inbound (Request)</h3>
+                                        <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
+                                    </div>
+
+                                    <SortableContext
+                                        id="inbound"
+                                        items={flow.inbound.map(s => s.id)}
+                                        strategy={verticalListSortingStrategy}
+                                    >
+                                        <div className="space-y-4 min-h-[100px] p-4 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-slate-300 transition-colors">
+                                            {flow.inbound.map((step, idx) => (
+                                                <PolicyStepCard
+                                                    key={step.id}
+                                                    step={step}
+                                                    index={idx + 1}
+                                                    isSelected={selectedStepId === step.id}
+                                                    onClick={() => !step.isLocked && !isReadOnly && setSelectedStepId(step.id)}
+                                                    isReadOnly={isReadOnly}
+                                                />
+                                            ))}
+                                            {flow.inbound.length === 0 && (
+                                                <div className="text-center text-slate-400 text-xs font-bold py-8 uppercase tracking-widest">
+                                                    Drop policies here
+                                                </div>
+                                            )}
+                                        </div>
+                                    </SortableContext>
+                                </div>
+
+                                {/* BACKEND SECTION */}
+                                <div className="mb-12 scale-110 relative z-10 group cursor-default">
+                                    <div className="absolute inset-0 bg-indigo-500 rounded-full blur-xl opacity-20 group-hover:opacity-40 transition duration-500"></div>
+                                    <div className="px-10 py-4 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-full font-black text-xs uppercase tracking-widest text-white shadow-xl shadow-indigo-500/30 flex items-center gap-3">
+                                        <span>⚡️</span> Backend Service
+                                    </div>
+                                </div>
+
+                                {/* BACKEND (OUTBOUND) SECTION - Just linking 'backend' flow here for simplicity, typically separate */}
+                                <div className="w-full max-w-2xl space-y-4 mb-24">
+                                    <SortableContext
+                                        id="backend"
+                                        items={flow.backend.map(s => s.id)}
+                                        strategy={verticalListSortingStrategy}
+                                    >
+                                        <div className="space-y-4">
+                                            {flow.backend.map((step, idx) => (
+                                                <PolicyStepCard
+                                                    key={step.id}
+                                                    step={step}
+                                                    index={idx + 1}
+                                                    isSelected={selectedStepId === step.id}
+                                                    onClick={() => !step.isLocked && !isReadOnly && setSelectedStepId(step.id)}
+                                                    isReadOnly={isReadOnly}
+                                                />
+                                            ))}
+                                        </div>
+                                    </SortableContext>
+                                </div>
+
+                            </div>
                         ) : (
-                            <div className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-xl text-[10px] font-black uppercase border border-slate-200 dark:border-slate-700 flex items-center gap-2">
-                                <span>🔒</span> Read-Only View
+                            <div className="h-full animate-in slide-in-from-bottom-4 duration-500">
+                                <Editor
+                                    height="100%"
+                                    defaultLanguage="xml"
+                                    theme="vs-dark"
+                                    value={rawXml}
+                                    onChange={(val) => !isReadOnly && setRawXml(val || '')}
+                                    options={{
+                                        readOnly: isReadOnly,
+                                        minimap: { enabled: false },
+                                        fontSize: 14,
+                                        lineNumbers: 'on',
+                                        scrollBeyondLastLine: false,
+                                        automaticLayout: true,
+                                        padding: { top: 20 }
+                                    }}
+                                />
                             </div>
                         )}
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-hidden relative">
-                    {editMode === 'visual' ? (
-                        <div className="h-full overflow-auto p-12 flex items-start justify-center animate-in fade-in zoom-in-95 duration-500">
-                            {/* The Pipe Visualization */}
-                            <div className="w-full max-w-2xl space-y-8">
-                                {/* INBOUND SECTION */}
-                                <div className="relative">
-                                    <div className="absolute -left-12 top-0 bottom-0 border-l-2 border-dashed border-gray-300 dark:border-slate-600"></div>
-                                    <h3 className="font-black text-xs uppercase tracking-widest text-gray-400 mb-4 ml-4">Inbound (Request)</h3>
+                {/* RIGHT COLUMN: Properties */}
+                <div className="w-80 bg-white dark:bg-slate-800 border-l border-gray-200 dark:border-slate-700 p-8 flex flex-col shadow-2xl z-20">
+                    <h2 className="font-black text-[10px] uppercase tracking-widest text-gray-400 mb-8">Specification</h2>
 
-                                    <div className="space-y-4">
-                                        {flow.inbound.map((step: PolicyStep, idx: number) => (
-                                            <div
-                                                key={step.id}
-                                                onClick={() => !step.isLocked && !isReadOnly && setSelectedStepId(step.id)}
-                                                className={`relative p-5 rounded-3xl border-2 flex items-center justify-between group transition-all cursor-pointer ${step.isLocked
-                                                    ? 'bg-slate-100 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-75 cursor-not-allowed'
-                                                    : selectedStepId === step.id
-                                                        ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500 shadow-2xl ring-4 ring-blue-500/10 scale-[1.02]'
-                                                        : 'bg-white dark:bg-slate-800 border-white dark:border-slate-800 hover:border-blue-400 hover:shadow-xl'
-                                                    }`}>
-                                                <div className="flex items-center gap-4">
-                                                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-lg ${step.isLocked ? 'bg-slate-200 dark:bg-slate-700' : 'bg-blue-100 text-blue-600 dark:bg-blue-900/30'}`}>
-                                                        {step.isLocked ? '🔒' : (idx + 1)}
-                                                    </div>
-                                                    <div>
-                                                        <div className="font-black text-sm text-gray-900 dark:text-white">{step.displayName}</div>
-                                                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{step.scope}</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* BACKEND SECTION */}
-                                <div className="py-12 flex justify-center scale-110">
-                                    <div className="px-10 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full font-black text-xs uppercase tracking-widest text-white shadow-xl shadow-purple-500/20">
-                                        Backend Service
-                                    </div>
+                    {activeStep ? (
+                        <div className="animate-in fade-in slide-in-from-right-4 duration-500">
+                            <div className="mb-8">
+                                <h3 className="text-2xl font-black text-gray-900 dark:text-white leading-tight">{activeStep.displayName}</h3>
+                                <div className="flex gap-2 mt-2">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${activeStep.isLocked ? 'bg-gray-100 text-gray-500' : 'bg-blue-50 text-blue-600'}`}>
+                                        {activeStep.scope}
+                                    </span>
                                 </div>
                             </div>
+
+                            {activeStep.type === 'rate-limit' ? (
+                                <RateLimitProperties step={activeStep} onChange={handleUpdateStep} />
+                            ) : (
+                                <div className="p-6 bg-slate-50 dark:bg-slate-900 rounded-3xl border border-dashed border-gray-200 dark:border-slate-700 text-sm italic text-gray-500">
+                                    This policy is currently read-only in visual mode.
+                                </div>
+                            )}
                         </div>
                     ) : (
-                        <div className="h-full animate-in slide-in-from-bottom-4 duration-500">
-                            <Editor
-                                height="100%"
-                                defaultLanguage="xml"
-                                theme="vs-dark"
-                                value={rawXml}
-                                onChange={(val) => !isReadOnly && setRawXml(val || '')}
-                                options={{
-                                    readOnly: isReadOnly,
-                                    minimap: { enabled: false },
-                                    fontSize: 14,
-                                    lineNumbers: 'on',
-                                    scrollBeyondLastLine: false,
-                                    automaticLayout: true,
-                                    padding: { top: 20 }
-                                }}
-                            />
+                        <div className="flex-1 flex flex-col items-center justify-center text-center">
+                            <div className="w-12 h-12 bg-slate-50 dark:bg-slate-900 rounded-2xl flex items-center justify-center text-2xl mb-4 opacity-50 grayscale">
+                                ⚙️
+                            </div>
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest leading-relaxed">
+                                Pick a step to<br />configure logic
+                            </p>
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* RIGHT COLUMN: Properties */}
-            <div className="w-80 bg-white dark:bg-slate-800 border-l border-gray-200 dark:border-slate-700 p-8 flex flex-col shadow-2xl z-20">
-                <h2 className="font-black text-[10px] uppercase tracking-widest text-gray-400 mb-8">Specification</h2>
-
-                {activeStep ? (
-                    <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-                        <div className="mb-8">
-                            <h3 className="text-2xl font-black text-gray-900 dark:text-white leading-tight">{activeStep.displayName}</h3>
-                            <div className="flex gap-2 mt-2">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${activeStep.isLocked ? 'bg-gray-100 text-gray-500' : 'bg-blue-50 text-blue-600'}`}>
-                                    {activeStep.scope}
-                                </span>
-                            </div>
+            <DragOverlay>
+                {activeDragItem ? (
+                    <div className="p-4 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border-2 border-blue-500 opacity-90 scale-105 cursor-grabbing w-64">
+                        <div className="font-bold text-sm text-gray-900 dark:text-white">
+                            {activeDragItem.template?.label || activeDragItem.step?.displayName}
                         </div>
-
-                        {activeStep.type === 'rate-limit' ? (
-                            <RateLimitProperties step={activeStep} onChange={handleUpdateStep} />
-                        ) : (
-                            <div className="p-6 bg-slate-50 dark:bg-slate-900 rounded-3xl border border-dashed border-gray-200 dark:border-slate-700 text-sm italic text-gray-500">
-                                This policy is currently read-only in visual mode.
-                            </div>
-                        )}
                     </div>
-                ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-center">
-                        <div className="w-12 h-12 bg-slate-50 dark:bg-slate-900 rounded-2xl flex items-center justify-center text-2xl mb-4 opacity-50 grayscale">
-                            ⚙️
-                        </div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest leading-relaxed">
-                            Pick a step to<br />configure logic
-                        </p>
-                    </div>
-                )}
-            </div>
-        </div>
+                ) : null}
+            </DragOverlay>
+        </DndContext>
     );
 };

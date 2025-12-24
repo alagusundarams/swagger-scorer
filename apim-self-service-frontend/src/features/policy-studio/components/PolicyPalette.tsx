@@ -1,3 +1,5 @@
+import { useDraggable } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 import { type PolicyStepType } from '../types/policyTypes';
 
 interface PaletteItem {
@@ -39,11 +41,42 @@ const PALETTE_CATEGORIES: { name: string; items: PaletteItem[] }[] = [
     }
 ];
 
-export const PolicyPalette = () => {
-    const handleDragStart = (e: React.DragEvent, type: PolicyStepType) => {
-        e.dataTransfer.setData('policy-type', type);
+// Draggable Item Component (Internal)
+const DraggablePaletteItem = ({ item }: { item: PaletteItem }) => {
+    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+        id: `palette-${item.type}`,
+        data: {
+            type: 'palette-item',
+            policyType: item.type,
+            template: item
+        }
+    });
+
+    const style = {
+        transform: CSS.Translate.toString(transform),
+        opacity: isDragging ? 0.6 : 1,
     };
 
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            {...listeners}
+            {...attributes}
+            className={`flex items-center gap-3 p-3 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-sm cursor-grab hover:border-blue-400 hover:shadow-md transition group ${isDragging ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}
+        >
+            <span className="text-xl">{item.icon}</span>
+            <div>
+                <div className="text-sm font-bold text-gray-700 dark:text-gray-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">
+                    {item.label}
+                </div>
+                <div className="text-[10px] text-gray-400">{item.description}</div>
+            </div>
+        </div>
+    );
+};
+
+export const PolicyPalette = () => {
     return (
         <div className="flex flex-col h-full">
             <div className="p-4 border-b border-gray-200 dark:border-slate-700">
@@ -55,20 +88,7 @@ export const PolicyPalette = () => {
                         <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">{cat.name}</h3>
                         <div className="space-y-2">
                             {cat.items.map((item) => (
-                                <div
-                                    key={item.type}
-                                    draggable
-                                    onDragStart={(e) => handleDragStart(e, item.type)}
-                                    className="flex items-center gap-3 p-3 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-sm cursor-grab hover:border-blue-400 hover:shadow-md transition group"
-                                >
-                                    <span className="text-xl">{item.icon}</span>
-                                    <div>
-                                        <div className="text-sm font-bold text-gray-700 dark:text-gray-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">
-                                            {item.label}
-                                        </div>
-                                        <div className="text-[10px] text-gray-400">{item.description}</div>
-                                    </div>
-                                </div>
+                                <DraggablePaletteItem key={item.type} item={item} />
                             ))}
                         </div>
                     </div>

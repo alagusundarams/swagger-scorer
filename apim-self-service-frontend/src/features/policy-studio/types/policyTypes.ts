@@ -1,6 +1,6 @@
 export type PolicyScope = 'global' | 'product' | 'api' | 'operation';
 
-export type PolicySection = 'inbound' | 'backend' | 'outbound' | 'on-error';
+export type PolicySection = 'inbound' | 'backend' | 'outbound' | 'onError';
 
 export type PolicyStepType =
     | 'base' // <base />

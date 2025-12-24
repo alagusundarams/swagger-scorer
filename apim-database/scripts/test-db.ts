@@ -11,9 +11,10 @@ async function test() {
     const pool = new pg.Pool({ connectionString, connectionTimeoutMillis: 2000 });
 
     try {
-        const res = await pool.query('SELECT current_database(), current_user, version()');
+        const res = await pool.query('SELECT id, name, display_name FROM products');
         console.log('✅ Connection Success!');
-        console.log(res.rows[0]);
+        console.log(`Found ${res.rowCount} products:`);
+        console.table(res.rows);
     } catch (err) {
         console.error('❌ Connection Failed:', err.message);
     } finally {

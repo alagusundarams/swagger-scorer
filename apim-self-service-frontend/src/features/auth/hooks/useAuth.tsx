@@ -100,23 +100,23 @@ const MockAuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
         };
     }, [baseUser, allTeams]);
 
-    const login = (userType?: string) => {
+    const login = React.useCallback((userType?: string) => {
         if (userType && userType in MOCK_USERS) {
             const validUserType = userType as keyof typeof MOCK_USERS;
             setSelectedUserType(validUserType);
             localStorage.setItem('mockUserType', validUserType);
         }
         setIsAuthenticated(true);
-    };
+    }, []);
 
-    const logout = () => {
+    const logout = React.useCallback(() => {
         setIsAuthenticated(false);
-    };
+    }, []);
 
-    const getToken = async () => {
+    const getToken = React.useCallback(async () => {
         if (!isAuthenticated) return null;
         return "mock-token-xyz";
-    };
+    }, [isAuthenticated]);
 
     // Load saved user selection on mount
     useEffect(() => {
@@ -126,8 +126,17 @@ const MockAuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
         }
     }, []);
 
+    const contextValue = useMemo(() => ({
+        isAuthenticated,
+        user: isAuthenticated ? user : null,
+        login,
+        logout,
+        getToken,
+        isMock: true
+    }), [isAuthenticated, user, login, logout, getToken]);
+
     return (
-        <AuthContext.Provider value={{ isAuthenticated, user: isAuthenticated ? user : null, login, logout, getToken, isMock: true }}>
+        <AuthContext.Provider value={contextValue}>
             {children}
         </AuthContext.Provider>
     );
@@ -147,7 +156,7 @@ const MsalAuthAdapter: React.FC<{ children: ReactNode }> = ({ children }) => {
     const account = accounts[0];
     const claims = account?.idTokenClaims as { groups?: string[], roles?: string[] };
 
-    const realUser: User | null = account ? {
+    const realUser: User | null = useMemo(() => account ? {
         id: account.localAccountId,
         email: account.username,
         name: account.name || "Unknown",
@@ -157,25 +166,25 @@ const MsalAuthAdapter: React.FC<{ children: ReactNode }> = ({ children }) => {
         defaultTeamId: claims?.groups?.[0] || '',
         role: claims?.roles?.includes('Scorer.Admin') ? 'admin' : 'user',
         username: account.username
-    } : null;
+    } : null, [account, claims]);
 
     const user = mockOverride || realUser;
 
-    const login = (userType?: string) => {
+    const login = React.useCallback((userType?: string) => {
         if (userType && userType in MOCK_USERS) {
             const validUserType = userType as keyof typeof MOCK_USERS;
             setMockOverride(MOCK_USERS[validUserType]);
             return;
         }
         instance.loginPopup(loginRequest).catch(console.error);
-    };
+    }, [instance]);
 
-    const logout = () => {
+    const logout = React.useCallback(() => {
         setMockOverride(null);
         instance.logoutPopup().catch(console.error);
-    };
+    }, [instance]);
 
-    const getToken = async () => {
+    const getToken = React.useCallback(async () => {
         if (mockOverride) return "mock-token-xyz";
         if (!account) return null;
         try {
@@ -189,10 +198,19 @@ const MsalAuthAdapter: React.FC<{ children: ReactNode }> = ({ children }) => {
             // Fallback to interaction if needed, or return null
             return null;
         }
-    };
+    }, [mockOverride, account, instance]);
+
+    const contextValue = useMemo(() => ({
+        isAuthenticated,
+        user,
+        login,
+        logout,
+        getToken,
+        isMock: false
+    }), [isAuthenticated, user, login, logout, getToken]);
 
     return (
-        <AuthContext.Provider value={{ isAuthenticated, user, login, logout, getToken, isMock: false }}>
+        <AuthContext.Provider value={contextValue}>
             {children}
         </AuthContext.Provider>
     );
