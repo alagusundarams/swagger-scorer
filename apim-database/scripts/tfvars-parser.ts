@@ -133,3 +133,24 @@ export function getAPIsForProduct(product: TfvarsProduct, tfvars: TfvarsData): T
         .map(apiName => findAPIInTfvars(apiName, tfvars))
         .filter(api => api !== null) as TfvarsAPI[];
 }
+/**
+ * Find the line number of a specific named block in a tfvars file
+ */
+export function findLineNumber(filePath: string, searchName: string): number | null {
+    try {
+        const content = readFileSync(filePath, 'utf-8');
+        const lines = content.split('\n');
+
+        // Search for lines like 'name = "searchName"' or 'name="searchName"'
+        const regex = new RegExp(`name\\s*=\\s*["']${searchName}["']`);
+
+        for (let i = 0; i < lines.length; i++) {
+            if (regex.test(lines[i])) {
+                return i + 1; // 1-indexed
+            }
+        }
+    } catch (err) {
+        // Ignore errors
+    }
+    return null;
+}

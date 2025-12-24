@@ -86,6 +86,34 @@ interface ADORepo {
     id: string;
     project: {
         name: string;
+        id: string;
+    };
+}
+
+interface ADOPipeline {
+    id: number;
+    name: string;
+    folder: string;
+    url: string;
+    _links: {
+        web: { href: string };
+    };
+}
+
+interface PipelineRun {
+    id: number;
+    name: string;
+    status: string;
+    result: string;
+    createdDate: string;
+    finishedDate: string;
+    resources?: {
+        repositories: {
+            self: {
+                refName: string;
+                version: string;
+            }
+        }
     };
 }
 
@@ -102,6 +130,54 @@ async function getAzureAccessToken(): Promise<string> {
     } catch (error) {
         throw new Error('Failed to get Azure access token. Make sure Azure CLI is installed and you are logged in (az login)');
     }
+}
+
+/**
+ * Construct absolute ADO URL with line forensics
+ */
+function constructADOUrl(repoUrl: string, path: string, line?: number): string {
+    if (!repoUrl || !path) return '';
+    // repoUrl is usually https://dev.azure.com/org/project/_git/repo
+    // Ensure path starts with /
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    let url = `${repoUrl}?path=${encodeURIComponent(normalizedPath)}&version=GBmaster&_a=contents`;
+    if (line) {
+        url += `&line=${line}&lineEnd=${line}&lineStartColumn=1&lineEndColumn=1`;
+    }
+    return url;
+}
+
+/**
+ * Fetch Tags for a specific Product
+ */
+async function fetchTagsForProduct(config: APIMConfig, productId: string): Promise<Record<string, string>> {
+    try {
+        // productId is the full resource ID. We need to append /tags
+        const response = await fetch(`https://management.azure.com${productId}/tags?api-version=2022-08-01`, {
+            headers: {
+                'Authorization': `Bearer ${config.accessToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            const data = await response.json() as { value: Array<{ name: string, properties: { displayName: string } }> };
+            const tags: Record<string, string> = {};
+            data.value.forEach(tag => {
+                // If tag is 'TeamID:123', we can parse it, or just use the name as key if it's simple
+                if (tag.name.includes(':')) {
+                    const [k, v] = tag.name.split(':');
+                    tags[k.trim()] = v.trim();
+                } else {
+                    tags[tag.name] = 'true';
+                }
+            });
+            return tags;
+        }
+    } catch (err) {
+        console.warn(`⚠️ [Tags] Failed to fetch tags for ${productId}`);
+    }
+    return {};
 }
 
 /**
@@ -182,6 +258,44 @@ async function fetchADOReposAcrossProjects(org: string, projects: ADOProject[], 
 }
 
 /**
+ * Fetch Pipelines for a specific repository
+ */
+async function fetchADOPipelines(org: string, project: string, repoId: string, pat: string): Promise<ADOPipeline[]> {
+    const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+    const url = `https://dev.azure.com/${org}/${project}/_apis/pipelines?api-version=7.1-preview.1&repositoryId=${repoId}&repositoryType=azureRepo`;
+
+    try {
+        const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+        if (response.ok) {
+            const data = await response.json() as { value: ADOPipeline[] };
+            return data.value;
+        }
+    } catch (err) {
+        console.error(`❌ [ADO] Failed to fetch pipelines for repo ${repoId}:`, err);
+    }
+    return [];
+}
+
+/**
+ * Fetch Recent Runs for a Pipeline
+ */
+async function fetchPipelineRuns(org: string, project: string, pipelineId: number, pat: string): Promise<PipelineRun[]> {
+    const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+    const url = `https://dev.azure.com/${org}/${project}/_apis/pipelines/${pipelineId}/runs?api-version=7.1-preview.1`;
+
+    try {
+        const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+        if (response.ok) {
+            const data = await response.json() as { value: PipelineRun[] };
+            return data.value;
+        }
+    } catch (err) {
+        console.error(`❌ [ADO] Failed to fetch runs for pipeline ${pipelineId}:`, err);
+    }
+    return [];
+}
+
+/**
  * Fetch a single environment
  */
 async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
@@ -207,24 +321,45 @@ async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
 
             console.log(`\n📦 Processing product: ${product.properties.displayName}`);
 
+            // Fetch Tags for automated ownership
+            const tags = await fetchTagsForProduct(config, product.id);
+            if (Object.keys(tags).length > 0) {
+                console.log(`  🏷️  Found tags: ${Object.keys(tags).join(', ')}`);
+                // Automated Ownership Assignment
+                if (tags.TeamID || tags.Owner) {
+                    const owner = tags.TeamID || tags.Owner;
+                    console.log(`  🎯 Auto-assigning ownership to: ${owner}`);
+                    (product as any).ownerTeamId = owner;
+                }
+            }
+
             // Identify GRP products
             const isGrpByName = prodName.includes('grp') || displayName.includes('grp');
             if (isGrpByName) {
                 (product as any).type = 'grp';
             }
 
-            // Step 1: Find Git repo by name matching (initial heuristic)
-            const stripGRP = (s: string) => s.replace(/^grp_/i, '').replace(/_grp$/i, '').replace(/-grp$/i, '');
-            const prodBase = stripGRP(prodName);
-            const displayBase = stripGRP(displayName.replace(/\s+/g, '-'));
+            // Step 1: Find Git repo by name matching (hardened heuristic)
+            const stripHeuristics = (s: string) => s
+                .replace(/^grp_/i, '')
+                .replace(/_grp$/i, '')
+                .replace(/-grp$/i, '')
+                .replace(/^apim-iac-/i, '')
+                .replace(/-iac$/i, '')
+                .replace(/^iac-/i, '');
+
+            const prodBase = stripHeuristics(prodName);
+            const displayBase = stripHeuristics(displayName.replace(/\s+/g, '-'));
 
             const matchedRepo = adoRepos.find(r => {
                 const repoName = r.name.toLowerCase();
-                const repoBase = stripGRP(repoName);
+                const repoBase = stripHeuristics(repoName);
 
                 return repoName === prodName ||
                     repoBase === prodBase ||
-                    repoBase === displayBase;
+                    repoBase === displayBase ||
+                    repoName.includes(prodName) ||
+                    prodName.includes(repoName);
             });
 
             if (!matchedRepo) {
@@ -261,7 +396,9 @@ async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
                 ...gitInfo,
                 productPolicyPath: tfvarsProduct.product_policy_path,
                 productPolicyFile: tfvarsProduct.product_policy,
-                managedByTfvars: true
+                managedByTfvars: true,
+                definitionUrl: constructADOUrl(gitInfo.repoUrl, gitInfo.tfvarsFile, gitInfo.tfvarsLine),
+                policyUrl: constructADOUrl(gitInfo.repoUrl, (tfvarsProduct.product_policy_path || '') + (tfvarsProduct.product_policy || ''))
             };
 
             // Step 4: Reconcile APIs for this product
@@ -271,15 +408,44 @@ async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
                 // Store API mappings for later use when processing APIs
                 (product as any).tfvarsAPIs = tfvarsProduct.api_name;
                 (product as any).tfvarsData = tfvarsData;
+
+                (product as any).tfvarsLineForAPI = gitInfo.apiLines;
             }
 
-            // Mock pipeline info (can be enhanced later with real ADO pipeline data)
-            product.pipelineInfo = {
-                name: `${product.properties.displayName} Deploy`,
-                lastRunStatus: i % 2 === 0 ? 'succeeded' : 'failed',
-                lastRunDate: new Date().toISOString(),
-                url: matchedRepo.webUrl.replace('_git', '_build')
-            };
+            // Step 5: Fetch Pipeline Hashes (Region-by-Region)
+            if (config.devops?.pat && config.devops?.organization) {
+                console.log(`  🚀 [Pipeline] Fetching regional hashes for ${product.properties.displayName}...`);
+                try {
+                    const pipelines = await fetchADOPipelines(config.devops.organization, matchedRepo.project.name, matchedRepo.id, config.devops.pat);
+
+                    // Usually there's one main deployment pipeline
+                    const mainPipeline = pipelines.find(p => p.name.toLowerCase().includes('deploy') || p.name.toLowerCase().includes('iac')) || pipelines[0];
+
+                    if (mainPipeline) {
+                        const runs = await fetchPipelineRuns(config.devops.organization, matchedRepo.project.name, mainPipeline.id, config.devops.pat);
+
+                        // Extract hashes for regions (Simulated mapping logic)
+                        // In a real app, you'd check stage/environment names in the run details
+                        // For this POC, we'll map the latest successful run to the current env's region
+                        const successfulRun = runs.find(r => r.result === 'succeeded' || r.status === 'completed');
+
+                        if (successfulRun) {
+                            const hash = successfulRun.resources?.repositories.self.version;
+                            (product as any).deployments = {
+                                [config.environment]: {
+                                    hash: hash || 'unknown',
+                                    date: successfulRun.finishedDate,
+                                    status: 'active',
+                                    pipelineUrl: mainPipeline._links.web.href
+                                }
+                            };
+                            console.log(`  ✅ [Pipeline] Found hash for ${config.environment}: ${hash?.substring(0, 7)}`);
+                        }
+                    }
+                } catch (pipeErr) {
+                    console.error(`  ⚠️ [Pipeline] Error fetching details for ${product.name}:`, pipeErr);
+                }
+            }
         }
 
         // Enrich APIs: Reconcile with tfvars
@@ -312,12 +478,15 @@ async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
                 const policyPath = getAPIPolicyPath(tfvarsAPI);
 
                 (api as any).gitInfo = {
-                    repoUrl: matchedProduct.gitInfo?.repoUrl,
-                    lastCommit: matchedProduct.gitInfo?.lastCommit,
-                    lastCommitDate: matchedProduct.gitInfo?.lastCommitDate,
+                    repoUrl: (matchedProduct as any).gitInfo?.repoUrl,
+                    lastCommit: (matchedProduct as any).gitInfo?.lastCommit,
+                    lastCommitDate: (matchedProduct as any).gitInfo?.lastCommitDate,
                     contractPath: contractPath,  // Full path from tfvars
                     policyPath: policyPath,
-                    managedByTfvars: true
+                    managedByTfvars: true,
+                    definitionUrl: (matchedProduct as any).gitInfo?.tfvarsFile ? constructADOUrl((matchedProduct as any).gitInfo.repoUrl, (matchedProduct as any).gitInfo.tfvarsFile, (matchedProduct as any).tfvarsLineForAPI?.[api.name]) : undefined,
+                    contractUrl: constructADOUrl((matchedProduct as any).gitInfo?.repoUrl || '', contractPath || ''),
+                    policyUrl: constructADOUrl((matchedProduct as any).gitInfo?.repoUrl || '', policyPath || '')
                 };
             } else {
                 console.log(`  ⚠️  API "${api.name}" not found in any tfvars (manual deployment?)`);

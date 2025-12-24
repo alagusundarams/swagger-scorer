@@ -1,29 +1,23 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { type Product, type Subscription, type Environment } from '../../../types/entities';
 import { type ApprovalRequest } from '../../../types/workflow';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
-import '../inventory.css';
 import { useStore } from '../../../store/useStore';
 import { DashboardPagination } from '../components/DashboardPagination';
 import { DashboardHero } from '../components/DashboardHero';
 import { DashboardFilters } from '../components/DashboardFilters';
 import { canAccessProduct, getAccessibleEnvironments } from '../../../utils/productRoleDetection';
-
-type ProductWithSubscription = Product & { subscription: Subscription };
-
 import { DashboardStatsGrid } from '../components/DashboardStatsGrid';
 import { DashboardTabs } from '../components/DashboardTabs';
 import { DashboardContent } from '../components/DashboardContent';
-import { useEffect } from 'react';
+import '../inventory.css';
+
+type ProductWithSubscription = Product & { subscription: Subscription };
 
 export const DashboardPage = () => {
     const navigate = useNavigate();
     const { setPageTitle } = useStore();
-
-    useEffect(() => {
-        setPageTitle('Dashboard');
-    }, [setPageTitle]);
 
     const {
         user,
@@ -33,8 +27,18 @@ export const DashboardPage = () => {
         subscriptions: allSubscriptions,
         teams: allTeams,
         approvalRequests: enhancedApprovals,
-        error
+        error,
+        isLoading
     } = useStore();
+
+    useEffect(() => {
+        setPageTitle('Dashboard');
+
+        // Refined Admin Day 1: Land admins on the Global Inventory by default
+        if (user?.role === 'admin' && activeTeamId === 'all') {
+            navigate('/admin/global-inventory');
+        }
+    }, [user, activeTeamId, navigate, setPageTitle]);
 
     const [searchParams] = useSearchParams();
     const [activeTab, setActiveTab] = useState<'produced' | 'consumed' | 'admin' | 'approvals'>(() => {
@@ -47,7 +51,6 @@ export const DashboardPage = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedEnvironment, setSelectedEnvironment] = useState<Environment>('ALL');
     const [currentPage, setCurrentPage] = useState(1);
-    const [isLoading, setIsLoading] = useState(false);
     const [revealedKeys, setRevealedKeys] = useState<Set<string>>(new Set());
 
     const [toast, setToast] = useState<{ message: string; show: boolean }>({ message: '', show: false });
@@ -58,7 +61,13 @@ export const DashboardPage = () => {
     useEffect(() => {
         if (activeTab === 'admin') {
             import('../api/inventoryClient').then(({ getAdminProducts }) => {
-                getAdminProducts().then(res => setAdminProducts(res.data));
+                getAdminProducts().then(res => {
+                    const sanitizedData = res.data.map((p: any) => ({
+                        ...p,
+                        state: (p.state?.toLowerCase() === 'published' ? 'published' : (p.state?.toLowerCase() === 'draft' ? 'draft' : 'notPublished')) as any
+                    }));
+                    setAdminProducts(sanitizedData);
+                });
             });
         }
     }, [activeTab]);
@@ -92,16 +101,10 @@ export const DashboardPage = () => {
         if (!user) return [];
         return enhancedApprovals.filter(req => {
             if (req.status !== 'PENDING') return false;
-
-            // 1. Admins see everything (Safety Net)
             if (user.role === 'admin') return true;
-
-            // 2. Team Leads see requests assigned to their teams
-            // req.approverTeamId is now populated by the smart routing logic
             if (req.approverTeamId && user.leadsTeams.includes(req.approverTeamId)) {
                 return true;
             }
-
             return false;
         });
     }, [enhancedApprovals, user]);
@@ -112,17 +115,13 @@ export const DashboardPage = () => {
     }, [user, activeTeamId, allTeams]);
 
     const handleTabChange = (tab: 'produced' | 'consumed' | 'admin' | 'approvals') => {
-        setIsLoading(true);
         setActiveTab(tab);
         setCurrentPage(1);
-        setTimeout(() => setIsLoading(false), 450);
     };
 
     const handlePageChange = (newPage: number) => {
-        setIsLoading(true);
         setCurrentPage(newPage);
         window.scrollTo({ top: 0, behavior: 'smooth' });
-        setTimeout(() => setIsLoading(false), 400);
     };
 
     const baseData = useMemo(() => {
@@ -221,7 +220,7 @@ export const DashboardPage = () => {
     return (
         <MainLayout>
             {toast.show && (
-                <div className="fixed top-24 right-8 bg-slate-900 dark:bg-blue-600 text-white px-8 py-5 rounded-[1.5rem] shadow-2xl z-50 animate-fade-in flex items-center gap-4 font-black text-xs uppercase tracking-widest border border-white/10 backdrop-blur-md">
+                <div className="fixed top-24 right-8 bg-slate-900 border-white/10 border dark:bg-blue-600 text-white px-8 py-5 rounded-3xl shadow-2xl z-50 animate-fade-in flex items-center gap-4 font-bold text-xs uppercase tracking-widest backdrop-blur-md">
                     <span className="bg-white/20 p-2 rounded-full text-lg">💡</span> {toast.message}
                 </div>
             )}

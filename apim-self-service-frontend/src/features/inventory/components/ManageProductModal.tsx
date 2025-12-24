@@ -31,20 +31,14 @@ export const ManageProductModal = ({
     const [activeTab, setActiveTab] = useState<'metadata' | 'access'>('metadata');
 
     // Ensure we have a default structure for local state to avoid 'undefined' checks
-    const [formData, setFormData] = useState<Required<Pick<Product, 'displayName' | 'description' | 'version' | 'visibility' | 'authorizedTeamsByEnv'>>>({
+    const [formData, setFormData] = useState<Required<Pick<Product, 'displayName' | 'description' | 'version' | 'visibility' | 'authorizedTeams'>>>({
         displayName: product.displayName || '',
         description: product.description || '',
         version: product.version || '1.0.0',
         visibility: product.visibility || 'public',
-        authorizedTeamsByEnv: product.authorizedTeamsByEnv || {
-            DEV: [],
-            QA: [],
-            STAGE: [],
-            PROD: []
-        }
+        authorizedTeams: product.authorizedTeams || []
     });
 
-    const [expandedEnv, setExpandedEnv] = useState<'DEV' | 'QA' | 'STAGE' | 'PROD' | null>('DEV');
     const [localToast, setLocalToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
     const [isRequestingApproval, setIsRequestingApproval] = useState(false);
 
@@ -57,7 +51,7 @@ export const ManageProductModal = ({
     const requiresRepromotion = isMetadataChanged && (currentStage === 'PROD' || currentStage === 'STAGE');
 
     const isVisibilityChanged = formData.visibility !== product.visibility;
-    const isAccessChanged = JSON.stringify(formData.authorizedTeamsByEnv) !== JSON.stringify(product.authorizedTeamsByEnv);
+    const isAccessChanged = JSON.stringify(formData.authorizedTeams) !== JSON.stringify(product.authorizedTeams);
     const requiresApproval = (isVisibilityChanged || isAccessChanged) && currentStage === 'PROD';
 
 
@@ -134,13 +128,13 @@ export const ManageProductModal = ({
                     </div>
                     <div className="flex items-center gap-3">
                         {/* Management Mode Badge */}
-                        {product.management_mode && product.management_mode !== 'PORTAL_MANAGED' && (
-                            <span className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border flex items-center gap-1.5 ${product.management_mode === 'TERRAFORM_MANAGED'
+                        {product.managementMode && product.managementMode !== 'PORTAL_MANAGED' && (
+                            <span className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border flex items-center gap-1.5 ${product.managementMode === 'TERRAFORM_MANAGED'
                                 ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800'
                                 : 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800'
                                 }`}>
-                                {product.management_mode === 'TERRAFORM_MANAGED' ? '🔴' : '🟡'}
-                                {product.management_mode === 'TERRAFORM_MANAGED' ? 'Terraform' : 'Hybrid'}
+                                {product.managementMode === 'TERRAFORM_MANAGED' ? '🔴' : '🟡'}
+                                {product.managementMode === 'TERRAFORM_MANAGED' ? 'Terraform' : 'Hybrid'}
                             </span>
                         )}
 
@@ -207,8 +201,8 @@ export const ManageProductModal = ({
                                     type="text"
                                     value={formData.displayName}
                                     onChange={e => setFormData({ ...formData, displayName: e.target.value })}
-                                    disabled={product.management_mode === 'TERRAFORM_MANAGED'}
-                                    className={`w-full p-4 rounded-xl font-bold border transition-all outline-none focus:ring-2 focus:ring-blue-500/20 ${product.management_mode === 'TERRAFORM_MANAGED'
+                                    disabled={product.managementMode === 'TERRAFORM_MANAGED'}
+                                    className={`w-full p-4 rounded-xl font-bold border transition-all outline-none focus:ring-2 focus:ring-blue-500/20 ${product.managementMode === 'TERRAFORM_MANAGED'
                                         ? 'bg-gray-100 dark:bg-slate-900 text-gray-500 dark:text-slate-600  cursor-not-allowed border-gray-200 dark:border-slate-800'
                                         : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white hover:border-blue-400'
                                         }`}
@@ -219,8 +213,8 @@ export const ManageProductModal = ({
                                 <textarea
                                     value={formData.description}
                                     onChange={e => setFormData({ ...formData, description: e.target.value })}
-                                    disabled={product.management_mode === 'TERRAFORM_MANAGED'}
-                                    className={`w-full p-4 rounded-xl font-medium border transition-all outline-none focus:ring-2 focus:ring-blue-500/20 h-32 resize-none ${product.management_mode === 'TERRAFORM_MANAGED'
+                                    disabled={product.managementMode === 'TERRAFORM_MANAGED'}
+                                    className={`w-full p-4 rounded-xl font-medium border transition-all outline-none focus:ring-2 focus:ring-blue-500/20 h-32 resize-none ${product.managementMode === 'TERRAFORM_MANAGED'
                                         ? 'bg-gray-100 dark:bg-slate-900 text-gray-500 dark:text-slate-600 cursor-not-allowed border-gray-200 dark:border-slate-800'
                                         : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white hover:border-blue-400'
                                         }`}
@@ -312,108 +306,29 @@ export const ManageProductModal = ({
                                 </div>
                             )}
 
-                            {/* Environment-Scoped Team Authorization - Only show if Private visibility */}
+                            {/* Team Authorization - Only show if Private visibility */}
                             {formData.visibility === 'private' && (
-                                <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Authorized Teams by Environment</label>
+                                <div className="space-y-4">
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">Authorized Teams</label>
                                     <p className="text-xs text-gray-500 dark:text-slate-400 mb-4">
-                                        Teams have different Azure AD groups per environment. Manage access separately for each stage.
+                                        Grant discovery and subscription rights to specific teams for this <strong>{currentStage}</strong> deployment.
                                     </p>
 
-                                    {(['DEV', 'QA', 'STAGE', 'PROD'] as const).map((env, idx) => {
-                                        const isExpanded = expandedEnv === env;
-                                        const teamsInEnv = formData.authorizedTeamsByEnv[env] || [];
-                                        const lockIcon = env === 'PROD' ? '🔒' : env === 'STAGE' ? '🔐' : '';
-
-                                        return (
-                                            <div key={env} className={`mb-3 border rounded-xl overflow-hidden ${env === 'PROD' ? 'border-red-200 dark:border-red-800' :
-                                                env === 'STAGE' ? 'border-amber-200 dark:border-amber-800' :
-                                                    'border-gray-200 dark:border-slate-700'
-                                                }`}>
-                                                {/* Environment Header */}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setExpandedEnv(isExpanded ? null : env)}
-                                                    className={`w-full p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-900 transition ${env === 'PROD' ? 'bg-red-50/50 dark:bg-red-900/10' :
-                                                        env === 'STAGE' ? 'bg-amber-50/50 dark:bg-amber-900/10' :
-                                                            'bg-gray-50/50 dark:bg-slate-900/50'
-                                                        }`}
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="text-lg">{lockIcon || '📂'}</span>
-                                                        <div className="text-left">
-                                                            <div className="text-sm font-bold text-gray-900 dark:text-white">{env}</div>
-                                                            <div className="text-xs text-gray-500 dark:text-slate-400">
-                                                                {teamsInEnv.length} team{teamsInEnv.length !== 1 ? 's' : ''} authorized
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <svg
-                                                        className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                    >
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                    </svg>
-                                                </button>
-
-                                                {/* Environment Content */}
-                                                {isExpanded && (
-                                                    <div className="p-4 border-t border-gray-100 dark:border-slate-700">
-                                                        {/* Copy from lower env button (except for DEV) */}
-                                                        {idx > 0 && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    const lowerEnv = (['DEV', 'QA', 'STAGE', 'PROD'] as const)[idx - 1];
-                                                                    setFormData({
-                                                                        ...formData,
-                                                                        authorizedTeamsByEnv: {
-                                                                            ...formData.authorizedTeamsByEnv,
-                                                                            [env]: [...(formData.authorizedTeamsByEnv[lowerEnv])]
-                                                                        }
-                                                                    });
-                                                                }}
-                                                                className="mb-3 text-xs px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition flex items-center gap-2"
-                                                            >
-                                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                                                </svg>
-                                                                Copy from {(['DEV', 'QA', 'STAGE', 'PROD'] as const)[idx - 1]}
-                                                            </button>
-                                                        )}
-
-                                                        {/* Team Search */}
-                                                        <TeamSearch
-                                                            allTeams={allTeams}
-                                                            selectedTeamIds={teamsInEnv}
-                                                            onToggleTeam={(id: string) => {
-                                                                const current = formData.authorizedTeamsByEnv[env];
-                                                                if (current.includes(id)) {
-                                                                    setFormData({
-                                                                        ...formData,
-                                                                        authorizedTeamsByEnv: {
-                                                                            ...formData.authorizedTeamsByEnv,
-                                                                            [env]: current.filter((t: string) => t !== id)
-                                                                        }
-                                                                    });
-                                                                } else {
-                                                                    setFormData({
-                                                                        ...formData,
-                                                                        authorizedTeamsByEnv: {
-                                                                            ...formData.authorizedTeamsByEnv,
-                                                                            [env]: [...current, id]
-                                                                        }
-                                                                    });
-                                                                }
-                                                            }}
-                                                        />
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
+                                    <div className="border border-gray-200 dark:border-slate-700 rounded-2xl p-4 bg-gray-50/30 dark:bg-slate-900/40">
+                                        <TeamSearch
+                                            allTeams={allTeams}
+                                            selectedTeamIds={formData.authorizedTeams}
+                                            onToggleTeam={(id: string) => {
+                                                const current = formData.authorizedTeams;
+                                                setFormData({
+                                                    ...formData,
+                                                    authorizedTeams: current.includes(id)
+                                                        ? current.filter(t => t !== id)
+                                                        : [...current, id]
+                                                });
+                                            }}
+                                        />
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -429,7 +344,7 @@ export const ManageProductModal = ({
                         </button>
 
                         {/* Save Button - Hidden for Terraform mode */}
-                        {product.management_mode !== 'TERRAFORM_MANAGED' && ((activeTab === 'metadata' && isMetadataChanged) || (activeTab === 'access' && (isVisibilityChanged || isAccessChanged))) && (
+                        {product.managementMode !== 'TERRAFORM_MANAGED' && ((activeTab === 'metadata' && isMetadataChanged) || (activeTab === 'access' && (isVisibilityChanged || isAccessChanged))) && (
                             <button
                                 onClick={handleSave}
                                 disabled={isRequestingApproval || (!isOwnerLead && activeTab === 'access')}

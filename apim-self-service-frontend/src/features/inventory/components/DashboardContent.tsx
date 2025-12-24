@@ -29,7 +29,7 @@ export const DashboardContent: React.FC<DashboardContentProps> = ({
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
                 {[1, 2, 3, 4, 5, 6].map(i => (
-                    <div key={i} className="bg-white dark:bg-slate-800 rounded-[2.5rem] p-12 border border-gray-100 dark:border-slate-700 h-[28rem] animate-pulse shadow-sm">
+                    <div key={i} className="bg-white dark:bg-slate-800 rounded-3xl p-12 border border-gray-100 dark:border-slate-700 h-[28rem] animate-pulse shadow-sm">
                         <div className="w-16 h-16 bg-gray-50 dark:bg-slate-900 rounded-2xl mb-10"></div>
                         <div className="w-3/4 h-10 bg-gray-50 dark:bg-slate-900 rounded-xl mb-8"></div>
                         <div className="w-full h-4 bg-gray-50 dark:bg-slate-900 rounded-lg mb-4"></div>
@@ -45,7 +45,7 @@ export const DashboardContent: React.FC<DashboardContentProps> = ({
         // This is a simplified check; ideally we check 'totalItems' before filtering.
         // For now, we assume if filter is empty, it's a search issue, but we can make it friendlier.
         return (
-            <div className="flex flex-col items-center justify-center py-32 bg-slate-50/50 dark:bg-slate-800/30 rounded-[3rem] border-2 border-dashed border-gray-200 dark:border-slate-700/50">
+            <div className="flex flex-col items-center justify-center py-32 bg-slate-50/50 dark:bg-slate-800/30 rounded-3xl border-2 border-dashed border-gray-200 dark:border-slate-700/50">
                 <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-3xl shadow-lg flex items-center justify-center text-4xl mb-6">✨</div>
                 <h3 className="text-gray-900 dark:text-white text-xl font-bold mb-2">No APIs Found</h3>
                 <p className="text-gray-500 dark:text-slate-400 text-sm mb-8 text-center max-w-sm">

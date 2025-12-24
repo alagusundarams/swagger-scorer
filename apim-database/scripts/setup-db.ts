@@ -12,12 +12,23 @@ async function setupDatabase() {
     let connectionString = process.env.DATABASE_URL;
 
     if (!connectionString) {
-        const configPath = join(process.cwd(), 'config.json');
-        try {
-            const config = JSON.parse(readFileSync(configPath, 'utf8'));
-            connectionString = config.database?.url;
-        } catch (err) {
-            console.error('❌ Could not load config.json');
+        const configPaths = [
+            join(process.cwd(), 'config.json'),
+            join(process.cwd(), 'apim-self-service-backend', 'config.json'),
+            join(process.cwd(), '..', 'apim-self-service-backend', 'config.json')
+        ];
+
+        for (const configPath of configPaths) {
+            try {
+                const config = JSON.parse(readFileSync(configPath, 'utf8'));
+                if (config.database?.url) {
+                    connectionString = config.database.url;
+                    console.log(`✅ Loaded config from ${configPath}`);
+                    break;
+                }
+            } catch (err) {
+                // Silent fallback
+            }
         }
     }
 

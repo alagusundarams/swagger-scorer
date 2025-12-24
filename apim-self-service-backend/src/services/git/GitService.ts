@@ -93,4 +93,32 @@ export class GitService {
             timestamp: new Date().toISOString()
         };
     }
+
+    /**
+     * Fetches a policy XML from the repository.
+     * @param resourceId The ID of the resource (API or Product)
+     * @param repoUrl The Git repository URL
+     * @param level The policy level (product, api, operation)
+     */
+    public async fetchPolicy(resourceId: string, repoUrl: string, level: string = 'api'): Promise<{ xml: string; filePath: string }> {
+        // In a real scenario, we would clone to a temp directory or reuse a cache
+        // For the demo, we assume the repo is already managed in this.repoPath
+        console.log(`[GitService] Fetching ${level} policy for ${resourceId} from ${repoUrl}`);
+
+        const sanitizedId = resourceId.replace(/[^a-zA-Z0-9]/g, '_');
+        const fileName = `${sanitizedId}.xml`;
+        const subDir = level === 'product' ? 'products' : level === 'operation' ? 'operations' : 'apis';
+        const filePath = path.join(this.repoPath, 'policies', subDir, fileName);
+
+        if (!existsSync(filePath)) {
+            // Initial mock content if file doesn't exist in our demo "repo"
+            const mockXml = `<policies>\n    <inbound>\n        <base />\n        <!-- ${level.toUpperCase()} Policy for ${resourceId} -->\n    </inbound>\n</policies>`;
+            await fs.mkdir(path.dirname(filePath), { recursive: true });
+            await fs.writeFile(filePath, mockXml, 'utf8');
+            return { xml: mockXml, filePath };
+        }
+
+        const xml = await fs.readFile(filePath, 'utf8');
+        return { xml, filePath };
+    }
 }

@@ -12,97 +12,66 @@ export interface ExtractedResource {
 
 export const MOCK_ORPHANED_DATA: ExtractedResource[] = [
     {
-        "id": "prod-dev-1",
-        "name": "Legacy Service 1 (DEV)",
+        "id": "prod-dev-payments",
+        "name": "payments-service",
         "type": "Product",
         "environment": "DEV",
         "details": {
-            "displayName": "Legacy Service 1",
+            "displayName": "Digital Payments Suite",
             "state": "published",
-            "description": "Imported from DEV APIM. Needs ownership assignment.",
-            "subscriptionRequired": true
+            "description": "Core payment processing product. Terraform managed.",
+            "subscriptionRequired": true,
+            "managementMode": "TERRAFORM_MANAGED",
+            "gitRepoUrl": "https://dev.azure.com/org/project/_git/apim-iac-payments",
+            "lastDeployedCommitHash": "8f2a1bc3df6a123456789abcdef",
+            "pipelineInfo": {
+                "url": "https://dev.azure.com/org/project/_build?definitionId=101"
+            }
         },
         "isOrphaned": true
     },
     {
-        "id": "api-dev-1",
-        "name": "legacy-api-1",
+        "id": "api-dev-payments-v1",
+        "name": "payments-api-v1",
         "type": "API",
         "environment": "DEV",
         "details": {
-            "displayName": "Legacy API 1",
-            "path": "/legacy/dev/v1",
-            "protocols": [
-                "https"
-            ],
-            "associatedProduct": "prod-dev-1"
+            "displayName": "Payments REST API",
+            "path": "/payments/v1",
+            "protocols": ["https"],
+            "associatedProduct": "prod-dev-payments",
+            "gitRepoUrl": "https://dev.azure.com/org/project/_git/apim-iac-payments",
+            "gitFilePath": "contracts/payments-v1.yaml"
         },
         "isOrphaned": true
     },
     {
-        "id": "nv-dev-1",
-        "name": "db-secret-1",
-        "type": "NamedValue",
-        "environment": "DEV",
-        "details": {
-            "displayName": "DB_CONNECTION_STRING",
-            "secret": true,
-            "tags": [
-                "migrated"
-            ]
-        },
-        "isOrphaned": true
-    },
-    {
-        "id": "backend-dev-1",
-        "name": "backend-service-1",
-        "type": "Backend",
-        "environment": "DEV",
-        "details": {
-            "url": "https://api-legacy-1.dev.internal",
-            "protocol": "http"
-        },
-        "isOrphaned": true
-    },
-    {
-        "id": "prod-qa-1",
-        "name": "Legacy Service 1 (QA)",
+        "id": "prod-qa-identity",
+        "name": "identity-service",
         "type": "Product",
         "environment": "QA",
         "details": {
-            "displayName": "Legacy Service 1",
+            "displayName": "Identity & Access Manager",
             "state": "published",
-            "description": "Imported from QA APIM. Needs ownership assignment.",
-            "subscriptionRequired": true
+            "description": "Legacy identity portal. Manual management.",
+            "subscriptionRequired": true,
+            "managementMode": "PORTAL_MANAGED"
         },
         "isOrphaned": true
     },
     {
-        "id": "api-qa-1",
-        "name": "legacy-api-1",
-        "type": "API",
-        "environment": "QA",
-        "details": {
-            "displayName": "Legacy API 1",
-            "path": "/legacy/qa/v1",
-            "protocols": [
-                "https"
-            ],
-            "associatedProduct": "prod-qa-1"
-        },
-        "isOrphaned": true
-    },
-    {
-        "id": "prod-grp-orphan-1",
-        "name": "Global Mobile Bundle (GRP)",
+        "id": "prod-grp-mobile",
+        "name": "grp-mobile-banking",
         "type": "Product",
         "environment": "PROD",
         "details": {
-            "displayName": "Mobile App Bundle (GRP)",
+            "displayName": "Mobile Banking Bundle (GRP)",
             "state": "published",
-            "description": "Orphaned GRP Product. Should only map Product, not APIs.",
+            "description": "Global bundle for mobile banking. APIs owned by Producer teams.",
             "subscriptionRequired": true,
-            "type": "grp"
+            "type": "grp",
+            "managementMode": "TERRAFORM_MANAGED",
+            "gitRepoUrl": "https://dev.azure.com/org/project/_git/grp-mobile-banking"
         },
         "isOrphaned": true
     }

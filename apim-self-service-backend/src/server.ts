@@ -22,6 +22,8 @@ import { analyzeRoutes } from './routes/analyze.js';
 import { catalogRoutes } from './routes/catalog.js';
 import draftsRoute from './routes/drafts.js';
 import { policyRoutes } from './routes/policyRoutes.js';
+import onboardingRoutes from './routes/onboarding.js';
+import multipart from '@fastify/multipart';
 import { AppConfig } from './types/index.js';
 
 /**
@@ -75,6 +77,9 @@ export async function build() {
         origin: true,
     });
 
+    // Register Multipart plugin for file uploads
+    await fastify.register(multipart);
+
     /**
      * WAF Hardening Hook: preParsing
      * Transparently decodes payloads that were Base64-encoded by the frontend to bypass WAF inspection.
@@ -124,6 +129,7 @@ export async function build() {
     await fastify.register(catalogRoutes, { prefix: '/api/v1' });
     await fastify.register(draftsRoute, { prefix: '/api/v1' });
     await fastify.register(policyRoutes, { prefix: '/api/v1/policy' });
+    await fastify.register(onboardingRoutes, { ...config, prefix: '/api/v1/onboarding' });
 
     // Error handler for uncaught errors
     fastify.setErrorHandler((error, _request, reply) => {

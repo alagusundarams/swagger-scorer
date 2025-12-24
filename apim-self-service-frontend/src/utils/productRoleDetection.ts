@@ -193,8 +193,7 @@ export function canAccessProduct(
 
     // Private products: Check authorized teams for the current environment
     if (product.visibility === 'private') {
-        const env = product.environment || 'PROD';
-        const authorizedTeams = product.authorizedTeamsByEnv?.[env] || [];
+        const authorizedTeams = product.authorizedTeams || [];
 
         // User must be in an authorized team for this environment
         // NOTE: Strictly enforcing this means existing subscriptions for non-authorized teams

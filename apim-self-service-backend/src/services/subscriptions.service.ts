@@ -65,7 +65,7 @@ export async function getAllSubscriptions(userRole?: string, teamId?: string) {
 /**
  * Create a new subscription request (creates pending subscription + approval)
  */
-export async function addSubscription(productId: string, teamId: string, requester: { name: string, email: string }) {
+export async function addSubscription(productId: string, teamId: string, requester: { name: string, email: string }, appId?: string, justification?: string) {
     const subId = `sub-${Math.random().toString(36).substr(2, 9)}`;
     const approvalId = `appr-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -73,19 +73,20 @@ export async function addSubscription(productId: string, teamId: string, request
     await query(`
         INSERT INTO approval_requests (id, type, status, requester_name, requester_email, requester_team_id, details)
         VALUES ($1, 'SUBSCRIPTION', 'PENDING', $2, $3, $4, $5)
-    `, [approvalId, requester.name, requester.email, teamId, JSON.stringify({ productId, subscriptionId: subId })]);
+    `, [approvalId, requester.name, requester.email, teamId, JSON.stringify({ productId, subscriptionId: subId, appId, justification })]);
 
     // 2. Create Pending Subscription
     const res = await query(`
-        INSERT INTO subscriptions (id, product_id, subscriber_team_id, state)
-        VALUES ($1, $2, $3, 'pending')
+        INSERT INTO subscriptions (id, product_id, subscriber_team_id, state, app_registration_id)
+        VALUES ($1, $2, $3, 'pending', $4)
         RETURNING *
-    `, [subId, productId, teamId]);
+    `, [subId, productId, teamId, appId]);
 
     return {
         ...res.rows[0],
         productId: res.rows[0].product_id,
-        subscriberTeamId: res.rows[0].subscriber_team_id
+        subscriberTeamId: res.rows[0].subscriber_team_id,
+        appRegistrationId: res.rows[0].app_registration_id
     };
 }
 

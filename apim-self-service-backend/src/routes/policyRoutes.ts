@@ -7,4 +7,5 @@ export async function policyRoutes(fastify: FastifyInstance) {
 
     fastify.post('/analyze', controller.parsePolicy);
     fastify.post('/deploy', controller.deployPolicy);
+    fastify.get('/fetch/:resourceId', controller.getPolicy);
 }

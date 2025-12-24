@@ -155,12 +155,18 @@ async function migrateProducts(pool: Pool, products: any[], importEnv: string) {
             // Quality scores will be calculated by background job
             const qualityScore = null;
 
-            // Extract Git info with tfvars-enhanced paths
+            // Extract Git & Pipeline info with regional enrichment
             const gitRepoUrl = (product as any).gitInfo?.repoUrl || envGitRepoUrl;
             const gitFilePath = (product as any).gitInfo?.contractPath ||
                 ((product as any).gitInfo?.productPolicyPath && (product as any).gitInfo?.productPolicyFile
                     ? `${(product as any).gitInfo.productPolicyPath}${(product as any).gitInfo.productPolicyFile}`
                     : null);
+
+            // Regional Deployment Enrichment (from ADO Pipelines)
+            const envKey = importEnv.toUpperCase();
+            const regionalDeployment = (product as any).deployments?.[envKey];
+            const deploymentHash = regionalDeployment?.hash || product.gitInfo?.lastCommit || null;
+            const pipelineUrl = regionalDeployment?.pipelineUrl || product.pipelineInfo?.url || null;
 
             console.log(`  💾 Inserting product: ${productId}${gitFilePath ? ` [tfvars path: ${gitFilePath}]` : ''}`);
 
@@ -186,11 +192,11 @@ async function migrateProducts(pool: Pool, products: any[], importEnv: string) {
                 null,
                 targetEnv,
                 'internal',
-                'TERRAFORM_MANAGED',
+                product.management_mode || (gitRepoUrl ? 'TERRAFORM_MANAGED' : 'PORTAL_MANAGED'),
                 gitRepoUrl,
                 gitFilePath,
-                product.pipelineInfo?.url || null,
-                product.gitInfo?.lastCommit || null,
+                pipelineUrl,
+                deploymentHash,
                 0,
                 qualityScore,
                 JSON.stringify(product),

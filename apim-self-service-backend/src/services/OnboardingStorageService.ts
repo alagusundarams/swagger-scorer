@@ -1,0 +1,82 @@
+import { mkdir, writeFile, readFile, rm } from 'fs/promises';
+import { join, dirname } from 'path';
+import { existsSync } from 'fs';
+import pino from 'pino';
+
+const logger = pino({
+    transport: {
+        target: 'pino-pretty',
+        options: { colorize: true }
+    }
+});
+
+/**
+ * OnboardingStorageService
+ * 
+ * Handles storage of API specs in a staging area.
+ * Uses the local file system, which in a K8s environment would be backed 
+ * by a CSI driver (Azure Blob CSI) for persistence and cross-replica access.
+ */
+export class OnboardingStorageService {
+    private stagingDir: string;
+
+    constructor() {
+        // Default to a folder in the app root, or use STORAGE_PATH env var
+        this.stagingDir = process.env.STORAGE_PATH || join(process.cwd(), 'staging');
+        this.ensureDir(this.stagingDir);
+    }
+
+    private async ensureDir(path: string) {
+        if (!existsSync(path)) {
+            await mkdir(path, { recursive: true });
+            logger.info(`Created staging directory: ${path}`);
+        }
+    }
+
+    /**
+     * Store an API spec for onboarding
+     */
+    async storeSpec(userId: string, sessionId: string, apiName: string, content: string | Buffer): Promise<string> {
+        const relativePath = join(userId, sessionId, `${apiName}.json`);
+        const fullPath = join(this.stagingDir, relativePath);
+
+        await mkdir(dirname(fullPath), { recursive: true });
+        await writeFile(fullPath, content);
+
+        logger.info(`Stored spec to staging: ${relativePath}`);
+        return relativePath; // Return relative path for DB storage
+    }
+
+    /**
+     * Retrieve a stored API spec
+     */
+    async retrieveSpec(relativePath: string): Promise<string> {
+        const fullPath = join(this.stagingDir, relativePath);
+        if (!existsSync(fullPath)) {
+            throw new Error(`Spec not found at path: ${relativePath}`);
+        }
+
+        const content = await readFile(fullPath, 'utf-8');
+        return content;
+    }
+
+    /**
+     * Delete a stored API spec
+     */
+    async deleteSpec(relativePath: string): Promise<void> {
+        const fullPath = join(this.stagingDir, relativePath);
+        if (existsSync(fullPath)) {
+            await rm(fullPath);
+            logger.info(`Deleted staged spec: ${relativePath}`);
+        }
+    }
+
+    /**
+     * Get the base staging directory
+     */
+    getStagingDir(): string {
+        return this.stagingDir;
+    }
+}
+
+export const onboardingStorageService = new OnboardingStorageService();

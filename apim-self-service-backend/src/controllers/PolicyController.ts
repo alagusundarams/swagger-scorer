@@ -74,4 +74,35 @@ export class PolicyController {
             });
         }
     };
+
+    public getPolicy = async (req: FastifyRequest<{ Params: { resourceId: string }; Query: { level?: string } }>, reply: FastifyReply) => {
+        const { resourceId } = req.params;
+        const { level = 'api' } = req.query as any;
+
+        try {
+            // 1. Fetch Git Repo URL
+            const repoUrl = await getRepoUrlForResource(resourceId);
+            if (!repoUrl) {
+                return reply.status(404).send({
+                    error: 'Not Found',
+                    details: 'No Git repository linked to this resource.'
+                });
+            }
+
+            // 2. Fetch from Git
+            const result = await this.gitService.fetchPolicy(resourceId, repoUrl, level);
+
+            return reply.send({
+                resourceId,
+                level,
+                xml: result.xml,
+                filePath: result.filePath
+            });
+        } catch (error) {
+            return reply.status(500).send({
+                error: 'Fetch failed',
+                details: error instanceof Error ? error.message : String(error)
+            });
+        }
+    };
 }

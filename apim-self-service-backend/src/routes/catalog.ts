@@ -5,14 +5,26 @@
  */
 
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
-import { getAllProducts } from '../services/products.service.js';
+import { getAllProducts, updateProduct, getGlobalInventory, getPermissionMatrix, updatePermissionMatrix } from '../services/products.service.js';
 import { getAllTeams } from '../services/teams.service.js';
 import { getAllSubscriptions, addSubscription, updateSubscriptionState } from '../services/subscriptions.service.js';
 import { getAllApprovals, updateApproval } from '../services/approvals.service.js';
 import { getAuditLogs } from '../services/audit.service.js';
 import { scoreAllProducts, scoreProductById } from '../services/scoring.service.js';
+import { getAppRegistrations, addAppRegistration } from '../services/apps.service.js';
 
 export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {
+
+    // GET /api/v1/admin/global-inventory (Aggregated view for admins)
+    fastify.get('/admin/global-inventory', async (_request, reply) => {
+        try {
+            const inventory = await getGlobalInventory();
+            return inventory;
+        } catch (error) {
+            fastify.log.error({ err: error }, 'Error fetching global inventory');
+            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to fetch inventory' });
+        }
+    });
 
     // GET /api/v1/products?environment=DEV&role=admin&teamId=xxx (with role-based filtering)
     fastify.get('/products', async (request, reply) => {
@@ -35,6 +47,19 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         } catch (error) {
             fastify.log.error({ err: error }, 'Error fetching admin products');
             return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to fetch products' });
+        }
+    });
+
+    // PATCH /api/v1/products/:id (Update product metadata/ownership)
+    fastify.patch('/products/:id', async (request, reply) => {
+        const { id } = request.params as any;
+        const body = request.body as any;
+        try {
+            const product = await updateProduct(id, body);
+            return product;
+        } catch (error) {
+            fastify.log.error({ err: error }, 'Error updating product');
+            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to update product' });
         }
     });
 
@@ -80,9 +105,11 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         const body = request.body as any;
         const productId = body.productId;
         const teamId = body.teamId || body.subscriberTeamId;
+        const appId = body.appId;
+        const justification = body.justification;
         try {
             const requester = { name: 'Portal User', email: 'user@portal.dev' };
-            const sub = await addSubscription(productId, teamId, requester);
+            const sub = await addSubscription(productId, teamId, requester, appId, justification);
             return sub;
         } catch (error) {
             fastify.log.error({ err: error }, 'Error creating subscription');
@@ -157,6 +184,56 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         } catch (error) {
             fastify.log.error({ err: error }, 'Error scoring product');
             return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to score product' });
+        }
+    });
+
+    // GET /api/v1/permissions/:productId
+    fastify.get('/permissions/:productId', async (request, reply) => {
+        const { productId } = request.params as any;
+        try {
+            const matrix = await getPermissionMatrix(productId);
+            return matrix;
+        } catch (error) {
+            fastify.log.error({ err: error }, 'Error fetching permission matrix');
+            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to fetch permissions' });
+        }
+    });
+
+    // POST /api/v1/permissions/:productId
+    fastify.post('/permissions/:productId', async (request, reply) => {
+        const { productId } = request.params as any;
+        const body = request.body as any;
+        const entries = body.entries || body; // Handle both wrapped and unwrapped
+        try {
+            const matrix = await updatePermissionMatrix(productId, entries);
+            return matrix;
+        } catch (error) {
+            fastify.log.error({ err: error }, 'Error updating permission matrix');
+            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to update permissions' });
+        }
+    });
+
+    // GET /api/v1/apps
+    fastify.get('/apps', async (request, reply) => {
+        const { teamId } = request.query as any;
+        try {
+            const apps = await getAppRegistrations(teamId);
+            return apps;
+        } catch (error) {
+            fastify.log.error({ err: error }, 'Error fetching app registrations');
+            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to fetch apps' });
+        }
+    });
+
+    // POST /api/v1/apps (Link an app)
+    fastify.post('/apps', async (request, reply) => {
+        const body = request.body as any;
+        try {
+            const app = await addAppRegistration(body);
+            return app;
+        } catch (error) {
+            fastify.log.error({ err: error }, 'Error linking app registration');
+            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to link app' });
         }
     });
 }

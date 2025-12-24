@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useMemo, useEffect } from 'react';
 import { useMsal, MsalProvider } from "@azure/msal-react";
 import { PublicClientApplication } from "@azure/msal-browser";
 import { msalConfig, loginRequest } from "./authConfig";
+import { useStore } from '../../../store/useStore';
 
 // === TYPES ===
 import { type User } from '../../../types/entities';
@@ -61,23 +62,54 @@ const MOCK_USERS = {
 // === MOCK IMPLEMENTATION ===
 const MockAuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [selectedUser, setSelectedUser] = useState<keyof typeof MOCK_USERS>('admin');
+    const [selectedUserType, setSelectedUserType] = useState<keyof typeof MOCK_USERS>('admin');
 
     // Get current user based on selection
-    const user: User = MOCK_USERS[selectedUser];
+    const baseUser: User = MOCK_USERS[selectedUserType];
+
+    // Access the data store to find real teams
+    const allTeams = useStore((state) => state.teams);
+
+    // Smart Identity Resolution:
+    // If we have real teams in the store, try to map the mock user to them.
+    const user: User = useMemo(() => {
+        if (!allTeams || allTeams.length === 0) return baseUser;
+
+        const resolvedTeams = baseUser.teams.map(mockId => {
+            // 1. Try exact match
+            const exact = allTeams.find(t => t.id === mockId);
+            if (exact) return exact.id;
+
+            // 2. Try name match (e.g. "Payments" in name)
+            const nameMatch = allTeams.find(t =>
+                t.name.toLowerCase().includes(mockId.replace('team-', '').toLowerCase())
+            );
+            if (nameMatch) return nameMatch.id;
+
+            // 3. Fallback to the first available team if this is a producer/consumer specific user
+            if (baseUser.role === 'admin') return allTeams.map(t => t.id); // Admins get everything
+            return allTeams[0].id;
+        }).flat();
+
+        return {
+            ...baseUser,
+            teams: Array.from(new Set(resolvedTeams)),
+            // Also resolve leadsTeams
+            leadsTeams: baseUser.leadsTeams.length > 0 ? [resolvedTeams[0]] : [],
+            defaultTeamId: resolvedTeams[0]
+        };
+    }, [baseUser, allTeams]);
 
     const login = (userType?: string) => {
         if (userType && userType in MOCK_USERS) {
             const validUserType = userType as keyof typeof MOCK_USERS;
-            setSelectedUser(validUserType);
+            setSelectedUserType(validUserType);
             localStorage.setItem('mockUserType', validUserType);
         }
-        console.log(`[Mock Auth] Login triggered as ${user.name}. Setting isAuthenticated to true.`);
         setIsAuthenticated(true);
     };
 
     const logout = () => {
-        console.log("[Mock Auth] Logout triggered.");
         setIsAuthenticated(false);
     };
 
@@ -87,10 +119,10 @@ const MockAuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     };
 
     // Load saved user selection on mount
-    React.useEffect(() => {
+    useEffect(() => {
         const saved = localStorage.getItem('mockUserType');
         if (saved && saved in MOCK_USERS) {
-            setSelectedUser(saved as keyof typeof MOCK_USERS);
+            setSelectedUserType(saved as keyof typeof MOCK_USERS);
         }
     }, []);
 
@@ -108,13 +140,14 @@ msalInstance.initialize().catch(console.error);
 
 const MsalAuthAdapter: React.FC<{ children: ReactNode }> = ({ children }) => {
     const { instance, accounts } = useMsal();
-    const isAuthenticated = accounts.length > 0;
+    const [mockOverride, setMockOverride] = useState<User | null>(null);
+    const isAuthenticated = accounts.length > 0 || !!mockOverride;
 
     // Derived User State
     const account = accounts[0];
     const claims = account?.idTokenClaims as { groups?: string[], roles?: string[] };
 
-    const user: User | null = account ? {
+    const realUser: User | null = account ? {
         id: account.localAccountId,
         email: account.username,
         name: account.name || "Unknown",
@@ -126,15 +159,24 @@ const MsalAuthAdapter: React.FC<{ children: ReactNode }> = ({ children }) => {
         username: account.username
     } : null;
 
-    const login = () => {
+    const user = mockOverride || realUser;
+
+    const login = (userType?: string) => {
+        if (userType && userType in MOCK_USERS) {
+            const validUserType = userType as keyof typeof MOCK_USERS;
+            setMockOverride(MOCK_USERS[validUserType]);
+            return;
+        }
         instance.loginPopup(loginRequest).catch(console.error);
     };
 
     const logout = () => {
+        setMockOverride(null);
         instance.logoutPopup().catch(console.error);
     };
 
     const getToken = async () => {
+        if (mockOverride) return "mock-token-xyz";
         if (!account) return null;
         try {
             const response = await instance.acquireTokenSilent({

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
 import { useAuth } from '../../../hooks/useAuth';
@@ -27,6 +27,8 @@ export const ProductDetailPage = () => {
         products: allProducts,
         subscriptions: allSubscriptions,
         addSubscription,
+        appRegistrations,
+        fetchAppRegistrations,
         isLoading,
         error
     } = useStore();
@@ -34,9 +36,18 @@ export const ProductDetailPage = () => {
     // --- State ---
     const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
     const [requestTeamId, setRequestTeamId] = useState(user?.defaultTeamId || '');
+    const [selectedAppId, setSelectedAppId] = useState('');
     const [isPending, setIsPending] = useState(false);
     const [businessReason, setBusinessReason] = useState('');
     const [toast, setToast] = useState<{ message: string; show: boolean }>({ message: '', show: false });
+
+    // --- Effects ---
+    useEffect(() => {
+        if (user && user.teams.length > 0) {
+            // Fetch apps for the first team by default, or all teams
+            fetchAppRegistrations();
+        }
+    }, [user, fetchAppRegistrations]);
 
     // --- Data Selectors ---
     const product = useMemo(() => allProducts.find(p => p.id === productId), [allProducts, productId]);
@@ -59,7 +70,7 @@ export const ProductDetailPage = () => {
         setIsRequestModalOpen(false);
 
         // --- Store Update ---
-        addSubscription(productId, requestTeamId, getToken);
+        addSubscription(productId, requestTeamId, getToken, selectedAppId, businessReason);
 
         setToast({ message: 'Access request submitted for review.', show: true });
         setTimeout(() => setToast({ message: '', show: false }), 4000);
@@ -145,9 +156,12 @@ export const ProductDetailPage = () => {
                 onSubmit={handleRequestAccess}
                 requestTeamId={requestTeamId}
                 setRequestTeamId={setRequestTeamId}
+                selectedAppId={selectedAppId}
+                setSelectedAppId={setSelectedAppId}
                 businessReason={businessReason}
                 setBusinessReason={setBusinessReason}
                 userTeams={user?.teams || []}
+                appRegistrations={appRegistrations}
             />
         </MainLayout>
     );

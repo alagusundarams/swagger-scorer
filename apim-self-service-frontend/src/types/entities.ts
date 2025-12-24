@@ -52,6 +52,19 @@ export interface API {
     operations: Operation[];
     qualityScore?: number;
     originTeamId?: string; // For GRP: Original owner of the API
+    gitRepoUrl?: string;   // Link to source code
+    gitFilePath?: string;  // Precise path to contract in Git
+    gitInfo?: {
+        managedByTfvars?: boolean;
+        contractPath?: string;
+        policyPath?: string;
+        repoUrl?: string;
+        lastCommit?: string;
+        lastCommitDate?: string;
+        definitionUrl?: string;
+        contractUrl?: string;
+        policyUrl?: string;
+    };
 }
 
 export interface Product {
@@ -61,7 +74,7 @@ export interface Product {
     type?: 'standard' | 'grp'; // Default to 'standard' if undefined
     version: string;
     description: string;
-    state: 'published' | 'notPublished' | 'draft';
+    state: 'published' | 'notPublished';
     ownerTeamId: string;
     ownerAdGroupId?: string; // Specific AD Group that owns this (if team has multiple)
     apis: API[];
@@ -71,8 +84,7 @@ export interface Product {
     updatedAt: string;
     environment?: 'DEV' | 'QA' | 'STAGE' | 'PROD';
     visibility?: 'public' | 'internal' | 'private' | 'owner-only';
-    authorizedTeams?: string[]; // DEPRECATED: Legacy, use authorizedTeamsByEnv
-    authorizedTeamsByEnv?: Record<'DEV' | 'QA' | 'STAGE' | 'PROD', string[]>; // Environment-scoped authorization
+    authorizedTeams?: string[]; // Teams authorized to view/subscribe to this product
     identity?: {
         clientId: string;
         displayName: string;
@@ -80,16 +92,32 @@ export interface Product {
     };
 
     // Migration support: Track product management mode
-    management_mode?: 'TERRAFORM_MANAGED' | 'HYBRID' | 'PORTAL_MANAGED';
-    terraform_pipeline_url?: string; // Link to Azure DevOps pipeline for Terraform products
-    git_repo_url?: string; // Main Repo URL
+    managementMode?: 'TERRAFORM_MANAGED' | 'HYBRID' | 'PORTAL_MANAGED';
+    terraformPipelineUrl?: string; // Link to Azure DevOps pipeline for Terraform products
+    gitRepoUrl?: string; // Main Repo URL
+    gitFilePath?: string; // Path to product policy
 
     // Git Sync
     lastDeployedCommitHash?: string;
     lastDeployedAt?: string;
 
+    // Infrastructure metadata
+    gitInfo?: {
+        repoUrl: string;
+        lastCommit: string;
+        lastCommitDate: string;
+        productPolicyPath?: string;
+        productPolicyFile?: string;
+        managedByTfvars?: boolean;
+        definitionUrl?: string; // Deep-link to .tfvars
+        policyUrl?: string; // Deep-link to policy XML
+        productDependencies?: string[];
+        apiDependencies?: Record<string, string[]>;
+    };
+
     // Governance
     detectedAnomalies?: string[];
+    reconciliationStatus?: 'GHOST' | 'RECONCILED' | 'MANUAL';
 }
 
 export type Environment = 'ALL' | 'DEV' | 'QA' | 'STAGE' | 'PROD';
@@ -99,11 +127,23 @@ export interface SubscriptionKey {
     value: string;
 }
 
+export interface AppRegistration {
+    id: string;
+    displayName: string;
+    clientId: string;
+    environment: 'DEV' | 'QA' | 'STAGE' | 'PROD';
+    ownerTeamId: string;
+    productId?: string;
+    appIdUri?: string;
+    secretExpiryDate?: string;
+    createdAt?: string;
+}
+
 export interface Subscription {
     id: string;
     productId: string;
     subscriberTeamId: string;
-    state: 'active' | 'suspended' | 'pending' | 'rejected' | 'cancelled' | 'expired';
+    state: 'active' | 'suspended' | 'submitted' | 'pending' | 'rejected' | 'cancelled' | 'expired';
     primaryKey: SubscriptionKey;
     secondaryKey: SubscriptionKey;
     createdAt: string;
@@ -111,13 +151,8 @@ export interface Subscription {
     expirationDate?: string;
     keysGeneratedAt?: string;
     lastSyncedAt?: string;
-    appRegistration?: {
-        id: string;
-        displayName: string;
-        clientId: string;
-        environment: string;
-        secretExpiryDate?: string;
-    };
+    appRegistrationId?: string;
+    appRegistration?: AppRegistration;
 }
 
 export interface ConfigurationItem {
@@ -133,4 +168,41 @@ export interface ConfigurationItem {
         expiryDate: string;
         subject: string;
     };
+}
+
+export interface GlobalDeployment {
+    id: string;
+    environment: string;
+    state: string;
+    gitRepoUrl: string;
+    managementMode: string;
+    qualityScore: number;
+    reconciliationStatus: 'GHOST' | 'RECONCILED' | 'MANUAL';
+}
+
+export interface GlobalProduct {
+    name: string;
+    displayName: string;
+    type: string;
+    ownerTeamId: string;
+    ownerTeamName: string;
+    deployments: GlobalDeployment[];
+}
+
+export interface GlobalAPI {
+    name: string;
+    displayName: string;
+    path: string;
+    deployments: {
+        id: string;
+        productId: string;
+        environment: string;
+        qualityScore: number;
+        originTeamId: string;
+    }[];
+}
+
+export interface GlobalInventoryResponse {
+    products: GlobalProduct[];
+    apis: GlobalAPI[];
 }

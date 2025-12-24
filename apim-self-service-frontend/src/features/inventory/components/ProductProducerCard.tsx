@@ -28,7 +28,7 @@ export const ProductProducerCard: React.FC<ProductProducerCardProps> = ({
 
     return (
         <div
-            className="group bg-white dark:bg-slate-800/90 rounded-2xl shadow-premium border border-gray-100 dark:border-slate-700/50 overflow-hidden hover:shadow-premium-hover transition-all duration-500 transform hover:-translate-y-2 cursor-pointer flex flex-col"
+            className="group bg-white dark:bg-slate-800/90 rounded-3xl shadow-premium border border-gray-100 dark:border-slate-700/50 overflow-hidden hover:shadow-premium-hover transition-all duration-500 transform hover:-translate-y-2 cursor-pointer flex flex-col"
             onClick={onClick}
         >
             <div className="p-7 flex-1">
@@ -114,40 +114,52 @@ export const ProductProducerCard: React.FC<ProductProducerCardProps> = ({
                             </span>
                         )}
 
+                        {/* Ghost Resource Badge */}
+                        {product.reconciliationStatus === 'GHOST' && (
+                            <span className="px-2 py-1 text-[8px] font-black rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 uppercase tracking-wider flex items-center gap-1">
+                                👻 <span className="hidden sm:inline">Unreconciled Ghost</span>
+                            </span>
+                        )}
+
                         {/* Management Mode Badge */}
-                        {product.management_mode && product.management_mode !== 'PORTAL_MANAGED' && (
-                            <span className={`px-2 py-1 text-[8px] font-black rounded-md border uppercase tracking-wider flex items-center gap-1 ${product.management_mode === 'TERRAFORM_MANAGED'
+                        {product.managementMode && product.managementMode !== 'PORTAL_MANAGED' && (
+                            <span className={`px-2 py-1 text-[8px] font-black rounded-md border uppercase tracking-wider flex items-center gap-1 ${product.managementMode === 'TERRAFORM_MANAGED'
                                 ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800'
                                 : 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800'
                                 }`}>
-                                {product.management_mode === 'TERRAFORM_MANAGED' ? '🔴' : '🟡'}
-                                <span className="hidden sm:inline">{product.management_mode === 'TERRAFORM_MANAGED' ? 'TF' : 'Hybrid'}</span>
+                                {product.managementMode === 'TERRAFORM_MANAGED' ? '🔴' : '🟡'}
+                                <span className="hidden sm:inline">{product.managementMode === 'TERRAFORM_MANAGED' ? 'TF' : 'Hybrid'}</span>
                             </span>
                         )}
                     </div>
 
                     <div className="flex items-center gap-3">
                         {/* Git Repo Link */}
-                        {product.git_repo_url && (
-                            <a
-                                href={product.git_repo_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
+                        {product.gitRepoUrl && (
+                            <div
                                 className="p-1.5 rounded-lg bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-700 hover:border-blue-500/50 hover:text-blue-500 transition-all group/git flex items-center gap-1.5"
                                 title={`Azure Repos: master @ ${product.lastDeployedCommitHash || 'Unknown'}`}
+                                onClick={(e) => e.stopPropagation()}
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                                 </svg>
-                                <span className="text-[10px] font-bold hidden group-hover/git:inline">Azure Repos</span>
-                            </a>
+                                <div className="flex flex-col gap-0.5">
+                                    <a href={product.gitRepoUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold hidden group-hover/git:inline hover:underline text-gray-500 dark:text-slate-400">Azure Repos</a>
+                                    {product.gitInfo?.definitionUrl && (
+                                        <a href={product.gitInfo.definitionUrl} target="_blank" rel="noopener noreferrer" className="text-[8px] text-blue-400 hover:text-blue-300 hidden group-hover/git:inline">📄 Definition</a>
+                                    )}
+                                    {product.gitInfo?.policyUrl && (
+                                        <a href={product.gitInfo.policyUrl} target="_blank" rel="noopener noreferrer" className="text-[8px] text-emerald-400 hover:text-emerald-300 hidden group-hover/git:inline">📜 Policy</a>
+                                    )}
+                                </div>
+                            </div>
                         )}
 
                         {/* Pipeline Link */}
-                        {product.terraform_pipeline_url && (
+                        {product.terraformPipelineUrl && (
                             <a
-                                href={product.terraform_pipeline_url}
+                                href={product.terraformPipelineUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
@@ -167,7 +179,7 @@ export const ProductProducerCard: React.FC<ProductProducerCardProps> = ({
             <div className="border-t border-gray-100 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 backdrop-blur-sm">
                 <button
                     onClick={(e) => { e.stopPropagation(); onClick?.(); }}
-                    className="w-full py-4 text-[10px] font-black text-gray-500 dark:text-slate-400 hover:text-blue-500 uppercase tracking-widest transition-all hover:bg-white dark:hover:bg-slate-700/50"
+                    className="w-full py-4 text-[10px] font-black text-gray-500 dark:text-slate-400 hover:text-blue-500 hover:bg-white dark:hover:bg-slate-700/50 uppercase tracking-widest transition-all"
                 >
                     View Details
                 </button>

@@ -226,6 +226,27 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                 onDeprecateClick={handleDeprecate}
             />
 
+            {/* GRP Policy Action Block */}
+            {product.type === 'grp' && (
+                <div className="mb-8 p-6 bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-800 rounded-3xl flex justify-between items-center animate-fade-in shadow-premium">
+                    <div>
+                        <h3 className="text-sm font-black text-purple-900 dark:text-purple-300 uppercase tracking-widest">GRP Product Governance</h3>
+                        <p className="text-xs text-purple-700 dark:text-purple-400 mt-1">
+                            As a GRP Product owner, you can edit product-level policies but API contracts remain under producer control.
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => {
+                            setSelectedApi(null); // Indicates Product level
+                            setIsPolicyStudioOpen(true);
+                        }}
+                        className="px-6 py-2.5 bg-purple-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-purple-700 transition-all shadow-lg"
+                    >
+                        Edit Product Policy
+                    </button>
+                </div>
+            )}
+
             {/* Reconciliation & Data Integrity Alerts */}
             <div className="mb-8 space-y-4">
                 {/* 1. Orphaned Product Check */}
@@ -411,7 +432,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                                         className="px-3 py-1.5 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 bg-purple-50 text-purple-600 hover:bg-purple-100 dark:bg-purple-900/20 dark:text-purple-300 dark:hover:bg-purple-900/40"
                                     >
                                         <span className="text-lg">👓</span>
-                                        Visual Policy
+                                        {product.type === 'grp' ? 'View API Policy' : 'Visual Policy'}
                                     </button>
                                 </div>
                             </div>
@@ -507,7 +528,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                             product={product}
                             api={selectedApi}
                             isOpen={isEditorOpen}
-                            readOnly={isInfraLocked}
+                            readOnly={isInfraLocked || product.type === 'grp'}
                             onClose={() => {
                                 setIsEditorOpen(false);
                                 setSelectedApi(null);
@@ -543,9 +564,11 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                                 setIsPolicyStudioOpen(false);
                                 setSelectedApi(null);
                             }}
-                            apiName={selectedApi.displayName}
+                            apiName={selectedApi?.displayName || 'Product Level'}
                             productName={product.displayName}
-                            isReadOnly={product.type === 'grp'}
+                            isReadOnly={product.type === 'grp' && !!selectedApi}
+                            resourceId={selectedApi?.id || product.id}
+                            level={selectedApi ? 'api' : 'product'}
                             // [DEMO MAGICAL MOMENT]: We inject a known Legacy API Policy XML to show off the Parser.
                             // In a real app, this comes from selectedApi.apim_raw_data.policyXml
                             initialXml={`

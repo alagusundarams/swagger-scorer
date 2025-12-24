@@ -201,6 +201,7 @@ CREATE TABLE IF NOT EXISTS app_registrations (
     display_name TEXT NOT NULL,
     client_id TEXT UNIQUE NOT NULL,
     environment TEXT NOT NULL CHECK (environment IN ('DEV', 'QA', 'STAGE', 'PROD')),
+    owner_team_id TEXT REFERENCES teams(id), -- Added for ownership tracking
     product_id TEXT REFERENCES products(id) ON DELETE CASCADE,
     
     -- App details
@@ -300,3 +301,41 @@ SELECT
 FROM subscriptions s
 LEFT JOIN products p ON s.product_id = p.id
 LEFT JOIN teams t ON s.subscriber_team_id = t.id;
+
+-- =============================================================================
+-- API ONBOARDING STAGING (Added for Staging Flow)
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS api_onboarding_staging (
+    id TEXT PRIMARY KEY,
+    user_id TEXT REFERENCES users(id) NOT NULL,
+    session_id TEXT NOT NULL,
+    api_name TEXT NOT NULL,
+    blob_path TEXT NOT NULL, -- staging/{userId}/{sessionId}/{apiName}
+    status TEXT NOT NULL CHECK (status IN ('STAGED', 'ANALYZED', 'APPROVED', 'REJECTED')) DEFAULT 'STAGED',
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_onboarding_user ON api_onboarding_staging(user_id);
+CREATE INDEX idx_onboarding_session ON api_onboarding_staging(session_id);
+CREATE INDEX idx_onboarding_status ON api_onboarding_staging(status);
+
+-- =============================================================================
+-- PERMISSION MATRIX (Refined Admin Day 1)
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS permission_matrix (
+    id SERIAL PRIMARY KEY,
+    product_id TEXT REFERENCES products(id) ON DELETE CASCADE,
+    ad_group_id TEXT NOT NULL,
+    environment TEXT NOT NULL CHECK (environment IN ('DEV', 'QA', 'STAGE', 'PROD')),
+    role TEXT NOT NULL CHECK (role IN ('Reader', 'Contributor', 'Admin')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(product_id, ad_group_id, environment)
+);
+
+CREATE INDEX idx_permissions_product ON permission_matrix(product_id);
+CREATE INDEX idx_permissions_ad_group ON permission_matrix(ad_group_id);

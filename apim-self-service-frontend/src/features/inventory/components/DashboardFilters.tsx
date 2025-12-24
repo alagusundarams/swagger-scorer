@@ -29,7 +29,7 @@ export function DashboardFilters({
     isFiltersDisabled
 }: DashboardFiltersProps) {
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-20 bg-white/60 dark:bg-slate-800/40 p-10 rounded-[2.5rem] border border-gray-100/50 dark:border-slate-700/30 backdrop-blur-2xl shadow-premium">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-20 bg-white/60 dark:bg-slate-800/40 p-10 rounded-3xl border border-gray-100/50 dark:border-slate-700/30 backdrop-blur-2xl shadow-premium">
             <div className="flex flex-col gap-4">
                 <label className="text-[10px] uppercase font-black text-gray-400 dark:text-slate-500 tracking-widest ml-1">Universal Search</label>
                 <Input

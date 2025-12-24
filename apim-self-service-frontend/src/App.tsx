@@ -18,6 +18,8 @@ const HeaderFooterTest = lazy(() => import('./core/ui/HeaderFooterTest.view').th
 const AdminGovernancePage = lazy(() => import('./features/admin/views/AdminGovernance.view').then(module => ({ default: module.AdminGovernancePage })));
 const AdminMappingView = lazy(() => import('./features/inventory/views/AdminMapping.view').then(module => ({ default: module.AdminMappingView })));
 const PolicyStudioContainer = lazy(() => import('./features/policy-studio/PolicyStudio.container').then(module => ({ default: module.PolicyStudioContainer })));
+const GlobalInventoryPage = lazy(() => import('./features/admin/views/GlobalInventory.view').then(module => ({ default: module.GlobalInventoryView })));
+const AppsPage = lazy(() => import('./features/consumer/views/Apps.view').then(module => ({ default: module.AppsPage })));
 
 import { ProtectedRoute } from './core/routing/ProtectedRoute';
 
@@ -104,6 +106,14 @@ function App() {
             }
           />
           <Route
+            path="/apps"
+            element={
+              <ProtectedRoute>
+                <AppsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             element={
               <ProtectedRoute>
                 <AdminGovernancePage />
@@ -115,6 +125,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <AdminMappingView />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/global-inventory"
+            element={
+              <ProtectedRoute>
+                <GlobalInventoryPage />
               </ProtectedRoute>
             }
           />

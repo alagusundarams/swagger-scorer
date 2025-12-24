@@ -9,6 +9,29 @@ import { existsSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { parseTfvars, TfvarsData, findAPIInTfvars, findProductInTfvars, getAPIContractPath } from './tfvars-parser.js';
+import { readFileSync } from 'fs';
+
+/**
+ * Extract dependencies from policy XML (send-request, etc)
+ */
+export function extractDependenciesFromPolicy(xmlContent: string): string[] {
+    const dependencies: Set<string> = new Set();
+
+    // 1. Find <send-request ... base-url="...">
+    const sendReqRegex = /<send-request[^>]*base-url=["']([^"']+)["']/g;
+    let match;
+    while ((match = sendReqRegex.exec(xmlContent)) !== null) {
+        dependencies.add(match[1]);
+    }
+
+    // 2. Find internal APIM calls via paths (e.g. forward-request to specific backends)
+    const backendRegex = /<set-backend-service[^>]*backend-id=["']([^"']+)["']/g;
+    while ((match = backendRegex.exec(xmlContent)) !== null) {
+        dependencies.add(`backend://${match[1]}`);
+    }
+
+    return Array.from(dependencies);
+}
 
 /**
  * Clone a Git repository to a temporary directory
@@ -170,12 +193,76 @@ export async function extractProductGitInfo(
             encoding: 'utf-8'
         }).trim();
 
+        // Find which specific tfvars file defining this product and its APIs
+        let tfvarsLine: number | null = null;
+        let tfvarsFile: string | null = null;
+        const apiLines: Record<string, number> = {};
+        const { findLineNumber } = await import('./tfvars-parser.js');
+
+        // Product Line
+        for (const file of tfvarsFiles) {
+            const line = findLineNumber(file, productName);
+            if (line) {
+                tfvarsLine = line;
+                tfvarsFile = 'IAC/' + maintainPath.split('/').pop() + '/' + file.split('/').pop();
+                break;
+            }
+        }
+
+        // API Lines
+        for (const file of tfvarsFiles) {
+            if (tfvarsData.apis) {
+                for (const api of tfvarsData.apis) {
+                    if (!apiLines[api.name]) {
+                        const line = findLineNumber(file, api.name);
+                        if (line) apiLines[api.name] = line;
+                    }
+                }
+            }
+        }
+
+        // Find tfvars product for dependency analysis
+        const tfvarsProduct = findProductInTfvars(productName, tfvarsData);
+
+        // Dependency Analysis: Scan Product Policy
+        const productDependencies: string[] = [];
+        if (tfvarsProduct && tfvarsProduct.product_policy_path && tfvarsProduct.product_policy) {
+            try {
+                const policyPath = join(repoPath, tfvarsProduct.product_policy_path, tfvarsProduct.product_policy);
+                if (existsSync(policyPath)) {
+                    const content = readFileSync(policyPath, 'utf-8');
+                    productDependencies.push(...extractDependenciesFromPolicy(content));
+                }
+            } catch (err) { /* ignore */ }
+        }
+
+        // Dependency Analysis: Scan API Policies
+        const apiDependencies: Record<string, string[]> = {};
+        if (tfvarsData.apis) {
+            for (const api of tfvarsData.apis) {
+                if (api.api_policy_path && api.api_policy_file) {
+                    try {
+                        const policyPath = join(repoPath, api.api_policy_path, api.api_policy_file);
+                        if (existsSync(policyPath)) {
+                            const content = readFileSync(policyPath, 'utf-8');
+                            apiDependencies[api.name] = extractDependenciesFromPolicy(content);
+                        }
+                    } catch (err) { /* ignore */ }
+                }
+            }
+        }
+
         const gitInfo = {
             repoUrl,
             lastCommit,
             lastCommitDate,
             isGRP,
-            iacPath: 'IAC/' + maintainPath.split('/').pop()
+            iacPath: 'IAC/' + maintainPath.split('/').pop(),
+            tfvarsFile,
+            tfvarsLine,
+            apiLines,
+            productDependencies,
+            apiDependencies
         };
 
         return { gitInfo, tfvarsData };

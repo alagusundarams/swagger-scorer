@@ -1,3 +1,4 @@
+import { type AppRegistration } from '../../../types/entities';
 
 interface RequestAccessModalProps {
     isOpen: boolean;
@@ -5,9 +6,12 @@ interface RequestAccessModalProps {
     onSubmit: () => void;
     requestTeamId: string;
     setRequestTeamId: (teamId: string) => void;
+    selectedAppId: string;
+    setSelectedAppId: (appId: string) => void;
     businessReason: string;
     setBusinessReason: (reason: string) => void;
     userTeams: string[];
+    appRegistrations: AppRegistration[];
 }
 
 export function RequestAccessModal({
@@ -16,9 +20,12 @@ export function RequestAccessModal({
     onSubmit,
     requestTeamId,
     setRequestTeamId,
+    selectedAppId,
+    setSelectedAppId,
     businessReason,
     setBusinessReason,
-    userTeams
+    userTeams,
+    appRegistrations
 }: RequestAccessModalProps) {
     if (!isOpen) return null;
 
@@ -45,6 +52,28 @@ export function RequestAccessModal({
                                     <option key={teamId} value={teamId}>{teamId.replace('team-', '').toUpperCase()} TEAM</option>
                                 ))}
                             </select>
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 block ml-1">Consuming Application Identity</label>
+                            <select
+                                className="w-full bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800 p-5 rounded-2xl text-sm font-bold outline-none ring-offset-2 focus:ring-2 focus:ring-emerald-600/20 transition-all cursor-pointer"
+                                value={selectedAppId}
+                                onChange={(e) => setSelectedAppId(e.target.value)}
+                                disabled={!requestTeamId}
+                            >
+                                <option value="" disabled>Select an application</option>
+                                {appRegistrations
+                                    .filter(app => app.ownerTeamId === requestTeamId)
+                                    .map(app => (
+                                        <option key={app.id} value={app.id}>
+                                            [{app.environment}] {app.displayName} ({app.clientId.slice(0, 8)}...)
+                                        </option>
+                                    ))}
+                            </select>
+                            {requestTeamId && appRegistrations.filter(app => app.ownerTeamId === requestTeamId).length === 0 && (
+                                <p className="text-[10px] text-rose-500 font-bold mt-2 ml-1">No apps linked to this team. Please link an app first.</p>
+                            )}
                         </div>
 
                         <div>

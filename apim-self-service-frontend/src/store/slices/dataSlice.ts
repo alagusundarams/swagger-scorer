@@ -1,26 +1,29 @@
 import { StateCreator } from 'zustand';
-import { type Product, type Subscription, type Team, type API } from '../../types/entities';
+import { type Product, type Subscription, type Team, type API, type AppRegistration } from '../../types/entities';
 import { type ApprovalRequest, type AuditLog } from '../../types/workflow';
-import { getProducts, getTeams, getSubscriptions, requestProductAccess, updateSubscription as apiUpdateSubscription, getApprovals, updateApproval, getAuditLogs, updateTeam as apiUpdateTeam, createTeam as apiCreateTeam, updateProduct as apiUpdateProduct, requestPromotion as apiRequestPromotion } from '../../features/inventory/api/inventoryClient';
+import { getProducts, getTeams, getSubscriptions, requestProductAccess, updateSubscription as apiUpdateSubscription, getApprovals, updateApproval, getAuditLogs, updateTeam as apiUpdateTeam, createTeam as apiCreateTeam, updateProduct as apiUpdateProduct, requestPromotion as apiRequestPromotion, getAppRegistrations, addAppRegistration as apiAddAppRegistration } from '../../features/inventory/api/inventoryClient';
 import { AuthSlice } from './authSlice';
 
 export interface DataSlice {
     products: Product[];
     subscriptions: Subscription[];
     teams: Team[];
+    appRegistrations: AppRegistration[];
     approvalRequests: ApprovalRequest[];
     auditLogs: AuditLog[];
 
     fetchInitialData: (getToken?: () => Promise<string | null>) => Promise<void>;
     fetchAuditLogs: (entityId?: string) => Promise<void>;
     updateSubscription: (id: string, updates: Partial<Subscription>, getToken?: () => Promise<string | null>) => Promise<void>;
-    addSubscription: (productId: string, teamId: string, getToken?: () => Promise<string | null>) => Promise<void>;
+    addSubscription: (productId: string, teamId: string, getToken?: () => Promise<string | null>, appId?: string, justification?: string) => Promise<void>;
     processApproval: (id: string, decision: 'APPROVE' | 'REJECT', justification?: string, getToken?: () => Promise<string | null>) => Promise<void>;
     updateProduct: (id: string, updates: Partial<Product>) => Promise<void>;
     updateAPI: (id: string, updates: Partial<API>) => Promise<void>;
     updateTeam: (id: string, updates: Partial<Team>) => Promise<void>;
     addTeam: (team: Team) => Promise<void>;
     requestProductPromotion: (productId: string, targetEnv: string, getToken?: () => Promise<string | null>) => Promise<void>;
+    fetchAppRegistrations: (teamId?: string) => Promise<void>;
+    addAppRegistration: (app: Partial<AppRegistration>) => Promise<void>;
     error: string | null;
     setError: (error: string | null) => void;
     isLoading: boolean;
@@ -30,6 +33,7 @@ export const createDataSlice: StateCreator<DataSlice & AuthSlice, [], [], DataSl
     products: [],
     subscriptions: [],
     teams: [],
+    appRegistrations: [],
     approvalRequests: [],
     auditLogs: [],
     error: null,
@@ -141,12 +145,12 @@ export const createDataSlice: StateCreator<DataSlice & AuthSlice, [], [], DataSl
         }
     },
 
-    addSubscription: async (productId, teamId, getToken) => {
+    addSubscription: async (productId, teamId, getToken, appId, justification) => {
         if (!getToken) return;
         try {
             const token = await getToken();
             if (token) {
-                const response = await requestProductAccess(productId, teamId, token);
+                const response = await requestProductAccess(productId, teamId, token, appId, justification);
                 const sub = response.data;
                 set((state) => ({
                     subscriptions: [sub, ...state.subscriptions]
@@ -245,6 +249,26 @@ export const createDataSlice: StateCreator<DataSlice & AuthSlice, [], [], DataSl
         } catch (error: any) {
             console.error("Failed to request promotion", error);
             throw error; // Re-throw to let UI handle toasts
+        }
+    },
+
+    fetchAppRegistrations: async (teamId) => {
+        try {
+            const response = await getAppRegistrations(teamId);
+            set({ appRegistrations: response.data });
+        } catch (error) {
+            console.error("Failed to fetch app registrations", error);
+        }
+    },
+
+    addAppRegistration: async (app) => {
+        try {
+            const response = await apiAddAppRegistration(app);
+            set((state) => ({
+                appRegistrations: [response.data, ...state.appRegistrations]
+            }));
+        } catch (error) {
+            console.error("Failed to add app registration", error);
         }
     }
 });

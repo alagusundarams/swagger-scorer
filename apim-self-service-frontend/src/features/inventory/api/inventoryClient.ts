@@ -1,6 +1,6 @@
 import { api } from '../../../api/baseClient';
 import { USE_MOCKS } from '../../../config/env';
-import { type Product, type Subscription, type Team, type API } from '../../../types/entities';
+import { type Product, type Subscription, type Team, type API, type AppRegistration } from '../../../types/entities';
 import { type ApprovalRequest, type ApprovalStatus, type AuditLog } from '../../../types/workflow';
 
 // === MOCK DATA ===
@@ -119,10 +119,39 @@ const MOCK_SUBSCRIPTIONS: Subscription[] = [
             id: 'app-grp-001',
             displayName: 'Mobile App Bundle (GRP)', // Matches GRP Product Name
             clientId: 'client-grp-mobile',
-            environment: 'PROD'
+            environment: 'PROD',
+            ownerTeamId: 'team-mobile'
         }
     }
 ];
+
+const MOCK_APPS: AppRegistration[] = [
+    {
+        id: 'app-001',
+        displayName: 'Mobile Checkout App',
+        clientId: 'client-8822-mobile',
+        environment: 'PROD',
+        ownerTeamId: 'team-payments',
+        createdAt: '2023-09-01T10:00:00Z'
+    }
+];
+
+export const getAppRegistrations = async (teamId?: string) => {
+    if (USE_MOCKS) {
+        if (teamId) return Promise.resolve({ data: MOCK_APPS.filter(a => a.ownerTeamId === teamId) });
+        return Promise.resolve({ data: MOCK_APPS });
+    }
+    return api.get<AppRegistration[]>('/apps', { params: { teamId } });
+};
+
+export const addAppRegistration = async (app: Partial<AppRegistration>) => {
+    if (USE_MOCKS) {
+        const newApp = { ...app, id: `app-${Date.now()}` } as AppRegistration;
+        MOCK_APPS.push(newApp);
+        return Promise.resolve({ data: newApp });
+    }
+    return api.post<AppRegistration>('/apps', app);
+};
 
 export const getSubscriptions = async (token: string) => {
     if (USE_MOCKS) return Promise.resolve({ data: MOCK_SUBSCRIPTIONS });
@@ -131,8 +160,8 @@ export const getSubscriptions = async (token: string) => {
     });
 };
 
-export const requestProductAccess = async (productId: string, teamId: string, token: string) => {
-    return api.post<Subscription>('/subscriptions', { productId, teamId }, {
+export const requestProductAccess = async (productId: string, teamId: string, token: string, appId?: string, justification?: string) => {
+    return api.post<Subscription>('/subscriptions', { productId, teamId, appId, justification }, {
         headers: { Authorization: `Bearer ${token}` }
     });
 };
@@ -244,7 +273,7 @@ export const getAdminProducts = async (environment?: string) => {
             displayName: `Enterprise ${['Core', 'Security', 'Data', 'Audit', 'Finance'][i % 5]} API ${i + 1}`,
             description: `Global administrative endpoint for ${['identity management', 'transaction auditing', 'real-time analytics', 'ledger synchronization', 'policy enforcement'][i % 5]} across all production gateways.`,
             version: `v${(i % 3) + 1}.0.${i % 10}`,
-            state: (i % 15 === 0 ? 'Review' : 'Published'),
+            state: (i % 15 === 0 ? 'draft' : 'published'),
             ownerTeamId: i % 2 === 0 ? 'team-cloudops' : 'team-security',
             apis: Array.from({ length: (i % 8) + 1 }),
             qualityScore: 70 + (i % 30),
@@ -257,4 +286,71 @@ export const getAdminProducts = async (environment?: string) => {
     }
     const params = environment ? { environment } : {};
     return api.get<Product[]>('/admin/products', { params });
+};
+
+/**
+ * Fetch a unified view of all products and APIs across regions for the Admin dashboard.
+ */
+export const getGlobalInventory = async (): Promise<{ data: { products: any[]; apis: any[] } }> => {
+    // In a real Day 1 scenario, we mostly want real data here
+    if (USE_MOCKS) {
+        return Promise.resolve({
+            data: {
+                products: [
+                    {
+                        name: 'payment-api',
+                        displayName: 'Payment Gateway API',
+                        type: 'standard',
+                        ownerTeamId: 'team-payments',
+                        ownerTeamName: 'Payments Squad',
+                        deployments: [
+                            { environment: 'DEV', state: 'published', gitRepoUrl: 'https://github.com/org/payment-api', managementMode: 'TERRAFORM_MANAGED' },
+                            { environment: 'PROD', state: 'published', gitRepoUrl: 'https://github.com/org/payment-api', managementMode: 'TERRAFORM_MANAGED' }
+                        ]
+                    }
+                ],
+                apis: [
+                    {
+                        name: 'authorize-v1',
+                        displayName: 'Authorize V1',
+                        path: '/v1/auth',
+                        deployments: [
+                            { environment: 'DEV', productId: 'p1', qualityScore: 85 }
+                        ]
+                    }
+                ]
+            }
+        });
+    }
+    return api.get('/admin/global-inventory');
+};
+
+export interface PermissionMatrixEntry {
+    id?: string;
+    productId?: string;
+    adGroupId: string;
+    adGroupName?: string;
+    environment: 'DEV' | 'QA' | 'STAGE' | 'PROD';
+    role: 'Reader' | 'Contributor' | 'Admin';
+}
+
+export const getPermissionMatrix = async (productId: string): Promise<{ data: PermissionMatrixEntry[] }> => {
+    if (USE_MOCKS) {
+        return Promise.resolve({
+            data: [
+                { adGroupId: 'group-platform-dev', adGroupName: 'Platform Devs', environment: 'DEV', role: 'Admin' },
+                { adGroupId: 'group-payments-dev', adGroupName: 'Payments Squad', environment: 'DEV', role: 'Contributor' },
+                { adGroupId: 'group-payments-prod', adGroupName: 'Payments Squad', environment: 'PROD', role: 'Reader' }
+            ]
+        });
+    }
+    return api.get(`/permissions/${productId}`);
+};
+
+export const updatePermissionMatrix = async (productId: string, entries: PermissionMatrixEntry[]) => {
+    if (USE_MOCKS) {
+        console.log(`[Mock] Updating Matrix for ${productId}`, entries);
+        return Promise.resolve({ data: entries });
+    }
+    return api.post(`/permissions/${productId}`, { entries });
 };

@@ -6,6 +6,7 @@ import { ProductGettingStarted } from '../components/ProductGettingStarted';
 import { ConfigurationTab } from '../components/ConfigurationTab';
 import { ApiInterfaceCatalog } from '../components/ApiInterfaceCatalog';
 import { ProductComplianceInfo } from '../components/ProductComplianceInfo';
+// import { ApiConsole } from '../../discovery/components/ApiConsole.component';
 
 /**
  * Props for the ProductDetailConsumer component

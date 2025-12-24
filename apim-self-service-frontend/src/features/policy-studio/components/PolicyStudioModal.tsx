@@ -6,10 +6,21 @@ interface Props {
     apiName: string;
     productName: string;
     initialXml?: string;
-    isReadOnly?: boolean; // ADDED
+    isReadOnly?: boolean;
+    resourceId?: string; // NEW
+    level?: 'product' | 'api' | 'operation'; // NEW
 }
 
-export const PolicyStudioModal = ({ isOpen, onClose, apiName, productName, initialXml, isReadOnly = false }: Props) => {
+export const PolicyStudioModal = ({
+    isOpen,
+    onClose,
+    apiName,
+    productName,
+    initialXml,
+    isReadOnly = false,
+    resourceId,
+    level = 'api'
+}: Props) => {
     if (!isOpen) return null;
 
     return (
@@ -56,7 +67,8 @@ export const PolicyStudioModal = ({ isOpen, onClose, apiName, productName, initi
                 <PolicyStudioContainer
                     initialXml={initialXml}
                     resourceName={apiName}
-                    resourceId={apiName}
+                    resourceId={resourceId || apiName}
+                    level={level}
                     isReadOnly={isReadOnly}
                 />
             </div>

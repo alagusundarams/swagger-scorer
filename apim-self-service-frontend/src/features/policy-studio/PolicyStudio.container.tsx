@@ -26,11 +26,18 @@ interface Props {
     initialXml?: string;
     resourceName?: string;
     resourceId?: string;
+    level?: 'product' | 'api' | 'operation';
     isReadOnly?: boolean;
 }
 
-export const PolicyStudioContainer = ({ initialXml, resourceName = 'Unknown Policy', resourceId = 'legacy-policy', isReadOnly = false }: Props) => {
-    const [selectedScope, setSelectedScope] = useState<PolicyScope>('api');
+export const PolicyStudioContainer = ({
+    initialXml,
+    resourceName = 'Unknown Policy',
+    resourceId = 'legacy-policy',
+    level = 'api',
+    isReadOnly = false
+}: Props) => {
+    const [selectedScope, setSelectedScope] = useState<PolicyScope>(level as PolicyScope);
     const { addNotification } = useStore();
 
     // State
@@ -92,6 +99,7 @@ export const PolicyStudioContainer = ({ initialXml, resourceName = 'Unknown Poli
             const response = await api.post('/policy/deploy', {
                 xml: rawXml,
                 resourceId,
+                level,
                 justification,
                 user: 'alagusundaram'
             });

@@ -28,7 +28,7 @@ export const ProductConsumerCard: React.FC<ProductConsumerCardProps> = ({
 
     return (
         <div
-            className="group bg-white dark:bg-slate-800/90 rounded-2xl shadow-premium border border-gray-100 dark:border-slate-700/50 overflow-hidden hover:shadow-premium-hover transition-all duration-500 transform hover:-translate-y-2 cursor-pointer flex flex-col"
+            className="group bg-white dark:bg-slate-800/90 rounded-3xl shadow-premium border border-gray-100 dark:border-slate-700/50 overflow-hidden hover:shadow-premium-hover transition-all duration-500 transform hover:-translate-y-2 cursor-pointer flex flex-col"
             onClick={onClick}
         >
             <div className="p-7 flex-1">

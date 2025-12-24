@@ -14,6 +14,11 @@ export const AdminMappingView = () => {
     const [selectedTeamId, setSelectedTeamId] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
 
+    // Permission Matrix State
+    const [selectedProductForMatrix, setSelectedProductForMatrix] = useState<ExtractedResource | null>(null);
+    const [matrixEntries, setMatrixEntries] = useState<any[]>([]);
+    const [isSavingMatrix, setIsSavingMatrix] = useState(false);
+
     // Navigation & Breadcrumbs
 
     const navigate = useNavigate();
@@ -80,6 +85,54 @@ export const AdminMappingView = () => {
         setIsCreatingTeam(false);
         setNewTeamName('');
         setNewAdGroup('');
+    };
+
+    const handleOpenMatrix = async (product: ExtractedResource) => {
+        setSelectedProductForMatrix(product);
+        setMatrixEntries([]); // Reset while loading
+
+        try {
+            import('../api/inventoryClient').then(async ({ getPermissionMatrix }) => {
+                const res = await getPermissionMatrix(product.id);
+                setMatrixEntries(res.data);
+            });
+        } catch (err) {
+            toast.error('Failed to load permission matrix');
+        }
+    };
+
+    const handleSaveMatrix = async () => {
+        if (!selectedProductForMatrix) return;
+        setIsSavingMatrix(true);
+        try {
+            const { updatePermissionMatrix } = await import('../api/inventoryClient');
+            await updatePermissionMatrix(selectedProductForMatrix.id, matrixEntries);
+            toast.success('Permission matrix updated successfully');
+            setSelectedProductForMatrix(null);
+        } catch (err) {
+            toast.error('Failed to save permission matrix');
+        } finally {
+            setIsSavingMatrix(false);
+        }
+    };
+
+    const addMatrixEntry = () => {
+        setMatrixEntries([...matrixEntries, {
+            adGroupId: '',
+            adGroupName: '',
+            environment: 'DEV',
+            role: 'Reader'
+        }]);
+    };
+
+    const updateMatrixEntry = (index: number, updates: any) => {
+        const next = [...matrixEntries];
+        next[index] = { ...next[index], ...updates };
+        setMatrixEntries(next);
+    };
+
+    const removeMatrixEntry = (index: number) => {
+        setMatrixEntries(matrixEntries.filter((_, i) => i !== index));
     };
 
     const handleAssign = async () => {
@@ -152,12 +205,19 @@ export const AdminMappingView = () => {
 
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <h1 className="text-3xl font-black text-slate-900 dark:text-white">Admin Mapping</h1>
-                        <p className="text-slate-500 mt-2">Reconcile orphaned APIM resources with Teams.</p>
+                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Admin Mapping</h1>
+                        <p className="text-slate-500 mt-2 flex items-center gap-2">
+                            <span>Reconcile orphaned APIM resources with Teams.</span>
+                            <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">Pristine Mode Active</span>
+                        </p>
                     </div>
-                    <div className="flex gap-4">
+                    <div className="flex flex-col items-end gap-2">
                         <div className="bg-amber-100 text-amber-800 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest flex items-center gap-2">
                             <span>⚠️</span> {orphans.length} Orphans Found
+                        </div>
+                        <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">
+                            Last Sync from Infra: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}
                         </div>
                     </div>
                 </div>
@@ -220,21 +280,81 @@ export const AdminMappingView = () => {
                                                 />
                                             </td>
                                             <td className="p-4 font-medium text-gray-900 dark:text-white">
-                                                {orphan.name}
-                                                <div className="text-xs text-cool-gray-400 font-mono mt-0.5">{orphan.id}</div>
-                                                {orphan.details?.type === 'grp' && (
-                                                    <span className="inline-block mt-1 px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[9px] font-bold uppercase rounded">GRP Bundle</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-bold">{orphan.details?.displayName || orphan.name}</span>
+                                                    {orphan.type === 'Product' && (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleOpenMatrix(orphan); }}
+                                                            className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-black uppercase rounded hover:bg-blue-100 transition"
+                                                        >
+                                                            Matrix
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <div className="text-[10px] text-cool-gray-400 font-mono mt-0.5">{orphan.name}</div>
+
+                                                {/* Meta Info: Git & Type */}
+                                                <div className="flex items-center gap-2 mt-2">
+                                                    {orphan.details?.type === 'grp' && (
+                                                        <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[9px] font-black uppercase rounded shadow-sm border border-purple-200">GRP Bundle</span>
+                                                    )}
+                                                    {orphan.details?.managementMode === 'TERRAFORM_MANAGED' ? (
+                                                        <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase rounded shadow-sm border border-emerald-200">Terraform Managed</span>
+                                                    ) : (
+                                                        <span className={`px-1.5 py-0.5 text-[9px] font-black uppercase rounded shadow-sm border ${(!orphan.details?.gitRepoUrl)
+                                                            ? 'bg-red-50 text-red-700 border-red-200'
+                                                            : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                                                            {(!orphan.details?.gitRepoUrl) ? 'Portal Managed - Ghost' : 'Portal Managed'}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Action Links */}
+                                                {(orphan.details?.gitRepoUrl || orphan.details?.pipelineInfo?.url) && (
+                                                    <div className="flex items-center gap-3 mt-2">
+                                                        {orphan.details?.gitRepoUrl && (
+                                                            <div className="flex items-center gap-2">
+                                                                <a
+                                                                    href={orphan.details.gitRepoUrl}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    className="text-[10px] text-blue-600 hover:text-blue-800 flex items-center gap-1 font-bold"
+                                                                >
+                                                                    <span>REPO</span>
+                                                                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                                                </a>
+                                                                {orphan.details?.lastDeployedCommitHash && (
+                                                                    <span className="text-[9px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200" title="Last Deployed Hash">
+                                                                        #{orphan.details.lastDeployedCommitHash.substring(0, 7)}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        {orphan.details?.pipelineInfo?.url && (
+                                                            <a
+                                                                href={orphan.details.pipelineInfo.url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                className="text-[10px] text-emerald-600 hover:text-emerald-800 flex items-center gap-1 font-bold"
+                                                            >
+                                                                <span>PIPELINE</span>
+                                                                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                                            </a>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </td>
                                             <td className="p-4">
-                                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${orphan.type === 'Product' ? 'bg-purple-100 text-purple-700' :
-                                                    orphan.type === 'API' ? 'bg-blue-100 text-blue-700' :
-                                                        'bg-gray-100 text-gray-700'
+                                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${orphan.type === 'Product' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' :
+                                                    orphan.type === 'API' ? 'bg-cyan-50 text-cyan-700 border border-cyan-100' :
+                                                        'bg-gray-50 text-gray-700 border border-gray-100'
                                                     }`}>
                                                     {orphan.type}
                                                 </span>
                                             </td>
-                                            <td className="p-4 text-xs font-mono text-gray-500">{orphan.environment}</td>
+                                            <td className="p-4 text-xs font-mono text-slate-400 font-bold">{orphan.environment}</td>
                                         </tr>
                                     ))}
                                     {filteredOrphans.length === 0 && (
@@ -329,6 +449,114 @@ export const AdminMappingView = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Permission Matrix Modal */}
+            {selectedProductForMatrix && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-800 w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+                        <div className="px-8 py-6 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+                            <div>
+                                <h2 className="text-xl font-black text-gray-900 dark:text-white">Permission Matrix</h2>
+                                <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest font-bold">
+                                    Product: {selectedProductForMatrix.name}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setSelectedProductForMatrix(null)}
+                                className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-200 dark:hover:bg-slate-700 transition"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-auto p-8">
+                            <div className="mb-6 flex justify-between items-center">
+                                <h3 className="text-sm font-black uppercase tracking-widest text-blue-600">Access Policies</h3>
+                                <button
+                                    onClick={addMatrixEntry}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-xl text-[10px] font-bold uppercase transition hover:bg-blue-700"
+                                >
+                                    + Add Group Mapping
+                                </button>
+                            </div>
+
+                            {matrixEntries.length === 0 ? (
+                                <div className="text-center py-20 bg-slate-50 dark:bg-slate-900/30 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-700">
+                                    <span className="text-4xl block mb-4">🛡️</span>
+                                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No custom permissions defined.</p>
+                                    <button onClick={addMatrixEntry} className="text-blue-600 font-bold mt-2 hover:underline">Apply First Policy</button>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {matrixEntries.map((entry, idx) => (
+                                        <div key={idx} className="p-6 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-gray-100 dark:border-slate-700 flex items-center gap-4 transition-all hover:shadow-md animate-in slide-in-from-bottom-2">
+                                            <div className="flex-1">
+                                                <Typeahead
+                                                    label="AD Group"
+                                                    placeholder="Search groups..."
+                                                    options={adGroupOptions}
+                                                    value={entry.adGroupId}
+                                                    onChange={(val) => {
+                                                        const label = adGroupOptions.find(o => o.id === val)?.label;
+                                                        updateMatrixEntry(idx, { adGroupId: val, adGroupName: label });
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="w-40">
+                                                <label className="block text-[10px] font-black uppercase text-gray-400 mb-1 ml-1">Environment</label>
+                                                <select
+                                                    value={entry.environment}
+                                                    onChange={e => updateMatrixEntry(idx, { environment: e.target.value })}
+                                                    className="w-full bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 rounded-lg text-xs p-2 font-bold focus:ring-2 focus:ring-blue-500"
+                                                >
+                                                    <option value="DEV">DEV</option>
+                                                    <option value="QA">QA</option>
+                                                    <option value="STAGE">STAGE</option>
+                                                    <option value="PROD">PROD</option>
+                                                </select>
+                                            </div>
+                                            <div className="w-40">
+                                                <label className="block text-[10px] font-black uppercase text-gray-400 mb-1 ml-1">Role</label>
+                                                <select
+                                                    value={entry.role}
+                                                    onChange={e => updateMatrixEntry(idx, { role: e.target.value })}
+                                                    className="w-full bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 rounded-lg text-xs p-2 font-bold focus:ring-2 focus:ring-blue-500"
+                                                >
+                                                    <option value="Reader">Reader</option>
+                                                    <option value="Contributor">Contributor</option>
+                                                    <option value="Admin">Admin</option>
+                                                </select>
+                                            </div>
+                                            <button
+                                                onClick={() => removeMatrixEntry(idx)}
+                                                className="mt-4 p-2 text-red-500 hover:bg-red-50 rounded-lg transition"
+                                            >
+                                                🗑️
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="px-8 py-6 bg-slate-50 dark:bg-slate-900/50 border-t border-gray-100 dark:border-slate-700 flex justify-end gap-4">
+                            <button
+                                onClick={() => setSelectedProductForMatrix(null)}
+                                className="px-6 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-900"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSaveMatrix}
+                                disabled={isSavingMatrix || matrixEntries.some(e => !e.adGroupId)}
+                                className="px-8 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold transition shadow-lg hover:bg-blue-700 disabled:opacity-50"
+                            >
+                                {isSavingMatrix ? 'Saving...' : 'Save Matrix'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </MainLayout>
     );
 };
