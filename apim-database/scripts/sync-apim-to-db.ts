@@ -19,6 +19,7 @@
 import { Pool } from 'pg';
 import { readFileSync, existsSync, appendFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { fork } from 'child_process';
 import { AzureService, AppRegistration } from './services/AzureService.js';
 
 // --- CONFIG LOADER ---
@@ -33,7 +34,7 @@ function loadConfig() {
     else if (existsSync(relativeConfig)) configPath = relativeConfig;
 
     if (configPath) {
-        console.log(`📂 Using config from: ${configPath}`);
+        // console.log(`📂 Using config from: ${configPath}`); // Reduce noise in orchestrator
         return JSON.parse(readFileSync(configPath, 'utf8'));
     }
     return {};
@@ -41,100 +42,112 @@ function loadConfig() {
 
 const config = loadConfig();
 
-// --- CONFIGURATION ---
-// STRICT RULE: Resolve Environment from CLI ARGUMENT ONLY.
-// Usage: npx tsx scripts/sync-apim-to-db.ts --env=DEV
-
+// --- ENTRY POINT LOGIC ---
 const args = process.argv.slice(2);
 const envArg = args.find(arg => arg.startsWith('--env='));
 const targetEnvName = envArg ? envArg.split('=')[1] : null;
 
 if (!targetEnvName) {
-    console.error('❌ FATAL: Missing required argument "--env={ENV_NAME}"');
-    console.error('Usage: npx tsx scripts/sync-apim-to-db.ts --env=DEV');
-    process.exit(1);
+    // === ORCHESTRATOR MODE ===
+    runOrchestrator();
+} else {
+    // === WORKER MODE ===
+    runWorker(targetEnvName);
 }
 
-const targetEnvConfig = config.azure?.environments?.find((e: any) => e.name === targetEnvName);
+// --- ORCHESTRATOR ---
+async function runOrchestrator() {
+    const envs = config.azure?.environments || [];
+    if (envs.length === 0) {
+        console.error("❌ No environments found in config.json");
+        process.exit(1);
+    }
 
-if (!targetEnvConfig) {
-    console.error(`❌ FATAL: Environment '${targetEnvName}' not found in config.json!`);
-    console.error(`Available environments: ${config.azure?.environments?.map((e: any) => e.name).join(', ')}`);
-    process.exit(1);
+    console.log(`🚀 [ORCHESTRATOR] Starting Parallel Sync for ${envs.length} environments: ${envs.map((e: any) => e.name).join(', ')}`);
+    console.log(`Logs will be written to scripts/logs/`);
+
+    const processes = envs.map((env: any) => {
+        return new Promise<void>((resolve) => {
+            console.log(`👉 Spawning worker for ${env.name}...`);
+            // Fork this same script with the --env argument
+            const child = fork(process.argv[1], [`--env=${env.name}`], {
+                stdio: 'inherit' // Pipe output to main console too? Or 'ignore' if strictly log file?
+                // User said "separate log files". Keeping inherit is good for "alive" check, 
+                // but logs are dual-written in worker.
+                // Let's keep inherit so user sees progress.
+            });
+
+            child.on('exit', (code) => {
+                const status = code === 0 ? '✅ SUCCESS' : '❌ FAILED';
+                console.log(`🏁 [ORCHESTRATOR] Worker ${env.name} finished: ${status}`);
+                resolve();
+            });
+        });
+    });
+
+    await Promise.all(processes);
+    console.log("✨ All environments completed.");
 }
 
-const DB_CONFIG = {
-    connectionString: targetEnvConfig.databaseUrl || config.database?.url || process.env.DATABASE_URL
-};
-
-const AZURE_CONFIG = {
-    subscriptionId: targetEnvConfig.subscriptionId,
-    resourceGroup: targetEnvConfig.resourceGroup,
-    serviceName: targetEnvConfig.instance,
-    environment: targetEnvName
-};
+// --- WORKER ---
 
 // --- DATA TYPES ---
 interface ApimProduct {
-    id: string;             // [APIM] /products/{id} (slug)
-    armId: string;          // [APIM] Full ARM Resource ID
-    name: string;           // [APIM] properties.displayName
-    description: string;    // [APIM] properties.description
-    state: string;          // [APIM] properties.state
-    subscriptionRequired: boolean; // [APIM] properties.subscriptionRequired
-    subscriptionCount: number; // [APIM] Computed from /subscriptions list
+    id: string;
+    armId: string;
+    name: string;
+    description: string;
+    state: string;
+    subscriptionRequired: boolean;
+    subscriptionCount: number;
 }
 
 interface ApimApi {
-    id: string;             // [APIM] /apis/{id}
-    name: string;           // [APIM] properties.displayName
-    path: string;           // [APIM] properties.path
-    protocols: string[];    // [APIM] properties.protocols
-    serviceUrl: string;     // [APIM] properties.serviceUrl
-    policyXml: string;      // [APIM] /policies/policy
+    id: string;
+    name: string;
+    path: string;
+    protocols: string[];
+    serviceUrl: string;
+    policyXml: string;
 }
 
-// --- HELPER FUNCTIONS ---
+interface AzureConfig {
+    subscriptionId: string;
+    resourceGroup: string;
+    serviceName: string;
+    environment: string;
+}
+
+// --- HELPER FUNCTIONS (Refactored to accept Config) ---
 
 async function getAzureToken(): Promise<string> {
     return AzureService.getAzureAccessToken();
 }
 
-function getApimConfig(token: string): any {
+function getApimConfig(token: string, azConfig: AzureConfig): any {
     return {
-        instance: AZURE_CONFIG.serviceName,
-        resourceGroup: AZURE_CONFIG.resourceGroup,
-        subscriptionId: AZURE_CONFIG.subscriptionId,
+        instance: azConfig.serviceName,
+        resourceGroup: azConfig.resourceGroup,
+        subscriptionId: azConfig.subscriptionId,
         accessToken: token,
-        environment: AZURE_CONFIG.environment,
-        devops: config.devops // Pass config with externally defined baseUrl
+        environment: azConfig.environment,
+        devops: config.devops
     };
 }
 
-// Extraction Regex
 function extractClientIdsFromPolicy(xml: string): string[] {
     if (!xml) return [];
     const ids = new Set<string>();
-
-    // Look for named values: {{value}}
     const nvMatches = xml.match(/{{([^}]+)}}/g);
-    if (nvMatches) {
-        nvMatches.forEach(m => ids.add(m.replace(/[{}]/g, '')));
-    }
-
-    // Look for GUIDs 
+    if (nvMatches) nvMatches.forEach(m => ids.add(m.replace(/[{}]/g, '')));
     const guidMatches = xml.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi);
-    if (guidMatches) {
-        guidMatches.forEach(m => ids.add(m));
-    }
-
+    if (guidMatches) guidMatches.forEach(m => ids.add(m));
     return Array.from(ids);
 }
 
-async function fetchApimProducts(token: string): Promise<ApimProduct[]> {
-    const config = getApimConfig(token);
-    const response = await AzureService.fetchAPIM<any>(config, '/products');
-
+async function fetchApimProducts(token: string, azConfig: AzureConfig): Promise<ApimProduct[]> {
+    const apiConfig = getApimConfig(token, azConfig);
+    const response = await AzureService.fetchAPIM<any>(apiConfig, '/products');
     return response.value.map((p: any) => ({
         id: p.name,
         armId: p.id,
@@ -146,14 +159,13 @@ async function fetchApimProducts(token: string): Promise<ApimProduct[]> {
     }));
 }
 
-async function fetchApimSubscriptions(token: string): Promise<any[]> {
-    const config = getApimConfig(token);
-    const response = await AzureService.fetchAPIM<any>(config, '/subscriptions');
-
+async function fetchApimSubscriptions(token: string, azConfig: AzureConfig): Promise<any[]> {
+    const apiConfig = getApimConfig(token, azConfig);
+    const response = await AzureService.fetchAPIM<any>(apiConfig, '/subscriptions');
     return response.value.map((s: any) => ({
         id: s.name,
         name: s.properties.displayName,
-        scope: s.properties.scope, // Needed for filtering
+        scope: s.properties.scope,
         productId: s.properties.scope.split('/').pop(),
         userId: s.properties.ownerId ? s.properties.ownerId.split('/').pop() : 'unknown',
         state: s.properties.state,
@@ -162,10 +174,9 @@ async function fetchApimSubscriptions(token: string): Promise<any[]> {
     }));
 }
 
-async function fetchNamedValues(token: string): Promise<any[]> {
-    const config = getApimConfig(token);
-    const response = await AzureService.fetchAPIM<any>(config, '/namedValues');
-
+async function fetchNamedValues(token: string, azConfig: AzureConfig): Promise<any[]> {
+    const apiConfig = getApimConfig(token, azConfig);
+    const response = await AzureService.fetchAPIM<any>(apiConfig, '/namedValues');
     return response.value.map((nv: any) => ({
         name: nv.name,
         value: nv.properties.value,
@@ -178,23 +189,19 @@ async function fetchGitInfo(productId: string): Promise<{ hash: string, date: st
     return { hash: 'manual-or-git-linked', date: new Date().toISOString() };
 }
 
-async function fetchApimApis(token: string): Promise<ApimApi[]> {
-    const config = getApimConfig(token);
-    const response = await AzureService.fetchAPIM<any>(config, '/apis');
+async function fetchApimApis(token: string, azConfig: AzureConfig): Promise<ApimApi[]> {
+    const apiConfig = getApimConfig(token, azConfig);
+    const response = await AzureService.fetchAPIM<any>(apiConfig, '/apis');
     const apis = response.value;
 
-    // Fetch policies (Batch or Parallel)
-    // We do simplified parallel fetch for policy content
-    console.log(`⏳ Fetching Policies for ${apis.length} APIs...`);
+    console.log(`⏳ [${azConfig.environment}] Fetching Policies for ${apis.length} APIs...`);
     const results = await Promise.all(apis.map(async (a: any) => {
         let policyXml = '';
         try {
             const polRes = await fetch(`https://management.azure.com${a.id}/policies/policy?api-version=2022-08-01&format=rawxml`, {
-                headers: { 'Authorization': `Bearer ${config.accessToken}` }
+                headers: { 'Authorization': `Bearer ${apiConfig.accessToken}` }
             });
             if (polRes.ok) {
-                // Response is JSON wrapper usually: { value: xml, format: ... } or raw text?
-                // Depending on endpoint. /policies/policy is a resource.
                 const json = await polRes.json();
                 policyXml = json.properties?.value || '';
             }
@@ -209,20 +216,35 @@ async function fetchApimApis(token: string): Promise<ApimApi[]> {
             policyXml: policyXml
         };
     }));
-
     return results;
 }
 
-// --- MAIN EXECUTION ---
-async function main() {
-    // --- LOGGING SETUP ---
+// --- MAIN WORKER ---
+async function runWorker(envName: string) {
+    // 1. Validate Env
+    const targetEnvConfig = config.azure?.environments?.find((e: any) => e.name === envName);
+    if (!targetEnvConfig) {
+        console.error(`❌ FATAL: Environment '${envName}' not found in config.json!`);
+        process.exit(1);
+    }
+
+    const AZURE_CONFIG: AzureConfig = {
+        subscriptionId: targetEnvConfig.subscriptionId,
+        resourceGroup: targetEnvConfig.resourceGroup,
+        serviceName: targetEnvConfig.instance,
+        environment: envName
+    };
+
+    const DB_CONFIG = {
+        connectionString: targetEnvConfig.databaseUrl || config.database?.url || process.env.DATABASE_URL
+    };
+
+    // 2. Logging Setup
     const logDir = join(__dirname, 'logs');
     if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true });
-
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const logFile = join(logDir, `sync_${AZURE_CONFIG.environment}_${timestamp}.log`);
 
-    // Override Console for Dual Logging (File + Stdout)
     const originalLog = console.log;
     const originalWarn = console.warn;
     const originalError = console.error;
@@ -234,30 +256,29 @@ async function main() {
         appendFileSync(logFile, line);
     }
 
-    console.log = (...args) => { writeToLog('INFO', args); originalLog(...args); };
-    console.warn = (...args) => { writeToLog('WARN', args); originalWarn(...args); };
-    console.error = (...args) => { writeToLog('ERROR', args); originalError(...args); };
+    // Capture logs only for this worker's output
+    console.log = (...args) => { writeToLog('INFO', args); originalLog(`[${envName}]`, ...args); };
+    console.warn = (...args) => { writeToLog('WARN', args); originalWarn(`[${envName}]`, ...args); };
+    console.error = (...args) => { writeToLog('ERROR', args); originalError(`[${envName}]`, ...args); };
 
     console.log(`📝 Logging to: ${logFile}`);
-    console.log(`🚀 Starting Master Sync for ENV: ${AZURE_CONFIG.environment}...`);
+    console.log(`🚀 Starting Worker for ENV: ${AZURE_CONFIG.environment}`);
+
     const pool = new Pool(DB_CONFIG);
 
     try {
         const token = await getAzureToken();
-        const apimConfig = getApimConfig(token);
+        const apimConfig = getApimConfig(token, AZURE_CONFIG);
         console.log('✅ Azure Auth Token Acquired');
 
-        // 1. INITIALIZE PLACEHOLDERS
-        // Ensure 'unknown-product' exists for unlinked items
         await pool.query(`
             INSERT INTO products (id, name, display_name, version, environment, state, owner_team_id, updated_at)
             VALUES ('unknown-product', 'unknown-product', 'Unknown Product', '0.0.0', $1, 'notPublished', NULL, NOW())
             ON CONFLICT (id) DO NOTHING
         `, [AZURE_CONFIG.environment]);
 
-        // 2. IDENTITY SYNC: Fetch Real AD Groups for Current User
         const myGroups = await AzureService.fetchUserGroups();
-        console.log(`👥 Found ${myGroups.length} AD Groups for the current user.`);
+        console.log(`👥 Found ${myGroups.length} AD Groups`);
         for (const g of myGroups) {
             await pool.query(`
                 INSERT INTO teams (id, display_name, description, contact_email, updated_at)
@@ -270,38 +291,30 @@ async function main() {
             `, [g.id, g.displayName, g.description, g.mail]);
         }
 
-        // 3. FETCH GLOBAL INVENTORY [SOURCE: APIM]
-        const apimProducts = await fetchApimProducts(token);
-        const apimApis = await fetchApimApis(token);
-        console.log(`📊 Found ${apimProducts.length} Products and ${apimApis.length} APIs in Azure.`);
+        const apimProducts = await fetchApimProducts(token, AZURE_CONFIG);
+        const apimApis = await fetchApimApis(token, AZURE_CONFIG);
+        console.log(`📊 Found ${apimProducts.length} Products, ${apimApis.length} APIs`);
 
-        // 4. FETCH SUBSCRIPTIONS
         let apimSubs: any[] = [];
         try {
-            apimSubs = await fetchApimSubscriptions(token);
-            console.log(`🔑 Found ${apimSubs.length} Subscriptions.`);
+            apimSubs = await fetchApimSubscriptions(token, AZURE_CONFIG);
+            console.log(`🔑 Found ${apimSubs.length} Subscriptions`);
         } catch (e) {
-            console.warn('⚠️ [PROD WARNING] Could not fetch Subscriptions. Skipping keys.');
+            console.warn('⚠️ Could not fetch Subscriptions');
         }
 
-        // 5. FETCH NAMED VALUES (For Environment Config & KeyVault Detection)
         let namedValues: any[] = [];
         try {
-            namedValues = await fetchNamedValues(token);
-            console.log(`🌍 Found ${namedValues.length} Named Values.`);
+            namedValues = await fetchNamedValues(token, AZURE_CONFIG);
+            console.log(`🌍 Found ${namedValues.length} Named Values`);
         } catch (e) {
-            console.warn('⚠️ [PROD WARNING] Could not fetch Named Values. Skipping config.');
+            console.warn('⚠️ Could not fetch Named Values');
         }
 
-        // Build NV Map for resolution
         const nvMap = new Map<string, any>(namedValues.map(n => [n.name, n]));
 
         // --- WRITING TO DB ---
-
-        // A. SYNC PRODUCTS
         for (const p of apimProducts) {
-            console.log(`Processing Product: ${p.name}...`);
-
             // [HYBRID] DYNAMIC OWNERSHIP via TAGS
             const tags = await AzureService.fetchTagsForProduct(apimConfig, p.armId);
             const inferredTeamId = tags.TeamID || tags.Owner || 'orphaned';
@@ -309,10 +322,10 @@ async function main() {
             if (inferredTeamId !== 'orphaned') {
                 // Upsert placeholder team if needed to satisfy FK
                 await pool.query(`
-                    INSERT INTO teams (id, display_name, updated_at)
-                    VALUES ($1, $1, NOW())
-                    ON CONFLICT (id) DO NOTHING
-                `, [inferredTeamId]);
+                     INSERT INTO teams (id, display_name, updated_at)
+                     VALUES ($1, $1, NOW())
+                     ON CONFLICT (id) DO NOTHING
+                 `, [inferredTeamId]);
             }
 
             // DB Value: NULL if orphaned, otherwise the ID
@@ -326,27 +339,23 @@ async function main() {
             const derivedManagementMode = anomalies.includes('MANUAL_CREATION') ? 'TERRAFORM_MANAGED' : 'HYBRID';
 
             await pool.query(`
-                INSERT INTO products (id, name, display_name, version, environment, description, state, subscriber_count, owner_team_id, 
-                    last_deployed_commit_hash, last_deployed_at, detected_anomalies, management_mode, updated_at)
-                VALUES ($1, $1, $2, '1.0.0', $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
-                ON CONFLICT (id) DO UPDATE SET
-                    display_name = EXCLUDED.display_name,
-                    state = EXCLUDED.state,
-                    subscriber_count = EXCLUDED.subscriber_count,
-                    owner_team_id = EXCLUDED.owner_team_id,
-                    last_deployed_commit_hash = EXCLUDED.last_deployed_commit_hash,
-                    detected_anomalies = EXCLUDED.detected_anomalies,
-                    management_mode = EXCLUDED.management_mode,
-                    updated_at = NOW();
-            `, [p.id, p.name, p.description, AZURE_CONFIG.environment, p.description, p.state, p.subscriptionCount, dbOwnerId, gitInfo.hash, gitInfo.date, JSON.stringify(anomalies), derivedManagementMode]);
+                 INSERT INTO products (id, name, display_name, version, environment, description, state, subscriber_count, owner_team_id, 
+                     last_deployed_commit_hash, last_deployed_at, detected_anomalies, management_mode, updated_at)
+                 VALUES ($1, $1, $2, '1.0.0', $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+                 ON CONFLICT (id) DO UPDATE SET
+                     display_name = EXCLUDED.display_name,
+                     state = EXCLUDED.state,
+                     subscriber_count = EXCLUDED.subscriber_count,
+                     owner_team_id = EXCLUDED.owner_team_id,
+                     last_deployed_commit_hash = EXCLUDED.last_deployed_commit_hash,
+                     detected_anomalies = EXCLUDED.detected_anomalies,
+                     management_mode = EXCLUDED.management_mode,
+                     updated_at = NOW();
+             `, [p.id, p.name, p.description, AZURE_CONFIG.environment, p.description, p.state, p.subscriptionCount, dbOwnerId, gitInfo.hash, gitInfo.date, JSON.stringify(anomalies), derivedManagementMode]);
         }
 
-        // B. SYNC APIs
         const capturedAppIds = new Set<string>();
-
         for (const a of apimApis) {
-            console.log(`Processing API: ${a.name} (${a.path})...`);
-
             const rawData = JSON.stringify({
                 protocols: a.protocols,
                 serviceUrl: a.serviceUrl,
@@ -365,22 +374,15 @@ async function main() {
                     updated_at = NOW();
             `, [a.id, a.name, a.path, rawData]);
 
-            // App ID Extraction from Policy
-            const extracted = extractClientIdsFromPolicy(a.policyXml);
-            extracted.forEach(cid => {
-                capturedAppIds.add(cid);
-            });
+            extractClientIdsFromPolicy(a.policyXml).forEach(cid => capturedAppIds.add(cid));
         }
 
-        // C. SYNC SUBSCRIPTIONS
         for (const s of apimSubs) {
-            // Strict Filter: Only sync Product-scoped subscriptions
             if (!s.scope || !s.scope.toLowerCase().includes('/products/')) {
                 console.warn(`⚠️ Skipping Non-Product Subscription: ${s.name} (Scope: ${s.scope})`);
                 continue;
             }
 
-            // Ensure the subscriber team (user) exists
             await pool.query(`
                 INSERT INTO teams (id, display_name, type, updated_at)
                 VALUES ($1, $1, 'consumer', NOW())
@@ -400,9 +402,7 @@ async function main() {
             `, [s.id, s.productId, s.userId, s.state, s.primaryKey, s.createdDate]);
         }
 
-        // D. SYNC ENVIRONMENT CONFIG
         for (const nv of namedValues) {
-            // If it's a KV URL, show that. If secret, show ***. If plain, show value.
             const val = nv.keyVaultUrl ? `KeyVault Ref: ${nv.keyVaultUrl}` : (nv.isSecret ? '***' : nv.value);
             await pool.query(`
                 INSERT INTO access_control_lists (key, environment, value)
@@ -412,52 +412,37 @@ async function main() {
             `, [nv.name, AZURE_CONFIG.environment, val]);
         }
 
-        // E. PROCESS APP REGISTRATIONS
-        // Resolve captured IDs: Literal GUIDs vs Named Values
         console.log(`🔗 Resolving ${capturedAppIds.size} potential App Identities...`);
         const realGuidCandidates: string[] = [];
         const appParams = new Map<string, { displayName: string, clientId: string }>();
 
         for (const cid of capturedAppIds) {
             if (nvMap.has(cid)) {
-                // It's a Named Value
                 const nv = nvMap.get(cid);
                 if (nv.keyVaultUrl) {
-                    // It's a KeyVault Reference -> "Smart" handling
-                    appParams.set(cid, {
-                        clientId: cid, // Use the NV Key as ID
-                        displayName: `KeyVault: ${nv.keyVaultUrl}`
-                    });
+                    appParams.set(cid, { clientId: cid, displayName: `KeyVault: ${nv.keyVaultUrl}` });
                 } else if (!nv.isSecret && nv.value) {
-                    // It resolves to a plain value (likely a GUID)
                     const val = nv.value;
                     if (/^[0-9a-f]{8}-/i.test(val)) {
                         realGuidCandidates.push(val);
-                        // Map NV -> Real GUID so we can update display name later
                         appParams.set(cid, { clientId: val, displayName: 'Pending Lookup...' });
                     }
                 }
             } else if (/^[0-9a-f]{8}-/i.test(cid)) {
-                // Literal GUID
                 realGuidCandidates.push(cid);
                 appParams.set(cid, { clientId: cid, displayName: 'Pending Lookup...' });
             }
         }
 
-        // Resolve Real GUIDs via Graph
         if (realGuidCandidates.length > 0) {
             const resolvedApps = await AzureService.fetchAppRegistrations(realGuidCandidates);
             for (const app of resolvedApps) {
-                // Update params where clientId matches
                 for (const [key, val] of appParams.entries()) {
-                    if (val.clientId === app.appId) {
-                        val.displayName = app.displayName;
-                    }
+                    if (val.clientId === app.appId) val.displayName = app.displayName;
                 }
             }
         }
 
-        // Upsert Apps using appParams
         for (const [key, val] of appParams.entries()) {
             await pool.query(`
                 INSERT INTO app_registrations (id, client_id, display_name, environment, product_id, owner_team_id)
@@ -470,9 +455,8 @@ async function main() {
 
     } catch (err) {
         console.error('❌ Sync Failed:', err);
+        process.exit(1);
     } finally {
         await pool.end();
     }
 }
-
-main();

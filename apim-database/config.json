@@ -14,10 +14,10 @@
                 "subscriptionId": "your-qa-sub"
             },
             {
-                "name": "PROD",
-                "instance": "your-prod-apim",
-                "resourceGroup": "your-prod-rg",
-                "subscriptionId": "your-prod-sub"
+                "name": "STAGE",
+                "instance": "your-stage-apim",
+                "resourceGroup": "your-stage-rg",
+                "subscriptionId": "your-stage-sub"
             }
         ]
     },
