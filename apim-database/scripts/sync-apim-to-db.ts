@@ -141,6 +141,13 @@ async function main() {
                 `, [inferredTeamId]);
             }
 
+            // Ensure 'unknown-product' exists for unlinked items
+            await pool.query(`
+                INSERT INTO products (id, name, display_name, version, environment, state, owner_team_id, updated_at)
+                VALUES ('unknown-product', 'unknown-product', 'Unknown Product', '0.0.0', 'PROD', 'notPublished', NULL, NOW())
+                ON CONFLICT (id) DO NOTHING
+            `);
+
             const gitInfo = await fetchGitInfo(p.id);
             const anomalies: string[] = [];
             if (!gitInfo.hash) anomalies.push('MANUAL_CREATION');
@@ -149,9 +156,9 @@ async function main() {
             const derivedManagementMode = anomalies.includes('MANUAL_CREATION') ? 'TERRAFORM_MANAGED' : 'HYBRID';
 
             await pool.query(`
-                INSERT INTO products (id, display_name, description, state, subscriber_count, owner_team_id, 
+                INSERT INTO products (id, name, display_name, version, environment, description, state, subscriber_count, owner_team_id, 
                     last_deployed_commit_hash, last_deployed_at, detected_anomalies, management_mode, updated_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+                VALUES ($1, $1, $2, '1.0.0', 'PROD', $3, $4, $5, $6, $7, $8, $9, $10, NOW())
                 ON CONFLICT (id) DO UPDATE SET
                     display_name = EXCLUDED.display_name,
                     state = EXCLUDED.state,
@@ -200,6 +207,13 @@ async function main() {
 
         // C. SYNC SUBSCRIPTIONS
         for (const s of apimSubs) {
+            // Ensure the subscriber team (user) exists
+            await pool.query(`
+                INSERT INTO teams (id, display_name, type, updated_at)
+                VALUES ($1, $1, 'consumer', NOW())
+                ON CONFLICT (id) DO NOTHING
+            `, [s.userId]);
+
             await pool.query(`
                 INSERT INTO subscriptions (
                     id, product_id, subscriber_team_id, state,

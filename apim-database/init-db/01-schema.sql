@@ -280,7 +280,7 @@ CREATE TABLE IF NOT EXISTS access_control_lists (
 CREATE OR REPLACE VIEW products_with_teams AS
 SELECT 
     p.*,
-    t.name as owner_team_name,
+    t.display_name as owner_team_name,
     t.type as owner_team_type,
     (SELECT COUNT(*) FROM apis WHERE product_id = p.id) as api_count
 FROM products p
@@ -292,7 +292,7 @@ SELECT
     s.*,
     p.display_name as product_name,
     p.environment as product_environment,
-    t.name as subscriber_team_name
+    t.display_name as subscriber_team_name
 FROM subscriptions s
 LEFT JOIN products p ON s.product_id = p.id
 LEFT JOIN teams t ON s.subscriber_team_id = t.id;
