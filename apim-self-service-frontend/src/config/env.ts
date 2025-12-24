@@ -6,7 +6,7 @@
  */
 
 // Priority: 1. Strict 'true' | 2. Undefined -> Check if API URL exists | 3. default to true
-export const USE_MOCKS = false;
+export const USE_MOCKS = true;
 
 export const API_CONFIG = {
     BASE_URL: import.meta.env.VITE_API_URL || '/api/v1',
