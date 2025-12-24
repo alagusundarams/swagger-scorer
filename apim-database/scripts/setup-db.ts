@@ -42,10 +42,10 @@ async function setupDatabase() {
 
     try {
         // Read schema file
-        const schemaPath = join(process.cwd(), 'schema', 'schema.sql');
+        const schemaPath = join(process.cwd(), 'init-db', '01-schema.sql');
         const schema = readFileSync(schemaPath, 'utf8');
 
-        console.log('📜 Executing schema.sql...');
+        console.log('📜 Executing init-db/01-schema.sql...');
         await pool.query(schema);
 
         console.log('✅ Database schema created successfully');
