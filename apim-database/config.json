@@ -6,6 +6,18 @@
                 "instance": "your-dev-apim",
                 "resourceGroup": "your-dev-rg",
                 "subscriptionId": "your-dev-sub"
+            },
+            {
+                "name": "QA",
+                "instance": "your-qa-apim",
+                "resourceGroup": "your-qa-rg",
+                "subscriptionId": "your-qa-sub"
+            },
+            {
+                "name": "PROD",
+                "instance": "your-prod-apim",
+                "resourceGroup": "your-prod-rg",
+                "subscriptionId": "your-prod-sub"
             }
         ]
     },
