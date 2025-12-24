@@ -17,7 +17,7 @@
  */
 
 import { Pool } from 'pg';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, appendFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { AzureService, AppRegistration } from './services/AzureService.js';
 
@@ -42,15 +42,25 @@ function loadConfig() {
 const config = loadConfig();
 
 // --- CONFIGURATION ---
+// STRICT RULE: Resolve Environment from ENV VAR, then load config FROM FILE.
+const targetEnvName = process.env.ENVIRONMENT || 'DEV'; // Default to first/DEV if not set
+const targetEnvConfig = config.azure?.environments?.find((e: any) => e.name === targetEnvName);
+
+if (!targetEnvConfig) {
+    console.error(`❌ FATAL: Environment '${targetEnvName}' not found in config.json!`);
+    console.error(`Available environments: ${config.azure?.environments?.map((e: any) => e.name).join(', ')}`);
+    process.exit(1);
+}
+
 const DB_CONFIG = {
     connectionString: process.env.DATABASE_URL || config.database?.url || 'postgresql://postgres:password@localhost:5432/apim'
 };
 
 const AZURE_CONFIG = {
-    subscriptionId: process.env.AZURE_SUBSCRIPTION_ID || config.azure?.environments?.[0]?.subscriptionId,
-    resourceGroup: process.env.AZURE_RG || config.azure?.environments?.[0]?.resourceGroup,
-    serviceName: process.env.APIM_SERVICE_NAME || config.azure?.environments?.[0]?.instance,
-    environment: process.env.ENVIRONMENT || 'PROD'
+    subscriptionId: targetEnvConfig.subscriptionId,
+    resourceGroup: targetEnvConfig.resourceGroup,
+    serviceName: targetEnvConfig.instance,
+    environment: targetEnvName
 };
 
 // --- DATA TYPES ---
@@ -60,6 +70,7 @@ interface ApimProduct {
     name: string;           // [APIM] properties.displayName
     description: string;    // [APIM] properties.description
     state: string;          // [APIM] properties.state
+    subscriptionRequired: boolean; // [APIM] properties.subscriptionRequired
     subscriptionCount: number; // [APIM] Computed from /subscriptions list
 }
 
@@ -72,8 +83,151 @@ interface ApimApi {
     policyXml: string;      // [APIM] /policies/policy
 }
 
+// --- HELPER FUNCTIONS ---
+
+async function getAzureToken(): Promise<string> {
+    return AzureService.getAzureAccessToken();
+}
+
+function getApimConfig(token: string): any {
+    return {
+        instance: AZURE_CONFIG.serviceName,
+        resourceGroup: AZURE_CONFIG.resourceGroup,
+        subscriptionId: AZURE_CONFIG.subscriptionId,
+        accessToken: token,
+        environment: AZURE_CONFIG.environment,
+        devops: config.devops // Pass config with externally defined baseUrl
+    };
+}
+
+// Extraction Regex
+function extractClientIdsFromPolicy(xml: string): string[] {
+    if (!xml) return [];
+    const ids = new Set<string>();
+
+    // Look for named values: {{value}}
+    const nvMatches = xml.match(/{{([^}]+)}}/g);
+    if (nvMatches) {
+        nvMatches.forEach(m => ids.add(m.replace(/[{}]/g, '')));
+    }
+
+    // Look for GUIDs 
+    const guidMatches = xml.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi);
+    if (guidMatches) {
+        guidMatches.forEach(m => ids.add(m));
+    }
+
+    return Array.from(ids);
+}
+
+async function fetchApimProducts(token: string): Promise<ApimProduct[]> {
+    const config = getApimConfig(token);
+    const response = await AzureService.fetchAPIM<any>(config, '/products');
+
+    return response.value.map((p: any) => ({
+        id: p.name,
+        armId: p.id,
+        name: p.properties.displayName,
+        description: p.properties.description,
+        state: p.properties.state,
+        subscriptionRequired: p.properties.subscriptionRequired,
+        subscriptionCount: 0
+    }));
+}
+
+async function fetchApimSubscriptions(token: string): Promise<any[]> {
+    const config = getApimConfig(token);
+    const response = await AzureService.fetchAPIM<any>(config, '/subscriptions');
+
+    return response.value.map((s: any) => ({
+        id: s.name,
+        name: s.properties.displayName,
+        scope: s.properties.scope, // Needed for filtering
+        productId: s.properties.scope.split('/').pop(),
+        userId: s.properties.ownerId ? s.properties.ownerId.split('/').pop() : 'unknown',
+        state: s.properties.state,
+        primaryKey: 'redacted-sync-real',
+        createdDate: s.properties.createdDate
+    }));
+}
+
+async function fetchNamedValues(token: string): Promise<any[]> {
+    const config = getApimConfig(token);
+    const response = await AzureService.fetchAPIM<any>(config, '/namedValues');
+
+    return response.value.map((nv: any) => ({
+        name: nv.name,
+        value: nv.properties.value,
+        isSecret: nv.properties.secret,
+        keyVaultUrl: nv.properties.keyVault ? nv.properties.keyVault.secretIdentifier : null
+    }));
+}
+
+async function fetchGitInfo(productId: string): Promise<{ hash: string, date: string }> {
+    return { hash: 'manual-or-git-linked', date: new Date().toISOString() };
+}
+
+async function fetchApimApis(token: string): Promise<ApimApi[]> {
+    const config = getApimConfig(token);
+    const response = await AzureService.fetchAPIM<any>(config, '/apis');
+    const apis = response.value;
+
+    // Fetch policies (Batch or Parallel)
+    // We do simplified parallel fetch for policy content
+    console.log(`⏳ Fetching Policies for ${apis.length} APIs...`);
+    const results = await Promise.all(apis.map(async (a: any) => {
+        let policyXml = '';
+        try {
+            const polRes = await fetch(`https://management.azure.com${a.id}/policies/policy?api-version=2022-08-01&format=rawxml`, {
+                headers: { 'Authorization': `Bearer ${config.accessToken}` }
+            });
+            if (polRes.ok) {
+                // Response is JSON wrapper usually: { value: xml, format: ... } or raw text?
+                // Depending on endpoint. /policies/policy is a resource.
+                const json = await polRes.json();
+                policyXml = json.properties?.value || '';
+            }
+        } catch (e) { /* ignore */ }
+
+        return {
+            id: a.name,
+            name: a.properties.displayName,
+            path: a.properties.path,
+            protocols: a.properties.protocols,
+            serviceUrl: a.properties.serviceUrl,
+            policyXml: policyXml
+        };
+    }));
+
+    return results;
+}
+
 // --- MAIN EXECUTION ---
 async function main() {
+    // --- LOGGING SETUP ---
+    const logDir = join(__dirname, 'logs');
+    if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true });
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const logFile = join(logDir, `sync_${AZURE_CONFIG.environment}_${timestamp}.log`);
+
+    // Override Console for Dual Logging (File + Stdout)
+    const originalLog = console.log;
+    const originalWarn = console.warn;
+    const originalError = console.error;
+
+    function writeToLog(level: string, args: any[]) {
+        const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+        const time = new Date().toISOString();
+        const line = `[${time}] [${level}] ${msg}\n`;
+        appendFileSync(logFile, line);
+    }
+
+    console.log = (...args) => { writeToLog('INFO', args); originalLog(...args); };
+    console.warn = (...args) => { writeToLog('WARN', args); originalWarn(...args); };
+    console.error = (...args) => { writeToLog('ERROR', args); originalError(...args); };
+
+    console.log(`📝 Logging to: ${logFile}`);
     console.log(`🚀 Starting Master Sync for ENV: ${AZURE_CONFIG.environment}...`);
     const pool = new Pool(DB_CONFIG);
 
@@ -308,125 +462,6 @@ async function main() {
     } finally {
         await pool.end();
     }
-}
-
-// --- HELPER FUNCTIONS ---
-
-async function getAzureToken(): Promise<string> {
-    return AzureService.getAzureAccessToken();
-}
-
-function getApimConfig(token: string): any {
-    return {
-        instance: AZURE_CONFIG.serviceName,
-        resourceGroup: AZURE_CONFIG.resourceGroup,
-        subscriptionId: AZURE_CONFIG.subscriptionId,
-        accessToken: token,
-        environment: AZURE_CONFIG.environment,
-        devops: config.devops // Pass config with externally defined baseUrl
-    };
-}
-
-// Extraction Regex
-function extractClientIdsFromPolicy(xml: string): string[] {
-    if (!xml) return [];
-    const ids = new Set<string>();
-
-    // Look for named values: {{value}}
-    const nvMatches = xml.match(/{{([^}]+)}}/g);
-    if (nvMatches) {
-        nvMatches.forEach(m => ids.add(m.replace(/[{}]/g, '')));
-    }
-
-    // Look for GUIDs 
-    const guidMatches = xml.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi);
-    if (guidMatches) {
-        guidMatches.forEach(m => ids.add(m));
-    }
-
-    return Array.from(ids);
-}
-
-async function fetchApimProducts(token: string): Promise<ApimProduct[]> {
-    const config = getApimConfig(token);
-    const response = await AzureService.fetchAPIM<any>(config, '/products');
-
-    return response.value.map((p: any) => ({
-        id: p.name,
-        armId: p.id,
-        name: p.properties.displayName,
-        description: p.properties.description,
-        state: p.properties.state,
-        subscriptionRequired: p.properties.subscriptionRequired,
-        subscriptionCount: 0
-    }));
-}
-
-async function fetchApimSubscriptions(token: string): Promise<any[]> {
-    const config = getApimConfig(token);
-    const response = await AzureService.fetchAPIM<any>(config, '/subscriptions');
-
-    return response.value.map((s: any) => ({
-        id: s.name,
-        name: s.properties.displayName,
-        scope: s.properties.scope, // Needed for filtering
-        productId: s.properties.scope.split('/').pop(),
-        userId: s.properties.ownerId ? s.properties.ownerId.split('/').pop() : 'unknown',
-        state: s.properties.state,
-        primaryKey: 'redacted-sync-real',
-        createdDate: s.properties.createdDate
-    }));
-}
-
-async function fetchNamedValues(token: string): Promise<any[]> {
-    const config = getApimConfig(token);
-    const response = await AzureService.fetchAPIM<any>(config, '/namedValues');
-
-    return response.value.map((nv: any) => ({
-        name: nv.name,
-        value: nv.properties.value,
-        isSecret: nv.properties.secret,
-        keyVaultUrl: nv.properties.keyVault ? nv.properties.keyVault.secretIdentifier : null
-    }));
-}
-
-async function fetchGitInfo(productId: string): Promise<{ hash: string, date: string }> {
-    return { hash: 'manual-or-git-linked', date: new Date().toISOString() };
-}
-
-async function fetchApimApis(token: string): Promise<ApimApi[]> {
-    const config = getApimConfig(token);
-    const response = await AzureService.fetchAPIM<any>(config, '/apis');
-    const apis = response.value;
-
-    // Fetch policies (Batch or Parallel)
-    // We do simplified parallel fetch for policy content
-    console.log(`⏳ Fetching Policies for ${apis.length} APIs...`);
-    const results = await Promise.all(apis.map(async (a: any) => {
-        let policyXml = '';
-        try {
-            const polRes = await fetch(`https://management.azure.com${a.id}/policies/policy?api-version=2022-08-01&format=rawxml`, {
-                headers: { 'Authorization': `Bearer ${config.accessToken}` }
-            });
-            if (polRes.ok) {
-                // Response is JSON wrapper usually: { value: xml, format: ... } or raw text?
-                // Depending on endpoint. /policies/policy is a resource.
-                const json = await polRes.json();
-                policyXml = json.properties?.value || '';
-            }
-        } catch (e) { /* ignore */ }
-
-        return {
-            id: a.name,
-            name: a.properties.displayName,
-            path: a.properties.path,
-            protocols: a.properties.protocols,
-            serviceUrl: a.properties.serviceUrl,
-            policyXml: policyXml
-        };
-    }));
-
-    return results;
 }
 
 main();
