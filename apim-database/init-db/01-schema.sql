@@ -19,10 +19,11 @@ GRANT ALL ON SCHEMA public TO public;
 
 CREATE TABLE IF NOT EXISTS teams (
     id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
+    display_name TEXT NOT NULL,
     azure_ad_group_id TEXT UNIQUE,
-    type TEXT NOT NULL CHECK (type IN ('producer', 'consumer', 'both')),
+    type TEXT NOT NULL CHECK (type IN ('producer', 'consumer', 'both')) DEFAULT 'both',
     description TEXT,
+    contact_email TEXT,
     member_count INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -242,6 +243,34 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 CREATE INDEX idx_audit_entity ON audit_log(entity_type, entity_id);
 CREATE INDEX idx_audit_timestamp ON audit_log(timestamp DESC);
+
+-- =============================================================================
+-- APP REGISTRATIONS (Linked Identities)
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS app_registrations (
+    id TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    display_name TEXT NOT NULL, -- Resolved from Graph or 'KeyVault:...'
+    environment TEXT NOT NULL,
+    product_id TEXT REFERENCES products(id),
+    owner_team_id TEXT REFERENCES teams(id),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_app_reg_client_id ON app_registrations(client_id);
+
+-- =============================================================================
+-- ACCESS CONTROL LISTS (Named Values / Config)
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS access_control_lists (
+    key TEXT NOT NULL,
+    environment TEXT NOT NULL,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    PRIMARY KEY (key, environment)
+);
 
 -- =============================================================================
 -- VIEWS FOR COMMON QUERIES
