@@ -7,18 +7,14 @@
 
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
-
-interface APIMConfig {
-    instance: string;
-    resourceGroup: string;
-    subscriptionId: string;
-    environment: string;
-    accessToken?: string;
-    devops?: {
-        pat: string;
-        organization: string;
-    };
-}
+import {
+    AzureService,
+    APIMConfig,
+    ADOProject,
+    ADORepo,
+    ADOPipeline,
+    PipelineRun
+} from './services/AzureService.js';
 
 interface EnvConfig {
     name: string;
@@ -75,63 +71,6 @@ interface Subscription {
     };
 }
 
-interface ADOProject {
-    name: string;
-    id: string;
-}
-
-interface ADORepo {
-    name: string;
-    webUrl: string;
-    id: string;
-    project: {
-        name: string;
-        id: string;
-    };
-}
-
-interface ADOPipeline {
-    id: number;
-    name: string;
-    folder: string;
-    url: string;
-    _links: {
-        web: { href: string };
-    };
-}
-
-interface PipelineRun {
-    id: number;
-    name: string;
-    status: string;
-    result: string;
-    createdDate: string;
-    finishedDate: string;
-    resources?: {
-        repositories: {
-            self: {
-                refName: string;
-                version: string;
-            }
-        }
-    };
-}
-
-/**
- * Get Azure access token using Azure CLI
- */
-async function getAzureAccessToken(): Promise<string> {
-    const { execSync } = await import('child_process');
-    try {
-        const token = execSync('az account get-access-token --resource https://management.azure.com --query accessToken -o tsv', {
-            encoding: 'utf-8'
-        }).trim();
-        return token;
-    } catch (error) {
-        throw new Error('Failed to get Azure access token. Make sure Azure CLI is installed and you are logged in (az login)');
-    }
-}
-
 /**
  * Construct absolute ADO URL with line forensics
  */
@@ -148,163 +87,15 @@ function constructADOUrl(repoUrl: string, path: string, line?: number): string {
 }
 
 /**
- * Fetch Tags for a specific Product
- */
-async function fetchTagsForProduct(config: APIMConfig, productId: string): Promise<Record<string, string>> {
-    try {
-        // productId is the full resource ID. We need to append /tags
-        const response = await fetch(`https://management.azure.com${productId}/tags?api-version=2022-08-01`, {
-            headers: {
-                'Authorization': `Bearer ${config.accessToken}`,
-                'Content-Type': 'application/json'
-            }
-        });
-
-        if (response.ok) {
-            const data = await response.json() as { value: Array<{ name: string, properties: { displayName: string } }> };
-            const tags: Record<string, string> = {};
-            data.value.forEach(tag => {
-                // If tag is 'TeamID:123', we can parse it, or just use the name as key if it's simple
-                if (tag.name.includes(':')) {
-                    const [k, v] = tag.name.split(':');
-                    tags[k.trim()] = v.trim();
-                } else {
-                    tags[tag.name] = 'true';
-                }
-            });
-            return tags;
-        }
-    } catch (err) {
-        console.warn(`⚠️ [Tags] Failed to fetch tags for ${productId}`);
-    }
-    return {};
-}
-
-/**
- * Fetch data from APIM REST API with pagination support
- */
-async function fetchAPIM<T>(config: APIMConfig, path: string): Promise<{ value: T[] }> {
-    const results: T[] = [];
-    const baseUrl = `https://management.azure.com/subscriptions/${config.subscriptionId}/resourceGroups/${config.resourceGroup}/providers/Microsoft.ApiManagement/service/${config.instance}`;
-    let nextLink: string | null = `${baseUrl}${path}?api-version=2022-08-01`;
-
-    while (nextLink) {
-        const response = await fetch(nextLink, {
-            headers: {
-                'Authorization': `Bearer ${config.accessToken}`,
-                'Content-Type': 'application/json'
-            }
-        });
-
-        if (!response.ok) {
-            const error = await response.text();
-            throw new Error(`APIM API error: ${response.status} ${response.statusText}\n${error}`);
-        }
-
-        const data = await response.json() as { value: T[], nextLink?: string };
-        results.push(...data.value);
-        nextLink = data.nextLink || null;
-    }
-
-    return { value: results };
-}
-
-/**
- * Fetch All Projects from Azure DevOps Organization
- */
-async function fetchADOProjects(org: string, pat: string): Promise<ADOProject[]> {
-    console.log(`📡 [ADO] Fetching all projects in organization: ${org}...`);
-    const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-    const url = `https://dev.azure.com/${org}/_apis/projects?api-version=7.1-preview.4`;
-
-    try {
-        const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-        if (response.ok) {
-            const data = await response.json() as { value: ADOProject[] };
-            return data.value;
-        }
-    } catch (err) {
-        console.error('❌ [ADO] Failed to fetch projects:', err);
-    }
-    return [];
-}
-
-/**
- * Fetch All Repositories from Azure DevOps Organization (via all projects)
- */
-async function fetchADOReposAcrossProjects(org: string, projects: ADOProject[], pat: string): Promise<ADORepo[]> {
-    const allRepos: ADORepo[] = [];
-    const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-
-    console.log(`🔍 [ADO] Starting organization-wide repository crawl across ${projects.length} projects...`);
-
-    // Fetch in parallel for speed
-    const projectResults = await Promise.all(projects.map(async (project) => {
-        try {
-            const url = `https://dev.azure.com/${org}/${project.name}/_apis/git/repositories?api-version=7.1-preview.1`;
-            const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-
-            if (response.ok) {
-                const data = await response.json() as { value: ADORepo[] };
-                return data.value;
-            }
-        } catch (err) {
-            console.warn(`⚠️ [ADO] Error fetching repos for ${project.name}`);
-        }
-        return [];
-    }));
-
-    return projectResults.flat();
-}
-
-/**
- * Fetch Pipelines for a specific repository
- */
-async function fetchADOPipelines(org: string, project: string, repoId: string, pat: string): Promise<ADOPipeline[]> {
-    const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-    const url = `https://dev.azure.com/${org}/${project}/_apis/pipelines?api-version=7.1-preview.1&repositoryId=${repoId}&repositoryType=azureRepo`;
-
-    try {
-        const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-        if (response.ok) {
-            const data = await response.json() as { value: ADOPipeline[] };
-            return data.value;
-        }
-    } catch (err) {
-        console.error(`❌ [ADO] Failed to fetch pipelines for repo ${repoId}:`, err);
-    }
-    return [];
-}
-
-/**
- * Fetch Recent Runs for a Pipeline
- */
-async function fetchPipelineRuns(org: string, project: string, pipelineId: number, pat: string): Promise<PipelineRun[]> {
-    const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-    const url = `https://dev.azure.com/${org}/${project}/_apis/pipelines/${pipelineId}/runs?api-version=7.1-preview.1`;
-
-    try {
-        const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-        if (response.ok) {
-            const data = await response.json() as { value: PipelineRun[] };
-            return data.value;
-        }
-    } catch (err) {
-        console.error(`❌ [ADO] Failed to fetch runs for pipeline ${pipelineId}:`, err);
-    }
-    return [];
-}
-
-/**
  * Fetch a single environment
  */
 async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
     console.log(`📍 [${config.environment}] Starting Extraction...`);
 
     try {
-        const productsData = await fetchAPIM<Product>(config, '/products');
-        const apisData = await fetchAPIM<API>(config, '/apis');
-        const subscriptionsData = await fetchAPIM<Subscription>(config, '/subscriptions');
+        const productsData = await AzureService.fetchAPIM<Product>(config, '/products');
+        const apisData = await AzureService.fetchAPIM<API>(config, '/apis');
+        const subscriptionsData = await AzureService.fetchAPIM<Subscription>(config, '/subscriptions');
 
 
         console.log(`✅ [${config.environment}] APIM Snapshot Complete: ${productsData.value.length} Products.`);
@@ -322,7 +113,7 @@ async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
             console.log(`\n📦 Processing product: ${product.properties.displayName}`);
 
             // Fetch Tags for automated ownership
-            const tags = await fetchTagsForProduct(config, product.id);
+            const tags = await AzureService.fetchTagsForProduct(config, product.id);
             if (Object.keys(tags).length > 0) {
                 console.log(`  🏷️  Found tags: ${Object.keys(tags).join(', ')}`);
                 // Automated Ownership Assignment
@@ -416,13 +207,13 @@ async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
             if (config.devops?.pat && config.devops?.organization) {
                 console.log(`  🚀 [Pipeline] Fetching regional hashes for ${product.properties.displayName}...`);
                 try {
-                    const pipelines = await fetchADOPipelines(config.devops.organization, matchedRepo.project.name, matchedRepo.id, config.devops.pat);
+                    const pipelines = await AzureService.fetchADOPipelines(config.devops.organization, matchedRepo.project.name, matchedRepo.id, config.devops.pat, config.devops.baseUrl);
 
                     // Usually there's one main deployment pipeline
                     const mainPipeline = pipelines.find(p => p.name.toLowerCase().includes('deploy') || p.name.toLowerCase().includes('iac')) || pipelines[0];
 
                     if (mainPipeline) {
-                        const runs = await fetchPipelineRuns(config.devops.organization, matchedRepo.project.name, mainPipeline.id, config.devops.pat);
+                        const runs = await AzureService.fetchPipelineRuns(config.devops.organization, matchedRepo.project.name, mainPipeline.id, config.devops.pat, config.devops.baseUrl);
 
                         // Extract hashes for regions (Simulated mapping logic)
                         // In a real app, you'd check stage/environment names in the run details
@@ -432,7 +223,7 @@ async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
                         if (successfulRun) {
                             const hash = successfulRun.resources?.repositories.self.version;
                             (product as any).deployments = {
-                                [config.environment]: {
+                                [config.environment || 'DEV']: {
                                     hash: hash || 'unknown',
                                     date: successfulRun.finishedDate,
                                     status: 'active',
@@ -510,10 +301,10 @@ async function fetchEnvironment(config: APIMConfig, adoRepos: ADORepo[]) {
         const outputDir = join(process.cwd(), 'data');
         mkdirSync(outputDir, { recursive: true });
         const timestamp = new Date().toISOString().split('T')[0];
-        const outputFile = join(outputDir, `apim-data-${config.environment.toLowerCase()}-${timestamp}.json`);
+        const outputFile = join(outputDir, `apim-data-${(config.environment || 'dev').toLowerCase()}-${timestamp}.json`);
 
         writeFileSync(outputFile, JSON.stringify(output, null, 2));
-        console.log(`💾 [${config.environment}] Saved matching state to: ${outputFile}`);
+        console.log(`💾 [${config.environment || 'DEV'}] Saved matching state to: ${outputFile}`);
 
         return outputFile;
     } catch (error) {
@@ -539,14 +330,14 @@ async function main() {
         const envsToFetch = configFile.azure.environments;
         const devops = configFile.devops;
 
-        const accessToken = await getAzureAccessToken();
+        const accessToken = await AzureService.getAzureAccessToken();
         console.log('✅ Azure Access Token acquired.');
 
         // 1. FULL AUTODISCOVERY: Fetch every project and repo in the Org
         let allRepos: ADORepo[] = [];
         if (devops?.pat && devops?.organization) {
-            const projects = await fetchADOProjects(devops.organization, devops.pat);
-            allRepos = await fetchADOReposAcrossProjects(devops.organization, projects, devops.pat);
+            const projects = await AzureService.fetchADOProjects(devops.organization, devops.pat, devops.baseUrl);
+            allRepos = await AzureService.fetchADOReposAcrossProjects(devops.organization, projects, devops.pat, devops.baseUrl);
             console.log(`✅ [ADO] Discovery Complete: Crawled ${projects.length} projects and found ${allRepos.length} repositories.\n`);
         } else {
             console.warn('⚠️ [ADO] Skipping discovery (missing credentials)\n');

@@ -4,7 +4,6 @@ import { type PolicyScope, type PolicyFlow, type PolicyStep, type PolicySection,
 import { PolicyPalette } from './components/PolicyPalette';
 import { PolicyStepCard } from './components/PolicyStepCard';
 import { RateLimitProperties } from './components/properties/RateLimitProperties';
-import { generatePolicyXml } from './utils/policyGenerator';
 import { DeploymentConfirmationModal } from './components/DeploymentConfirmationModal';
 import { useStore } from '../../store/useStore';
 import { api } from '../../api/baseClient';
@@ -108,6 +107,24 @@ export const PolicyStudioContainer = ({
         ? Object.values(flow).flat().find(s => s.id === selectedStepId)
         : null;
 
+    // Helper to update flow and fetch XML from backend
+    const updateFlowWithBackend = async (newFlow: PolicyFlow) => {
+        setFlow(newFlow);
+        try {
+            const response = await api.post('/policy/generate', { flow: newFlow });
+            if (response.data && response.data.xml) {
+                setRawXml(response.data.xml);
+            }
+        } catch (error) {
+            console.error('Failed to generate XML:', error);
+            addNotification({
+                title: 'Sync Error',
+                message: 'Failed to synchronize XML with visual changes.',
+                type: 'error'
+            });
+        }
+    };
+
     const handleUpdateStep = (updates: Record<string, any>) => {
         if (!activeStep) return;
 
@@ -121,8 +138,21 @@ export const PolicyStudioContainer = ({
             newFlow[section] = updateSection(newFlow[section]);
         });
 
-        setFlow(newFlow);
-        setRawXml(generatePolicyXml(newFlow));
+        updateFlowWithBackend(newFlow);
+    };
+
+    const handleDeleteStep = (stepId: string) => {
+        const newFlow = { ...flow };
+
+        (Object.keys(newFlow) as PolicySection[]).forEach(section => {
+            newFlow[section] = newFlow[section].filter(s => s.id !== stepId);
+        });
+
+        if (selectedStepId === stepId) {
+            setSelectedStepId(null);
+        }
+
+        updateFlowWithBackend(newFlow);
     };
 
     const handleDeploy = async (justification: string) => {
@@ -165,7 +195,7 @@ export const PolicyStudioContainer = ({
         if (!over) return;
 
         // Case 1: Reordering within same list
-        // Case 2: Moving between lists (not implemented fully for simplification, assuming inbound mostly)
+        // Case 2: Moving between lists
         // Case 3: Dropping from Palette
 
         const activeData = active.data.current;
@@ -196,9 +226,8 @@ export const PolicyStudioContainer = ({
                 newFlow[section].push(newStep);
             }
 
-            setFlow(newFlow);
             setSelectedStepId(newStep.id);
-            setRawXml(generatePolicyXml(newFlow));
+            updateFlowWithBackend(newFlow);
             return;
         }
 
@@ -213,8 +242,7 @@ export const PolicyStudioContainer = ({
                     ...flow,
                     [section]: arrayMove(flow[section], oldIndex, newIndex)
                 };
-                setFlow(newFlow);
-                setRawXml(generatePolicyXml(newFlow));
+                updateFlowWithBackend(newFlow);
             }
         }
     };
@@ -240,7 +268,7 @@ export const PolicyStudioContainer = ({
                 />
 
                 {/* LEFT COLUMN: Palette */}
-                <div className="w-64 bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 flex flex-col z-20 shadow-xl">
+                <div className="bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 flex flex-col z-20 shadow-xl h-full">
                     <PolicyPalette />
                 </div>
 
@@ -314,6 +342,7 @@ export const PolicyStudioContainer = ({
                                                     index={idx + 1}
                                                     isSelected={selectedStepId === step.id}
                                                     onClick={() => !step.isLocked && !isReadOnly && setSelectedStepId(step.id)}
+                                                    onDelete={handleDeleteStep}
                                                     isReadOnly={isReadOnly}
                                                 />
                                             ))}
@@ -349,6 +378,7 @@ export const PolicyStudioContainer = ({
                                                     index={idx + 1}
                                                     isSelected={selectedStepId === step.id}
                                                     onClick={() => !step.isLocked && !isReadOnly && setSelectedStepId(step.id)}
+                                                    onDelete={handleDeleteStep}
                                                     isReadOnly={isReadOnly}
                                                 />
                                             ))}

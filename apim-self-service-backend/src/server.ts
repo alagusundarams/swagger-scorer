@@ -22,6 +22,7 @@ import { analyzeRoutes } from './routes/analyze.js';
 import { catalogRoutes } from './routes/catalog.js';
 import draftsRoute from './routes/drafts.js';
 import { policyRoutes } from './routes/policyRoutes.js';
+import { mockRoutes } from './routes/mockRoutes.js';
 import onboardingRoutes from './routes/onboarding.js';
 import multipart from '@fastify/multipart';
 import { AppConfig } from './types/index.js';
@@ -48,6 +49,7 @@ export async function build() {
 
     // Create Fastify instance with logging
     const fastify = Fastify({
+        bodyLimit: 10 * 1024 * 1024, // 10MB limit for large specs
         logger: {
             level: appConfig.server.logLevel || 'info',
             transport: {
@@ -89,6 +91,10 @@ export async function build() {
         const encodingHeader = request.headers['x-safe-transport'];
 
         if (encodingHeader === 'base64') {
+            // STRIP CONTENT-LENGTH: Fastify will verify this against the stream size.
+            // Since we are decoding (changing size), the original header is invalid.
+            delete request.headers['content-length'];
+
             // Buffer the stream
             const chunks: Buffer[] = [];
             for await (const chunk of payload) {
@@ -129,6 +135,7 @@ export async function build() {
     await fastify.register(catalogRoutes, { prefix: '/api/v1' });
     await fastify.register(draftsRoute, { prefix: '/api/v1' });
     await fastify.register(policyRoutes, { prefix: '/api/v1/policy' });
+    await fastify.register(mockRoutes, { prefix: '/api/v1' });
     await fastify.register(onboardingRoutes, { ...config, prefix: '/api/v1/onboarding' });
 
     // Error handler for uncaught errors

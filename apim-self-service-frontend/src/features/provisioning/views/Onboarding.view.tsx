@@ -63,7 +63,7 @@ export const OnboardingWizard = () => {
     return (
         <MainLayout>
             <div className="py-16">
-                <div className="max-w-3xl mx-auto px-6">
+                <div className={`${step === 2 ? 'max-w-[1400px]' : 'max-w-3xl'} mx-auto px-6 transition-all duration-500 ease-in-out`}>
                     <OnboardingProgressBar currentStep={step} totalSteps={3} />
 
                     <div className="bg-white dark:bg-slate-800 rounded-[3rem] shadow-premium border border-gray-100 dark:border-slate-700/40 relative overflow-hidden min-h-[600px] flex flex-col">

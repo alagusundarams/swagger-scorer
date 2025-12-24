@@ -131,3 +131,27 @@ export interface AppConfig {
         host?: string;
     };
 }
+
+// === Policy Studio Types ===
+export type PolicyScope = 'global' | 'product' | 'api' | 'operation';
+export type PolicyStepType = 'base' | 'rate-limit' | 'cors' | 'mock-response' | 'set-header' | 'validate-jwt' | 'ip-filter' | 'custom-xml' | 'palette-item';
+export type PolicySection = 'inbound' | 'backend' | 'outbound' | 'onError';
+
+export interface PolicyStep {
+    id: string;
+    type: PolicyStepType;
+    displayName: string;
+    description?: string;
+    scope: PolicyScope;
+    isLocked: boolean;
+    properties: Record<string, any>;
+    xmlSnippet?: string; // For base/custom policies
+    customXmlContent?: string;
+}
+
+export interface PolicyFlow {
+    inbound: PolicyStep[];
+    backend: PolicyStep[];
+    outbound: PolicyStep[];
+    onError: PolicyStep[];
+}

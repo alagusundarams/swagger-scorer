@@ -7,10 +7,11 @@ interface PolicyStepCardProps {
     index: number;
     isSelected: boolean;
     onClick: () => void;
+    onDelete?: (id: string) => void;
     isReadOnly: boolean;
 }
 
-export const PolicyStepCard = ({ step, index, isSelected, onClick, isReadOnly }: PolicyStepCardProps) => {
+export const PolicyStepCard = ({ step, index, isSelected, onClick, onDelete, isReadOnly }: PolicyStepCardProps) => {
     const {
         attributes,
         listeners,
@@ -72,9 +73,26 @@ export const PolicyStepCard = ({ step, index, isSelected, onClick, isReadOnly }:
                     </div>
                 </div>
 
-                {/* Status Indicator */}
-                {!step.isLocked && (
-                    <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-blue-500' : 'bg-transparent group-hover:bg-blue-200'}`}></div>
+                {/* Status Indicator / Delete Button */}
+                {!step.isLocked && !isReadOnly && (
+                    <div className="flex items-center">
+                        {/* Show delete on hover, otherwise show indicator */}
+                        <div className="hidden group-hover:block transition-all animate-in fade-in slide-in-from-right-4">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation(); // Prevent card selection
+                                    onDelete && onDelete(step.id);
+                                }}
+                                className="p-2 rounded-xl text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 transition"
+                                title="Remove Policy"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className={`group-hover:hidden w-2 h-2 rounded-full ${isSelected ? 'bg-blue-500' : 'bg-transparent'}`}></div>
+                    </div>
                 )}
             </div>
         </div>

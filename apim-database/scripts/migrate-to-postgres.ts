@@ -17,8 +17,28 @@ import { join } from 'path';
 import { Pool } from 'pg';
 import axios from 'axios';
 
+// Helper to load config
+function loadConfig() {
+    const rootConfig = join(process.cwd(), 'apim-database', 'config.json');
+    const localConfig = join(process.cwd(), 'config.json');
+    const relativeConfig = join(__dirname, '..', 'config.json');
+
+    let configPath = '';
+    if (existsSync(rootConfig)) configPath = rootConfig;
+    else if (existsSync(localConfig)) configPath = localConfig;
+    else if (existsSync(relativeConfig)) configPath = relativeConfig;
+
+    if (configPath) {
+        console.log(`📂 Using config from: ${configPath}`);
+        return JSON.parse(readFileSync(configPath, 'utf8'));
+    }
+    return {};
+}
+
+const config = loadConfig();
+
 // For calling the scoring API
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3001';
+const BACKEND_URL = process.env.BACKEND_URL || config.backend?.url || 'http://localhost:3001';
 
 interface APIMData {
     fetchedAt: string;
@@ -35,25 +55,7 @@ interface APIMData {
 }
 
 function createDbPool(): Pool {
-    let connectionString = process.env.DATABASE_URL;
-
-    // Fallback to config.json with priority-based discovery
-    if (!connectionString) {
-        const rootConfig = join(process.cwd(), 'apim-database', 'config.json');
-        const localConfig = join(process.cwd(), 'config.json');
-        const relativeConfig = join(__dirname, '..', 'config.json');
-
-        let configPath = '';
-        if (existsSync(rootConfig)) configPath = rootConfig;
-        else if (existsSync(localConfig)) configPath = localConfig;
-        else if (existsSync(relativeConfig)) configPath = relativeConfig;
-
-        if (configPath) {
-            console.log(`📂 Using config from: ${configPath}`);
-            const config = JSON.parse(readFileSync(configPath, 'utf8'));
-            connectionString = config.database?.url;
-        }
-    }
+    let connectionString = process.env.DATABASE_URL || config.database?.url;
 
     if (!connectionString) {
         throw new Error('DATABASE_URL environment variable or database.url in config.json is required');
