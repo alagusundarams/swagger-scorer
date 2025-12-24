@@ -19,10 +19,11 @@ GRANT ALL ON SCHEMA public TO public;
 
 CREATE TABLE IF NOT EXISTS teams (
     id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
+    display_name TEXT NOT NULL,
     azure_ad_group_id TEXT UNIQUE,
-    type TEXT NOT NULL CHECK (type IN ('producer', 'consumer', 'both')),
+    type TEXT NOT NULL CHECK (type IN ('producer', 'consumer', 'both')) DEFAULT 'both',
     description TEXT,
+    contact_email TEXT,
     member_count INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -71,7 +72,6 @@ CREATE TABLE IF NOT EXISTS products (
     version TEXT NOT NULL,
     description TEXT,
     state TEXT NOT NULL CHECK (state IN ('published', 'notPublished')),
-    type TEXT CHECK (type IN ('standard', 'grp')) DEFAULT 'standard',
     
     -- Owner team (NULLABLE - no teams initially)
     owner_team_id TEXT REFERENCES teams(id),  -- Removed NOT NULL
@@ -85,7 +85,6 @@ CREATE TABLE IF NOT EXISTS products (
     -- Management mode (ALL start as TERRAFORM_MANAGED)
     management_mode TEXT CHECK (management_mode IN ('TERRAFORM_MANAGED', 'HYBRID', 'PORTAL_MANAGED')) DEFAULT 'TERRAFORM_MANAGED',
     terraform_pipeline_url TEXT,
-    last_deployed_commit_hash TEXT,
     
     -- Git repository (varies by environment)
     git_repo_url TEXT,  -- Main repo URL (DEV/QA/STAGE share one)
@@ -107,7 +106,14 @@ CREATE TABLE IF NOT EXISTS products (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     
     -- APIM source data (for audit/troubleshooting)
-    apim_raw_data JSONB
+    apim_raw_data JSONB,
+
+    -- Deployment Tracking (Git Sync)
+    last_deployed_commit_hash TEXT,
+    last_deployed_at TIMESTAMP WITH TIME ZONE,
+    
+    -- Governance Intelligence
+    detected_anomalies JSONB -- e.g. ["MANUAL_CREATION", "ENV_SKIP", "UNOWNED"]
 );
 
 CREATE INDEX idx_products_owner ON products(owner_team_id);
@@ -124,7 +130,6 @@ CREATE INDEX idx_products_git_repo ON products(git_repo_url);
 CREATE TABLE IF NOT EXISTS apis (
     id TEXT PRIMARY KEY,
     product_id TEXT REFERENCES products(id) ON DELETE CASCADE NOT NULL,
-    origin_team_id TEXT REFERENCES teams(id),
     name TEXT NOT NULL,
     display_name TEXT NOT NULL,
     description TEXT,
@@ -168,7 +173,6 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     id TEXT PRIMARY KEY,
     product_id TEXT REFERENCES products(id) ON DELETE CASCADE NOT NULL,
     subscriber_team_id TEXT REFERENCES teams(id) NOT NULL,
-    app_registration_id TEXT, -- References app_registrations(id), added for day 2
     state TEXT NOT NULL CHECK (state IN ('active', 'suspended', 'submitted', 'pending', 'rejected', 'cancelled', 'expired')),
     
     -- Keys
@@ -180,8 +184,6 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     expiration_date TIMESTAMP WITH TIME ZONE,
-    keys_generated_at TIMESTAMP WITH TIME ZONE,
-    last_synced_at TIMESTAMP WITH TIME ZONE,
     
     -- APIM source data
     apim_raw_data JSONB
@@ -190,39 +192,6 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 CREATE INDEX idx_subscriptions_product ON subscriptions(product_id);
 CREATE INDEX idx_subscriptions_team ON subscriptions(subscriber_team_id);
 CREATE INDEX idx_subscriptions_state ON subscriptions(state);
-CREATE INDEX idx_subscriptions_app_reg ON subscriptions(app_registration_id);
-
--- =============================================================================
--- APP REGISTRATIONS (Day 2 Feature)
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS app_registrations (
-    id TEXT PRIMARY KEY,
-    display_name TEXT NOT NULL,
-    client_id TEXT UNIQUE NOT NULL,
-    environment TEXT NOT NULL CHECK (environment IN ('DEV', 'QA', 'STAGE', 'PROD')),
-    owner_team_id TEXT REFERENCES teams(id), -- Added for ownership tracking
-    product_id TEXT REFERENCES products(id) ON DELETE CASCADE,
-    
-    -- App details
-    app_id_uri TEXT,
-    secret_expiry_date TIMESTAMP WITH TIME ZONE,
-    
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    
-    -- Azure AD source data
-    azure_ad_raw_data JSONB
-);
-
-CREATE INDEX idx_app_registrations_product ON app_registrations(product_id);
-CREATE INDEX idx_app_registrations_environment ON app_registrations(environment);
-CREATE INDEX idx_app_registrations_client_id ON app_registrations(client_id);
-
--- Now add the foreign key constraint for subscriptions -> app_registrations
-ALTER TABLE subscriptions 
-ADD CONSTRAINT fk_subscriptions_app_registration 
-FOREIGN KEY (app_registration_id) REFERENCES app_registrations(id) ON DELETE SET NULL;
 
 -- =============================================================================
 -- APPROVAL REQUESTS
@@ -249,11 +218,9 @@ CREATE TABLE IF NOT EXISTS approval_requests (
     -- Request details (flexible JSONB for different request types)
     details JSONB NOT NULL,
     
-    justification TEXT, -- OBO reason or rejection feedback
-    
     submitted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     resolved_at TIMESTAMP WITH TIME ZONE,
-    resolved_by TEXT -- User ID/Email of the actual approver (OBO)
+    resolved_by TEXT
 );
 
 CREATE INDEX idx_approvals_status ON approval_requests(status);
@@ -278,6 +245,34 @@ CREATE INDEX idx_audit_entity ON audit_log(entity_type, entity_id);
 CREATE INDEX idx_audit_timestamp ON audit_log(timestamp DESC);
 
 -- =============================================================================
+-- APP REGISTRATIONS (Linked Identities)
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS app_registrations (
+    id TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    display_name TEXT NOT NULL, -- Resolved from Graph or 'KeyVault:...'
+    environment TEXT NOT NULL,
+    product_id TEXT REFERENCES products(id),
+    owner_team_id TEXT REFERENCES teams(id),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_app_reg_client_id ON app_registrations(client_id);
+
+-- =============================================================================
+-- ACCESS CONTROL LISTS (Named Values / Config)
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS access_control_lists (
+    key TEXT NOT NULL,
+    environment TEXT NOT NULL,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    PRIMARY KEY (key, environment)
+);
+
+-- =============================================================================
 -- VIEWS FOR COMMON QUERIES
 -- =============================================================================
 
@@ -285,7 +280,7 @@ CREATE INDEX idx_audit_timestamp ON audit_log(timestamp DESC);
 CREATE OR REPLACE VIEW products_with_teams AS
 SELECT 
     p.*,
-    t.name as owner_team_name,
+    t.display_name as owner_team_name,
     t.type as owner_team_type,
     (SELECT COUNT(*) FROM apis WHERE product_id = p.id) as api_count
 FROM products p
@@ -297,45 +292,7 @@ SELECT
     s.*,
     p.display_name as product_name,
     p.environment as product_environment,
-    t.name as subscriber_team_name
+    t.display_name as subscriber_team_name
 FROM subscriptions s
 LEFT JOIN products p ON s.product_id = p.id
 LEFT JOIN teams t ON s.subscriber_team_id = t.id;
-
--- =============================================================================
--- API ONBOARDING STAGING (Added for Staging Flow)
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS api_onboarding_staging (
-    id TEXT PRIMARY KEY,
-    user_id TEXT REFERENCES users(id) NOT NULL,
-    session_id TEXT NOT NULL,
-    api_name TEXT NOT NULL,
-    blob_path TEXT NOT NULL, -- staging/{userId}/{sessionId}/{apiName}
-    status TEXT NOT NULL CHECK (status IN ('STAGED', 'ANALYZED', 'APPROVED', 'REJECTED')) DEFAULT 'STAGED',
-    metadata JSONB DEFAULT '{}',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX idx_onboarding_user ON api_onboarding_staging(user_id);
-CREATE INDEX idx_onboarding_session ON api_onboarding_staging(session_id);
-CREATE INDEX idx_onboarding_status ON api_onboarding_staging(status);
-
--- =============================================================================
--- PERMISSION MATRIX (Refined Admin Day 1)
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS permission_matrix (
-    id SERIAL PRIMARY KEY,
-    product_id TEXT REFERENCES products(id) ON DELETE CASCADE,
-    ad_group_id TEXT NOT NULL,
-    environment TEXT NOT NULL CHECK (environment IN ('DEV', 'QA', 'STAGE', 'PROD')),
-    role TEXT NOT NULL CHECK (role IN ('Reader', 'Contributor', 'Admin')),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(product_id, ad_group_id, environment)
-);
-
-CREATE INDEX idx_permissions_product ON permission_matrix(product_id);
-CREATE INDEX idx_permissions_ad_group ON permission_matrix(ad_group_id);
