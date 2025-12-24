@@ -141,6 +141,9 @@ async function main() {
                 `, [inferredTeamId]);
             }
 
+            // DB Value: NULL if orphaned, otherwise the ID
+            const dbOwnerId = inferredTeamId === 'orphaned' ? null : inferredTeamId;
+
             // Ensure 'unknown-product' exists for unlinked items
             await pool.query(`
                 INSERT INTO products (id, name, display_name, version, environment, state, owner_team_id, updated_at)
@@ -168,7 +171,7 @@ async function main() {
                     detected_anomalies = EXCLUDED.detected_anomalies,
                     management_mode = EXCLUDED.management_mode,
                     updated_at = NOW();
-            `, [p.id, p.name, p.description, p.state, p.subscriptionCount, inferredTeamId, gitInfo.hash, gitInfo.date, JSON.stringify(anomalies), derivedManagementMode]);
+            `, [p.id, p.name, p.description, p.state, p.subscriptionCount, dbOwnerId, gitInfo.hash, gitInfo.date, JSON.stringify(anomalies), derivedManagementMode]);
         }
 
         // B. SYNC APIs & APP REGISTRATIONS
@@ -290,7 +293,7 @@ async function main() {
             // But we record the existence.
             await pool.query(`
                 INSERT INTO app_registrations (id, client_id, display_name, environment, product_id, owner_team_id)
-                VALUES ($1, $1, $2, 'PROD', 'unknown-product', 'orphaned')
+                VALUES ($1, $1, $2, 'PROD', 'unknown-product', NULL)
                 ON CONFLICT (id) DO UPDATE SET display_name = EXCLUDED.display_name;
             `, [val.clientId, val.displayName]);
         }
