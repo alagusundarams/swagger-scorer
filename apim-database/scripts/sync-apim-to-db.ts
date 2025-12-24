@@ -49,7 +49,8 @@ const DB_CONFIG = {
 const AZURE_CONFIG = {
     subscriptionId: process.env.AZURE_SUBSCRIPTION_ID || config.azure?.environments?.[0]?.subscriptionId,
     resourceGroup: process.env.AZURE_RG || config.azure?.environments?.[0]?.resourceGroup,
-    serviceName: process.env.APIM_SERVICE_NAME || config.azure?.environments?.[0]?.instance
+    serviceName: process.env.APIM_SERVICE_NAME || config.azure?.environments?.[0]?.instance,
+    environment: process.env.ENVIRONMENT || 'PROD'
 };
 
 // --- DATA TYPES ---
@@ -73,13 +74,21 @@ interface ApimApi {
 
 // --- MAIN EXECUTION ---
 async function main() {
-    console.log('🚀 Starting Master Sync...');
+    console.log(`🚀 Starting Master Sync for ENV: ${AZURE_CONFIG.environment}...`);
     const pool = new Pool(DB_CONFIG);
 
     try {
         const token = await getAzureToken();
         const apimConfig = getApimConfig(token);
         console.log('✅ Azure Auth Token Acquired');
+
+        // 1. INITIALIZE PLACEHOLDERS
+        // Ensure 'unknown-product' exists for unlinked items
+        await pool.query(`
+            INSERT INTO products (id, name, display_name, version, environment, state, owner_team_id, updated_at)
+            VALUES ('unknown-product', 'unknown-product', 'Unknown Product', '0.0.0', $1, 'notPublished', NULL, NOW())
+            ON CONFLICT (id) DO NOTHING
+        `, [AZURE_CONFIG.environment]);
 
         // 2. IDENTITY SYNC: Fetch Real AD Groups for Current User
         const myGroups = await AzureService.fetchUserGroups();
@@ -144,13 +153,6 @@ async function main() {
             // DB Value: NULL if orphaned, otherwise the ID
             const dbOwnerId = inferredTeamId === 'orphaned' ? null : inferredTeamId;
 
-            // Ensure 'unknown-product' exists for unlinked items
-            await pool.query(`
-                INSERT INTO products (id, name, display_name, version, environment, state, owner_team_id, updated_at)
-                VALUES ('unknown-product', 'unknown-product', 'Unknown Product', '0.0.0', 'PROD', 'notPublished', NULL, NOW())
-                ON CONFLICT (id) DO NOTHING
-            `);
-
             const gitInfo = await fetchGitInfo(p.id);
             const anomalies: string[] = [];
             if (!gitInfo.hash) anomalies.push('MANUAL_CREATION');
@@ -161,7 +163,7 @@ async function main() {
             await pool.query(`
                 INSERT INTO products (id, name, display_name, version, environment, description, state, subscriber_count, owner_team_id, 
                     last_deployed_commit_hash, last_deployed_at, detected_anomalies, management_mode, updated_at)
-                VALUES ($1, $1, $2, '1.0.0', 'PROD', $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+                VALUES ($1, $1, $2, '1.0.0', $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
                 ON CONFLICT (id) DO UPDATE SET
                     display_name = EXCLUDED.display_name,
                     state = EXCLUDED.state,
@@ -171,13 +173,11 @@ async function main() {
                     detected_anomalies = EXCLUDED.detected_anomalies,
                     management_mode = EXCLUDED.management_mode,
                     updated_at = NOW();
-            `, [p.id, p.name, p.description, p.state, p.subscriptionCount, dbOwnerId, gitInfo.hash, gitInfo.date, JSON.stringify(anomalies), derivedManagementMode]);
+            `, [p.id, p.name, p.description, AZURE_CONFIG.environment, p.description, p.state, p.subscriptionCount, dbOwnerId, gitInfo.hash, gitInfo.date, JSON.stringify(anomalies), derivedManagementMode]);
         }
 
-        // B. SYNC APIs & APP REGISTRATIONS
+        // B. SYNC APIs
         const capturedAppIds = new Set<string>();
-        // We'll store potential links: { sourceId, clientId }
-        const appLinks: { sourceId: string, clientId: string }[] = [];
 
         for (const a of apimApis) {
             console.log(`Processing API: ${a.name} (${a.path})...`);
@@ -204,7 +204,6 @@ async function main() {
             const extracted = extractClientIdsFromPolicy(a.policyXml);
             extracted.forEach(cid => {
                 capturedAppIds.add(cid);
-                appLinks.push({ sourceId: a.id, clientId: cid });
             });
         }
 
@@ -216,6 +215,13 @@ async function main() {
                 VALUES ($1, $1, 'consumer', NOW())
                 ON CONFLICT (id) DO NOTHING
             `, [s.userId]);
+
+            // Ensure Product Exists (Safe Upsert for Scoped Subscriptions like 'apis')
+            await pool.query(`
+                INSERT INTO products (id, name, display_name, version, environment, state, owner_team_id, updated_at)
+                VALUES ($1, $1, $2, '0.0.0', $3, 'published', NULL, NOW())
+                ON CONFLICT (id) DO NOTHING
+            `, [s.productId, `Placeholder: ${s.productId}`, AZURE_CONFIG.environment]);
 
             await pool.query(`
                 INSERT INTO subscriptions (
@@ -236,10 +242,10 @@ async function main() {
             const val = nv.keyVaultUrl ? `KeyVault Ref: ${nv.keyVaultUrl}` : (nv.isSecret ? '***' : nv.value);
             await pool.query(`
                 INSERT INTO access_control_lists (key, environment, value)
-                VALUES ($1, 'PROD', $2)
+                VALUES ($1, $2, $3)
                 ON CONFLICT (key, environment) DO UPDATE SET 
                     value = EXCLUDED.value;
-            `, [nv.name, val]);
+            `, [nv.name, AZURE_CONFIG.environment, val]);
         }
 
         // E. PROCESS APP REGISTRATIONS
@@ -289,13 +295,11 @@ async function main() {
 
         // Upsert Apps using appParams
         for (const [key, val] of appParams.entries()) {
-            // We default product_id to 'unknown-product' as linking API->Product is complex in this script without map
-            // But we record the existence.
             await pool.query(`
                 INSERT INTO app_registrations (id, client_id, display_name, environment, product_id, owner_team_id)
-                VALUES ($1, $1, $2, 'PROD', 'unknown-product', NULL)
+                VALUES ($1, $1, $2, $3, 'unknown-product', NULL)
                 ON CONFLICT (id) DO UPDATE SET display_name = EXCLUDED.display_name;
-            `, [val.clientId, val.displayName]);
+            `, [val.clientId, val.displayName, AZURE_CONFIG.environment]);
         }
 
         console.log('✅ Sync Complete.');
@@ -319,7 +323,7 @@ function getApimConfig(token: string): any {
         resourceGroup: AZURE_CONFIG.resourceGroup,
         subscriptionId: AZURE_CONFIG.subscriptionId,
         accessToken: token,
-        environment: 'PROD',
+        environment: AZURE_CONFIG.environment,
         devops: config.devops // Pass config with externally defined baseUrl
     };
 }
