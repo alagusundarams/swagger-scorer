@@ -209,19 +209,18 @@ async function main() {
 
         // C. SYNC SUBSCRIPTIONS
         for (const s of apimSubs) {
+            // Strict Filter: Only sync Product-scoped subscriptions
+            if (!s.scope || !s.scope.toLowerCase().includes('/products/')) {
+                console.warn(`⚠️ Skipping Non-Product Subscription: ${s.name} (Scope: ${s.scope})`);
+                continue;
+            }
+
             // Ensure the subscriber team (user) exists
             await pool.query(`
                 INSERT INTO teams (id, display_name, type, updated_at)
                 VALUES ($1, $1, 'consumer', NOW())
                 ON CONFLICT (id) DO NOTHING
             `, [s.userId]);
-
-            // Ensure Product Exists (Safe Upsert for Scoped Subscriptions like 'apis')
-            await pool.query(`
-                INSERT INTO products (id, name, display_name, version, environment, state, owner_team_id, updated_at)
-                VALUES ($1, $1, $2, '0.0.0', $3, 'published', NULL, NOW())
-                ON CONFLICT (id) DO NOTHING
-            `, [s.productId, `Placeholder: ${s.productId}`, AZURE_CONFIG.environment]);
 
             await pool.query(`
                 INSERT INTO subscriptions (
@@ -370,6 +369,7 @@ async function fetchApimSubscriptions(token: string): Promise<any[]> {
     return response.value.map((s: any) => ({
         id: s.name,
         name: s.properties.displayName,
+        scope: s.properties.scope, // Needed for filtering
         productId: s.properties.scope.split('/').pop(),
         userId: s.properties.ownerId ? s.properties.ownerId.split('/').pop() : 'unknown',
         state: s.properties.state,
