@@ -21,6 +21,17 @@ apim-discovery-tool/
 .idea/
 .DS_Store
 
-# Temporary files
-alagu_apim_shipped.zip
-test-output.json
+# Build artifacts
+**/*.tsbuildinfo
+**/*.tmp
+**/*.temp
+
+# Common Binary Exclusions (Security Scan hygiene)
+**/*.exe
+**/*.bin
+**/*.dll
+**/*.so
+**/*.wasm
+**/*.dylib
+**/*.pyc
+**/*.class
