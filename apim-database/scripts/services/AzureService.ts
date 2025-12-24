@@ -240,31 +240,48 @@ export class AzureService {
     /**
      * Fetch Transitive Groups for the logged-in User
      */
+    /**
+     * Fetch Transitive Groups for the logged-in User
+     */
     static async fetchUserGroups(): Promise<AzureADGroup[]> {
         const token = await this.getGraphAccessToken();
         if (!token) return [];
 
         console.log('🔗 Fetching Azure AD Groups for current user...');
-        try {
-            const response = await fetch('https://graph.microsoft.com/v1.0/me/transitiveMemberOf/microsoft.graph.group?$select=id,displayName,description,mail', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
+        const allGroups: AzureADGroup[] = [];
+        let nextLink: string | null = 'https://graph.microsoft.com/v1.0/me/transitiveMemberOf/microsoft.graph.group?$select=id,displayName,description,mail';
 
-            if (response.ok) {
-                const data = await response.json() as { value: any[] };
-                console.log(`✅ Found ${data.value.length} AD Groups.`);
-                return data.value.map(g => ({
-                    id: g.id,
-                    displayName: g.displayName,
-                    description: g.description,
-                    mail: g.mail
-                }));
-            } else {
-                console.warn(`⚠️ Graph API Error: ${response.status} ${response.statusText}`);
+        try {
+            while (nextLink) {
+                const response = await fetch(nextLink, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json() as { value: any[], '@odata.nextLink'?: string };
+                    const pageGroups = data.value.map(g => ({
+                        id: g.id,
+                        displayName: g.displayName,
+                        description: g.description,
+                        mail: g.mail
+                    }));
+
+                    allGroups.push(...pageGroups);
+                    console.log(`  Fetched ${pageGroups.length} groups... (Total: ${allGroups.length})`);
+
+                    nextLink = data['@odata.nextLink'] || null;
+                } else {
+                    console.warn(`⚠️ Graph API Error: ${response.status} ${response.statusText}`);
+                    nextLink = null;
+                }
             }
+
+            console.log(`✅ Total AD Groups Found: ${allGroups.length}`);
+            return allGroups;
+
         } catch (err) {
             console.error('❌ Failed to fetch user groups:', err);
         }
