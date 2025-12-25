@@ -339,19 +339,19 @@ async function runWorker(envName: string) {
             const derivedManagementMode = anomalies.includes('MANUAL_CREATION') ? 'TERRAFORM_MANAGED' : 'HYBRID';
 
             await pool.query(`
-                 INSERT INTO products (id, name, display_name, version, environment, description, state, subscriber_count, owner_team_id, 
-                     last_deployed_commit_hash, last_deployed_at, detected_anomalies, management_mode, updated_at)
-                 VALUES ($1, $1, $2, '1.0.0', $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
-                 ON CONFLICT (id) DO UPDATE SET
-                     display_name = EXCLUDED.display_name,
-                     state = EXCLUDED.state,
-                     subscriber_count = EXCLUDED.subscriber_count,
-                     owner_team_id = EXCLUDED.owner_team_id,
-                     last_deployed_commit_hash = EXCLUDED.last_deployed_commit_hash,
-                     detected_anomalies = EXCLUDED.detected_anomalies,
-                     management_mode = EXCLUDED.management_mode,
-                     updated_at = NOW();
-             `, [p.id, p.name, p.description, AZURE_CONFIG.environment, p.description, p.state, p.subscriptionCount, dbOwnerId, gitInfo.hash, gitInfo.date, JSON.stringify(anomalies), derivedManagementMode]);
+                INSERT INTO products (id, name, display_name, version, environment, description, state, subscriber_count, owner_team_id, 
+                    last_deployed_commit_hash, last_deployed_at, detected_anomalies, management_mode, updated_at)
+                VALUES ($1, $2, $3, '1.0.0', $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+                ON CONFLICT (id) DO UPDATE SET
+                    display_name = EXCLUDED.display_name,
+                    state = EXCLUDED.state,
+                    subscriber_count = EXCLUDED.subscriber_count,
+                    owner_team_id = EXCLUDED.owner_team_id,
+                    last_deployed_commit_hash = EXCLUDED.last_deployed_commit_hash,
+                    detected_anomalies = EXCLUDED.detected_anomalies,
+                    management_mode = EXCLUDED.management_mode,
+                    updated_at = NOW();
+            `, [p.id, p.id, p.name, AZURE_CONFIG.environment, p.description, p.state, p.subscriptionCount, dbOwnerId, gitInfo.hash, gitInfo.date, JSON.stringify(anomalies), derivedManagementMode]);
         }
 
         const capturedAppIds = new Set<string>();
