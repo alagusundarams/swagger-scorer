@@ -310,6 +310,10 @@ async function runWorker(envName: string) {
         const apimApis = await fetchApimApis(token, AZURE_CONFIG);
         console.log(`📊 Found ${apimProducts.length} Products, ${apimApis.length} APIs`);
 
+        // Build Known Product ID Set for FK integrity
+        const knownProductIds = new Set<string>(apimProducts.map(p => p.id));
+        knownProductIds.add('unknown-product'); // Add default fallback if used
+
         let apimSubs: any[] = [];
         try {
             apimSubs = await fetchApimSubscriptions(token, AZURE_CONFIG);
@@ -395,6 +399,12 @@ async function runWorker(envName: string) {
         for (const s of apimSubs) {
             if (!s.scope || !s.scope.toLowerCase().includes('/products/')) {
                 console.warn(`⚠️ Skipping Non-Product Subscription: ${s.name} (Scope: ${s.scope})`);
+                continue;
+            }
+
+            // Referential Integrity Check
+            if (!knownProductIds.has(s.productId)) {
+                console.warn(`⚠️ Skipping Orphaned Subscription: ${s.name} (Target Product '${s.productId}' not found in sync)`);
                 continue;
             }
 
