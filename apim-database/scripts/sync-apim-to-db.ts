@@ -259,7 +259,7 @@ async function fetchNamedValues(token: string, azConfig: AzureConfig): Promise<a
 
 interface GitMetadata {
     hash: string;
-    date: string;
+    date: string | null;
     pipelineUrl: string;
     repoUrl: string;
 }
@@ -282,7 +282,7 @@ async function initAdoCache(devopsConfig: any) {
 }
 
 async function resolveGitMetadata(productName: string, productTags: Record<string, string>, devopsConfig: any): Promise<GitMetadata> {
-    const fallback = { hash: '', date: '', pipelineUrl: '', repoUrl: '' };
+    const fallback: GitMetadata = { hash: '', date: null, pipelineUrl: '', repoUrl: '' };
     if (!devopsConfig || !ADO_INIT_DONE) return fallback;
 
     // 1. Find Repo
