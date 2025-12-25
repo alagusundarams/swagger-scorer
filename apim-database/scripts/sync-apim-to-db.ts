@@ -300,7 +300,7 @@ async function runWorker(envName: string) {
             apimSubs = await fetchApimSubscriptions(token, AZURE_CONFIG);
             console.log(`🔑 Found ${apimSubs.length} Subscriptions`);
         } catch (e) {
-            console.warn('⚠️ Could not fetch Subscriptions');
+            console.warn('⚠️ Could not fetch Subscriptions:', e);
         }
 
         let namedValues: any[] = [];
@@ -308,7 +308,7 @@ async function runWorker(envName: string) {
             namedValues = await fetchNamedValues(token, AZURE_CONFIG);
             console.log(`🌍 Found ${namedValues.length} Named Values`);
         } catch (e) {
-            console.warn('⚠️ Could not fetch Named Values');
+            console.warn('⚠️ Could not fetch Named Values:', e);
         }
 
         const nvMap = new Map<string, any>(namedValues.map(n => [n.name, n]));
