@@ -167,24 +167,50 @@ function extractClientIdsFromPolicy(xml: string): string[] {
     if (!xml) return [];
     const ids = new Set<string>();
 
+    // Helper to clean and add
+    const addIfGuidOrNv = (val: string) => {
+        const clean = val.replace(/[{}]/g, '').trim();
+        // Named Value or GUID
+        if (clean.length > 0 && (clean.includes('-') || /^[a-zA-Z0-9-_]+$/.test(clean))) {
+            ids.add(clean.toLowerCase());
+        }
+    };
+
     // 1. Named Values: {{my-client-id}}
     const nvMatches = xml.match(/{{([^}]+)}}/g);
-    if (nvMatches) nvMatches.forEach(m => ids.add(m.replace(/[{}]/g, '')));
+    if (nvMatches) nvMatches.forEach(m => addIfGuidOrNv(m));
 
-    // 2. Raw GUIDs (Stricter boundary check)
-    // Matches standard UUID/GUID pattern
+    // 2. Raw GUIDs
     const guidMatches = xml.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/gi);
     if (guidMatches) guidMatches.forEach(m => ids.add(m.toLowerCase()));
 
-    // 3. validate-jwt audience="GUID"
-    const audMatches = xml.match(/audience=["']([^"']+)["']/g);
-    if (audMatches) {
-        audMatches.forEach(m => {
+    // 3. validate-jwt / audiences attributes / validate-azure-ad-token
+    // Matches: audience="GUID", application-id="GUID", client-id="GUID", aud="GUID", azp="GUID"
+    const attrMatches = xml.match(/(audience|application-id|client-id|azp|aud)=["']([^"']+)["']/gi);
+    if (attrMatches) {
+        attrMatches.forEach(m => {
             const val = m.split(/["']/)[1];
-            // Only add if it looks like a GUID or Named Value, otherwise it might be a URL
-            if (val.includes('{{') || /^[0-9a-f]{8}-/i.test(val)) {
-                ids.add(val.replace(/[{}]/g, '').toLowerCase());
-            }
+            addIfGuidOrNv(val);
+        });
+    }
+
+    // 4. XML Elements: <audience>GUID</audience>, <value>GUID</value> (inside check-header/claims)
+    const elemMatches = xml.match(/<(audience|value|claim)[^>]*>([^<]+)<\/\1>/gi);
+    if (elemMatches) {
+        elemMatches.forEach(m => {
+            const content = m.replace(/<[^>]+>/g, '');
+            if (content.length < 100) addIfGuidOrNv(content); // Sanity check length
+        });
+    }
+
+    // 5. OpenID Config: <openid-config url=".../GUID/..." />
+    // Extract GUIDs embedded in URLs
+    const urlMatches = xml.match(/url=["']([^"']+)["']/gi);
+    if (urlMatches) {
+        urlMatches.forEach(m => {
+            const val = m.split(/["']/)[1];
+            const guids = val.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/gi);
+            if (guids) guids.forEach(g => ids.add(g.toLowerCase()));
         });
     }
 
