@@ -275,6 +275,12 @@ async function fetchGitInfo(productId: string): Promise<GitMetadata> {
     // END: Mock Logic
 }
 
+function extractVersion(name: string): string {
+    // Matches patterns like v1, v1.0, v2.3.4, or just 1.0.0 at the end or surrounded by separators
+    const versionMatch = name.match(/(v\d+(\.\d+)*|\d+\.\d+\.\d+)/i);
+    return versionMatch ? versionMatch[0] : '1.0.0';
+}
+
 async function fetchApimApis(token: string, azConfig: AzureConfig): Promise<ApimApi[]> {
     const apiConfig = getApimConfig(token, azConfig);
     const response = await AzureService.fetchAPIM<any>(apiConfig, '/apis');
@@ -468,11 +474,12 @@ async function runWorker(envName: string) {
             // So we just need to invert the ternary assignment.
 
             const derivedManagementMode = anomalies.includes('MANUAL_CREATION') ? 'HYBRID' : 'TERRAFORM_MANAGED';
+            const extractedVersion = extractVersion(p.name);
 
             await pool.query(`
                 INSERT INTO products (id, name, display_name, version, environment, description, state, subscriber_count, owner_team_id, 
                     last_deployed_commit_hash, last_deployed_at, detected_anomalies, management_mode, terraform_pipeline_url, github_url, updated_at)
-                VALUES ($1, $2, $3, '1.0.0', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
+                VALUES ($1, $2, $3, $15, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
                 ON CONFLICT (id) DO UPDATE SET
                     display_name = EXCLUDED.display_name,
                     state = EXCLUDED.state,
@@ -484,7 +491,9 @@ async function runWorker(envName: string) {
                     terraform_pipeline_url = EXCLUDED.terraform_pipeline_url,
                     github_url = EXCLUDED.github_url,
                     updated_at = NOW();
-            `, [p.id, p.id, p.name, AZURE_CONFIG.environment, p.description, p.state, p.subscriptionCount, dbOwnerId, gitInfo.hash, gitInfo.date, JSON.stringify(anomalies), derivedManagementMode, gitInfo.pipelineUrl, gitInfo.repoUrl]);
+                    github_url = EXCLUDED.github_url,
+                    updated_at = NOW();
+            `, [p.id, p.id, p.name, AZURE_CONFIG.environment, p.description, p.state, p.subscriptionCount, dbOwnerId, gitInfo.hash, gitInfo.date, JSON.stringify(anomalies), derivedManagementMode, gitInfo.pipelineUrl, gitInfo.repoUrl, extractedVersion]);
         }
 
         const capturedAppIds = new Set<string>();
