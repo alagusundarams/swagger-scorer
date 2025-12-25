@@ -195,27 +195,42 @@ async function fetchApimApis(token: string, azConfig: AzureConfig): Promise<Apim
     const apis = response.value;
 
     console.log(`⏳ [${azConfig.environment}] Fetching Policies for ${apis.length} APIs...`);
-    const results = await Promise.all(apis.map(async (a: any) => {
-        let policyXml = '';
-        try {
-            const polRes = await fetch(`https://management.azure.com${a.id}/policies/policy?api-version=2022-08-01&format=rawxml`, {
-                headers: { 'Authorization': `Bearer ${apiConfig.accessToken}` }
-            });
-            if (polRes.ok) {
-                const json = await polRes.json();
-                policyXml = json.properties?.value || '';
-            }
-        } catch (e) { /* ignore */ }
+    const results: ApimApi[] = [];
+    const BATCH_SIZE = 10;
 
-        return {
-            id: a.name,
-            name: a.properties.displayName,
-            path: a.properties.path,
-            protocols: a.properties.protocols,
-            serviceUrl: a.properties.serviceUrl,
-            policyXml: policyXml
-        };
-    }));
+    for (let i = 0; i < apis.length; i += BATCH_SIZE) {
+        const batch = apis.slice(i, i + BATCH_SIZE);
+        console.log(`  ⏳ [${azConfig.environment}] Fetching policies for batch ${i + 1}-${Math.min(i + BATCH_SIZE, apis.length)} of ${apis.length}...`);
+
+        const batchResults = await Promise.all(batch.map(async (a: any) => {
+            let policyXml = '';
+            try {
+                const polRes = await fetch(`https://management.azure.com${a.id}/policies/policy?api-version=2022-08-01&format=rawxml`, {
+                    headers: { 'Authorization': `Bearer ${apiConfig.accessToken}` }
+                });
+                if (polRes.ok) {
+                    const json = await polRes.json();
+                    policyXml = json.properties?.value || '';
+                } else if (polRes.status === 429) {
+                    console.warn(`  ⚠️ Rate Limit Hit for ${a.name}, pausing...`);
+                    await new Promise(r => setTimeout(r, 2000));
+                }
+            } catch (e) { /* ignore */ }
+
+            return {
+                id: a.name,
+                name: a.properties.displayName,
+                path: a.properties.path,
+                protocols: a.properties.protocols,
+                serviceUrl: a.properties.serviceUrl,
+                policyXml: policyXml
+            };
+        }));
+
+        results.push(...batchResults);
+        if (i + BATCH_SIZE < apis.length) await new Promise(r => setTimeout(r, 1000));
+    }
+
     return results;
 }
 
