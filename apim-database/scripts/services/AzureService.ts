@@ -366,7 +366,7 @@ export class AzureService {
     /**
      * Search for Code in ADO (TF match strategy)
      */
-    static async searchCode(org: string, searchTerm: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<CodeSearchResponse> {
+    static async searchCode(org: string, searchTerm: string, pat: string, baseUrl: string = 'https://dev.azure.com', filters?: any): Promise<CodeSearchResponse> {
         const cleanBaseUrl = baseUrl.replace(/\/$/, '');
         const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
 
@@ -383,9 +383,9 @@ export class AzureService {
         }
 
         const body = {
-            searchText: searchTerm,
+            searchText: searchTerm.includes(' ') ? `"${searchTerm}"` : searchTerm,
             $top: 20,
-            filters: {
+            filters: filters || {
                 FileExtension: ["tf", "tfvars"]
             }
         };
