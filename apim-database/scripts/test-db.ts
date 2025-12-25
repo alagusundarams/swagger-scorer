@@ -16,7 +16,7 @@ async function test() {
         console.log(`Found ${res.rowCount} products:`);
         console.table(res.rows);
     } catch (err) {
-        console.error('❌ Connection Failed:', err.message);
+        console.error('❌ Connection Failed:', (err as Error).message);
     } finally {
         await pool.end();
     }

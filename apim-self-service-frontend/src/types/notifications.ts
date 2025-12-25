@@ -9,7 +9,7 @@ export interface Notification {
     message: string;
     timestamp: string;
     read: boolean;
-    navigateTo: string; // URL to navigate to (e.g., "/approvals", "/products/abc")
+    navigateTo?: string; // URL to navigate to (e.g., "/approvals", "/products/abc")
 }
 
 export interface GlobalError {
