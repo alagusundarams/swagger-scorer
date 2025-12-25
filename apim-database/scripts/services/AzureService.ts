@@ -55,6 +55,26 @@ export interface PipelineRun {
     };
 }
 
+export interface CodeSearchResponse {
+    count: number;
+    results: {
+        fileName: string;
+        path: string;
+        repository: {
+            name: string;
+            id: string;
+            project: {
+                name: string;
+                id: string;
+            }
+        };
+        versions: {
+            branchName: string;
+            changeId: string;
+        }[];
+    }[];
+}
+
 export class AzureService {
     /**
      * Get Azure access token using Azure CLI
@@ -341,6 +361,55 @@ export class AzureService {
         }
 
         return results;
+    }
+
+    /**
+     * Search for Code in ADO (TF match strategy)
+     */
+    static async searchCode(org: string, searchTerm: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<CodeSearchResponse> {
+        const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+        const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+
+        // Determine Search URL
+        // DEV.AZURE.COM -> https://almsearch.dev.azure.com/{org}/_apis/search/codesearchresults
+        // VISUALSTUDIO.COM -> https://{org}.visualstudio.com/_apis/search/codesearchresults
+
+        let searchUrl = '';
+        if (cleanBaseUrl.includes('visualstudio.com')) {
+            searchUrl = `${cleanBaseUrl}/_apis/search/codesearchresults?api-version=7.1-preview.1`;
+        } else {
+            // Assume dev.azure.com pattern
+            searchUrl = `https://almsearch.dev.azure.com/${org}/_apis/search/codesearchresults?api-version=7.1-preview.1`;
+        }
+
+        const body = {
+            searchText: searchTerm,
+            $top: 20,
+            filters: {
+                FileExtension: ["tf", "tfvars"]
+            }
+        };
+
+        try {
+            const response = await fetch(searchUrl, {
+                method: 'POST',
+                headers: {
+                    'Authorization': authHeader,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (response.ok) {
+                return await response.json() as CodeSearchResponse;
+            } else {
+                const txt = await response.text();
+                console.warn(`⚠️ [ADO Search] Failed: ${response.status} ${response.statusText}`, txt);
+            }
+        } catch (err) {
+            console.error('❌ [ADO Search] Network Warning:', err);
+        }
+        return { count: 0, results: [] };
     }
 }
 

@@ -39,65 +39,75 @@ if (!devopsConfig || !devopsConfig.pat) {
 
 // --- MAIN ---
 async function runDebug() {
-    console.log(`\n🕵️‍♀️ DEBUG: Tracing Git Logic for Product: "${productNameArg}"`);
+    console.log(`\n🕵️‍♀️ DEBUG: Tracing Git Logic (Content Search) for Product: "${productNameArg}"`);
     console.log(`   Organization: ${devopsConfig.organization}`);
     console.log(`   Base URL:     ${devopsConfig.baseUrl || 'https://dev.azure.com'}`);
 
-    // 1. Fetch All Repos
-    console.log(`\n➡️  Step 1: Fetching ALL Repos from Org...`);
-    let repos: any[] = [];
-    try {
-        const projects = await AzureService.fetchADOProjects(devopsConfig.organization, devopsConfig.pat, devopsConfig.baseUrl);
-        console.log(`   Found ${projects.length} Projects.`);
+    // 1. Content Search
+    console.log(`\n➡️  Step 1: Searching Code for "${productNameArg}" in .tf/.tfvars files...`);
+    let matchedRepo = null;
+    let repoUrl = '';
 
-        repos = await AzureService.fetchADOReposAcrossProjects(devopsConfig.organization, projects, devopsConfig.pat, devopsConfig.baseUrl);
-        console.log(`   ✅ Total Repos Discovered: ${repos.length}`);
+    try {
+        const searchResp = await AzureService.searchCode(
+            devopsConfig.organization,
+            productNameArg!,
+            devopsConfig.pat,
+            devopsConfig.baseUrl
+        );
+
+        console.log(`   Found ${searchResp.count} total hits.`);
+
+        if (searchResp.count === 0) {
+            console.error("   ❌ [Search] No files found containing the product name.");
+            return;
+        }
+
+        // Group by Repository
+        const repoMap = new Map<string, any>();
+        searchResp.results.forEach(r => {
+            if (!repoMap.has(r.repository.name)) {
+                repoMap.set(r.repository.name, {
+                    id: r.repository.id,
+                    name: r.repository.name,
+                    project: r.repository.project.name,
+                    files: []
+                });
+            }
+            repoMap.get(r.repository.name).files.push(`${r.path} (${r.fileName})`);
+        });
+
+        const uniqueRepos = Array.from(repoMap.values());
+        console.log(`   Found matches in ${uniqueRepos.length} unique repositories:`);
+        uniqueRepos.forEach(r => {
+            console.log(`     - [${r.name}] (Project: ${r.project})`);
+            r.files.slice(0, 3).forEach((f: string) => console.log(`         Files: ${f}`));
+        });
+
+        // GAP LOGIC: Check for duplicates or exclude GRP?
+        const filteredRepos = uniqueRepos.filter(r => !r.name.toLowerCase().includes('grp'));
+
+        if (filteredRepos.length === 0) {
+            console.warn("   ⚠️ Matches found, but all were filtered out (e.g., GRP repos).");
+            return;
+        } else if (filteredRepos.length > 1) {
+            console.warn("   ⚠️ CONFLICT: Product found in multiple valid repositories. Checking Gap Sheet logic...");
+            console.log("   Arbitrarily picking the first one for debug purposes.");
+        }
+
+        matchedRepo = filteredRepos[0];
+        console.log(`   ✅ Selected Target Repo: ${matchedRepo.name} (ID: ${matchedRepo.id})`);
+
     } catch (e) {
-        console.error("   ❌ Failed to fetch repos. check PAT/Permissions.", e);
+        console.error("   ❌ Failed to search ADO.", e);
         process.exit(1);
     }
 
-    // 2. Exact Match Logic
-    console.log(`\n➡️  Step 2: Matching Product...`);
-    let matchedRepo = null;
-
-    // A. Tag Match
-    if (explicitTagArg) {
-        // Mocking the tag lookup logic
-        const tagName = explicitTagArg.replace('repo:', '');
-        console.log(`   [Check] Provided Tag: "repo:${tagName}"`);
-        matchedRepo = repos.find(r => r.name.toLowerCase() === tagName.toLowerCase());
-        if (matchedRepo) console.log(`   🎯 MATCHED via TAG! -> ${matchedRepo.name} (ID: ${matchedRepo.id})`);
-        else console.log(`   ⚠️ Tag provided but NO repo matches name "${tagName}".`);
-    } else {
-        console.log(`   [Check] No --tag arg provided. Skipping tag lookup.`);
-    }
-
-    // B. Name Match
-    if (!matchedRepo) {
-        console.log(`   [Check] Fuzzy Name Match against "${productNameArg}"...`);
-        // Debug candidates
-        const candidates = repos.filter(r => r.name.toLowerCase().includes(productNameArg!.toLowerCase()) || productNameArg!.toLowerCase().includes(r.name.toLowerCase()));
-        if (candidates.length > 0) {
-            console.log(`   ℹ️  Potential partial matches found: ${candidates.map(c => c.name).join(', ')}`);
-        }
-
-        matchedRepo = repos.find(r => r.name.toLowerCase() === productNameArg!.toLowerCase());
-        if (matchedRepo) console.log(`   🎯 MATCHED via NAME! -> ${matchedRepo.name} (ID: ${matchedRepo.id})`);
-        else console.log(`   ❌ No Exact Name Match found.`);
-    }
-
-    if (!matchedRepo) {
-        console.error("\n⛔ STOP: No Repository matched. Logic ends here.");
-        console.log("   Suggestion: Verify the Product Name matches the Repo matched exactly, or use a 'repo:<name>' tag.");
-        return;
-    }
-
-    // 3. Fetch Pipelines
-    console.log(`\n➡️  Step 3: Fetching Pipelines for Repo: ${matchedRepo.name}`);
+    // 2. Fetch Pipelines
+    console.log(`\n➡️  Step 2: Fetching Pipelines for Repo: ${matchedRepo.name}`);
     const pipelines = await AzureService.fetchADOPipelines(
         devopsConfig.organization,
-        matchedRepo.project.name,
+        matchedRepo.project,
         matchedRepo.id,
         devopsConfig.pat,
         devopsConfig.baseUrl
@@ -111,15 +121,15 @@ async function runDebug() {
         return;
     }
 
-    // 4. Determine "Best" Pipeline
+    // 3. Determine "Best" Pipeline
     const bestPipeline = pipelines.find(p => p.name.includes(matchedRepo.name) || p.name.toLowerCase().includes('ci')) || pipelines[0];
-    console.log(`\n➡️  Step 4: Selecting Target Pipeline -> "${bestPipeline.name}" (ID: ${bestPipeline.id})`);
+    console.log(`\n➡️  Step 3: Selecting Target Pipeline -> "${bestPipeline.name}" (ID: ${bestPipeline.id})`);
 
-    // 5. Fetch Runs
+    // 4. Fetch Runs
     console.log(`   Fetching Runs...`);
     const runs = await AzureService.fetchPipelineRuns(
         devopsConfig.organization,
-        matchedRepo.project.name,
+        matchedRepo.project,
         bestPipeline.id,
         devopsConfig.pat,
         devopsConfig.baseUrl

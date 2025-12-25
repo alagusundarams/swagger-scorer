@@ -139,10 +139,8 @@ interface SyncReport {
             name: string;
             reason: string;
         }>;
-        unavailableResources: Array<{
-            type: string;
-            error: string;
-        }>;
+        unavailableResources: Array<{ type: string, error: string }>;
+        gitOpsDrift: Array<{ productId: string, mode: string, message: string }>;
     };
 }
 
@@ -281,50 +279,92 @@ async function initAdoCache(devopsConfig: any) {
     }
 }
 
-async function resolveGitMetadata(productName: string, productTags: Record<string, string>, devopsConfig: any): Promise<GitMetadata> {
+async function resolveGitMetadata(productName: string, productTags: Record<string, string>, devopsConfig: any, syncReport: SyncReport): Promise<GitMetadata> {
     const fallback: GitMetadata = { hash: '', date: null, pipelineUrl: '', repoUrl: '' };
-    if (!devopsConfig || !ADO_INIT_DONE) return fallback;
+    if (!devopsConfig) return fallback;
 
-    // 1. Find Repo
+    // 1. Content Search Logic (Per user request)
+    // We search for the Product Name inside .tf / .tfvars files
     let matchedRepo = null;
+    let repoUrl = '';
 
-    // A. Explicit Tag Match (repo:my-repo-name)
-    // Note: tags are like "version:v1", "repo:accounting-api"
-    const explicitRepoName = Object.entries(productTags)
-        .find(([k]) => k.toLowerCase() === 'repo')?.[1];
+    try {
+        const searchResp = await AzureService.searchCode(
+            devopsConfig.organization,
+            productName,
+            devopsConfig.pat,
+            devopsConfig.baseUrl
+        );
 
-    if (explicitRepoName) {
-        matchedRepo = GLOBAL_ADO_REPOS.find(r => r.name.toLowerCase() === explicitRepoName.toLowerCase());
-        if (matchedRepo) console.log(`    🎯 [Git] Matched via Tag (repo:${explicitRepoName}) -> ${matchedRepo.name}`);
-        else console.warn(`    ⚠️ [Git] Tag 'repo:${explicitRepoName}' found, but no ADO repo matches that name.`);
-    }
+        if (searchResp.count === 0) {
+            console.log(`    ⚠️ [Git] No files found containing product name: "${productName}"`);
+            return fallback;
+        }
 
-    // B. Fuzzy Name Match
-    if (!matchedRepo) {
-        matchedRepo = GLOBAL_ADO_REPOS.find(r => r.name.toLowerCase() === productName.toLowerCase());
-        if (matchedRepo) console.log(`    🎯 [Git] Matched via Name (${productName}) -> ${matchedRepo.name}`);
-    }
+        // Group by Repository to detect ambiguity
+        const repoMap = new Map<string, any>();
+        searchResp.results.forEach(r => {
+            if (!repoMap.has(r.repository.name)) {
+                repoMap.set(r.repository.name, {
+                    id: r.repository.id,
+                    name: r.repository.name,
+                    project: r.repository.project.name,
+                    remoteUrl: r.repository.name // Placeholder, we assume AzureService returns enough or we fetch details later if needed
+                });
+            }
+        });
 
-    if (!matchedRepo) {
-        console.log(`    ⚠️ [Git] No Repo matched for Product: ${productName} (Tried Tag: ${explicitRepoName || 'None'}, Name Match)`);
+        const uniqueRepos = Array.from(repoMap.values());
+
+        // Filter out "GRP" repos (common shared infra) as requested
+        const filteredRepos = uniqueRepos.filter(r => !r.name.toLowerCase().includes('grp'));
+
+        if (filteredRepos.length === 0) {
+            console.log(`    ⚠️ [Git] Matches found (${uniqueRepos.length}), but all were filtered (GRP).`);
+            return fallback;
+        } else if (filteredRepos.length > 1) {
+            console.warn(`    ⚠️ [Git] CONFLICT: Product "${productName}" found in ${filteredRepos.length} repos: ${filteredRepos.map(r => r.name).join(', ')}`);
+            syncReport.gaps.gitOpsDrift.push({
+                productId: productName,
+                mode: 'AMBIGUOUS_REPO',
+                message: `Found in multiple repos: ${filteredRepos.map(r => r.name).join(', ')}`
+            });
+            // We cannot safely proceed if we don't know which one.
+            // Current GAP LOGIC says: log it and return.
+            return fallback;
+        }
+
+        matchedRepo = filteredRepos[0];
+        // repoUrl = `https://dev.azure.com/${devopsConfig.organization}/${matchedRepo.project}/_git/${matchedRepo.name}`;
+        // Best effort URL construction or need to fetch full repo details. 
+        // Logic: if we have full object from previous cache we could use it, but here we don't have it easily.
+        // We will construct standard URL.
+        const cleanBase = (devopsConfig.baseUrl || 'https://dev.azure.com').replace(/\/$/, '');
+        if (cleanBase.includes('visualstudio.com')) {
+            repoUrl = `${cleanBase}/${matchedRepo.project}/_git/${matchedRepo.name}`;
+        } else {
+            repoUrl = `${cleanBase}/${devopsConfig.organization}/${matchedRepo.project}/_git/${matchedRepo.name}`;
+        }
+
+        console.log(`    🎯 [Git] Matched via Search -> ${matchedRepo.name} (Project: ${matchedRepo.project})`);
+
+    } catch (e) {
+        console.error('    ❌ [Git] Search failed:', e);
         return fallback;
     }
 
+    // 2. Fetch Pipelines for this Repo
     try {
-        const repoUrl = matchedRepo.webUrl || matchedRepo.remoteUrl;
-
-        // 2. Fetch Pipelines for this Repo
         const pipelines = await AzureService.fetchADOPipelines(
             devopsConfig.organization,
-            matchedRepo.project.name,
+            matchedRepo.project,
             matchedRepo.id,
             devopsConfig.pat,
             devopsConfig.baseUrl
         );
 
-        console.log(`    🔎 [Git] Repo '${matchedRepo.name}' has ${pipelines.length} pipelines.`);
-
         if (pipelines.length === 0) {
+            console.log(`    ⚠️ [Git] Repo matched but has 0 pipelines.`);
             return { ...fallback, repoUrl };
         }
 
@@ -334,7 +374,7 @@ async function resolveGitMetadata(productName: string, productTags: Record<strin
 
         const runs = await AzureService.fetchPipelineRuns(
             devopsConfig.organization,
-            matchedRepo.project.name,
+            matchedRepo.project,
             bestPipeline.id,
             devopsConfig.pat,
             devopsConfig.baseUrl
@@ -357,7 +397,7 @@ async function resolveGitMetadata(productName: string, productTags: Record<strin
         return { ...fallback, repoUrl };
 
     } catch (error) {
-        console.warn(`    ❌ [Git] Error resolving details for ${productName}:`, error);
+        console.warn(`    ❌ [Git] Error resolving pipeline details for ${productName}:`, error);
         return fallback;
     }
 }
@@ -433,7 +473,7 @@ async function runWorker(envName: string) {
         timestamp: new Date().toISOString(),
         environment: envName,
         summary: { productsFound: 0, apisFound: 0, subsFound: 0, namedValuesFound: 0, orphanedSubsSkipped: 0 },
-        gaps: { orphanedSubscriptions: [], failedApis: [], unavailableResources: [] }
+        gaps: { orphanedSubscriptions: [], failedApis: [], unavailableResources: [], gitOpsDrift: [] }
     };
 
     const DB_CONFIG = {
@@ -546,7 +586,7 @@ async function runWorker(envName: string) {
             const dbOwnerId = inferredTeamId === 'orphaned' ? null : inferredTeamId;
 
             // [REAL GIT INTEGRATION]
-            const gitInfo = await resolveGitMetadata(p.name, tags, config.devops);
+            const gitInfo = await resolveGitMetadata(p.name, tags, config.devops, syncReport);
             const anomalies: string[] = [];
 
             // If hash is missing, it implies manual creation (drift)
