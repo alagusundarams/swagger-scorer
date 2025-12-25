@@ -492,8 +492,6 @@ async function runWorker(envName: string) {
                     terraform_pipeline_url = EXCLUDED.terraform_pipeline_url,
                     github_url = EXCLUDED.github_url,
                     updated_at = NOW();
-                    github_url = EXCLUDED.github_url,
-                    updated_at = NOW();
             `, [p.id, p.id, p.name, AZURE_CONFIG.environment, p.description, p.state, p.subscriptionCount, dbOwnerId, gitInfo.hash, gitInfo.date, JSON.stringify(anomalies), derivedManagementMode, gitInfo.pipelineUrl, gitInfo.repoUrl, extractedVersion]);
         }
 
