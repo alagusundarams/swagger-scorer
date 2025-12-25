@@ -213,8 +213,22 @@ async function fetchNamedValues(token: string, azConfig: AzureConfig): Promise<a
     }));
 }
 
-async function fetchGitInfo(productId: string): Promise<{ hash: string, date: string }> {
-    return { hash: 'manual-or-git-linked', date: new Date().toISOString() };
+interface GitMetadata {
+    hash: string;
+    date: string;
+    pipelineUrl: string;
+    repoUrl: string;
+}
+
+async function fetchGitInfo(productId: string): Promise<GitMetadata> {
+    // START: Mock Logic (Replace with real AzureService lookup if available)
+    return {
+        hash: 'a1b2c3d4',
+        date: new Date().toISOString(),
+        pipelineUrl: 'https://dev.azure.com/my-org/my-project/_build?definitionId=123',
+        repoUrl: 'https://dev.azure.com/my-org/my-project/_git/my-repo'
+    };
+    // END: Mock Logic
 }
 
 async function fetchApimApis(token: string, azConfig: AzureConfig): Promise<ApimApi[]> {
@@ -413,8 +427,8 @@ async function runWorker(envName: string) {
 
             await pool.query(`
                 INSERT INTO products (id, name, display_name, version, environment, description, state, subscriber_count, owner_team_id, 
-                    last_deployed_commit_hash, last_deployed_at, detected_anomalies, management_mode, updated_at)
-                VALUES ($1, $2, $3, '1.0.0', $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+                    last_deployed_commit_hash, last_deployed_at, detected_anomalies, management_mode, terraform_pipeline_url, github_url, updated_at)
+                VALUES ($1, $2, $3, '1.0.0', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
                 ON CONFLICT (id) DO UPDATE SET
                     display_name = EXCLUDED.display_name,
                     state = EXCLUDED.state,
@@ -423,8 +437,10 @@ async function runWorker(envName: string) {
                     last_deployed_commit_hash = EXCLUDED.last_deployed_commit_hash,
                     detected_anomalies = EXCLUDED.detected_anomalies,
                     management_mode = EXCLUDED.management_mode,
+                    terraform_pipeline_url = EXCLUDED.terraform_pipeline_url,
+                    github_url = EXCLUDED.github_url,
                     updated_at = NOW();
-            `, [p.id, p.id, p.name, AZURE_CONFIG.environment, p.description, p.state, p.subscriptionCount, dbOwnerId, gitInfo.hash, gitInfo.date, JSON.stringify(anomalies), derivedManagementMode]);
+            `, [p.id, p.id, p.name, AZURE_CONFIG.environment, p.description, p.state, p.subscriptionCount, dbOwnerId, gitInfo.hash, gitInfo.date, JSON.stringify(anomalies), derivedManagementMode, gitInfo.pipelineUrl, gitInfo.repoUrl]);
         }
 
         const capturedAppIds = new Set<string>();
