@@ -483,6 +483,7 @@ async function runWorker(envName: string) {
                 ON CONFLICT (id) DO UPDATE SET
                     display_name = EXCLUDED.display_name,
                     state = EXCLUDED.state,
+                    environment = EXCLUDED.environment,
                     subscriber_count = EXCLUDED.subscriber_count,
                     owner_team_id = EXCLUDED.owner_team_id,
                     last_deployed_commit_hash = EXCLUDED.last_deployed_commit_hash,
