@@ -17,7 +17,7 @@
  */
 
 import { Pool } from 'pg';
-import { readFileSync, existsSync, appendFileSync, mkdirSync } from 'fs';
+import { readFileSync, existsSync, appendFileSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { fork } from 'child_process';
 import { AzureService, AppRegistration } from './services/AzureService.js';
@@ -116,6 +116,34 @@ interface AzureConfig {
     resourceGroup: string;
     serviceName: string;
     environment: string;
+}
+
+interface SyncReport {
+    timestamp: string;
+    environment: string;
+    summary: {
+        productsFound: number;
+        apisFound: number;
+        subsFound: number;
+        namedValuesFound: number;
+        orphanedSubsSkipped: number;
+    };
+    gaps: {
+        orphanedSubscriptions: Array<{
+            id: string;
+            name: string;
+            targetProduct: string;
+            reason: string;
+        }>;
+        failedApis: Array<{
+            name: string;
+            reason: string;
+        }>;
+        unavailableResources: Array<{
+            type: string;
+            error: string;
+        }>;
+    };
 }
 
 // --- HELPER FUNCTIONS (Refactored to accept Config) ---
@@ -250,6 +278,13 @@ async function runWorker(envName: string) {
         environment: envName
     };
 
+    const syncReport: SyncReport = {
+        timestamp: new Date().toISOString(),
+        environment: envName,
+        summary: { productsFound: 0, apisFound: 0, subsFound: 0, namedValuesFound: 0, orphanedSubsSkipped: 0 },
+        gaps: { orphanedSubscriptions: [], failedApis: [], unavailableResources: [] }
+    };
+
     const DB_CONFIG = {
         connectionString: targetEnvConfig.databaseUrl || config.database?.url || process.env.DATABASE_URL
     };
@@ -309,6 +344,8 @@ async function runWorker(envName: string) {
         const apimProducts = await fetchApimProducts(token, AZURE_CONFIG);
         const apimApis = await fetchApimApis(token, AZURE_CONFIG);
         console.log(`📊 Found ${apimProducts.length} Products, ${apimApis.length} APIs`);
+        syncReport.summary.productsFound = apimProducts.length;
+        syncReport.summary.apisFound = apimApis.length;
 
         // Build Known Product ID Set for FK integrity
         const knownProductIds = new Set<string>(apimProducts.map(p => p.id));
@@ -318,16 +355,20 @@ async function runWorker(envName: string) {
         try {
             apimSubs = await fetchApimSubscriptions(token, AZURE_CONFIG);
             console.log(`🔑 Found ${apimSubs.length} Subscriptions`);
+            syncReport.summary.subsFound = apimSubs.length;
         } catch (e) {
             console.warn('⚠️ Could not fetch Subscriptions:', e);
+            syncReport.gaps.unavailableResources.push({ type: 'Subscriptions', error: String(e) });
         }
 
         let namedValues: any[] = [];
         try {
             namedValues = await fetchNamedValues(token, AZURE_CONFIG);
             console.log(`🌍 Found ${namedValues.length} Named Values`);
+            syncReport.summary.namedValuesFound = namedValues.length;
         } catch (e) {
             console.warn('⚠️ Could not fetch Named Values:', e);
+            syncReport.gaps.unavailableResources.push({ type: 'NamedValues', error: String(e) });
         }
 
         const nvMap = new Map<string, any>(namedValues.map(n => [n.name, n]));
@@ -398,13 +439,17 @@ async function runWorker(envName: string) {
 
         for (const s of apimSubs) {
             if (!s.scope || !s.scope.toLowerCase().includes('/products/')) {
-                console.warn(`⚠️ Skipping Non-Product Subscription: ${s.name} (Scope: ${s.scope})`);
+                // console.warn(`⚠️ Skipping Non-Product Subscription: ${s.name} (Scope: ${s.scope})`);
+                syncReport.gaps.orphanedSubscriptions.push({ id: s.id, name: s.name, targetProduct: 'N/A', reason: `Non-Product Scope: ${s.scope}` });
+                syncReport.summary.orphanedSubsSkipped++;
                 continue;
             }
 
             // Referential Integrity Check
             if (!knownProductIds.has(s.productId)) {
-                console.warn(`⚠️ Skipping Orphaned Subscription: ${s.name} (Target Product '${s.productId}' not found in sync)`);
+                // console.warn(`⚠️ Skipping Orphaned Subscription: ${s.name} (Target Product '${s.productId}' not found in sync)`);
+                syncReport.gaps.orphanedSubscriptions.push({ id: s.id, name: s.name, targetProduct: s.productId, reason: 'Target Product not found in APIM or DB' });
+                syncReport.summary.orphanedSubsSkipped++;
                 continue;
             }
 
@@ -483,5 +528,8 @@ async function runWorker(envName: string) {
         process.exit(1);
     } finally {
         await pool.end();
+        const reportPath = join(logDir, `report_${envName}_${timestamp}.json`);
+        writeFileSync(reportPath, JSON.stringify(syncReport, null, 2));
+        console.log(`📊 Sync Report written to: ${reportPath}`);
     }
 }
