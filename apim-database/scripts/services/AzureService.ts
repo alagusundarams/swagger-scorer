@@ -140,7 +140,12 @@ export class AzureService {
         const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
         // Remove trailing slash if present
         const cleanBaseUrl = baseUrl.replace(/\/$/, '');
-        const url = `${cleanBaseUrl}/${org}/_apis/projects?api-version=7.1-preview.4`;
+        let url = `${cleanBaseUrl}/${org}/_apis/projects?api-version=7.1-preview.4`;
+
+        // Handle Legacy visualstudio.com
+        if (cleanBaseUrl.includes('visualstudio.com')) {
+            url = `${cleanBaseUrl}/_apis/projects?api-version=7.1-preview.4`;
+        }
 
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
@@ -166,7 +171,10 @@ export class AzureService {
         // Fetch in parallel for speed
         const projectResults = await Promise.all(projects.map(async (project) => {
             try {
-                const url = `${cleanBaseUrl}/${org}/${project.name}/_apis/git/repositories?api-version=7.1-preview.1`;
+                let url = `${cleanBaseUrl}/${org}/${project.name}/_apis/git/repositories?api-version=7.1-preview.1`;
+                if (cleanBaseUrl.includes('visualstudio.com')) {
+                    url = `${cleanBaseUrl}/${project.name}/_apis/git/repositories?api-version=7.1-preview.1`;
+                }
                 const response = await fetch(url, { headers: { 'Authorization': authHeader } });
 
                 if (response.ok) {
@@ -188,7 +196,10 @@ export class AzureService {
     static async fetchADOPipelines(org: string, project: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADOPipeline[]> {
         const cleanBaseUrl = baseUrl.replace(/\/$/, '');
         const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-        const url = `${cleanBaseUrl}/${org}/${project}/_apis/pipelines?api-version=7.1-preview.1&repositoryId=${repoId}&repositoryType=azureRepo`;
+        let url = `${cleanBaseUrl}/${org}/${project}/_apis/pipelines?api-version=7.1-preview.1&repositoryId=${repoId}&repositoryType=azureRepo`;
+        if (cleanBaseUrl.includes('visualstudio.com')) {
+            url = `${cleanBaseUrl}/${project}/_apis/pipelines?api-version=7.1-preview.1&repositoryId=${repoId}&repositoryType=azureRepo`;
+        }
 
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
@@ -208,7 +219,10 @@ export class AzureService {
     static async fetchPipelineRuns(org: string, project: string, pipelineId: number, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<PipelineRun[]> {
         const cleanBaseUrl = baseUrl.replace(/\/$/, '');
         const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-        const url = `${cleanBaseUrl}/${org}/${project}/_apis/pipelines/${pipelineId}/runs?api-version=7.1-preview.1`;
+        let url = `${cleanBaseUrl}/${org}/${project}/_apis/pipelines/${pipelineId}/runs?api-version=7.1-preview.1`;
+        if (cleanBaseUrl.includes('visualstudio.com')) {
+            url = `${cleanBaseUrl}/${project}/_apis/pipelines/${pipelineId}/runs?api-version=7.1-preview.1`;
+        }
 
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });

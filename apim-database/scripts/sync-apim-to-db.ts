@@ -264,15 +264,87 @@ interface GitMetadata {
     repoUrl: string;
 }
 
-async function fetchGitInfo(productId: string): Promise<GitMetadata> {
-    // START: Mock Logic (Replace with real AzureService lookup if available)
-    return {
-        hash: 'a1b2c3d4',
-        date: new Date().toISOString(),
-        pipelineUrl: 'https://dev.azure.com/my-org/my-project/_build?definitionId=123',
-        repoUrl: 'https://dev.azure.com/my-org/my-project/_git/my-repo'
-    };
-    // END: Mock Logic
+// Cache for Repos to avoid re-fetching per product
+let GLOBAL_ADO_REPOS: any[] = [];
+let ADO_INIT_DONE = false;
+
+async function initAdoCache(devopsConfig: any) {
+    if (ADO_INIT_DONE || !devopsConfig) return;
+    try {
+        console.log('🏗️ [ADO] Initializing Git Repository Cache...');
+        const projects = await AzureService.fetchADOProjects(devopsConfig.organization, devopsConfig.pat, devopsConfig.baseUrl);
+        GLOBAL_ADO_REPOS = await AzureService.fetchADOReposAcrossProjects(devopsConfig.organization, projects, devopsConfig.pat, devopsConfig.baseUrl);
+        console.log(`✅ [ADO] Cached ${GLOBAL_ADO_REPOS.length} Repositories.`);
+        ADO_INIT_DONE = true;
+    } catch (e) {
+        console.error('❌ [ADO] Failed to initialize cache:', e);
+    }
+}
+
+async function resolveGitMetadata(productName: string, productTags: Record<string, string>, devopsConfig: any): Promise<GitMetadata> {
+    const fallback = { hash: '', date: '', pipelineUrl: '', repoUrl: '' };
+    if (!devopsConfig || !ADO_INIT_DONE) return fallback;
+
+    // 1. Find Repo
+    let matchedRepo = null;
+
+    // A. Explicit Tag Match (repo:my-repo-name)
+    // Note: tags are like "version:v1", "repo:accounting-api"
+    const explicitRepoName = Object.entries(productTags)
+        .find(([k]) => k.toLowerCase() === 'repo')?.[1];
+
+    if (explicitRepoName) {
+        matchedRepo = GLOBAL_ADO_REPOS.find(r => r.name.toLowerCase() === explicitRepoName.toLowerCase());
+    }
+
+    // B. Fuzzy Name Match
+    if (!matchedRepo) {
+        matchedRepo = GLOBAL_ADO_REPOS.find(r => r.name.toLowerCase() === productName.toLowerCase());
+    }
+
+    if (!matchedRepo) return fallback;
+
+    try {
+        const repoUrl = matchedRepo.webUrl || matchedRepo.remoteUrl;
+
+        // 2. Fetch Pipelines for this Repo
+        const pipelines = await AzureService.fetchADOPipelines(
+            devopsConfig.organization,
+            matchedRepo.project.name,
+            matchedRepo.id,
+            devopsConfig.pat,
+            devopsConfig.baseUrl
+        );
+
+        if (pipelines.length === 0) {
+            return { ...fallback, repoUrl };
+        }
+
+        // 3. Get Latest Run of the first pipeline (usually CI/CD)
+        const runs = await AzureService.fetchPipelineRuns(
+            devopsConfig.organization,
+            matchedRepo.project.name,
+            pipelines[0].id,
+            devopsConfig.pat,
+            devopsConfig.baseUrl
+        );
+
+        if (runs.length > 0) {
+            const latest = runs[0];
+            return {
+                hash: 'sourceVersion' in latest ? (latest as any).sourceVersion : '', // sourceVersion often holds commit hash
+                date: latest.finishedDate || latest.createdDate,
+                pipelineUrl: (latest as any).web?.href || (latest as any)._links?.web?.href, // Link to the run
+                repoUrl
+            };
+        }
+
+        return { ...fallback, repoUrl };
+
+    } catch (error) {
+        console.warn(`⚠️ [ADO] Error resolving details for ${productName}:`, error);
+        return fallback;
+    }
 }
 
 function extractVersion(name: string): string {
@@ -385,6 +457,9 @@ async function runWorker(envName: string) {
         const apimConfig = getApimConfig(token, AZURE_CONFIG);
         console.log('✅ Azure Auth Token Acquired');
 
+        // [ADO] Init Cache of all Repos
+        await initAdoCache(config.devops);
+
         await pool.query(`
             INSERT INTO products (id, name, display_name, version, environment, state, owner_team_id, updated_at)
             VALUES ('unknown-product', 'unknown-product', 'Unknown Product', '0.0.0', $1, 'notPublished', NULL, NOW())
@@ -455,7 +530,8 @@ async function runWorker(envName: string) {
             // DB Value: NULL if orphaned, otherwise the ID
             const dbOwnerId = inferredTeamId === 'orphaned' ? null : inferredTeamId;
 
-            const gitInfo = await fetchGitInfo(p.id);
+            // [REAL GIT INTEGRATION]
+            const gitInfo = await resolveGitMetadata(p.name, tags, config.devops);
             const anomalies: string[] = [];
 
             // If hash is missing, it implies manual creation (drift)
