@@ -295,14 +295,20 @@ async function resolveGitMetadata(productName: string, productTags: Record<strin
 
     if (explicitRepoName) {
         matchedRepo = GLOBAL_ADO_REPOS.find(r => r.name.toLowerCase() === explicitRepoName.toLowerCase());
+        if (matchedRepo) console.log(`    🎯 [Git] Matched via Tag (repo:${explicitRepoName}) -> ${matchedRepo.name}`);
+        else console.warn(`    ⚠️ [Git] Tag 'repo:${explicitRepoName}' found, but no ADO repo matches that name.`);
     }
 
     // B. Fuzzy Name Match
     if (!matchedRepo) {
         matchedRepo = GLOBAL_ADO_REPOS.find(r => r.name.toLowerCase() === productName.toLowerCase());
+        if (matchedRepo) console.log(`    🎯 [Git] Matched via Name (${productName}) -> ${matchedRepo.name}`);
     }
 
-    if (!matchedRepo) return fallback;
+    if (!matchedRepo) {
+        console.log(`    ⚠️ [Git] No Repo matched for Product: ${productName} (Tried Tag: ${explicitRepoName || 'None'}, Name Match)`);
+        return fallback;
+    }
 
     try {
         const repoUrl = matchedRepo.webUrl || matchedRepo.remoteUrl;
@@ -316,33 +322,42 @@ async function resolveGitMetadata(productName: string, productTags: Record<strin
             devopsConfig.baseUrl
         );
 
+        console.log(`    🔎 [Git] Repo '${matchedRepo.name}' has ${pipelines.length} pipelines.`);
+
         if (pipelines.length === 0) {
             return { ...fallback, repoUrl };
         }
 
         // 3. Get Latest Run of the first pipeline (usually CI/CD)
+        // Optimization: Try to find a pipeline named after the repo or 'CI'
+        const bestPipeline = pipelines.find(p => p.name.includes(matchedRepo.name) || p.name.toLowerCase().includes('ci')) || pipelines[0];
+
         const runs = await AzureService.fetchPipelineRuns(
             devopsConfig.organization,
             matchedRepo.project.name,
-            pipelines[0].id,
+            bestPipeline.id,
             devopsConfig.pat,
             devopsConfig.baseUrl
         );
 
         if (runs.length > 0) {
             const latest = runs[0];
+            const hash = 'sourceVersion' in latest ? (latest as any).sourceVersion : '';
+            console.log(`    ✅ [Git] Metadata Found: Hash=${hash.substring(0, 7)}, Date=${latest.finishedDate}`);
             return {
-                hash: 'sourceVersion' in latest ? (latest as any).sourceVersion : '', // sourceVersion often holds commit hash
+                hash,
                 date: latest.finishedDate || latest.createdDate,
-                pipelineUrl: (latest as any).web?.href || (latest as any)._links?.web?.href, // Link to the run
+                pipelineUrl: (latest as any).web?.href || (latest as any)._links?.web?.href,
                 repoUrl
             };
+        } else {
+            console.log(`    ⚠️ [Git] Pipeline '${bestPipeline.name}' found but has 0 runs.`);
         }
 
         return { ...fallback, repoUrl };
 
     } catch (error) {
-        console.warn(`⚠️ [ADO] Error resolving details for ${productName}:`, error);
+        console.warn(`    ❌ [Git] Error resolving details for ${productName}:`, error);
         return fallback;
     }
 }
