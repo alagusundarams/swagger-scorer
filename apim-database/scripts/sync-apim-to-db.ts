@@ -166,10 +166,28 @@ function getApimConfig(token: string, azConfig: AzureConfig): any {
 function extractClientIdsFromPolicy(xml: string): string[] {
     if (!xml) return [];
     const ids = new Set<string>();
+
+    // 1. Named Values: {{my-client-id}}
     const nvMatches = xml.match(/{{([^}]+)}}/g);
     if (nvMatches) nvMatches.forEach(m => ids.add(m.replace(/[{}]/g, '')));
-    const guidMatches = xml.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi);
-    if (guidMatches) guidMatches.forEach(m => ids.add(m));
+
+    // 2. Raw GUIDs (Stricter boundary check)
+    // Matches standard UUID/GUID pattern
+    const guidMatches = xml.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/gi);
+    if (guidMatches) guidMatches.forEach(m => ids.add(m.toLowerCase()));
+
+    // 3. validate-jwt audience="GUID"
+    const audMatches = xml.match(/audience=["']([^"']+)["']/g);
+    if (audMatches) {
+        audMatches.forEach(m => {
+            const val = m.split(/["']/)[1];
+            // Only add if it looks like a GUID or Named Value, otherwise it might be a URL
+            if (val.includes('{{') || /^[0-9a-f]{8}-/i.test(val)) {
+                ids.add(val.replace(/[{}]/g, '').toLowerCase());
+            }
+        });
+    }
+
     return Array.from(ids);
 }
 
