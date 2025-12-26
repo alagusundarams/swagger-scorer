@@ -134,7 +134,13 @@ async function runDebug() {
     console.log(`   📡 Fetching from: ${pipelineUrl}`);
 
     let pipelines = await AzureService.fetchADOPipelines(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl);
-    console.log(`   Count via Repo ID filter: ${pipelines.length}`);
+    console.log(`   Count via Pipelines API (repo filter): ${pipelines.length}`);
+
+    if (pipelines.length === 0) {
+        console.log(`   🔎 No Pipelines found. Attempting Build Definitions API (fallback)...`);
+        pipelines = await AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl);
+        console.log(`   Count via Build Definitions API: ${pipelines.length}`);
+    }
 
     if (pipelines.length === 0) {
         console.log(`   ⚠️  No pipelines found via repo filter. Attempting to fetch ALL pipelines in project to find match...`);
