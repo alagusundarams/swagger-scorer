@@ -1,3 +1,10 @@
+/**
+ * @fileoverview DEBUG: HYBRID SURGICAL HASH DISCOVERY
+ * 
+ * 🛡️ SAFE_MODE: This is a read-only diagnostic tool. It will NOT mutate the database.
+ * Use this to verify logic for a single product before running the full sync.
+ */
+
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { AzureService } from '../services/AzureService.js';

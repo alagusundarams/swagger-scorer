@@ -71,8 +71,13 @@ async function main() {
     // 3. Discovery Loop
     const results: ADOMetadata[] = [];
     const sanitize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
     for (const prod of inventory) {
+        // --- SAFETY THROTTLE ---
+        // Respects ADO/APIM rate limits by adding a 500ms jitter between products.
+        await sleep(500);
+
         console.log(`\n🔹 Processing: ${prod.name} (${prod.id})`);
         const meta: ADOMetadata = { productId: prod.id, productName: prod.name, deployments: {}, status: 'ORPHAN' };
 
@@ -148,51 +153,71 @@ async function main() {
             meta.status = 'MATCHED';
             console.log(`   ✅ Pipeline: ${matchedPipeline.name} (Score: ${pipeScore})`);
 
-            // C. Surgical Hash Sync (Scale-Optimized)
+            // C. Surgical Hash Sync (Hybrid Strategy: Environments API + Adaptive Fallback)
             const envsToSync = ['DEV', 'QA', 'STAGE', 'PROD'];
             const projectIdent = repo.project.id || repo.project.name;
-            const runs = await AzureService.fetchBuildsByDefinition(devops.organization, projectIdent, matchedPipeline.id, devops.pat, devops.baseUrl, cliToken);
-
-            const SCAN_DEPTH = 15;
             const timelineCache = new Map<number, any[]>();
 
-            for (const run of runs.slice(0, SCAN_DEPTH)) {
-                // Early Exit: if we found hashes for all environments, skip remaining runs
-                if (Object.keys(meta.deployments).length === envsToSync.length) break;
+            // Phase 1: Surgical Strikes (Environments API) - Ultra Fast
+            for (const envName of envsToSync) {
+                const deploy = await AzureService.fetchLatestEnvironmentDeployment(
+                    devops.organization, projectIdent, matchedPipeline.id, envName, devops.pat, devops.baseUrl, cliToken
+                );
 
-                // Status Filter: Skip runs that didn't at least partially succeed
-                const runResult = (run as any).result || (run as any).state;
-                if (runResult !== 'succeeded' && runResult !== 'partiallySucceeded' && runResult !== 'completed') continue;
-
-                if (!timelineCache.has(run.id)) {
-                    timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdent, run.id, devops.pat, devops.baseUrl, cliToken));
+                if (deploy) {
+                    const commitHash = deploy.build?.sourceVersion || 'unknown';
+                    meta.deployments[envName] = {
+                        hash: commitHash,
+                        date: deploy.finishTime || deploy.startTime
+                    };
+                    console.log(`      🎯 ${envName.padEnd(5)}: Surgical Hit! Captured ${commitHash.substring(0, 7)} (Deployment ${deploy.id})`);
                 }
+            }
 
-                const timeline = timelineCache.get(run.id)!;
-                for (const envName of envsToSync) {
-                    if (meta.deployments[envName]) continue;
+            // Phase 2: Adaptive Fallback (Timeline Scanner) - For projects not using ADO Environments
+            const missingEnvs = envsToSync.filter(e => !meta.deployments[e]);
+            if (missingEnvs.length > 0) {
+                let skip = 0;
+                const pageSize = 20;
+                const maxDepth = 100;
 
-                    // Match stage, job, or phase
-                    const record = timeline.find((t: any) => {
-                        const type = (t.type || '').toLowerCase();
-                        const isContainer = ['stage', 'job', 'phase'].includes(type);
-                        const nameMatches = sanitize(t.name).includes(sanitize(envName));
-                        const isSuccess = t.result === 'succeeded' || t.result === 'partiallySucceeded';
-                        return isContainer && nameMatches && isSuccess;
-                    });
+                while (Object.keys(meta.deployments).length < envsToSync.length && skip < maxDepth) {
+                    const builds = await AzureService.fetchBuildsByDefinition(
+                        devops.organization, projectIdent, matchedPipeline.id, devops.pat, devops.baseUrl, cliToken, pageSize, skip
+                    );
 
-                    if (record) {
-                        // Builds API provides sourceVersion reliably
-                        const commitHash = (run as any).sourceVersion ||
-                            (run as any).resources?.repositories?.self?.version ||
-                            'unknown';
+                    if (builds.length === 0) break;
 
-                        meta.deployments[envName] = {
-                            hash: commitHash,
-                            date: record.finishTime || run.finishedDate
-                        };
-                        console.log(`      📍 ${envName.padEnd(5)}: Captured ${commitHash.substring(0, 7)} (Run ${run.id} via ${record.name})`);
+                    for (const run of builds) {
+                        if (Object.keys(meta.deployments).length === envsToSync.length) break;
+
+                        if (!timelineCache.has(run.id)) {
+                            timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdent, run.id, devops.pat, devops.baseUrl, cliToken));
+                        }
+
+                        const timeline = timelineCache.get(run.id)!;
+                        for (const envName of envsToSync) {
+                            if (meta.deployments[envName]) continue;
+
+                            const record = timeline.find((t: any) => {
+                                const type = (t.type || '').toLowerCase();
+                                const isContainer = ['stage', 'job', 'phase'].includes(type);
+                                const nameMatches = sanitize(t.name).includes(sanitize(envName));
+                                const isSuccess = t.result === 'succeeded' || t.result === 'partiallySucceeded';
+                                return isContainer && nameMatches && isSuccess;
+                            });
+
+                            if (record) {
+                                const commitHash = (run as any).sourceVersion || 'unknown';
+                                meta.deployments[envName] = {
+                                    hash: commitHash,
+                                    date: record.finishTime || run.finishedDate
+                                };
+                                console.log(`      📍 ${envName.padEnd(5)}: Scanner Hit! Captured ${commitHash.substring(0, 7)} (Build ${run.id} via ${record.name})`);
+                            }
+                        }
                     }
+                    skip += pageSize;
                 }
             }
 
