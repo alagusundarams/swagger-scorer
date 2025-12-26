@@ -210,8 +210,10 @@ async function runDebug() {
     );
 
     if (!matchedPipeline) {
-        console.log(`\n   ⚠️  No direct name match found. Candidates:`);
-        pipelines.slice(0, 10).forEach(p => console.log(`      - [ID: ${p.id}] ${p.name}`));
+        console.log(`\n   ⚠️  No direct name match found between product "${productNameArg}" and ${pipelines.length} pipelines.`);
+        console.log(`      Showing top 20 candidates (check if one matches your product):`);
+        pipelines.slice(0, 20).forEach(p => console.log(`      - [ID: ${p.id}] ${p.name}`));
+        console.log(`\n      💡 Tip: Use a more specific --product name or update the pipeline name to include the product name.`);
         return;
     }
 
