@@ -87,8 +87,8 @@ async function main() {
 
     for (const prod of inventory) {
         // --- SAFETY THROTTLE ---
-        // Respects ADO/APIM rate limits by adding a 500ms jitter between products.
-        await sleep(500);
+        // Respects ADO/APIM rate limits by adding a 2s delay between products to avoid hitting search API limits.
+        await sleep(2000);
 
         console.log(`\n🔹 Processing: ${prod.name} (${prod.id})`);
         const meta: ADOMetadata = { productId: prod.id, productName: prod.name, deployments: {}, status: 'ORPHAN' };
