@@ -19,14 +19,14 @@ const logsDir = cwd.endsWith('apim-database')
     : join(cwd, 'apim-database', 'scripts', 'logs');
 if (!existsSync(logsDir)) mkdirSync(logsDir, { recursive: true });
 
-const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+const timestamp = new Date().toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replace(/[\/,: ]/g, '-');
 const envSuffix = args.find(a => a.startsWith('--env='))?.split('=')[1] || 'ALL';
 const logFile = join(logsDir, `discover-sync_${envSuffix}_${timestamp}.log`);
 const logStream = createWriteStream(logFile, { flags: 'a' });
 
 // Dual logging helper with timestamp
 function log(message: string) {
-    const timestamp = new Date().toISOString();
+    const timestamp = new Date().toLocaleString('en-US', { hour12: false });
     const timestampedMsg = `[${timestamp}] ${message}`;
     console.log(timestampedMsg);
     logStream.write(timestampedMsg + '\n');
@@ -65,7 +65,7 @@ async function runScript(scriptPath: string) {
 
 async function main() {
     const startTime = Date.now();
-    const startDate = new Date().toISOString();
+    const startDate = new Date().toLocaleString('en-US', { hour12: false });
 
     log(`📋 [DISCOVER-SYNC] Starting orchestrated sync...`);
     log(`🗂️  Log file: ${logFile}`);
@@ -78,7 +78,7 @@ async function main() {
         await runScript('scripts/core/reconcile-governance.ts');
 
         const endTime = Date.now();
-        const endDate = new Date().toISOString();
+        const endDate = new Date().toLocaleString('en-US', { hour12: false });
         const durationMs = endTime - startTime;
         const durationSec = (durationMs / 1000).toFixed(2);
         const durationMin = (durationMs / 60000).toFixed(2);
@@ -89,7 +89,7 @@ async function main() {
         log(`📄 Full log saved to: ${logFile}`);
     } catch (err) {
         const endTime = Date.now();
-        const endDate = new Date().toISOString();
+        const endDate = new Date().toLocaleString('en-US', { hour12: false });
         const durationMs = endTime - startTime;
         const durationSec = (durationMs / 1000).toFixed(2);
 
