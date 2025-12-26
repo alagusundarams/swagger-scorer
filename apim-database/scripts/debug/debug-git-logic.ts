@@ -217,10 +217,11 @@ async function runDebug() {
         }
 
         if (verbose && timelinesFetched === 1) {
-            console.log(`      🔍 Run Object Keys: ${Object.keys(run).join(', ')}`);
-            if ((run as any).resources?.repositories?.self) {
-                console.log(`      🔍 Run Commit Version: ${(run as any).resources.repositories.self.version}`);
-            }
+            console.log(`      🔍 DEBUG: Inspecting first Run object structure:`);
+            console.log(JSON.stringify(run, (key, value) => {
+                // Redact things that look like URLs with tokens if any, but usually run objects are fine
+                return value;
+            }, 2));
         }
 
         const timeline = timelineCache.get(run.id)!;
