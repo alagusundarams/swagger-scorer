@@ -139,8 +139,18 @@ async function main() {
                 const globalUrl = `https://management.azure.com/subscriptions/${env.subscriptionId}/resourceGroups/${env.resourceGroup}/providers/Microsoft.ApiManagement/service/${env.instance}/policies/policy?api-version=2022-08-01&format=rawxml`;
                 const gPolRes = await fetch(globalUrl, { headers: { 'Authorization': `Bearer ${azureToken}` } });
                 if (gPolRes.ok) {
-                    const json = await gPolRes.json() as any;
-                    const xml = json.properties?.value || '';
+                    const text = await gPolRes.text();
+                    let xml = '';
+                    if (text.trim().startsWith('<')) {
+                        xml = text;
+                    } else {
+                        try {
+                            const json = JSON.parse(text);
+                            xml = json.properties?.value || '';
+                        } catch (e) {
+                            xml = text;
+                        }
+                    }
                     const { guids, nvs, backends } = extractForensicsFromPolicy(xml);
                     guids.forEach(id => envAppIds.add(id));
                     nvs.forEach(nv => potentialNvs.add(nv));
@@ -167,8 +177,18 @@ async function main() {
                         headers: { 'Authorization': `Bearer ${azureToken}` }
                     });
                     if (pPolRes.ok) {
-                        const json = await pPolRes.json() as any;
-                        const xml = json.properties?.value || '';
+                        const text = await pPolRes.text();
+                        let xml = '';
+                        if (text.trim().startsWith('<')) {
+                            xml = text;
+                        } else {
+                            try {
+                                const json = JSON.parse(text);
+                                xml = json.properties?.value || '';
+                            } catch (e) {
+                                xml = text;
+                            }
+                        }
                         const { guids, nvs, backends: _b } = extractForensicsFromPolicy(xml);
                         guids.forEach((id: string) => envAppIds.add(id));
                         nvs.forEach((nv: string) => potentialNvs.add(nv));
@@ -212,8 +232,18 @@ async function main() {
                         headers: { 'Authorization': `Bearer ${azureToken}` }
                     });
                     if (polRes.ok) {
-                        const json = await polRes.json() as any;
-                        const xml = json.properties?.value || '';
+                        const text = await polRes.text();
+                        let xml = '';
+                        if (text.trim().startsWith('<')) {
+                            xml = text;
+                        } else {
+                            try {
+                                const json = JSON.parse(text);
+                                xml = json.properties?.value || '';
+                            } catch (e) {
+                                xml = text;
+                            }
+                        }
                         const { guids, nvs, backends } = extractForensicsFromPolicy(xml);
                         guids.forEach((id: string) => envAppIds.add(id));
                         nvs.forEach((nv: string) => potentialNvs.add(nv));

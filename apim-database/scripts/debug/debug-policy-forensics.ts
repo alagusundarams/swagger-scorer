@@ -119,8 +119,19 @@ async function debug() {
         const globalUrl = `https://management.azure.com/subscriptions/${env.subscriptionId}/resourceGroups/${env.resourceGroup}/providers/Microsoft.ApiManagement/service/${env.instance}/policies/policy?api-version=2022-08-01&format=rawxml`;
         const gPolRes = await fetch(globalUrl, { headers: { 'Authorization': `Bearer ${azureToken}` } });
         if (gPolRes.ok) {
-            const json = await gPolRes.json() as any;
-            const xml = json.properties?.value || '';
+            const text = await gPolRes.text();
+            let xml = '';
+            if (text.trim().startsWith('<')) {
+                xml = text;
+            } else {
+                try {
+                    const json = JSON.parse(text);
+                    xml = json.properties?.value || '';
+                } catch (e) {
+                    if (verbose) console.warn(`      ⚠️  Failed to parse Global Policy as JSON, treating as raw text.`);
+                    xml = text;
+                }
+            }
             const results = extractForensicsFromPolicy(xml);
             console.log(`   ✅ App IDs:`, results.guids);
             console.log(`   ✅ Named Values:`, results.nvs);
@@ -135,8 +146,18 @@ async function debug() {
         const prodUrl = `https://management.azure.com/subscriptions/${env.subscriptionId}/resourceGroups/${env.resourceGroup}/providers/Microsoft.ApiManagement/service/${env.instance}/products/${targetProduct}/policies/policy?api-version=2022-08-01&format=rawxml`;
         const pPolRes = await fetch(prodUrl, { headers: { 'Authorization': `Bearer ${azureToken}` } });
         if (pPolRes.ok) {
-            const json = await pPolRes.json() as any;
-            const xml = json.properties?.value || '';
+            const text = await pPolRes.text();
+            let xml = '';
+            if (text.trim().startsWith('<')) {
+                xml = text;
+            } else {
+                try {
+                    const json = JSON.parse(text);
+                    xml = json.properties?.value || '';
+                } catch (e) {
+                    xml = text;
+                }
+            }
             const results = extractForensicsFromPolicy(xml);
             console.log(`   ✅ App IDs:`, results.guids);
             console.log(`   ✅ Named Values:`, results.nvs);
@@ -170,8 +191,18 @@ async function debug() {
             const apiPolUrl = `https://management.azure.com${api.id}/policies/policy?api-version=2022-08-01&format=rawxml`;
             const polRes = await fetch(apiPolUrl, { headers: { 'Authorization': `Bearer ${azureToken}` } });
             if (polRes.ok) {
-                const json = await polRes.json() as any;
-                const xml = json.properties?.value || '';
+                const text = await polRes.text();
+                let xml = '';
+                if (text.trim().startsWith('<')) {
+                    xml = text;
+                } else {
+                    try {
+                        const json = JSON.parse(text);
+                        xml = json.properties?.value || '';
+                    } catch (e) {
+                        xml = text;
+                    }
+                }
                 const results = extractForensicsFromPolicy(xml);
                 console.log(`      ✅ App IDs:`, results.guids);
                 console.log(`      ✅ Named Values:`, results.nvs);
