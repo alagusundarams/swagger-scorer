@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { AzureService } from './services/AzureService.js';
+import fetch from 'node-fetch';
 
 // --- ARGS ---
 const args = process.argv.slice(2);
@@ -11,9 +12,6 @@ if (help || !productNameArg) {
     console.log(`
 Usage: 
   npx tsx scripts/debug-git-logic.ts --product="My Product Name"
-
-Purpose:
-  Probe legacy ADO Search endpoints by testing multiple path/collection variations.
     `);
     process.exit(0);
 }
@@ -38,64 +36,78 @@ if (!devopsConfig || !devopsConfig.pat) {
 
 // --- MAIN ---
 async function runDebug() {
-    console.log(`\n🕵️‍♀️ DEBUG: Legacy Search URL Probe`);
-    console.log(`   Organization: ${devopsConfig.organization}`);
-    console.log(`   Base URL:     ${devopsConfig.baseUrl || 'https://dev.azure.com'}`);
+    console.log(`\n🕵️‍♀️ DEBUG: Ultimate Connectivity & Search Probe`);
 
-    const org = devopsConfig.organization;
+    const rawOrg = devopsConfig.organization;
     const pat = devopsConfig.pat;
     const cleanBaseUrl = (devopsConfig.baseUrl || 'https://dev.azure.com').replace(/\/$/, '');
     const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
 
-    // Discovery Step: Fetch Projects to enable scoped tests
-    console.log(`\n➡️  Step 0: Discovery (Fetching Projects)...`);
+    // 0. Auto-detect Org from URL if legacy
+    let detectedOrg = rawOrg;
+    if (cleanBaseUrl.includes('visualstudio.com')) {
+        const match = cleanBaseUrl.match(/https?:\/\/([^.]+)\.visualstudio\.com/);
+        if (match) {
+            detectedOrg = match[1];
+            console.log(`   💡 Detected Organization from URL: ${detectedOrg}`);
+        }
+    }
+    console.log(`   Configured Org: ${rawOrg}`);
+    console.log(`   Base URL:       ${cleanBaseUrl}`);
+
+    // 1. Fetch Projects (Discovery)
+    console.log(`\n➡️  Step 1: Discovery (Fetching Projects)...`);
     let projects: any[] = [];
     try {
-        projects = await AzureService.fetchADOProjects(org, pat, cleanBaseUrl);
-        console.log(`   ✅ Found ${projects.length} projects.`);
+        projects = await AzureService.fetchADOProjects(detectedOrg, pat, cleanBaseUrl);
+        console.log(`   ✅ Success! Found ${projects.length} projects.`);
     } catch (e: any) {
-        console.warn(`   ⚠️  Discovery failed, continuing with global probes only.`);
+        console.warn(`   ⚠️  Discovery failed (Expected on some legacy restricted accounts).`);
     }
 
-    // 1. Content Search Probing
-    console.log(`\n➡️  Step 1: Probing Search Endpoints for "${productNameArg}"...`);
+    // 2. Search Probing
+    console.log(`\n➡️  Step 2: Probing Search Endpoints for "${productNameArg}"...`);
 
-    const searchBody = {
+    // We will test both the "Configured Org" and "Detected Org"
+    const orgsToTest = Array.from(new Set([rawOrg, detectedOrg]));
+    const body = {
         searchText: productNameArg!.includes(' ') ? `"${productNameArg}"` : productNameArg,
-        $top: 20,
+        $top: 10,
         filters: { Extension: ["tf", "tfvars"] }
     };
 
-    // Endpoints to test - focusing on Legacy visualstudio.com patterns
-    const endpoints = [
-        {
-            name: "Modern Standard Host",
-            url: `https://almsearch.dev.azure.com/${org}/_apis/search/codesearchresults?api-version=7.1-preview.1`
-        },
-        {
-            name: "Legacy Direct (No doubled org)",
-            url: `${cleanBaseUrl}/_apis/search/codesearchresults?api-version=5.1`
-        },
-        {
-            name: "Legacy with Collection Path",
-            url: `${cleanBaseUrl}/DefaultCollection/_apis/search/codesearchresults?api-version=5.1`
-        },
-        {
-            name: "Legacy with Collection Path (API 7.1)",
-            url: `${cleanBaseUrl}/DefaultCollection/_apis/search/codesearchresults?api-version=7.1-preview.1`
-        }
-    ];
+    const searchVariations: any[] = [];
 
-    // Add specific project-scoped probe if possible
-    if (projects.length > 0) {
-        const testProj = projects[0].name;
-        endpoints.push({
-            name: `Project-Scoped (Project: ${testProj})`,
-            url: `${cleanBaseUrl}/${testProj}/_apis/search/codesearchresults?api-version=5.1`
+    for (const testOrg of orgsToTest) {
+        // A. Modern Host (Best for REST APIs)
+        searchVariations.push({
+            name: `Modern Host (Org: ${testOrg})`,
+            url: `https://almsearch.dev.azure.com/${testOrg}/_apis/search/codesearchresults?api-version=7.1-preview.1`
         });
+
+        // B. Legacy Direct
+        searchVariations.push({
+            name: `Legacy Direct (Org: ${testOrg})`,
+            url: `${cleanBaseUrl}/_apis/search/codesearchresults?api-version=5.1`
+        });
+
+        // C. Legacy with DefaultCollection
+        searchVariations.push({
+            name: `Legacy with Collection (Org: ${testOrg})`,
+            url: `${cleanBaseUrl}/DefaultCollection/_apis/search/codesearchresults?api-version=5.1`
+        });
+
+        // D. Project Scoped (if possible)
+        if (projects.length > 0) {
+            const project = projects[0].name;
+            searchVariations.push({
+                name: `Project Scoped (Project: ${project})`,
+                url: `${cleanBaseUrl}/${project}/_apis/search/codesearchresults?api-version=5.1`
+            });
+        }
     }
 
-    for (const ep of endpoints) {
+    for (const ep of searchVariations) {
         console.log(`\n   📡 Testing: ${ep.name}`);
         console.log(`      URL: ${ep.url}`);
 
@@ -106,28 +118,25 @@ async function runDebug() {
                     'Authorization': authHeader,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(searchBody)
+                body: JSON.stringify(body)
             });
 
             console.log(`      Status: ${response.status} ${response.statusText}`);
 
             if (response.ok) {
                 const searchResp = await response.json() as any;
-                console.log(`      Hits found: ${searchResp.count}`);
-
+                console.log(`      Hits: ${searchResp.count}`);
                 if (searchResp.count > 0) {
-                    console.log(`      🎯 SUCCESS! Found results.`);
-                    const first = searchResp.results[0];
-                    console.log(`      Example: ${first.path} in Repo [${first.repository.name}]`);
+                    console.log(`      🎯 SUCCESS! Found repo: ${searchResp.results[0].repository.name}`);
                     break;
                 }
             } else {
                 const txt = await response.text();
-                console.log(`      ❌ Error Details: ${txt.substring(0, 150)}...`);
+                console.log(`      ❌ Message: ${txt.substring(0, 150)}...`);
             }
 
         } catch (e: any) {
-            console.error(`      ❌ Network error: ${e.message}`);
+            console.error(`      ❌ Network Error: ${e.message}`);
         }
     }
 
