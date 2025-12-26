@@ -2,13 +2,15 @@
  * @fileoverview PART 3: GOVERNANCE RECONCILIATION
  * 
  * PURPOSE:
- * Merges the APIM Inventory (Part 1) and ADO Metadata (Part 2) into the database.
- * Updates product records with Pipeline IDs, Repo URLs, and per-environment hashes.
+ * 1. Merges Inventory, ADO Metadata, and APIM Metadata into the database.
+ * 2. Resolves App identities via Microsoft Graph.
+ * 3. Updates Products, ACLs (Named Values), and App Registrations.
  */
 
 import { Pool } from 'pg';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { AzureService } from '../services/AzureService.js';
 
 interface ADOMetadata {
     productId: string;
@@ -17,6 +19,11 @@ interface ADOMetadata {
     pipeline: { id: number; name: string };
     deployments: Record<string, { hash: string; date: string }>;
     status: 'MATCHED' | 'REPO_MISSING' | 'PIPELINE_MISSING' | 'ORPHAN';
+}
+
+interface MetadataStore {
+    namedValues: Record<string, any[]>;
+    appIds: Record<string, string[]>;
 }
 
 // --- CONFIG LOADER ---
@@ -32,47 +39,41 @@ async function main() {
     console.log(`🚀 [PART 3] Starting Governance Reconciliation...\n`);
 
     // 1. Data Loading
-    const inventoryPath = join(process.cwd(), 'apim-database', 'scripts', 'data', 'apim-inventory.json');
-    const metadataPath = join(process.cwd(), 'apim-database', 'scripts', 'data', 'ado-metadata.json');
+    const dataDir = join(process.cwd(), 'apim-database', 'scripts', 'data');
+    const inventoryPath = join(dataDir, 'apim-inventory.json');
+    const adoMetaPath = join(dataDir, 'ado-metadata.json');
+    const apimMetaPath = join(dataDir, 'apim-metadata.json');
 
-    if (!existsSync(inventoryPath) || !existsSync(metadataPath)) {
+    if (!existsSync(inventoryPath) || !existsSync(adoMetaPath) || !existsSync(apimMetaPath)) {
         console.error("❌ Required JSON data missing. Run Part 1 and Part 2 first.");
         process.exit(1);
     }
 
     const inventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
-    const metadataList: ADOMetadata[] = JSON.parse(readFileSync(metadataPath, 'utf8'));
-    const metadataMap = new Map<string, ADOMetadata>(metadataList.map((m: ADOMetadata) => [m.productId, m]));
+    const adoList: ADOMetadata[] = JSON.parse(readFileSync(adoMetaPath, 'utf8'));
+    const apimMeta: MetadataStore = JSON.parse(readFileSync(apimMetaPath, 'utf8'));
+
+    const adoMap = new Map<string, ADOMetadata>(adoList.map(m => [m.productId, m]));
 
     // 2. DB Connection
-    const envConfig = config.azure?.environments[0];
-    const dbUrl = envConfig?.databaseUrl || config.database?.url;
+    const dbUrl = config.azure?.environments[0]?.databaseUrl || config.database?.url;
     if (!dbUrl) {
-        console.error("❌ Database URL not found in config.json");
         process.exit(1);
     }
-
     const pool = new Pool({ connectionString: dbUrl });
 
     try {
-        console.log(`📋 Reconciling ${inventory.length} products to DB...`);
-
+        // --- A. PRODUCTS RECONCILIATION ---
+        console.log(`📋 Reconciling ${inventory.length} products...`);
         for (const prod of inventory) {
-            const meta = metadataMap.get(prod.id);
-            if (!meta) continue;
+            const ado = adoMap.get(prod.id);
+            if (!ado) continue;
 
-            const region = 'Global'; // Defaulting for simple reconcile
-
-            // Loop through environments where this product exists
             for (const envName of prod.environments) {
-                const uniqueProductId = `${prod.id}:${envName}:${region}`;
-                const deploy = meta.deployments[envName];
-                const prodDeploy = meta.deployments['PROD'];
+                const uniqueProductId = `${prod.id}:${envName}:Global`;
+                const deploy = ado.deployments[envName];
+                const prodDeploy = ado.deployments['PROD'];
 
-                console.log(`   📝 Updating ${uniqueProductId}...`);
-
-                // We use ON CONFLICT to ensure we don't break existing governance fields (like Team Ownership)
-                // but we update the discovered technical fields.
                 await pool.query(`
                     INSERT INTO products (
                         id, name, display_name, environment, region,
@@ -92,17 +93,55 @@ async function main() {
                         management_mode = EXCLUDED.management_mode,
                         updated_at = NOW();
                 `, [
-                    uniqueProductId, prod.id, prod.name, envName, region,
+                    uniqueProductId, prod.id, prod.name, envName, 'Global',
                     deploy?.hash || null, deploy?.date || null,
-                    meta.pipeline ? `https://dev.azure.com/${config.devops.organization}/${meta.repository.project}/_build?definitionId=${meta.pipeline.id}` : null,
-                    meta.repository ? `https://dev.azure.com/${config.devops.organization}/${meta.repository.project}/_git/${meta.repository.name}` : null,
+                    ado.pipeline ? `https://dev.azure.com/${config.devops.organization}/${ado.repository.project}/_build?definitionId=${ado.pipeline.id}` : null,
+                    ado.repository ? `https://dev.azure.com/${config.devops.organization}/${ado.repository.project}/_git/${ado.repository.name}` : null,
                     prodDeploy?.hash || null, prodDeploy?.date || null,
-                    meta.status === 'MATCHED' ? 'TERRAFORM_MANAGED' : 'MANUAL'
+                    ado.status === 'MATCHED' ? 'TERRAFORM_MANAGED' : 'MANUAL'
                 ]);
             }
         }
 
-        console.log(`\n✅ Reconciliation Complete! Database is now the source of truth.`);
+        // --- B. ACCESS CONTROL (NAMED VALUES) ---
+        console.log(`🌍 Reconciling Named Values (ACL)...`);
+        for (const [env, nvs] of Object.entries(apimMeta.namedValues)) {
+            for (const nv of nvs) {
+                const val = nv.keyVaultUrl ? `KeyVault Ref: ${nv.keyVaultUrl}` : (nv.isSecret ? '***' : nv.value);
+                await pool.query(`
+                    INSERT INTO access_control_lists (key, environment, value, updated_at)
+                    VALUES ($1, $2, $3, NOW())
+                    ON CONFLICT (key, environment) DO UPDATE SET
+                        value = EXCLUDED.value,
+                        updated_at = NOW();
+                `, [nv.name, env, val]);
+            }
+        }
+
+        // --- C. IDENTITY (APP REGISTRATIONS) ---
+        console.log(`🔗 Resolving App Identities via Graph...`);
+        const allAppIds = new Set<string>();
+        Object.values(apimMeta.appIds).forEach(list => list.forEach(id => allAppIds.add(id)));
+
+        if (allAppIds.size > 0) {
+            const resolved = await AzureService.fetchAppRegistrations(Array.from(allAppIds));
+            const appMap = new Map<string, string>(resolved.map(r => [r.appId, r.displayName]));
+
+            for (const [env, ids] of Object.entries(apimMeta.appIds)) {
+                for (const id of ids) {
+                    const name = appMap.get(id) || 'Unknown Application';
+                    await pool.query(`
+                        INSERT INTO app_registrations (id, client_id, display_name, environment, updated_at)
+                        VALUES ($1, $1, $2, $3, NOW())
+                        ON CONFLICT (id) DO UPDATE SET
+                            display_name = EXCLUDED.display_name,
+                            updated_at = NOW();
+                    `, [id, name, env]);
+                }
+            }
+        }
+
+        console.log(`\n✅ Reconciliation Complete!`);
 
     } catch (e: any) {
         console.error(`\n❌ Reconciliation Failed:`, e.message);
@@ -111,6 +150,4 @@ async function main() {
     }
 }
 
-main().catch(err => {
-    console.error(`\n💥 Fatal Error:`, err);
-});
+main().catch(err => console.error(`\n💥 Fatal Error:`, err));
