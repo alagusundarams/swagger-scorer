@@ -108,19 +108,28 @@ async function main() {
             }
 
             // --- RANKING LOGIC ---
-            const repoCandidates = searchResp.results.map(r => {
-                const rName = r.repository.name;
-                const cleanRepo = sanitize(rName);
-                let score = 0;
+            const repoCandidates = searchResp.results
+                .filter(r => r.repository && r.repository.name && r.repository.project) // Filter out malformed results
+                .map(r => {
+                    const rName = r.repository.name;
+                    const cleanRepo = sanitize(rName);
+                    let score = 0;
 
-                if (cleanRepo === cleanProd) score += 100; // Perfect match
-                else if (cleanRepo.includes(cleanProd)) score += 50; // Name included
+                    if (cleanRepo === cleanProd) score += 100; // Perfect match
+                    else if (cleanRepo.includes(cleanProd)) score += 50; // Name included
 
-                if (cleanRepo.includes('grp')) score -= 20;
-                if (cleanRepo.includes('shared') || cleanRepo.includes('common')) score -= 30;
+                    if (cleanRepo.includes('grp')) score -= 20;
+                    if (cleanRepo.includes('shared') || cleanRepo.includes('common')) score -= 30;
 
-                return { repo: r.repository, score, name: rName };
-            }).sort((a, b) => b.score - a.score);
+                    return { repo: r.repository, score, name: rName };
+                }).sort((a, b) => b.score - a.score);
+
+            if (repoCandidates.length === 0) {
+                console.log(`   ⚠️  REPO_MISSING: Search returned malformed results for "${prod.name}"`);
+                meta.status = 'REPO_MISSING';
+                results.push(meta);
+                continue;
+            }
 
             const repo = repoCandidates[0].repo;
             const repoScore = repoCandidates[0].score;
@@ -129,7 +138,12 @@ async function main() {
                 console.log(`   ⚠️  LOW_CONFIDENCE_REPO: Nearest match "${repo.name}" has score ${repoScore}.`);
             }
 
-            meta.repository = { id: repo.id, name: repo.name, project: repo.project.name, projectId: repo.project.id };
+            meta.repository = {
+                id: repo.id,
+                name: repo.name,
+                project: repo.project?.name || 'Unknown',
+                projectId: repo.project?.id || repo.project?.name || 'Unknown'
+            };
             console.log(`   ✅ Repo: ${repo.name} (Score: ${repoScore})`);
 
             // B. Pipeline Discovery & Ranking
