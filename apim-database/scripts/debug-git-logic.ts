@@ -50,7 +50,7 @@ async function runDebug() {
     const org = devopsConfig.organization;
     const cleanBaseUrl = (devopsConfig.baseUrl || 'https://dev.azure.com').replace(/\/$/, '');
 
-    // Endpoints to test
+    // Endpoints to test based on REST API standards vs Browser UI patterns
     const endpoints = [
         {
             name: "Modern Search Host (Recommended)",
@@ -61,8 +61,8 @@ async function runDebug() {
             url: `${cleanBaseUrl}/_apis/search/codesearchresults?api-version=7.1-preview.1`
         },
         {
-            name: "Legacy Base URL + Org Path (Doubled)",
-            url: `${cleanBaseUrl}/${org}/_apis/search/codesearchresults?api-version=7.1-preview.1`
+            name: "Legacy Base URL + DefaultCollection",
+            url: `${cleanBaseUrl}/DefaultCollection/_apis/search/codesearchresults?api-version=7.1-preview.1`
         }
     ];
 
@@ -113,13 +113,15 @@ async function runDebug() {
                         matchedRepo = filtered[0];
                         console.log(`      🎯 SUCCESS! Matched Repo: ${matchedRepo.name} via ${ep.name}`);
                         break;
+                    } else {
+                        console.log(`      ⚠️ Results found, but all filtered (e.g. GRP repos).`);
                     }
                 }
             } else if (response.status === 404) {
-                console.log(`      ⚠️  Not Found (404). This endpoint is likely incorrect for this account.`);
+                console.log(`      ⚠️ Not Found (404).`);
             } else {
                 const txt = await response.text();
-                console.log(`      ❌ Error Details: ${txt.substring(0, 100)}...`);
+                console.log(`      ❌ Error Details: ${txt.substring(0, 150)}...`);
             }
 
         } catch (e: any) {
@@ -129,7 +131,7 @@ async function runDebug() {
 
     if (!matchedRepo) {
         console.error("\n⛔ STOP: All search probes failed or returned 0 results.");
-        console.log("   Suggestion: Verify your PAT has 'Code (Read & Search)' permissions.");
+        console.log("   Check: Is your PAT scope set to 'Code (Read & Search)'?");
         return;
     }
 
