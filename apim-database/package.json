@@ -6,7 +6,7 @@
     "scripts": {
         "setup-db": "tsx scripts/utils/setup-db.ts",
         "reset-db": "tsx scripts/utils/reset-db.ts",
-        "discover-sync": "tsx scripts/core/extract-apim-inventory.ts && tsx scripts/core/extract-ado-metadata.ts && tsx scripts/core/reconcile-governance.ts",
+        "discover-sync": "tsx scripts/core/discover-sync.ts",
         "fetch": "tsx scripts/utils/fetch-apim-data.ts",
         "fetch-ad-groups": "tsx scripts/utils/fetch-ad-groups.ts",
         "migrate": "tsx scripts/utils/migrate-to-postgres.ts"
