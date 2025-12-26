@@ -135,7 +135,8 @@ async function runDebug() {
     console.log(`   🔎 Checking for Azure CLI Access Token...`);
     let cliToken = "";
     try {
-        cliToken = await AzureService.getAzureAccessToken();
+        // Resource ID for Azure DevOps: 499b84ee-1328-4417-95a1-8288018c668b
+        cliToken = await AzureService.getAzureAccessToken("499b84ee-1328-4417-95a1-8288018c668b");
         if (cliToken) console.log(`      ✅ CLI Token obtained (bypassing PAT restrictions)`);
     } catch (e) {
         console.log(`      ℹ️  CLI Token unavailable. Continuing with PAT.`);
@@ -145,36 +146,42 @@ async function runDebug() {
         const label = tokenOverride ? "CLI Token" : "PAT";
         console.log(`\n   --- Trying Discovery via ${label} ---`);
 
-        // Strategy 1: Modern Pipelines API + azureRepo filter
-        console.log(`   [Strategy 1] Checking Pipelines API (Modern, repoId=${primaryRepoId}, type=azureRepo)...`);
-        let results = await AzureService.fetchADOPipelines(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl, tokenOverride);
+        const tryBase = async (base: string, label: string) => {
+            console.log(`\n      [${label}] Testing Base URL: ${base}`);
 
-        // Strategy 2: Legacy Build API + TfsGit filter
-        if (results.length === 0) {
-            console.log(`   [Strategy 2] Checking Build API (Legacy, repoId=${primaryRepoId}, type=TfsGit)...`);
-            results = await AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl, tokenOverride);
-        }
+            // Strategy: Modern Pipelines API
+            console.log(`      [Pipelines API] repoId=${primaryRepoId}, type=azureRepo...`);
+            let results = await AzureService.fetchADOPipelines(devops.organization, projectIdentifier, primaryRepoId, devops.pat, base, tokenOverride);
 
-        // Strategy 3: Directly check Build History
-        if (results.length === 0) {
-            console.log(`   [Strategy 3] Checking Build History (Recent Builds, repoId=${primaryRepoId})...`);
-            const recentBuilds = await AzureService.fetchADOBuilds(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl, tokenOverride);
-            if (recentBuilds.length > 0) {
-                // Map to min format to satisfy ADOPipeline interface
-                results = recentBuilds.map(b => ({
-                    id: b.definition.id,
-                    name: b.definition.name,
-                    folder: b.definition.path || "",
-                    url: b.definition.url || "",
-                    _links: b.definition._links || { web: { href: "" } }
-                }));
+            // Strategy: Legacy Build API
+            if (results.length === 0) {
+                console.log(`      [Build API] repoId=${primaryRepoId}, type=TfsGit...`);
+                results = await AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, primaryRepoId, devops.pat, base, tokenOverride);
             }
-        }
 
-        // Strategy 4: Global Project Fetch (No Filter)
-        if (results.length === 0) {
-            console.log(`   [Strategy 4] Checking Pipelines API (Project-wide, no filters)...`);
-            results = await AzureService.fetchADOPipelines(devops.organization, projectIdentifier, "", devops.pat, devops.baseUrl, tokenOverride);
+            // Strategy: Recent Builds
+            if (results.length === 0) {
+                console.log(`      [Recent Builds] Checking history...`);
+                const recentBuilds = await AzureService.fetchADOBuilds(devops.organization, projectIdentifier, primaryRepoId, devops.pat, base, tokenOverride);
+                if (recentBuilds.length > 0) {
+                    results = recentBuilds.map(b => ({
+                        id: b.definition.id,
+                        name: b.definition.name,
+                        folder: b.definition.path || "",
+                        url: b.definition.url || "",
+                        _links: b.definition._links || { web: { href: "" } }
+                    }));
+                }
+            }
+            return results;
+        };
+
+        let results = await tryBase(devops.baseUrl, "Standard");
+
+        // Try DefaultCollection fallback for legacy orgs
+        if (results.length === 0 && devops.baseUrl.includes("visualstudio.com")) {
+            const collectionBase = devops.baseUrl.replace(/\/?$/, "") + "/DefaultCollection";
+            results = await tryBase(collectionBase, "Legacy DefaultCollection");
         }
 
         return results;

@@ -90,14 +90,14 @@ export class AzureService {
     /**
      * Get Azure access token using Azure CLI
      */
-    static async getAzureAccessToken(): Promise<string> {
+    static async getAzureAccessToken(resource: string = 'https://management.azure.com'): Promise<string> {
         try {
-            const token = execSync('az account get-access-token --resource https://management.azure.com --query accessToken -o tsv', {
+            const token = execSync(`az account get-access-token --resource ${resource} --query accessToken -o tsv`, {
                 encoding: 'utf-8'
             }).trim();
             return token;
         } catch (error) {
-            throw new Error('Failed to get Azure access token. Make sure Azure CLI is installed and you are logged in (az login)');
+            throw new Error(`Failed to get Azure access token for ${resource}. Make sure Azure CLI is installed and you are logged in (az login).`);
         }
     }
 
@@ -251,12 +251,17 @@ export class AzureService {
         console.log(`      🌐 [Request] ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+            const text = await response.text();
+
             if (response.ok) {
-                const data = await response.json() as { value: ADOPipeline[] };
-                return data.value || [];
+                try {
+                    const data = JSON.parse(text) as { value: ADOPipeline[] };
+                    return data.value || [];
+                } catch (e) {
+                    console.warn(`      ⚠️  Failed to parse JSON response. Content: ${text.substring(0, 200)}...`);
+                }
             } else {
-                const errorText = await response.text();
-                console.warn(`      ⚠️  HTTP ${response.status}: ${errorText.substring(0, 100)}...`);
+                console.warn(`      ⚠️  HTTP ${response.status}: ${text.substring(0, 100)}...`);
             }
         } catch (err) {
             console.error(`      ❌ Network Error:`, err);
@@ -278,12 +283,17 @@ export class AzureService {
         console.log(`      🌐 [Request] ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+            const text = await response.text();
+
             if (response.ok) {
-                const data = await response.json() as { value: any[] };
-                return (data.value || []).map(b => ({ id: b.id, name: b.name, folder: b.path || '', url: b.url, _links: b._links }));
+                try {
+                    const data = JSON.parse(text) as { value: any[] };
+                    return (data.value || []).map(b => ({ id: b.id, name: b.name, folder: b.path || '', url: b.url, _links: b._links }));
+                } catch (e) {
+                    console.warn(`      ⚠️  Failed to parse JSON response. Content: ${text.substring(0, 200)}...`);
+                }
             } else {
-                const errorText = await response.text();
-                console.warn(`      ⚠️  HTTP ${response.status}: ${errorText.substring(0, 100)}...`);
+                console.warn(`      ⚠️  HTTP ${response.status}: ${text.substring(0, 100)}...`);
             }
         } catch (err) {
             console.error(`      ❌ Network Error:`, err);
