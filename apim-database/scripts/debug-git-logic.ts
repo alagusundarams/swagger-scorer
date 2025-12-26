@@ -19,9 +19,15 @@ Usage:
 
 // --- CONFIG ---
 function loadConfig() {
+    const rootConfig = join(process.cwd(), 'apim-database', 'config.json');
     const localConfig = join(process.cwd(), 'config.json');
+
     if (existsSync(localConfig)) return JSON.parse(readFileSync(localConfig, 'utf8'));
-    console.error("❌ config.json not found.");
+    if (existsSync(rootConfig)) return JSON.parse(readFileSync(rootConfig, 'utf8'));
+
+    console.error("❌ config.json not found. Looked in:");
+    console.error(`   - ${localConfig}`);
+    console.error(`   - ${rootConfig}`);
     process.exit(1);
 }
 
