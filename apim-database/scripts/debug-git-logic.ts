@@ -103,7 +103,19 @@ async function runDebug() {
 
     const primaryRepoName = firstResult.repository.name;
     const primaryRepoId = firstResult.repository.id;
-    const project = firstResult.repository.project?.name || "Unknown";
+    let project = firstResult.repository.project?.name || "Unknown";
+
+    if (project === "Unknown") {
+        console.log(`   🔎 Project missing in search result. Attempting recovery via Repo ID ${primaryRepoId}...`);
+        try {
+            const repoDetails = await AzureService.fetchRepoById(devops.organization, primaryRepoId, devops.pat, devops.baseUrl);
+            project = repoDetails.project.name;
+            console.log(`      ✅ Recovered Project Name: ${project}`);
+        } catch (e) {
+            console.log(`      ⚠️  Failed to recover project name. Repo Object:`, JSON.stringify(firstResult.repository, null, 2));
+        }
+    }
+
     console.log(`   🎯 Selected Primary Repo: ${primaryRepoName} (ID: ${primaryRepoId}, Project: ${project})`);
 
     // 2. Locate YAML Pipeline

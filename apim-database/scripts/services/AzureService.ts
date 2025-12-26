@@ -191,6 +191,19 @@ export class AzureService {
     }
 
     /**
+     * Fetch Repository by ID (Global Org Scope)
+     */
+    static async fetchRepoById(org: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADORepo> {
+        const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+        const url = `${cleanBaseUrl}/${org}/_apis/git/repositories/${repoId}?api-version=7.1-preview.1`;
+        const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+
+        const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+        if (!response.ok) throw new Error(`Failed to fetch repo ${repoId}: ${response.statusText}`);
+        return await response.json() as ADORepo;
+    }
+
+    /**
      * Fetch All Repositories from Azure DevOps Organization (via all projects)
      */
     static async fetchADOReposAcrossProjects(org: string, projects: ADOProject[], pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADORepo[]> {
