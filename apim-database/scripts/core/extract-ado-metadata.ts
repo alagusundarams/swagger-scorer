@@ -151,7 +151,7 @@ async function main() {
             // C. Surgical Hash Sync (Scale-Optimized)
             const envsToSync = ['DEV', 'QA', 'STAGE', 'PROD'];
             const projectIdent = repo.project.id || repo.project.name;
-            const runs = await AzureService.fetchPipelineRuns(devops.organization, projectIdent, matchedPipeline.id, devops.pat, devops.baseUrl, cliToken);
+            const runs = await AzureService.fetchBuildsByDefinition(devops.organization, projectIdent, matchedPipeline.id, devops.pat, devops.baseUrl, cliToken);
 
             const SCAN_DEPTH = 15;
             const timelineCache = new Map<number, any[]>();
@@ -182,11 +182,16 @@ async function main() {
                     });
 
                     if (record) {
+                        // Builds API provides sourceVersion reliably
+                        const commitHash = (run as any).sourceVersion ||
+                            (run as any).resources?.repositories?.self?.version ||
+                            'unknown';
+
                         meta.deployments[envName] = {
-                            hash: (run as any).sourceVersion || 'unknown',
+                            hash: commitHash,
                             date: record.finishTime || run.finishedDate
                         };
-                        console.log(`      📍 ${envName.padEnd(5)}: Captured ${meta.deployments[envName].hash.substring(0, 7)} (Run ${run.id} via ${record.name})`);
+                        console.log(`      📍 ${envName.padEnd(5)}: Captured ${commitHash.substring(0, 7)} (Run ${run.id} via ${record.name})`);
                     }
                 }
             }
