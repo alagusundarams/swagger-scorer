@@ -240,15 +240,15 @@ export class AzureService {
     /**
      * Fetch Pipelines for a specific repository
      */
-    static async fetchADOPipelines(org: string, project: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADOPipeline[]> {
+    static async fetchADOPipelines(org: string, project: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<ADOPipeline[]> {
         const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
-        const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
         const isLegacy = cleanBaseUrl.includes('visualstudio.com');
-
         const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
         let url = `${urlBase}/_apis/pipelines?api-version=7.1-preview.1`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=azureRepo`;
 
+        console.log(`      🌐 [Request] ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
             if (response.ok) {
@@ -256,10 +256,10 @@ export class AzureService {
                 return data.value || [];
             } else {
                 const errorText = await response.text();
-                console.warn(`⚠️ [ADO Pipelines] HTTP ${response.status}: ${errorText}`);
+                console.warn(`      ⚠️  HTTP ${response.status}: ${errorText.substring(0, 100)}...`);
             }
         } catch (err) {
-            console.error(`❌ [ADO] Pipelines API Network Error:`, err);
+            console.error(`      ❌ Network Error:`, err);
         }
         return [];
     }
@@ -267,14 +267,15 @@ export class AzureService {
     /**
      * Fetch Build Definitions (Fallback for Pipelines API)
      */
-    static async fetchADOBuildDefinitions(org: string, project: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADOPipeline[]> {
+    static async fetchADOBuildDefinitions(org: string, project: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<ADOPipeline[]> {
         const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
-        const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
         const isLegacy = cleanBaseUrl.includes('visualstudio.com');
         const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
         let url = `${urlBase}/_apis/build/definitions?api-version=7.0`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
 
+        console.log(`      🌐 [Request] ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
             if (response.ok) {
@@ -282,11 +283,34 @@ export class AzureService {
                 return (data.value || []).map(b => ({ id: b.id, name: b.name, folder: b.path || '', url: b.url, _links: b._links }));
             } else {
                 const errorText = await response.text();
-                console.warn(`⚠️ [ADO Builds] HTTP ${response.status}: ${errorText}`);
+                console.warn(`      ⚠️  HTTP ${response.status}: ${errorText.substring(0, 100)}...`);
             }
         } catch (err) {
-            console.error(`❌ [ADO] Build Definitions API Network Error:`, err);
+            console.error(`      ❌ Network Error:`, err);
         }
+        return [];
+    }
+
+    /**
+     * Fetch Recent Builds (Discovery Fallback 3)
+     */
+    static async fetchADOBuilds(org: string, project: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<any[]> {
+        const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
+        const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const isLegacy = cleanBaseUrl.includes('visualstudio.com');
+        const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
+
+        let url = `${urlBase}/_apis/build/builds?api-version=7.0&$top=10`;
+        if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
+
+        console.log(`      🌐 [Request] ${url}`);
+        try {
+            const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+            if (response.ok) {
+                const data = await response.json() as { value: any[] };
+                return data.value || [];
+            }
+        } catch (err) { }
         return [];
     }
 

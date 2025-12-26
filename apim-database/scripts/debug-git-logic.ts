@@ -128,29 +128,62 @@ async function runDebug() {
 
     // Diagnostic log
     // --- PIPELINE DISCOVERY LOOP ---
-    console.log(`\n➡️  Step 2: Starting Exhaustive Pipeline Discovery...`);
-    let pipelines: any[] = []; // Changed to any[] to match original type inference
+    console.log(`\n➡️  Step 2: Starting Exhaustive Pipeline Discovery (with CLI Token fallback)...`);
+    let pipelines: any[] = [];
 
-    // Strategy 1: Modern Pipelines API + azureRepo filter
-    console.log(`   [Strategy 1] Checking Pipelines API (Modern, repoId=${primaryRepoId}, type=azureRepo)...`);
-    pipelines = await AzureService.fetchADOPipelines(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl);
-
-    // Strategy 2: Legacy Build API + TfsGit filter
-    if (pipelines.length === 0) {
-        console.log(`   [Strategy 2] Checking Build API (Legacy, repoId=${primaryRepoId}, type=TfsGit)...`);
-        pipelines = await AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl);
+    // Attempt CLI token recovery for permission override
+    console.log(`   🔎 Checking for Azure CLI Access Token...`);
+    let cliToken = "";
+    try {
+        cliToken = await AzureService.getAzureAccessToken();
+        if (cliToken) console.log(`      ✅ CLI Token obtained (bypassing PAT restrictions)`);
+    } catch (e) {
+        console.log(`      ℹ️  CLI Token unavailable. Continuing with PAT.`);
     }
 
-    // Strategy 3: Global Project Fetch (No Filter) - Pipelines API
-    if (pipelines.length === 0) {
-        console.log(`   [Strategy 3] Checking Pipelines API (Project-wide, no filters)...`);
-        pipelines = await AzureService.fetchADOPipelines(devops.organization, projectIdentifier, "", devops.pat, devops.baseUrl);
-    }
+    const runDiscovery = async (tokenOverride?: string) => {
+        const label = tokenOverride ? "CLI Token" : "PAT";
+        console.log(`\n   --- Trying Discovery via ${label} ---`);
 
-    // Strategy 4: Global Project Fetch (No Filter) - Build API
-    if (pipelines.length === 0) {
-        console.log(`   [Strategy 4] Checking Build API (Project-wide, no filters)...`);
-        pipelines = await AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, "", devops.pat, devops.baseUrl);
+        // Strategy 1: Modern Pipelines API + azureRepo filter
+        console.log(`   [Strategy 1] Checking Pipelines API (Modern, repoId=${primaryRepoId}, type=azureRepo)...`);
+        let results = await AzureService.fetchADOPipelines(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl, tokenOverride);
+
+        // Strategy 2: Legacy Build API + TfsGit filter
+        if (results.length === 0) {
+            console.log(`   [Strategy 2] Checking Build API (Legacy, repoId=${primaryRepoId}, type=TfsGit)...`);
+            results = await AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl, tokenOverride);
+        }
+
+        // Strategy 3: Directly check Build History
+        if (results.length === 0) {
+            console.log(`   [Strategy 3] Checking Build History (Recent Builds, repoId=${primaryRepoId})...`);
+            const recentBuilds = await AzureService.fetchADOBuilds(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl, tokenOverride);
+            if (recentBuilds.length > 0) {
+                // Map to min format to satisfy ADOPipeline interface
+                results = recentBuilds.map(b => ({
+                    id: b.definition.id,
+                    name: b.definition.name,
+                    folder: b.definition.path || "",
+                    url: b.definition.url || "",
+                    _links: b.definition._links || { web: { href: "" } }
+                }));
+            }
+        }
+
+        // Strategy 4: Global Project Fetch (No Filter)
+        if (results.length === 0) {
+            console.log(`   [Strategy 4] Checking Pipelines API (Project-wide, no filters)...`);
+            results = await AzureService.fetchADOPipelines(devops.organization, projectIdentifier, "", devops.pat, devops.baseUrl, tokenOverride);
+        }
+
+        return results;
+    };
+
+    // First try with PAT, then try with CLI token if PAT failed and token exists
+    pipelines = await runDiscovery();
+    if (pipelines.length === 0 && cliToken) {
+        pipelines = await runDiscovery(cliToken);
     }
 
     console.log(`\n📊 Discovery Summary: Found ${pipelines.length} possible pipeline matches.`);
