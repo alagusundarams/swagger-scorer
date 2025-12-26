@@ -35,20 +35,21 @@ function extractForensicsFromPolicy(xml: string): { guids: string[], nvs: string
     const backends = new Set<string>();
 
     // 0. Backend References (backend-id and base-url)
-    const backendMatches = xml.match(/backend-id=["']([^"']+)["']/gi);
+    // Matches: backend-id="...", backend-id = "...", backend-id='...'
+    const backendMatches = xml.match(/backend-id\s*=\s*["']([^"']+)["']/gi);
     if (backendMatches) {
         backendMatches.forEach(m => {
-            const id = m.split(/["']/)[1];
+            const id = m.split(/\s*=\s*/)[1].replace(/["']/g, '');
             backends.add(id);
             if (id.startsWith('{{')) nvs.add(id.replace(/[{}]/g, '').trim());
         });
     }
 
-    const baseUrlMatches = xml.match(/base-url=["']([^"']+)["']/gi);
+    const baseUrlMatches = xml.match(/base-url\s*=\s*["']([^"']+)["']/gi);
     if (baseUrlMatches) {
         baseUrlMatches.forEach(m => {
-            const url = m.split(/["']/)[1];
-            backends.add(`URL: ${url}`);
+            const url = m.split(/\s*=\s*/)[1].replace(/["']/g, '');
+            backends.add(`Static: ${url}`);
             if (url.startsWith('{{')) nvs.add(url.replace(/[{}]/g, '').trim());
         });
     }
@@ -208,7 +209,15 @@ async function debug() {
     console.log(`\n📡 Inspecting APIs for ${targetProduct}...`);
     const apisRes = await AzureService.fetchAPIM<any>(apimConfig, `/products/${targetProduct}/apis`);
     for (const api of apisRes.value || []) {
+        // Fetch full API details to get serviceUrl
+        const fullApiUrl = `https://management.azure.com${api.id}?api-version=2022-08-01`;
+        const fullApiRes = await fetch(fullApiUrl, { headers: { 'Authorization': `Bearer ${azureToken}` } });
+        const apiData = fullApiRes.ok ? await fullApiRes.json() : api;
+        const serviceUrl = apiData.properties?.serviceUrl || 'NONE';
+
         console.log(`   🔹 API: ${api.properties.displayName} (${api.name})`);
+        console.log(`      🌐 Default Backend (serviceUrl): ${serviceUrl}`);
+
         try {
             const apiPolUrl = `https://management.azure.com${api.id}${api.id.includes('/policies/') ? '' : '/policies/policy'}?api-version=2022-08-01&format=rawxml`;
             if (verbose) console.log(`      🔗 Fetching API Policy from: ${apiPolUrl}`);
@@ -227,14 +236,14 @@ async function debug() {
                     }
                 }
 
-                if (verbose && xml.length < 50) {
-                    console.log(`      ⚠️  Empty or trivial policy found (${xml.length} chars).`);
+                if (verbose && (!xml || xml.length < 50)) {
+                    console.log(`      ⚠️  Empty or trivial policy found (${xml?.length || 0} chars).`);
                 }
 
                 const results = extractForensicsFromPolicy(xml);
-                console.log(`      ✅ App IDs:`, results.guids);
-                console.log(`      ✅ Named Values:`, results.nvs);
-                console.log(`      ✅ Backends:`, results.backends);
+                if (results.guids.length > 0) console.log(`      ✅ App IDs:`, results.guids);
+                if (results.nvs.length > 0) console.log(`      ✅ Named Values:`, results.nvs);
+                if (results.backends.length > 0) console.log(`      ✅ Policy Backends:`, results.backends);
 
                 // Resolve NVs
                 results.nvs.forEach(nvKey => {
@@ -244,9 +253,10 @@ async function debug() {
 
                 // Resolve Backends
                 results.backends.forEach(bId => {
-                    const match = allBackends.find((b: any) => b.name === bId);
-                    if (match) console.log(`         🔗 Resolved Backend [${bId}] -> ${match.properties.url}`);
-                    else console.log(`         ⚠️  Backend [${bId}] reference found but NOT in inventory.`);
+                    const cleanBId = bId.replace(/^[^:]+: /, ''); // Remove "Static: " prefix
+                    const match = allBackends.find((b: any) => b.name === cleanBId || b.id === cleanBId);
+                    if (match) console.log(`         🔗 Resolved Backend [${cleanBId}] -> ${match.properties.url}`);
+                    else if (!bId.startsWith('Static:')) console.log(`         ⚠️  Backend [${cleanBId}] reference found but NOT in inventory.`);
                 });
             }
         } catch (e) { }

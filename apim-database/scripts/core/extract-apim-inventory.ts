@@ -56,19 +56,19 @@ function extractForensicsFromPolicy(xml: string): { guids: string[], nvs: string
     const backends = new Set<string>();
 
     // 0. Backend References
-    const backendMatches = xml.match(/backend-id=["']([^"']+)["']/gi);
+    const backendMatches = xml.match(/backend-id\s*=\s*["']([^"']+)["']/gi);
     if (backendMatches) {
         backendMatches.forEach(m => {
-            const id = m.split(/["']/)[1];
+            const id = m.split(/\s*=\s*/)[1].replace(/["']/g, '');
             backends.add(id);
             if (id.startsWith('{{')) nvs.add(id.replace(/[{}]/g, '').trim());
         });
     }
 
-    const baseUrlMatches = xml.match(/base-url=["']([^"']+)["']/gi);
+    const baseUrlMatches = xml.match(/base-url\s*=\s*["']([^"']+)["']/gi);
     if (baseUrlMatches) {
         baseUrlMatches.forEach(m => {
-            const url = m.split(/["']/)[1];
+            const url = m.split(/\s*=\s*/)[1].replace(/["']/g, '');
             backends.add(`Static: ${url}`);
             if (url.startsWith('{{')) nvs.add(url.replace(/[{}]/g, '').trim());
         });
@@ -278,6 +278,18 @@ async function main() {
                         const { guids, nvs, backends } = extractForensicsFromPolicy(xml);
                         guids.forEach((id: string) => envAppIds.add(id));
                         nvs.forEach((nv: string) => potentialNvs.add(nv));
+
+                        // Add serviceUrl as a default backend if present
+                        // We fetch the full API details here to ensure we have the serviceUrl
+                        const apiRes = await fetch(`https://management.azure.com${apiFullId}?api-version=2022-08-01`, {
+                            headers: { 'Authorization': `Bearer ${azureToken}` }
+                        });
+                        if (apiRes.ok) {
+                            const apiData = await apiRes.json() as any;
+                            if (apiData.properties?.serviceUrl) {
+                                backends.push(`Default: ${apiData.properties.serviceUrl}`);
+                            }
+                        }
 
                         metadata.apiForensics[env.name][apiName] = { guids, backends };
                     }
