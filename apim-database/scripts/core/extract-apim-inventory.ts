@@ -55,23 +55,43 @@ function extractForensicsFromPolicy(xml: string): { guids: string[], nvs: string
     const nvs = new Set<string>();
     const backends = new Set<string>();
 
-    // 0. Backend References
-    const backendMatches = xml.match(/backend-id\s*=\s*["']([^"']+)["']/gi);
-    if (backendMatches) {
-        backendMatches.forEach(m => {
-            const id = m.split(/\s*=\s*/)[1].replace(/["']/g, '');
-            backends.add(id);
-            if (id.startsWith('{{')) nvs.add(id.replace(/[{}]/g, '').trim());
+    // 0. Backend References (Unified Tag Parsing)
+    // Looking for ANY tag with backend-id, base-url, dapr-app-id, or set-url
+    // Matches: backend-id="...", backend-id = "...", backend-id='...'
+    const backendAttrMatches = xml.match(/(backend-id|base-url|dapr-app-id)\s*=\s*["']([^"']+)["']/gi);
+    if (backendAttrMatches) {
+        backendAttrMatches.forEach(m => {
+            const parts = m.split(/\s*=\s*/);
+            const key = parts[0].toLowerCase();
+            const val = parts[1].replace(/["']/g, '');
+            if (key === 'backend-id') backends.add(val);
+            else if (key === 'base-url') backends.add(`Static: ${val}`);
+            else if (key === 'dapr-app-id') backends.add(`Dapr: ${val}`);
+
+            if (val.startsWith('{{')) nvs.add(val.replace(/[{}]/g, '').trim());
         });
     }
 
-    const baseUrlMatches = xml.match(/base-url\s*=\s*["']([^"']+)["']/gi);
-    if (baseUrlMatches) {
-        baseUrlMatches.forEach(m => {
-            const url = m.split(/\s*=\s*/)[1].replace(/["']/g, '');
-            backends.add(`Static: ${url}`);
-            if (url.startsWith('{{')) nvs.add(url.replace(/[{}]/g, '').trim());
+    // b. Element content (set-url)
+    const setUrlValMatches = xml.match(/<set-url>([\s\S]*?)<\/set-url>/gi);
+    if (setUrlValMatches) {
+        setUrlValMatches.forEach(m => {
+            const content = m.replace(/<\/?set-url>/gi, '').trim();
+            if (content) backends.add(`Static(URL): ${content}`);
+            if (content.startsWith('{{')) nvs.add(content.replace(/[{}]/g, '').trim());
         });
+    }
+
+    // c. Case-insensitive Tag Check for anything complex
+    if (xml.toLowerCase().includes('set-backend-service')) {
+        const fullTagMatches = xml.match(/<set-backend-service[^>]*>/gi);
+        if (fullTagMatches) {
+            fullTagMatches.forEach(t => {
+                if (!t.toLowerCase().includes('backend-id') && !t.toLowerCase().includes('base-url')) {
+                    backends.add(`Complex: ${t.trim()}`);
+                }
+            });
+        }
     }
 
     // 1. Direct GUIDs

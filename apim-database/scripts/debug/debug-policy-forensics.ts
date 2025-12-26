@@ -34,33 +34,42 @@ function extractForensicsFromPolicy(xml: string): { guids: string[], nvs: string
     const nvs = new Set<string>();
     const backends = new Set<string>();
 
-    // 0. Backend References (backend-id and base-url)
-    // Matches: backend-id="...", backend-id = "...", backend-id='...'
-    const backendMatches = xml.match(/backend-id\s*=\s*["']([^"']+)["']/gi);
-    if (backendMatches) {
-        backendMatches.forEach(m => {
-            const id = m.split(/\s*=\s*/)[1].replace(/["']/g, '');
-            backends.add(id);
-            if (id.startsWith('{{')) nvs.add(id.replace(/[{}]/g, '').trim());
+    // 0. Backend References (Unified Tag Parsing)
+    // Looking for ANY tag with backend-id, base-url, dapr-app-id, or set-url
+    const tagMatches = xml.match(/<(set-backend-service|set-url|forward-request)[^>]*>([\s\S]*?<\/\1>)?/gi) || [];
+
+    // a. Generic Attribute Search (Catch-all)
+    const backendAttrMatches = xml.match(/(backend-id|base-url|dapr-app-id)\s*=\s*["']([^"']+)["']/gi);
+    if (backendAttrMatches) {
+        backendAttrMatches.forEach(m => {
+            const parts = m.split(/\s*=\s*/);
+            const key = parts[0].toLowerCase();
+            const val = parts[1].replace(/["']/g, '');
+            if (key === 'backend-id') backends.add(val);
+            else if (key === 'base-url') backends.add(`Static: ${val}`);
+            else if (key === 'dapr-app-id') backends.add(`Dapr: ${val}`);
+
+            if (val.startsWith('{{')) nvs.add(val.replace(/[{}]/g, '').trim());
         });
     }
 
-    const baseUrlMatches = xml.match(/base-url\s*=\s*["']([^"']+)["']/gi);
-    if (baseUrlMatches) {
-        baseUrlMatches.forEach(m => {
-            const url = m.split(/\s*=\s*/)[1].replace(/["']/g, '');
-            backends.add(`Static: ${url}`);
-            if (url.startsWith('{{')) nvs.add(url.replace(/[{}]/g, '').trim());
+    // b. Element content (set-url)
+    const setUrlValMatches = xml.match(/<set-url>([\s\S]*?)<\/set-url>/gi);
+    if (setUrlValMatches) {
+        setUrlValMatches.forEach(m => {
+            const content = m.replace(/<\/?set-url>/gi, '').trim();
+            if (content) backends.add(`Static(URL): ${content}`);
+            if (content.startsWith('{{')) nvs.add(content.replace(/[{}]/g, '').trim());
         });
     }
 
-    // Capture the tag itself just in case
-    if (xml.includes('set-backend-service')) {
-        const tagMatches = xml.match(/<set-backend-service[^>]*>/gi);
-        if (tagMatches && tagMatches.length > backends.size) {
-            tagMatches.forEach(t => {
-                if (!t.includes('backend-id') && !t.includes('base-url')) {
-                    backends.add(`Complex: ${t}`);
+    // c. Case-insensitive Tag Check for anything complex
+    if (xml.toLowerCase().includes('set-backend-service')) {
+        const fullTagMatches = xml.match(/<set-backend-service[^>]*>/gi);
+        if (fullTagMatches) {
+            fullTagMatches.forEach(t => {
+                if (!t.toLowerCase().includes('backend-id') && !t.toLowerCase().includes('base-url')) {
+                    backends.add(`Complex: ${t.trim()}`);
                 }
             });
         }
@@ -222,6 +231,7 @@ async function debug() {
             const apiPolUrl = `https://management.azure.com${api.id}${api.id.includes('/policies/') ? '' : '/policies/policy'}?api-version=2022-08-01&format=rawxml`;
             if (verbose) console.log(`      🔗 Fetching API Policy from: ${apiPolUrl}`);
             const polRes = await fetch(apiPolUrl, { headers: { 'Authorization': `Bearer ${azureToken}` } });
+
             if (polRes.ok) {
                 const text = await polRes.text();
                 let xml = '';
@@ -243,7 +253,20 @@ async function debug() {
                 const results = extractForensicsFromPolicy(xml);
                 if (results.guids.length > 0) console.log(`      ✅ App IDs:`, results.guids);
                 if (results.nvs.length > 0) console.log(`      ✅ Named Values:`, results.nvs);
-                if (results.backends.length > 0) console.log(`      ✅ Policy Backends:`, results.backends);
+                if (results.backends.length > 0) {
+                    console.log(`      ✅ Policy Backends:`, results.backends);
+                    // Resolve Backends
+                    results.backends.forEach(bId => {
+                        const cleanBId = bId.replace(/^[^:]+: /, ''); // Remove "Static: " prefix
+                        const match = allBackends.find((b: any) => b.name === cleanBId || b.id === cleanBId);
+                        if (match) console.log(`         🔗 Resolved Backend [${cleanBId}] -> ${match.properties.url}`);
+                        else if (!bId.startsWith('Static:') && !bId.startsWith('Dapr:') && !bId.startsWith('Complex:')) {
+                            console.log(`         ⚠️  Backend [${cleanBId}] reference found but NOT in inventory.`);
+                        }
+                    });
+                } else if (verbose) {
+                    console.log(`      ℹ️  No explicit backend configuration found in this policy.`);
+                }
 
                 // Resolve NVs
                 results.nvs.forEach(nvKey => {
@@ -251,15 +274,12 @@ async function debug() {
                     if (match) console.log(`         🔗 Resolved {{${nvKey}}} -> ${match.properties.secret ? '*** (Secret)' : match.properties.value}`);
                 });
 
-                // Resolve Backends
-                results.backends.forEach(bId => {
-                    const cleanBId = bId.replace(/^[^:]+: /, ''); // Remove "Static: " prefix
-                    const match = allBackends.find((b: any) => b.name === cleanBId || b.id === cleanBId);
-                    if (match) console.log(`         🔗 Resolved Backend [${cleanBId}] -> ${match.properties.url}`);
-                    else if (!bId.startsWith('Static:')) console.log(`         ⚠️  Backend [${cleanBId}] reference found but NOT in inventory.`);
-                });
+            } else {
+                if (verbose) console.log(`      ⚠️  API Policy fetch failed (HTTP ${polRes.status})`);
             }
-        } catch (e) { }
+        } catch (e) {
+            console.error(`      ❌ Error fetching/parsing policy for ${api.name}:`, (e as Error).message);
+        }
     }
 
     // 4. Summarize (The PoC "Satisfaction" report)
