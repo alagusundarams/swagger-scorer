@@ -70,7 +70,7 @@ async function resetDb() {
         console.log("👉 Now run the discovery flow: npm run discover-sync");
 
     } catch (err: any) {
-        console.error("❌ Reset Failed:", err.message);
+        console.error("❌ Reset Failed:", err);
     } finally {
         await pool.end();
     }

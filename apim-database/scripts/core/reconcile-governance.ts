@@ -25,6 +25,8 @@ interface MetadataStore {
     namedValues: Record<string, any[]>;
     appIds: Record<string, string[]>;
     apiContracts: Record<string, any>;
+    backends: Record<string, any[]>;
+    backendAssociations: Record<string, string[]>;
 }
 
 // --- CONFIG LOADER ---
@@ -74,6 +76,9 @@ async function main() {
 
         const appKey = Object.keys(apimMeta.appIds).find(k => k.toUpperCase() === targetEnv);
         apimMeta.appIds = appKey ? { [appKey]: apimMeta.appIds[appKey] } : {};
+
+        const backKey = Object.keys(apimMeta.backends).find(k => k.toUpperCase() === targetEnv);
+        apimMeta.backends = backKey ? { [backKey]: apimMeta.backends[backKey] } : {};
 
         console.log(`📊 Filtered to ${inventory.length} products associated with ${targetEnv}.`);
     }
@@ -177,6 +182,39 @@ async function main() {
                             display_name = EXCLUDED.display_name,
                             updated_at = NOW();
                     `, [id, name, env]);
+                }
+            }
+        }
+
+        // --- D. BACKENDS RECONCILIATION ---
+        console.log(`🔌 Reconciling Backend inventory...`);
+        for (const [env, backends] of Object.entries(apimMeta.backends || {})) {
+            for (const b of backends) {
+                await pool.query(`
+                    INSERT INTO governance_backends (id, environment, url, description, title, resource_id, protocol, updated_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+                    ON CONFLICT (id, environment) DO UPDATE SET
+                        url = EXCLUDED.url,
+                        description = EXCLUDED.description,
+                        title = EXCLUDED.title,
+                        resource_id = EXCLUDED.resource_id,
+                        protocol = EXCLUDED.protocol,
+                        updated_at = NOW();
+                `, [b.id, env, b.url, b.description, b.title, b.resourceId, b.protocol]);
+            }
+        }
+
+        console.log(`🔗 Linking API to Backends...`);
+        for (const [apiId, backendIds] of Object.entries(apimMeta.backendAssociations || {})) {
+            for (const bId of backendIds) {
+                // Determine environment for this association (we'll use the target or all if multiple)
+                const envs = targetEnv ? [targetEnv] : Object.keys(apimMeta.backends);
+                for (const envName of envs) {
+                    await pool.query(`
+                        INSERT INTO api_backends (api_id, backend_id, environment)
+                        VALUES ($1, $2, $3)
+                        ON CONFLICT (api_id, backend_id, environment) DO NOTHING;
+                    `, [apiId, bId, envName]);
                 }
             }
         }

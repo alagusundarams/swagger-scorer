@@ -273,6 +273,29 @@ CREATE TABLE IF NOT EXISTS app_registrations (
 CREATE INDEX idx_app_reg_client_id ON app_registrations(client_id);
 
 -- =============================================================================
+-- BACKENDS
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS governance_backends (
+    id TEXT NOT NULL,
+    environment TEXT NOT NULL,
+    url TEXT,
+    description TEXT,
+    title TEXT,
+    resource_id TEXT,
+    protocol TEXT,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    PRIMARY KEY (id, environment)
+);
+
+CREATE TABLE IF NOT EXISTS api_backends (
+    api_id TEXT, -- Note: can't always guarantee api_id matches our DB id yet
+    backend_id TEXT,
+    environment TEXT,
+    PRIMARY KEY (api_id, backend_id, environment)
+);
+
+-- =============================================================================
 -- ACCESS CONTROL LISTS (Named Values / Config)
 -- =============================================================================
 

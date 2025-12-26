@@ -41,15 +41,28 @@ interface MetadataStore {
     namedValues: Record<string, any[]>; // env -> nv[]
     appIds: Record<string, string[]>;   // env -> unique_guids[]
     apiContracts: Record<string, any>;  // apiId -> { displayName: string, definition: any }
+    backends: Record<string, any[]>;    // env -> backend[]
+    backendAssociations: Record<string, string[]>; // apiId -> backendId[]
 }
 
 /**
- * Regex-based forensics to find Client IDs in XML
+ * Regex-based forensics to find Client IDs and Backends in XML
  */
-function extractPotentialIdsFromPolicy(xml: string): { guids: string[], nvs: string[] } {
-    if (!xml) return { guids: [], nvs: [] };
+function extractForensicsFromPolicy(xml: string): { guids: string[], nvs: string[], backends: string[] } {
+    if (!xml) return { guids: [], nvs: [], backends: [] };
     const guids = new Set<string>();
     const nvs = new Set<string>();
+    const backends = new Set<string>();
+
+    // 0. Backend References (Surgical)
+    // <set-backend-service backend-id="my-backend" />
+    const backendMatches = xml.match(/backend-id=["']([^"']+)["']/gi);
+    if (backendMatches) {
+        backendMatches.forEach(m => {
+            const id = m.split(/["']/)[1];
+            backends.add(id);
+        });
+    }
 
     // 1. Direct GUIDs
     const guidMatches = xml.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/gi);
@@ -76,7 +89,11 @@ function extractPotentialIdsFromPolicy(xml: string): { guids: string[], nvs: str
         });
     }
 
-    return { guids: Array.from(guids), nvs: Array.from(nvs) };
+    return {
+        guids: Array.from(guids),
+        nvs: Array.from(nvs),
+        backends: Array.from(backends)
+    };
 }
 
 async function main() {
@@ -85,7 +102,13 @@ async function main() {
 
     const azureToken = await AzureService.getAzureAccessToken();
     const uniqueProducts = new Map<string, ProductIdentity>();
-    const metadata: MetadataStore = { namedValues: {}, appIds: {}, apiContracts: {} };
+    const metadata: MetadataStore = {
+        namedValues: {},
+        appIds: {},
+        apiContracts: {},
+        backends: {},
+        backendAssociations: {}
+    };
 
     let envConfigs = config.azure?.environments || [];
     if (targetEnv) {
@@ -118,10 +141,12 @@ async function main() {
                 if (gPolRes.ok) {
                     const json = await gPolRes.json() as any;
                     const xml = json.properties?.value || '';
-                    const { guids, nvs } = extractPotentialIdsFromPolicy(xml);
+                    const { guids, nvs, backends } = extractForensicsFromPolicy(xml);
                     guids.forEach(id => envAppIds.add(id));
                     nvs.forEach(nv => potentialNvs.add(nv));
-                    if (verbose && (guids.length > 0 || nvs.length > 0)) console.log(`      📄 Global Policy: Found ${guids.length} GUIDs, ${nvs.length} NVs`);
+                    if (verbose && (guids.length > 0 || nvs.length > 0 || backends.length > 0)) {
+                        console.log(`      📄 Global Policy: Found ${guids.length} GUIDs, ${nvs.length} NVs, ${backends.length} Backends`);
+                    }
                 }
             } catch (e) { }
 
@@ -144,9 +169,9 @@ async function main() {
                     if (pPolRes.ok) {
                         const json = await pPolRes.json() as any;
                         const xml = json.properties?.value || '';
-                        const { guids, nvs } = extractPotentialIdsFromPolicy(xml);
-                        guids.forEach(id => envAppIds.add(id));
-                        nvs.forEach(nv => potentialNvs.add(nv));
+                        const { guids, nvs, backends: _b } = extractForensicsFromPolicy(xml);
+                        guids.forEach((id: string) => envAppIds.add(id));
+                        nvs.forEach((nv: string) => potentialNvs.add(nv));
                     }
                 } catch (e) { }
             }
@@ -163,6 +188,18 @@ async function main() {
                 keyVaultUrl: nv.properties.keyVault ? nv.properties.keyVault.secretIdentifier : null
             }));
 
+            // --- 2.5 Backends ---
+            console.log(`      🔌 Fetching Backend Entities...`);
+            const backendRes = await AzureService.fetchAPIM<any>(apimConfig, '/backends');
+            metadata.backends[env.name] = (backendRes.value || []).map((b: any) => ({
+                id: b.name,
+                url: b.properties.url,
+                description: b.properties.description,
+                title: b.properties.title,
+                resourceId: b.properties.resourceId,
+                protocol: b.properties.protocol
+            }));
+
             // --- 3. API Policies & Contracts (Smart Fetch) ---
             console.log(`      📄 Scanning API Policies & Contracts...`);
             const apiRes = await AzureService.fetchAPIM<any>(apimConfig, '/apis');
@@ -177,9 +214,13 @@ async function main() {
                     if (polRes.ok) {
                         const json = await polRes.json() as any;
                         const xml = json.properties?.value || '';
-                        const { guids, nvs } = extractPotentialIdsFromPolicy(xml);
-                        guids.forEach(id => envAppIds.add(id));
-                        nvs.forEach(nv => potentialNvs.add(nv));
+                        const { guids, nvs, backends } = extractForensicsFromPolicy(xml);
+                        guids.forEach((id: string) => envAppIds.add(id));
+                        nvs.forEach((nv: string) => potentialNvs.add(nv));
+
+                        if (backends.length > 0) {
+                            metadata.backendAssociations[apiId] = Array.from(new Set([...(metadata.backendAssociations[apiId] || []), ...backends]));
+                        }
                     }
                 } catch (e) { }
 
