@@ -120,17 +120,38 @@ async function runDebug() {
 
     // 2. Locate YAML Pipeline
     console.log(`\n➡️  Step 2: Locating Pipeline for Repo...`);
-    const pipelines = await AzureService.fetchADOPipelines(devops.organization, project, primaryRepoId, devops.pat, devops.baseUrl);
+
+    // Diagnostic log
+    const pipelineUrl = `${devops.baseUrl}/${devops.organization}/${project}/_apis/pipelines?api-version=7.1-preview.1&repositoryId=${primaryRepoId}&repositoryType=azureRepo`;
+    console.log(`   📡 Fetching from: ${pipelineUrl}`);
+
+    let pipelines = await AzureService.fetchADOPipelines(devops.organization, project, primaryRepoId, devops.pat, devops.baseUrl);
+    console.log(`   Count via Repo ID filter: ${pipelines.length}`);
 
     if (pipelines.length === 0) {
-        console.log(`   ❌ No pipelines found for this repo ID.`);
+        console.log(`   ⚠️  No pipelines found via repo filter. Attempting to fetch ALL pipelines in project to find match...`);
+        // Generic fetch (no repo filter)
+        const allPipelines = await AzureService.fetchADOPipelines(devops.organization, project, "", devops.pat, devops.baseUrl);
+        console.log(`   Total pipelines in project: ${allPipelines.length}`);
+
+        // Manual filter
+        pipelines = allPipelines;
+    }
+
+    if (pipelines.length === 0) {
+        console.log(`   ❌ No pipelines found for this project.`);
         return;
     }
 
     const matchedPipeline = pipelines.find(p =>
-        p.name.toLowerCase().includes(primaryRepoName.toLowerCase()) ||
-        p.url.toLowerCase().includes(primaryRepoName.toLowerCase())
-    ) || pipelines[0]; // Fallback to first if only one exists
+        p.name.toLowerCase().includes(productNameArg!.toLowerCase()) ||
+        p.name.toLowerCase().includes(primaryRepoName.toLowerCase())
+    ) || pipelines[0];
+
+    if (!matchedPipeline) {
+        console.log(`   ❌ No pipeline could be matched.`);
+        return;
+    }
 
     console.log(`   ✅ Selected Pipeline: ${matchedPipeline.name} (ID: ${matchedPipeline.id})`);
 
