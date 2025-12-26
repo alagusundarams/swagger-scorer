@@ -92,12 +92,13 @@ export class AzureService {
      */
     static async getAzureAccessToken(resource: string = 'https://management.azure.com'): Promise<string> {
         try {
-            const token = execSync(`az account get-access-token --resource ${resource} --query accessToken -o tsv`, {
+            const token = execSync(`az account get-access-token --resource ${resource} --query accessToken -o tsv 2>/dev/null`, {
                 encoding: 'utf-8'
             }).trim();
             return token;
         } catch (error) {
-            throw new Error(`Failed to get Azure access token for ${resource}. Make sure Azure CLI is installed and you are logged in (az login).`);
+            // Silently fail - caller will handle fallback (e.g., PAT for ADO)
+            throw new Error(`Failed to get Azure access token for ${resource}`);
         }
     }
 
