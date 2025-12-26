@@ -327,9 +327,9 @@ export class AzureService {
     /**
      * Fetch Recent Runs for a Pipeline
      */
-    static async fetchPipelineRuns(org: string, project: string, pipelineId: number, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<PipelineRun[]> {
+    static async fetchPipelineRuns(org: string, project: string, pipelineId: number, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<PipelineRun[]> {
         const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
-        const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
         const isLegacy = cleanBaseUrl.includes('visualstudio.com');
 
         const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
@@ -350,9 +350,9 @@ export class AzureService {
     /**
      * Fetch Timeline for a specific Pipeline Run
      */
-    static async fetchPipelineRunTimeline(org: string, project: string, runId: number, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<TimelineRecord[]> {
+    static async fetchPipelineRunTimeline(org: string, project: string, runId: number, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<TimelineRecord[]> {
         const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
-        const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
         const isLegacy = cleanBaseUrl.includes('visualstudio.com');
 
         const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
@@ -481,9 +481,9 @@ export class AzureService {
     /**
      * Search for Code in ADO (TF match strategy)
      */
-    static async searchCode(org: string, searchTerm: string, pat: string, baseUrl: string = 'https://dev.azure.com', filters?: any): Promise<CodeSearchResponse> {
+    static async searchCode(org: string, searchTerm: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<CodeSearchResponse> {
         const cleanBaseUrl = baseUrl.replace(/\/$/, '');
-        const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
 
         // Determine Search URL
         // DEV.AZURE.COM & VISUALSTUDIO.COM -> Use almsearch sub-domain for REST API
@@ -499,11 +499,6 @@ export class AzureService {
             searchText: searchTerm,
             $top: 20
         };
-
-        // If specific filters are passed (like project), use them, otherwise stay minimalist
-        if (filters && Object.keys(filters).length > 0) {
-            body.filters = filters;
-        }
 
         try {
             const response = await fetch(searchUrl, {
