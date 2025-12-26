@@ -24,10 +24,12 @@ const envSuffix = args.find(a => a.startsWith('--env='))?.split('=')[1] || 'ALL'
 const logFile = join(logsDir, `discover-sync_${envSuffix}_${timestamp}.log`);
 const logStream = createWriteStream(logFile, { flags: 'a' });
 
-// Dual logging helper
+// Dual logging helper with timestamp
 function log(message: string) {
-    console.log(message);
-    logStream.write(message + '\n');
+    const timestamp = new Date().toISOString();
+    const timestampedMsg = `[${timestamp}] ${message}`;
+    console.log(timestampedMsg);
+    logStream.write(timestampedMsg + '\n');
 }
 
 async function runScript(scriptPath: string) {
@@ -62,19 +64,38 @@ async function runScript(scriptPath: string) {
 }
 
 async function main() {
+    const startTime = Date.now();
+    const startDate = new Date().toISOString();
+
     log(`📋 [DISCOVER-SYNC] Starting orchestrated sync...`);
     log(`🗂️  Log file: ${logFile}`);
-    log(`🎯 Arguments: ${args.join(' ') || 'None (full sync)'}\n`);
+    log(`🎯 Arguments: ${args.join(' ') || 'None (full sync)'}`);
+    log(`⏰ Start time: ${startDate}\n`);
 
     try {
         await runScript('scripts/core/extract-apim-inventory.ts');
         await runScript('scripts/core/extract-ado-metadata.ts');
         await runScript('scripts/core/reconcile-governance.ts');
 
+        const endTime = Date.now();
+        const endDate = new Date().toISOString();
+        const durationMs = endTime - startTime;
+        const durationSec = (durationMs / 1000).toFixed(2);
+        const durationMin = (durationMs / 60000).toFixed(2);
+
         log(`\n✅ [COMPLETE] All discovery and sync phases finished successfully.`);
+        log(`⏰ End time: ${endDate}`);
+        log(`⏱️  Total duration: ${durationSec}s (${durationMin} minutes)`);
         log(`📄 Full log saved to: ${logFile}`);
     } catch (err) {
+        const endTime = Date.now();
+        const endDate = new Date().toISOString();
+        const durationMs = endTime - startTime;
+        const durationSec = (durationMs / 1000).toFixed(2);
+
         log(`\n💥 [FAILED] Sync orchestration aborted: ${(err as Error).message}`);
+        log(`⏰ Failed at: ${endDate}`);
+        log(`⏱️  Time before failure: ${durationSec}s`);
         log(`📄 Error log saved to: ${logFile}`);
         process.exit(1);
     } finally {

@@ -116,7 +116,7 @@ async function main() {
 
                 await pool.query(`
                     INSERT INTO products (
-                        id, name, display_name, environment, region,
+                        id, name, display_name, version, state, environment, region,
                         last_deployed_commit_hash, last_deployed_at,
                         terraform_pipeline_url, github_url,
                         dev_hash, dev_deployment_date,
@@ -125,7 +125,7 @@ async function main() {
                         production_hash, production_deployment_date,
                         management_mode, updated_at
                     )
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW())
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, NOW())
                     ON CONFLICT (id) DO UPDATE SET
                         last_deployed_commit_hash = COALESCE(EXCLUDED.last_deployed_commit_hash, products.last_deployed_commit_hash),
                         last_deployed_at = COALESCE(EXCLUDED.last_deployed_at, products.last_deployed_at),
@@ -142,7 +142,7 @@ async function main() {
                         management_mode = EXCLUDED.management_mode,
                         updated_at = NOW();
                 `, [
-                    uniqueProductId, prod.id, prod.name, envName, 'Global',
+                    uniqueProductId, prod.id, prod.name, '1.0', 'published', envName, 'Global',
                     localDeploy?.hash || null, localDeploy?.date || null,
                     ado.pipeline ? `https://dev.azure.com/${config.devops.organization}/${ado.repository.project}/_build?definitionId=${ado.pipeline.id}` : null,
                     ado.repository ? `https://dev.azure.com/${config.devops.organization}/${ado.repository.project}/_git/${ado.repository.name}` : null,
