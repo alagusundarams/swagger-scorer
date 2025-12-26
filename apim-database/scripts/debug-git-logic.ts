@@ -14,7 +14,7 @@ Usage:
   npx tsx scripts/debug-git-logic.ts --product="My Product Name"
 
 Purpose:
-  Probe multiple ADO Search endpoints using the correct REST API patterns.
+  Probe legacy ADO Search endpoints by testing multiple path/collection variations.
     `);
     process.exit(0);
 }
@@ -39,7 +39,7 @@ if (!devopsConfig || !devopsConfig.pat) {
 
 // --- MAIN ---
 async function runDebug() {
-    console.log(`\n🕵️‍♀️ DEBUG: Connectivity & Search Probe`);
+    console.log(`\n🕵️‍♀️ DEBUG: Legacy Search URL Probe`);
     console.log(`   Organization: ${devopsConfig.organization}`);
     console.log(`   Base URL:     ${devopsConfig.baseUrl || 'https://dev.azure.com'}`);
 
@@ -48,16 +48,14 @@ async function runDebug() {
     const cleanBaseUrl = (devopsConfig.baseUrl || 'https://dev.azure.com').replace(/\/$/, '');
     const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
 
-    // 0. Verify Connectivity & Discovery
-    console.log(`\n➡️  Step 0: Verifying Connectivity (Fetching Projects)...`);
-    let projectList: any[] = [];
+    // Discovery Step: Fetch Projects to enable scoped tests
+    console.log(`\n➡️  Step 0: Discovery (Fetching Projects)...`);
+    let projects: any[] = [];
     try {
-        projectList = await AzureService.fetchADOProjects(org, pat, cleanBaseUrl);
-        console.log(`   ✅ Connected! Found ${projectList.length} projects.`);
+        projects = await AzureService.fetchADOProjects(org, pat, cleanBaseUrl);
+        console.log(`   ✅ Found ${projects.length} projects.`);
     } catch (e: any) {
-        console.error(`   ❌ FAIL: Could not fetch projects. Your baseUrl/org/pat might be wrong.`);
-        console.error(`      Error: ${e.message}`);
-        return;
+        console.warn(`   ⚠️  Discovery failed, continuing with global probes only.`);
     }
 
     // 1. Content Search Probing
@@ -65,36 +63,40 @@ async function runDebug() {
 
     const searchBody = {
         searchText: productNameArg!.includes(' ') ? `"${productNameArg}"` : productNameArg,
-        $top: 10,
+        $top: 20,
         filters: { Extension: ["tf", "tfvars"] }
     };
 
-    // Refined Endpoints based on REST API standards for Legacy vs Modern
-    const searchVariations = [
+    // Endpoints to test - focusing on Legacy visualstudio.com patterns
+    const endpoints = [
         {
-            name: "Modern Search Host (Official Cloud Endpoint)",
+            name: "Modern Standard Host",
             url: `https://almsearch.dev.azure.com/${org}/_apis/search/codesearchresults?api-version=7.1-preview.1`
         },
         {
-            name: "Legacy Subdomain (Direct path - No doubled org)",
+            name: "Legacy Direct (No doubled org)",
             url: `${cleanBaseUrl}/_apis/search/codesearchresults?api-version=5.1`
         },
         {
-            name: "Legacy with DefaultCollection (Common legacy pattern)",
+            name: "Legacy with Collection Path",
             url: `${cleanBaseUrl}/DefaultCollection/_apis/search/codesearchresults?api-version=5.1`
+        },
+        {
+            name: "Legacy with Collection Path (API 7.1)",
+            url: `${cleanBaseUrl}/DefaultCollection/_apis/search/codesearchresults?api-version=7.1-preview.1`
         }
     ];
 
-    // Add Project-scoped test if we have projects
-    if (projectList.length > 0) {
-        const testProj = projectList[0].name;
-        searchVariations.push({
-            name: `Project-Scoped Search (Testing Project: ${testProj})`,
+    // Add specific project-scoped probe if possible
+    if (projects.length > 0) {
+        const testProj = projects[0].name;
+        endpoints.push({
+            name: `Project-Scoped (Project: ${testProj})`,
             url: `${cleanBaseUrl}/${testProj}/_apis/search/codesearchresults?api-version=5.1`
         });
     }
 
-    for (const ep of searchVariations) {
+    for (const ep of endpoints) {
         console.log(`\n   📡 Testing: ${ep.name}`);
         console.log(`      URL: ${ep.url}`);
 
@@ -115,14 +117,14 @@ async function runDebug() {
                 console.log(`      Hits found: ${searchResp.count}`);
 
                 if (searchResp.count > 0) {
-                    console.log(`      🎯 SUCCESS! Hits found.`);
+                    console.log(`      🎯 SUCCESS! Found results.`);
                     const first = searchResp.results[0];
-                    console.log(`      Sample Result: ${first.path} in [${first.repository.name}]`);
+                    console.log(`      Example: ${first.path} in Repo [${first.repository.name}]`);
                     break;
                 }
             } else {
                 const txt = await response.text();
-                console.log(`      ❌ Error: ${txt.substring(0, 150)}...`);
+                console.log(`      ❌ Error Details: ${txt.substring(0, 150)}...`);
             }
 
         } catch (e: any) {
