@@ -26,6 +26,11 @@ function loadConfig() {
 
 const config = loadConfig();
 
+// --- ARGS ---
+const args = process.argv.slice(2);
+const targetEnv = args.find(a => a.startsWith('--env='))?.split('=')[1]?.toUpperCase();
+const verbose = args.includes('--verbose');
+
 interface ProductIdentity {
     id: string;
     name: string;
@@ -35,46 +40,62 @@ interface ProductIdentity {
 interface MetadataStore {
     namedValues: Record<string, any[]>; // env -> nv[]
     appIds: Record<string, string[]>;   // env -> unique_guids[]
+    apiContracts: Record<string, any>;  // apiId -> { displayName: string, definition: any }
 }
 
 /**
  * Regex-based forensics to find Client IDs in XML
  */
-function extractClientIdsFromPolicy(xml: string): string[] {
-    if (!xml) return [];
-    const ids = new Set<string>();
+function extractPotentialIdsFromPolicy(xml: string): { guids: string[], nvs: string[] } {
+    if (!xml) return { guids: [], nvs: [] };
+    const guids = new Set<string>();
+    const nvs = new Set<string>();
 
-    const addIfGuidOrNv = (val: string) => {
-        const clean = val.replace(/[{}]/g, '').trim();
-        if (clean.length > 0 && (clean.includes('-') || /^[a-zA-Z0-9-_]+$/.test(clean))) {
-            ids.add(clean.toLowerCase());
-        }
-    };
-
-    // 1. GUIDs
+    // 1. Direct GUIDs
     const guidMatches = xml.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/gi);
-    if (guidMatches) guidMatches.forEach(m => ids.add(m.toLowerCase()));
+    if (guidMatches) guidMatches.forEach(m => guids.add(m.toLowerCase()));
 
-    // 2. Attributes
+    // 2. Named Value References {{env-name}}
+    const nvMatches = xml.match(/\{\{([^}]+)\}\}/g);
+    if (nvMatches) {
+        nvMatches.forEach(m => {
+            const name = m.replace(/[{}]/g, '').trim();
+            nvs.add(name);
+        });
+    }
+
+    // 3. Attribute-based (Surgical)
     const attrMatches = xml.match(/(audience|application-id|client-id|azp|aud)=["']([^"']+)["']/gi);
     if (attrMatches) {
         attrMatches.forEach(m => {
             const val = m.split(/["']/)[1];
-            addIfGuidOrNv(val);
+            if (/^[0-9a-fA-F]{8}-/.test(val)) guids.add(val.toLowerCase());
+            else if (val.startsWith('{{')) {
+                nvs.add(val.replace(/[{}]/g, '').trim());
+            }
         });
     }
 
-    return Array.from(ids).filter(id => /^[0-9a-f]{8}-/i.test(id)); // Only return GUIDs for App Reg
+    return { guids: Array.from(guids), nvs: Array.from(nvs) };
 }
 
 async function main() {
     console.log(`🚀 [PART 1] Starting APIM Inventory & Metadata Extraction...\n`);
+    if (targetEnv) console.log(`🎯 Target Environment: ${targetEnv}\n`);
 
     const azureToken = await AzureService.getAzureAccessToken();
     const uniqueProducts = new Map<string, ProductIdentity>();
-    const metadata: MetadataStore = { namedValues: {}, appIds: {} };
+    const metadata: MetadataStore = { namedValues: {}, appIds: {}, apiContracts: {} };
 
-    const envConfigs = config.azure?.environments || [];
+    let envConfigs = config.azure?.environments || [];
+    if (targetEnv) {
+        envConfigs = envConfigs.filter((env: any) => env.name.toUpperCase() === targetEnv);
+    }
+
+    if (envConfigs.length === 0) {
+        console.error(`❌ No matching environments found${targetEnv ? ` for ${targetEnv}` : ''}.`);
+        process.exit(1);
+    }
 
     for (const env of envConfigs) {
         try {
@@ -87,9 +108,27 @@ async function main() {
                 environment: env.name
             };
 
-            // 1. Products
+            const envAppIds = new Set<string>();
+            const potentialNvs = new Set<string>();
+
+            // --- 0. Global Policy (Priority) ---
+            try {
+                const globalUrl = `https://management.azure.com/subscriptions/${env.subscriptionId}/resourceGroups/${env.resourceGroup}/providers/Microsoft.ApiManagement/service/${env.instance}/policies/policy?api-version=2022-08-01&format=rawxml`;
+                const gPolRes = await fetch(globalUrl, { headers: { 'Authorization': `Bearer ${azureToken}` } });
+                if (gPolRes.ok) {
+                    const json = await gPolRes.json() as any;
+                    const xml = json.properties?.value || '';
+                    const { guids, nvs } = extractPotentialIdsFromPolicy(xml);
+                    guids.forEach(id => envAppIds.add(id));
+                    nvs.forEach(nv => potentialNvs.add(nv));
+                    if (verbose && (guids.length > 0 || nvs.length > 0)) console.log(`      📄 Global Policy: Found ${guids.length} GUIDs, ${nvs.length} NVs`);
+                }
+            } catch (e) { }
+
+            // --- 1. Products & Product Policies ---
             const prodRes = await AzureService.fetchAPIM<any>(apimConfig, '/products');
-            for (const p of prodRes.value || []) {
+            const products = prodRes.value || [];
+            for (const p of products) {
                 const prodId = p.name;
                 const prodName = p.properties.displayName;
                 if (!uniqueProducts.has(prodId)) {
@@ -97,24 +136,40 @@ async function main() {
                 } else {
                     uniqueProducts.get(prodId)!.environments.push(env.name);
                 }
+
+                try {
+                    const pPolRes = await fetch(`https://management.azure.com${p.id}/policies/policy?api-version=2022-08-01&format=rawxml`, {
+                        headers: { 'Authorization': `Bearer ${azureToken}` }
+                    });
+                    if (pPolRes.ok) {
+                        const json = await pPolRes.json() as any;
+                        const xml = json.properties?.value || '';
+                        const { guids, nvs } = extractPotentialIdsFromPolicy(xml);
+                        guids.forEach(id => envAppIds.add(id));
+                        nvs.forEach(nv => potentialNvs.add(nv));
+                    }
+                } catch (e) { }
             }
 
-            // 2. Named Values
+            // --- 2. Named Values ---
             console.log(`      🌏 Fetching Named Values...`);
             const nvRes = await AzureService.fetchAPIM<any>(apimConfig, '/namedValues');
-            metadata.namedValues[env.name] = (nvRes.value || []).map((nv: any) => ({
+            const envNvs = (nvRes.value || []);
+            metadata.namedValues[env.name] = envNvs.map((nv: any) => ({
                 name: nv.name,
+                displayName: nv.properties.displayName,
                 value: nv.properties.value,
                 isSecret: nv.properties.secret,
                 keyVaultUrl: nv.properties.keyVault ? nv.properties.keyVault.secretIdentifier : null
             }));
 
-            // 3. API Policy Scanning (Forensics)
-            console.log(`      📄 Scanning API Policies for identities...`);
+            // --- 3. API Policies & Contracts (Smart Fetch) ---
+            console.log(`      📄 Scanning API Policies & Contracts...`);
             const apiRes = await AzureService.fetchAPIM<any>(apimConfig, '/apis');
-            const appIds = new Set<string>();
-
             for (const api of apiRes.value || []) {
+                const apiId = api.name;
+
+                // 3a. Policy Forensics
                 try {
                     const polRes = await fetch(`https://management.azure.com${api.id}/policies/policy?api-version=2022-08-01&format=rawxml`, {
                         headers: { 'Authorization': `Bearer ${azureToken}` }
@@ -122,12 +177,49 @@ async function main() {
                     if (polRes.ok) {
                         const json = await polRes.json() as any;
                         const xml = json.properties?.value || '';
-                        extractClientIdsFromPolicy(xml).forEach(id => appIds.add(id));
+                        const { guids, nvs } = extractPotentialIdsFromPolicy(xml);
+                        guids.forEach(id => envAppIds.add(id));
+                        nvs.forEach(nv => potentialNvs.add(nv));
                     }
                 } catch (e) { }
+
+                // 3b. Global Contract Cache (Deduplication)
+                if (!metadata.apiContracts[apiId]) {
+                    try {
+                        const contractRes = await fetch(`https://management.azure.com${api.id}?api-version=2022-08-01&export=true&format=openapi`, {
+                            headers: { 'Authorization': `Bearer ${azureToken}` }
+                        });
+                        if (contractRes.ok) {
+                            const contractJson = await contractRes.json() as any;
+                            metadata.apiContracts[apiId] = {
+                                displayName: api.properties.displayName,
+                                definition: contractJson.value || contractJson
+                            };
+                            if (verbose) console.log(`         ✅ Cached Contract: ${api.properties.displayName}`);
+                        }
+                    } catch (e) {
+                        if (verbose) console.warn(`         ⚠️  Contract fetch failed for ${apiId}`);
+                    }
+                }
             }
-            metadata.appIds[env.name] = Array.from(appIds);
-            console.log(`      ✅ Found ${metadata.appIds[env.name].length} unique App IDs in policies.`);
+
+            // --- 4. Resolve Named Values ---
+            if (potentialNvs.size > 0) {
+                if (verbose) console.log(`      🔍 Resolving ${potentialNvs.size} potential Named Value references...`);
+                for (const nvKey of potentialNvs) {
+                    const match = envNvs.find((nv: any) => nv.name === nvKey || nv.properties.displayName === nvKey);
+                    if (match && match.properties.value) {
+                        const val = match.properties.value;
+                        if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/.test(val)) {
+                            envAppIds.add(val.toLowerCase());
+                            if (verbose) console.log(`         ✅ Resolved {{${nvKey}}} -> ${val.substring(0, 8)}...`);
+                        }
+                    }
+                }
+            }
+
+            metadata.appIds[env.name] = Array.from(envAppIds).filter(id => /^[0-9a-f]{8}-/i.test(id));
+            console.log(`      ✅ Found ${metadata.appIds[env.name].length} unique App IDs for ${env.name}.`);
 
         } catch (e: any) {
             console.error(`   ❌ Failed to scan ${env.name}:`, e.message);
@@ -146,6 +238,7 @@ async function main() {
 
     console.log(`\n✅ Extraction Complete!`);
     console.log(`📊 Inventory: ${uniqueProducts.size} Products.`);
+    if (targetEnv) console.log(`🎯 Results filtered for: ${targetEnv}`);
     console.log(`💾 Metadata Saved to: scripts/data/apim-metadata.json`);
 }
 

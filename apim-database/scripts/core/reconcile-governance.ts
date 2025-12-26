@@ -24,19 +24,30 @@ interface ADOMetadata {
 interface MetadataStore {
     namedValues: Record<string, any[]>;
     appIds: Record<string, string[]>;
+    apiContracts: Record<string, any>;
 }
 
 // --- CONFIG LOADER ---
 function loadConfig() {
-    const rootConfig = join(process.cwd(), 'apim-database', 'config.json');
-    if (existsSync(rootConfig)) return JSON.parse(readFileSync(rootConfig, 'utf8'));
+    const configPaths = [
+        join(process.cwd(), 'apim-database', 'config.json'),
+        join(process.cwd(), 'config.json')
+    ];
+    for (const path of configPaths) {
+        if (existsSync(path)) return JSON.parse(readFileSync(path, 'utf8'));
+    }
     return {};
 }
 
 const config = loadConfig();
 
+// --- ARGS ---
+const args = process.argv.slice(2);
+const targetEnv = args.find(a => a.startsWith('--env='))?.split('=')[1]?.toUpperCase();
+
 async function main() {
     console.log(`🚀 [PART 3] Starting Governance Reconciliation...\n`);
+    if (targetEnv) console.log(`🎯 Filtering for Environment: ${targetEnv}\n`);
 
     // 1. Data Loading
     const dataDir = join(process.cwd(), 'apim-database', 'scripts', 'data');
@@ -49,9 +60,23 @@ async function main() {
         process.exit(1);
     }
 
-    const inventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
+    let inventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
     const adoList: ADOMetadata[] = JSON.parse(readFileSync(adoMetaPath, 'utf8'));
-    const apimMeta: MetadataStore = JSON.parse(readFileSync(apimMetaPath, 'utf8'));
+    let apimMeta: MetadataStore = JSON.parse(readFileSync(apimMetaPath, 'utf8'));
+
+    // Filter by environment if flag is provided
+    if (targetEnv) {
+        inventory = inventory.filter((p: any) => p.environments.map((e: any) => e.toUpperCase()).includes(targetEnv));
+
+        // Match environment keys in apimMeta (case-insensitive)
+        const nvKey = Object.keys(apimMeta.namedValues).find(k => k.toUpperCase() === targetEnv);
+        apimMeta.namedValues = nvKey ? { [nvKey]: apimMeta.namedValues[nvKey] } : {};
+
+        const appKey = Object.keys(apimMeta.appIds).find(k => k.toUpperCase() === targetEnv);
+        apimMeta.appIds = appKey ? { [appKey]: apimMeta.appIds[appKey] } : {};
+
+        console.log(`📊 Filtered to ${inventory.length} products associated with ${targetEnv}.`);
+    }
 
     const adoMap = new Map<string, ADOMetadata>(adoList.map(m => [m.productId, m]));
 

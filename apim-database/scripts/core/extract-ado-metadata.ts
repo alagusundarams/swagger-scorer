@@ -25,6 +25,10 @@ function loadConfig() {
 
 const config = loadConfig();
 
+// --- ARGS ---
+const args = process.argv.slice(2);
+const targetEnv = args.find(a => a.startsWith('--env='))?.split('=')[1]?.toUpperCase();
+
 interface ProductIdentity {
     id: string;
     name: string;
@@ -42,6 +46,7 @@ interface ADOMetadata {
 
 async function main() {
     console.log(`🚀 [PART 2] Starting ADO Metadata Extraction...\n`);
+    if (targetEnv) console.log(`🎯 Filtering for Environment: ${targetEnv}\n`);
 
     const devops = config.devops;
     if (!devops) {
@@ -55,8 +60,15 @@ async function main() {
         console.error(`❌ Inventory file not found: ${inventoryPath}. Run Part 1 first!`);
         process.exit(1);
     }
-    const inventory: ProductIdentity[] = JSON.parse(readFileSync(inventoryPath, 'utf8'));
-    console.log(`📊 Loaded ${inventory.length} unique products for discovery.`);
+    let inventory: ProductIdentity[] = JSON.parse(readFileSync(inventoryPath, 'utf8'));
+
+    // Filter by environment if flag is provided
+    if (targetEnv) {
+        inventory = inventory.filter(p => p.environments.map(e => e.toUpperCase()).includes(targetEnv));
+        console.log(`📊 Filtered to ${inventory.length} products associated with ${targetEnv}.`);
+    } else {
+        console.log(`📊 Loaded ${inventory.length} unique products for discovery.`);
+    }
 
     // 2. Setup Auth (CLI Fallback)
     let cliToken = "";
