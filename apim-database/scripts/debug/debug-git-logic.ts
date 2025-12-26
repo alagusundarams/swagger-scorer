@@ -195,89 +195,88 @@ async function runDebug() {
         console.log(`   ✅ Best Match: ${matchedPipeline.name} (ID: ${matchedPipeline.id})`);
     }
 
-    // --- STEP 4: SURGICAL ENVIRONMENT SYNC ---
-    console.log(`\n➡️  Step 4: Surgical Environment Hash Sync (Scale-Optimized)...`);
+    // --- STEP 4: SURGICAL ENVIRONMENT SYNC (HYBRID STRATEGY) ---
+    console.log(`\n➡️  Step 4: Surgical Environment Hash Sync (Hybrid Strategy)...`);
     const envsToSync = ['DEV', 'QA', 'STAGE', 'PROD'];
     const deployments: Record<string, { hash: string; date: string }> = {};
-
-    console.log(`   ⏳ Fetching latest builds from main (rich metadata)...`);
-    const runs = await AzureService.fetchBuildsByDefinition(devops.organization, projectIdentifier, matchedPipeline.id, devops.pat, devops.baseUrl, cliToken);
-
-    const SCAN_DEPTH = 15;
     const timelineCache = new Map<number, any[]>();
-    let apiCyclesAvoided = 0;
-    let timelinesFetched = 0;
+    const projectIdent = projectIdentifier;
 
-    // Optimized Scan: One pass over runs, surgical timeline fetching
-    for (const run of runs.slice(0, SCAN_DEPTH)) {
-        // Early Exit: Stop if we found all environments
-        const foundCount = Object.keys(deployments).length;
-        if (foundCount === envsToSync.length) {
-            apiCyclesAvoided += (SCAN_DEPTH - timelinesFetched - (apiCyclesAvoided));
-            break;
+    console.log(`   ⏳ Attempting surgical strikes (Environments API)...`);
+
+    for (const envName of envsToSync) {
+        // High Speed Try: Use the Environments API directly (no scanning)
+        const deploy = await AzureService.fetchLatestEnvironmentDeployment(
+            devops.organization, projectIdent, matchedPipeline.id, envName, devops.pat, devops.baseUrl, cliToken
+        );
+
+        if (deploy) {
+            const commitHash = deploy.build?.sourceVersion || 'unknown';
+            deployments[envName] = {
+                hash: commitHash,
+                date: deploy.finishTime || deploy.startTime
+            };
+            console.log(`      🎯 ${envName.padEnd(5)}: Surgical Hit! Captured ${commitHash.substring(0, 7)} (Deployment ${deploy.id})`);
         }
+    }
 
-        // Optimization: Only scan successful/partially successful runs
-        const runResult = (run as any).result || (run as any).state;
-        if (runResult !== 'succeeded' && runResult !== 'partiallySucceeded' && runResult !== 'completed') {
-            apiCyclesAvoided++;
-            continue;
-        }
+    // Fallback: If any environments were missed, use the Paginated Timeline Scanner
+    const missingEnvs = envsToSync.filter(e => !deployments[e]);
+    if (missingEnvs.length > 0) {
+        console.log(`   🔍 Missed ${missingEnvs.length} envs. Falling back to paginated timeline scan (Depth: 100)...`);
 
-        if (!timelineCache.has(run.id)) {
-            timelinesFetched++;
-            const tl = await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdentifier, run.id, devops.pat, devops.baseUrl, cliToken);
-            timelineCache.set(run.id, tl);
+        let skip = 0;
+        const pageSize = 20;
+        const maxDepth = 100;
 
-            if (verbose && timelinesFetched === 1) {
-                const containers = tl.filter(t => ['stage', 'job', 'phase'].includes(t.type?.toLowerCase()));
-                console.log(`      🔍 Run ${run.id} Containers: ${containers.map(c => `${c.name} (${c.type}:${c.result})`).join(', ')}`);
+        while (Object.keys(deployments).length < envsToSync.length && skip < maxDepth) {
+            const builds = await AzureService.fetchBuildsByDefinition(
+                devops.organization, projectIdent, matchedPipeline.id, devops.pat, devops.baseUrl, cliToken, pageSize, skip
+            );
 
-                // Forensic Hash Discovery
-                const potentialShas = findGitSha(run);
-                if (potentialShas.length > 0) {
-                    console.log(`      🔍 DEBUG: Forensic SHA Discovery (Top level or nested):`);
-                    potentialShas.forEach(s => console.log(`         - [${s.path}]: ${s.value}`));
+            if (builds.length === 0) break;
+
+            for (const run of builds) {
+                if (Object.keys(deployments).length === envsToSync.length) break;
+
+                if (!timelineCache.has(run.id)) {
+                    timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdent, run.id, devops.pat, devops.baseUrl, cliToken));
+                }
+
+                const timeline = timelineCache.get(run.id)!;
+                for (const envName of envsToSync) {
+                    if (deployments[envName]) continue;
+
+                    const record = timeline.find((t: any) => {
+                        const type = (t.type || '').toLowerCase();
+                        const isContainer = ['stage', 'job', 'phase'].includes(type);
+                        const nameMatches = sanitize(t.name).includes(sanitize(envName));
+                        const isSuccess = t.result === 'succeeded' || t.result === 'partiallySucceeded';
+                        return isContainer && nameMatches && isSuccess;
+                    });
+
+                    if (record) {
+                        const commitHash = (run as any).sourceVersion || 'unknown';
+                        deployments[envName] = {
+                            hash: commitHash,
+                            date: record.finishTime || run.finishedDate
+                        };
+                        console.log(`      📍 ${envName.padEnd(5)}: Scanner Hit! Captured ${commitHash.substring(0, 7)} (Build ${run.id} via ${record.name})`);
+                    }
                 }
             }
-        }
-
-        const timeline = timelineCache.get(run.id)!;
-        for (const envName of envsToSync) {
-            if (deployments[envName]) continue;
-
-            // Match stage, job, or phase
-            const record = timeline.find((t: any) => {
-                const type = (t.type || '').toLowerCase();
-                const isContainer = ['stage', 'job', 'phase'].includes(type);
-                const nameMatches = sanitize(t.name).includes(sanitize(envName));
-                const isSuccess = t.result === 'succeeded' || t.result === 'partiallySucceeded';
-                return isContainer && nameMatches && isSuccess;
-            });
-
-            if (record) {
-                // Determine Hash via findGitSha (Forensic fallback)
-                const shas = findGitSha(run);
-                const commitHash = shas.length > 0 ? shas[0].value : 'unknown';
-
-                deployments[envName] = {
-                    hash: commitHash,
-                    date: record.finishTime || run.finishedDate
-                };
-                console.log(`      📍 ${envName.padEnd(5)}: Captured ${commitHash.substring(0, 7)} (Run ${run.id} via ${record.name})`);
-            }
+            skip += pageSize;
         }
     }
 
     // Report missing envs
     envsToSync.forEach(env => {
-        if (!deployments[env]) console.log(`      📍 ${env.padEnd(5)}: (No successful deployment found in last ${SCAN_DEPTH} runs)`);
+        if (!deployments[env]) console.log(`      📍 ${env.padEnd(5)}: (No successful deployment found in last 100 builds)`);
     });
 
     console.log(`\n📊 Efficiency Report:`);
-    console.log(`   - Timelines Fetched: ${timelinesFetched}`);
-    console.log(`   - API Cycles Avoided: ${apiCyclesAvoided}`);
-    console.log(`   - Scale Readiness: ${apiCyclesAvoided > 3 ? '🟢 OPTIMIZED' : '🟡 SCANNING...'}`);
+    console.log(`   - Environments Found: ${Object.keys(deployments).length} / ${envsToSync.length}`);
+    console.log(`   - Discovery Mode: ${missingEnvs.length === 0 ? '🟢 SURGICAL HIT' : '🟡 HYBRID SCAN'}`);
 
     console.log(`\n✅ Final Seed Data:`);
     console.log(JSON.stringify({

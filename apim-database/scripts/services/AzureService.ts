@@ -328,13 +328,22 @@ export class AzureService {
      * Fetch Recent Builds for a specific Definition (Pipeline ID)
      * Richer metadata than the Runs API
      */
-    static async fetchBuildsByDefinition(org: string, project: string, definitionId: number, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<any[]> {
+    static async fetchBuildsByDefinition(
+        org: string,
+        project: string,
+        definitionId: number,
+        pat: string,
+        baseUrl: string = 'https://dev.azure.com',
+        bearerToken?: string,
+        top: number = 20,
+        skip: number = 0
+    ): Promise<any[]> {
         const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
         const isLegacy = cleanBaseUrl.includes('visualstudio.com');
         const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
 
-        const url = `${urlBase}/_apis/build/builds?api-version=7.0&definitions=${definitionId}&$top=15`;
+        const url = `${urlBase}/_apis/build/builds?api-version=7.0&definitions=${definitionId}&resultFilter=succeeded&$top=${top}&$skip=${skip}`;
 
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
@@ -349,8 +358,47 @@ export class AzureService {
     }
 
     /**
-     * Fetch Recent Runs for a Pipeline
+     * Fetch the latest successful deployment for a specific environment and pipeline definition.
+     * This is the "Sharp" surgical way to find PROD/STAGE/QA markers.
      */
+    static async fetchLatestEnvironmentDeployment(
+        org: string,
+        project: string,
+        definitionId: number,
+        environmentName: string,
+        pat: string,
+        baseUrl: string = 'https://dev.azure.com',
+        bearerToken?: string
+    ): Promise<any | null> {
+        const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
+        const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const isLegacy = cleanBaseUrl.includes('visualstudio.com');
+        const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
+
+        // 1. Find the Environment ID for the given name (Surgical Step 1)
+        // Note: In ADO, environment names like 'PROD' or 'QA' are case-sensitive or product-prefixed
+        const envUrl = `${urlBase}/_apis/distributedtask/environments?name=${environmentName}&api-version=7.1-preview.1`;
+
+        try {
+            const envResp = await fetch(envUrl, { headers: { 'Authorization': authHeader } });
+            if (!envResp.ok) return null;
+            const envData = await envResp.json() as { count: number; value: any[] };
+            if (envData.count === 0) return null;
+
+            const envId = envData.value[0].id;
+
+            // 2. Query Deployments for this specific definition and environment (Surgical Step 2)
+            const deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/deployments?definitionId=${definitionId}&latestState=succeeded&$top=1&api-version=7.1-preview.1`;
+            const deployResp = await fetch(deployUrl, { headers: { 'Authorization': authHeader } });
+            if (!deployResp.ok) return null;
+            const deployData = await deployResp.json() as { count: number; value: any[] };
+
+            return deployData.count > 0 ? deployData.value[0] : null;
+        } catch (err) {
+            console.warn(`⚠️ [ADO] Surgical environment lookup failed for ${environmentName}:`, err);
+        }
+        return null;
+    }
     static async fetchPipelineRuns(org: string, project: string, pipelineId: number, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<PipelineRun[]> {
         const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
