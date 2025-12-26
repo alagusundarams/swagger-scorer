@@ -48,18 +48,36 @@ async function runDebug() {
     // 1. Repository Discovery via Search
     console.log(`\n➡️  Step 1: Code Search Discovery...`);
     const quotedName = productNameArg!.includes(' ') ? `"${productNameArg}"` : productNameArg;
-    const searchTerm = `${quotedName} ext:tf ext:tfvars`;
-    const searchRes = await AzureService.searchCode(devops.organization, searchTerm, devops.pat, devops.baseUrl);
 
-    console.log(`   Found ${searchRes.count} hits in ADO Search.`);
+    // Test different term strategies
+    const testStrategies = [
+        { name: "Single Extension (tf)", term: `${quotedName} ext:tf` },
+        { name: "OR Extensions", term: `${quotedName} (ext:tf OR ext:tfvars)` },
+        { name: "No Extension (Baseline)", term: `${quotedName}` },
+        { name: "Path Filter", term: `${quotedName} path:*.tf` }
+    ];
+
+    let searchRes: any = { count: 0, results: [] };
+    let usedTerm = '';
+
+    for (const strategy of testStrategies) {
+        console.log(`   📡 Testing Strategy: ${strategy.name} ("${strategy.term}")`);
+        const res = await AzureService.searchCode(devops.organization, strategy.term, devops.pat, devops.baseUrl);
+        console.log(`      Hits: ${res.count}`);
+        if (res.count > 0 && searchRes.count === 0) {
+            searchRes = res;
+            usedTerm = strategy.term;
+            console.log(`      🎯 Selected this strategy.`);
+        }
+    }
 
     if (searchRes.count === 0) {
-        console.log(`   ❌ No matches found for this product name.`);
+        console.log(`   ❌ All search strategies returned 0 results.`);
         return;
     }
 
     const matchedRepos = new Set<string>();
-    searchRes.results.forEach(r => matchedRepos.add(r.repository.name));
+    searchRes.results.forEach((r: any) => matchedRepos.add(r.repository.name));
 
     console.log(`   Matches found in repos: ${Array.from(matchedRepos).join(', ')}`);
 
