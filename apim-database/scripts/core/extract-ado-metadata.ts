@@ -172,13 +172,21 @@ async function main() {
                 for (const envName of envsToSync) {
                     if (meta.deployments[envName]) continue;
 
-                    const stage = timeline.find(t => t.type === 'stage' && sanitize(t.name).includes(sanitize(envName)) && t.result === 'succeeded');
-                    if (stage) {
+                    // Match stage, job, or phase
+                    const record = timeline.find((t: any) => {
+                        const type = (t.type || '').toLowerCase();
+                        const isContainer = ['stage', 'job', 'phase'].includes(type);
+                        const nameMatches = sanitize(t.name).includes(sanitize(envName));
+                        const isSuccess = t.result === 'succeeded' || t.result === 'partiallySucceeded';
+                        return isContainer && nameMatches && isSuccess;
+                    });
+
+                    if (record) {
                         meta.deployments[envName] = {
                             hash: (run as any).sourceVersion || 'unknown',
-                            date: stage.finishTime || run.finishedDate
+                            date: record.finishTime || run.finishedDate
                         };
-                        console.log(`      📍 ${envName.padEnd(5)}: Captured ${meta.deployments[envName].hash.substring(0, 7)} (Run ${run.id})`);
+                        console.log(`      📍 ${envName.padEnd(5)}: Captured ${meta.deployments[envName].hash.substring(0, 7)} (Run ${run.id} via ${record.name})`);
                     }
                 }
             }

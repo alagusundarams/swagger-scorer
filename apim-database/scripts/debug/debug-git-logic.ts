@@ -207,25 +207,34 @@ async function runDebug() {
 
         if (!timelineCache.has(run.id)) {
             timelinesFetched++;
-            timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdentifier, run.id, devops.pat, devops.baseUrl, cliToken));
+            const tl = await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdentifier, run.id, devops.pat, devops.baseUrl, cliToken);
+            timelineCache.set(run.id, tl);
+
+            if (verbose) {
+                const containers = tl.filter(t => ['stage', 'job', 'phase'].includes(t.type?.toLowerCase()));
+                console.log(`      🔍 Run ${run.id} Containers: ${containers.map(c => `${c.name} (${c.type}:${c.result})`).join(', ')}`);
+            }
         }
 
         const timeline = timelineCache.get(run.id)!;
         for (const envName of envsToSync) {
             if (deployments[envName]) continue;
 
-            const stage = timeline.find((t: any) =>
-                t.type === 'stage' &&
-                sanitize(t.name).includes(sanitize(envName)) &&
-                t.result === 'succeeded'
-            );
+            // Match stage, job, or phase
+            const record = timeline.find((t: any) => {
+                const type = (t.type || '').toLowerCase();
+                const isContainer = ['stage', 'job', 'phase'].includes(type);
+                const nameMatches = sanitize(t.name).includes(sanitize(envName));
+                const isSuccess = t.result === 'succeeded' || t.result === 'partiallySucceeded';
+                return isContainer && nameMatches && isSuccess;
+            });
 
-            if (stage) {
+            if (record) {
                 deployments[envName] = {
                     hash: (run as any).sourceVersion || 'unknown',
-                    date: stage.finishTime || run.finishedDate
+                    date: record.finishTime || run.finishedDate
                 };
-                console.log(`      📍 ${envName.padEnd(5)}: Captured ${deployments[envName].hash.substring(0, 7)} (Run ${run.id})`);
+                console.log(`      📍 ${envName.padEnd(5)}: Captured ${deployments[envName].hash.substring(0, 7)} (Run ${run.id} via ${record.name})`);
             }
         }
     }
