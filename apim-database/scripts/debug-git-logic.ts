@@ -202,62 +202,40 @@ async function runDebug() {
     }
 
     // --- PIPELINE MATCHING ---
-    console.log(`\n➡️  Step 3: Matching Pipeline by Name...`);
+    console.log(`\n➡️  Step 3: Matching Pipeline...`);
 
     const matchedPipeline = pipelines.find(p =>
         p.name.toLowerCase().includes(productNameArg!.toLowerCase()) ||
-        p.name.toLowerCase().includes(primaryRepoName.toLowerCase())
-    ) || pipelines[0];
+        productNameArg!.toLowerCase().includes(p.name.toLowerCase())
+    );
 
     if (!matchedPipeline) {
-        console.log(`   ❌ No pipeline could be matched.`);
+        console.log(`\n   ⚠️  No direct name match found. Candidates:`);
+        pipelines.slice(0, 10).forEach(p => console.log(`      - [ID: ${p.id}] ${p.name}`));
         return;
     }
 
-    console.log(`   ✅ Selected Pipeline: ${matchedPipeline.name} (ID: ${matchedPipeline.id})`);
+    console.log(`\n🎉 MATCH FOUND:`);
+    console.log(`   Product:   ${productNameArg}`);
+    console.log(`   Repo:      ${primaryRepoName} (ID: ${primaryRepoId})`);
+    console.log(`   Project:   ${project} (ID: ${projectId})`);
+    console.log(`   Pipeline:  ${matchedPipeline.name} (ID: ${matchedPipeline.id})`);
 
-    // 3. Fetch Runs & Stage Discovery
-    console.log(`\n➡️  Step 3: Fetching Recent Runs & Timelines...`);
-    const runs = await AzureService.fetchPipelineRuns(devops.organization, projectIdentifier, matchedPipeline.id, devops.pat, devops.baseUrl);
-    console.log(`   Found ${runs.length} recent runs.`);
+    console.log(`\n✅ Database Seeding Data:`);
+    const seedData = {
+        product: productNameArg,
+        organization: devops.organization,
+        project: project,
+        projectId: projectId,
+        repositoryId: primaryRepoId,
+        pipelineId: matchedPipeline.id,
+        pipelineName: matchedPipeline.name
+    };
+    console.log(JSON.stringify(seedData, null, 2));
 
-    for (const run of runs.slice(0, 3)) { // Look at top 3
-        console.log(`\n   --- Run ID: ${run.id} (${run.status}, Result: ${run.result}) ---`);
-        const timeline = await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdentifier, run.id, devops.pat, devops.baseUrl);
-
-        // Find environment stage
-        const envStage = timeline.find((r: any) =>
-            r.type === 'Stage' &&
-            r.name.toLowerCase().includes(envArg.toLowerCase())
-        );
-
-        if (envStage) {
-            console.log(`      📍 Env [${envArg}] Stage Found: ${envStage.name} (Result: ${envStage.result})`);
-            if (envStage.result === 'succeeded') {
-                console.log(`      💎 SUCCESS! Captured Hash: ${run.resources?.repositories?.self?.version || 'N/A'}`);
-                console.log(`      📅 Deployed At: ${envStage.finishTime}`);
-            }
-        } else {
-            console.log(`      📍 Env [${envArg}] Stage NOT found in this run.`);
-        }
-
-        // Find Production stage (Universal Visibility)
-        const prodStage = timeline.find((r: any) =>
-            r.type === 'Stage' &&
-            (r.name.toLowerCase().includes('prod') || r.name.toLowerCase().includes('production'))
-        );
-
-        if (prodStage) {
-            console.log(`      🌍 PRODUCTION Stage Found: ${prodStage.name} (Result: ${prodStage.result})`);
-            if (prodStage.result === 'succeeded') {
-                console.log(`      📡 PROD DATA: Hash=${run.resources?.repositories?.self?.version}, Date=${prodStage.finishTime}`);
-            }
-        }
-    }
-
-    console.log(`\n🏁 Debug Complete.`);
+    console.log(`\n💡 Skipping deep deployment crawl to preserve rate limits.`);
 }
 
 runDebug().catch(err => {
-    console.error(`❌ Fatal Error:`, err);
+    console.error(`\n💥 Fatal Error:`, err);
 });
