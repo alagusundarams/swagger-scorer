@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { AzureService } from './services/AzureService.js';
+import fetch from 'node-fetch';
 
 // --- ARGS ---
 const args = process.argv.slice(2);
@@ -13,7 +14,7 @@ Usage:
   npx tsx scripts/debug-git-logic.ts --product="My Product Name"
 
 Purpose:
-  Probe multiple ADO Search endpoints to find the correct one for legacy accounts.
+  Probe multiple ADO Search endpoints and verify project connectivity.
     `);
     process.exit(0);
 }
@@ -38,53 +39,70 @@ if (!devopsConfig || !devopsConfig.pat) {
 
 // --- MAIN ---
 async function runDebug() {
-    console.log(`\n🕵️‍♀️ DEBUG: Tracing Git Logic (Content Search) for Product: "${productNameArg}"`);
+    console.log(`\n🕵️‍♀️ DEBUG: Connectivity & Search Probe`);
     console.log(`   Organization: ${devopsConfig.organization}`);
     console.log(`   Base URL:     ${devopsConfig.baseUrl || 'https://dev.azure.com'}`);
+
+    const org = devopsConfig.organization;
+    const pat = devopsConfig.pat;
+    const cleanBaseUrl = (devopsConfig.baseUrl || 'https://dev.azure.com').replace(/\/$/, '');
+    const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+
+    // 0. Verify Connectivity (Fetch Projects)
+    console.log(`\n➡️  Step 0: Verifying Connectivity (Fetching Projects)...`);
+    try {
+        const projects = await AzureService.fetchADOProjects(org, pat, cleanBaseUrl);
+        console.log(`   ✅ Connected! Found ${projects.length} projects.`);
+        if (projects.length > 0) {
+            console.log(`   Example Project: ${projects[0].name} (ID: ${projects[0].id})`);
+        }
+    } catch (e: any) {
+        console.error(`   ❌ FAIL: Could not fetch projects. Your baseUrl/org/pat might be wrong.`);
+        console.error(`      Error: ${e.message}`);
+        // Continue anyway to probe search
+    }
 
     // 1. Content Search Probing
     console.log(`\n➡️  Step 1: Probing Search Endpoints for "${productNameArg}"...`);
     let matchedRepo = null;
 
-    const org = devopsConfig.organization;
-    const cleanBaseUrl = (devopsConfig.baseUrl || 'https://dev.azure.com').replace(/\/$/, '');
+    const searchBody = {
+        searchText: productNameArg!.includes(' ') ? `"${productNameArg}"` : productNameArg,
+        $top: 10,
+        filters: { Extension: ["tf", "tfvars"] }
+    };
 
-    // Endpoints to test based on REST API standards vs Browser UI patterns
-    const endpoints = [
+    const searchVariations = [
         {
-            name: "Modern Search Host (Recommended)",
+            name: "Modern Standard (dev.azure.com host)",
             url: `https://almsearch.dev.azure.com/${org}/_apis/search/codesearchresults?api-version=7.1-preview.1`
         },
         {
-            name: "Legacy Base URL (Direct)",
-            url: `${cleanBaseUrl}/_apis/search/codesearchresults?api-version=7.1-preview.1`
+            name: "Legacy Subdomain (visualstudio.com host)",
+            url: `${cleanBaseUrl}/_apis/search/codesearchresults?api-version=6.1-preview.1`
         },
         {
-            name: "Legacy Base URL + DefaultCollection",
-            url: `${cleanBaseUrl}/DefaultCollection/_apis/search/codesearchresults?api-version=7.1-preview.1`
+            name: "Legacy Subdomain (API 6.0 Stable)",
+            url: `${cleanBaseUrl}/_apis/search/codesearchresults?api-version=6.0`
+        },
+        {
+            name: "Legacy Collection Path",
+            url: `${cleanBaseUrl}/DefaultCollection/_apis/search/codesearchresults?api-version=5.1`
         }
     ];
 
-    const authHeader = `Basic ${Buffer.from(`:${devopsConfig.pat}`).toString('base64')}`;
-
-    for (const ep of endpoints) {
+    for (const ep of searchVariations) {
         console.log(`\n   📡 Testing: ${ep.name}`);
         console.log(`      URL: ${ep.url}`);
 
         try {
-            const body = {
-                searchText: productNameArg!.includes(' ') ? `"${productNameArg}"` : productNameArg,
-                $top: 20,
-                filters: { Extension: ["tf", "tfvars"] }
-            };
-
             const response = await fetch(ep.url, {
                 method: 'POST',
                 headers: {
                     'Authorization': authHeader,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(body)
+                body: JSON.stringify(searchBody)
             });
 
             console.log(`      Status: ${response.status} ${response.statusText}`);
@@ -94,33 +112,15 @@ async function runDebug() {
                 console.log(`      Hits found: ${searchResp.count}`);
 
                 if (searchResp.count > 0) {
-                    const repoMap = new Map<string, any>();
-                    searchResp.results.forEach((r: any) => {
-                        if (!repoMap.has(r.repository.name)) {
-                            repoMap.set(r.repository.name, {
-                                id: r.repository.id,
-                                name: r.repository.name,
-                                project: r.repository.project.name
-                            });
-                        }
-                    });
-
-                    const uniqueRepos = Array.from(repoMap.values());
-                    const filtered = uniqueRepos.filter(r => !r.name.toLowerCase().includes('grp'));
-
-                    if (filtered.length > 0) {
-                        matchedRepo = filtered[0];
-                        console.log(`      🎯 SUCCESS! Matched Repo: ${matchedRepo.name} via ${ep.name}`);
-                        break;
-                    } else {
-                        console.log(`      ⚠️ Results found, but all filtered (e.g. GRP repos).`);
-                    }
+                    console.log(`      🎯 SUCCESS! Hits found via ${ep.name}`);
+                    // List first hit for verification
+                    const first = searchResp.results[0];
+                    console.log(`      First Result: ${first.path} in Repo [${first.repository.name}]`);
+                    break;
                 }
-            } else if (response.status === 404) {
-                console.log(`      ⚠️ Not Found (404).`);
             } else {
                 const txt = await response.text();
-                console.log(`      ❌ Error Details: ${txt.substring(0, 150)}...`);
+                console.log(`      ❌ Response: ${txt.substring(0, 200)}...`);
             }
 
         } catch (e: any) {
@@ -128,48 +128,7 @@ async function runDebug() {
         }
     }
 
-    if (!matchedRepo) {
-        console.error("\n⛔ STOP: All search probes failed or returned 0 results.");
-        console.log("   Check: Is your PAT scope set to 'Code (Read & Search)'?");
-        return;
-    }
-
-    // 2. Fetch Pipelines
-    console.log(`\n➡️  Step 2: Fetching Pipelines for Repo: ${matchedRepo.name} (ID: ${matchedRepo.id})`);
-    const pipelines = await AzureService.fetchADOPipelines(
-        devopsConfig.organization,
-        matchedRepo.project,
-        matchedRepo.id,
-        devopsConfig.pat,
-        devopsConfig.baseUrl
-    );
-
-    console.log(`   Found ${pipelines.length} Pipelines.`);
-    if (pipelines.length === 0) return;
-
-    // 3. Determine "Best" Pipeline
-    const bestPipeline = pipelines.find(p => p.name.includes(matchedRepo.name) || p.name.toLowerCase().includes('ci')) || pipelines[0];
-    console.log(`\n➡️  Step 3: Selecting Pipeline -> "${bestPipeline.name}"`);
-
-    // 4. Fetch Runs
-    console.log(`   Fetching Runs...`);
-    const runs = await AzureService.fetchPipelineRuns(
-        devopsConfig.organization,
-        matchedRepo.project,
-        bestPipeline.id,
-        devopsConfig.pat,
-        devopsConfig.baseUrl
-    );
-
-    if (runs.length > 0) {
-        const latest = runs[0];
-        console.log(`\n✅ SUCCESS! Metadata:`);
-        console.log(`   Hash: ${'sourceVersion' in latest ? (latest as any).sourceVersion : 'N/A'}`);
-        console.log(`   Date: ${latest.finishedDate || latest.createdDate}`);
-        console.log(`   URL:  ${(latest as any).web?.href || (latest as any)._links?.web?.href}`);
-    } else {
-        console.log(`   ⚠️ Pipeline has 0 runs.`);
-    }
+    console.log(`\n🏁 Probe complete. Please check the logs above for any "200 OK".`);
 }
 
 runDebug();
