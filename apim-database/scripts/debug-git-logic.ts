@@ -1,20 +1,20 @@
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { AzureService } from './services/AzureService.js';
+import fetch from 'node-fetch';
 
 // --- ARGS ---
 const args = process.argv.slice(2);
 const help = args.includes('--help');
 const productNameArg = args.find(a => a.startsWith('--product='))?.split('=')[1];
-const explicitTagArg = args.find(a => a.startsWith('--tag='))?.split('=')[1]; // Optional: simulate a "repo:xyz" tag
 
 if (help || !productNameArg) {
     console.log(`
 Usage: 
-  npx tsx scripts/debug-git-logic.ts --product="My Product Name" [--tag="repo:my-repo"]
+  npx tsx scripts/debug-git-logic.ts --product="My Product Name"
 
 Purpose:
-  Diagnose exactly why a Product is or isn't matching an ADO Repo/Pipeline.
+  Probe multiple ADO Search endpoints to find the correct one for legacy accounts.
     `);
     process.exit(0);
 }
@@ -43,78 +43,93 @@ async function runDebug() {
     console.log(`   Organization: ${devopsConfig.organization}`);
     console.log(`   Base URL:     ${devopsConfig.baseUrl || 'https://dev.azure.com'}`);
 
-    // 1. Content Search
-    console.log(`\n➡️  Step 1: Searching Code for "${productNameArg}"...`);
+    // 1. Content Search Probing
+    console.log(`\n➡️  Step 1: Probing Search Endpoints for "${productNameArg}"...`);
     let matchedRepo = null;
-    let repoUrl = '';
 
-    const strategies = [
-        { name: "Phrase Search (+ .tf filters)", filters: { Extension: ["tf", "tfvars"] } },
-        { name: "Global Search (No filters)", filters: {} }
+    const org = devopsConfig.organization;
+    const cleanBaseUrl = (devopsConfig.baseUrl || 'https://dev.azure.com').replace(/\/$/, '');
+
+    // Endpoints to test
+    const endpoints = [
+        {
+            name: "Modern Search Host (Recommended)",
+            url: `https://almsearch.dev.azure.com/${org}/_apis/search/codesearchresults?api-version=7.1-preview.1`
+        },
+        {
+            name: "Legacy Base URL (Direct)",
+            url: `${cleanBaseUrl}/_apis/search/codesearchresults?api-version=7.1-preview.1`
+        },
+        {
+            name: "Legacy Base URL + Org Path (Doubled)",
+            url: `${cleanBaseUrl}/${org}/_apis/search/codesearchresults?api-version=7.1-preview.1`
+        }
     ];
 
-    for (const strategy of strategies) {
-        console.log(`\n   🔍 Trying strategy: ${strategy.name}`);
-        console.log(`      Filters: ${JSON.stringify(strategy.filters)}`);
+    const authHeader = `Basic ${Buffer.from(`:${devopsConfig.pat}`).toString('base64')}`;
+
+    for (const ep of endpoints) {
+        console.log(`\n   📡 Testing: ${ep.name}`);
+        console.log(`      URL: ${ep.url}`);
+
         try {
-            const searchResp = await AzureService.searchCode(
-                devopsConfig.organization,
-                productNameArg!,
-                devopsConfig.pat,
-                devopsConfig.baseUrl,
-                strategy.filters
-            );
+            const body = {
+                searchText: productNameArg!.includes(' ') ? `"${productNameArg}"` : productNameArg,
+                $top: 20,
+                filters: { Extension: ["tf", "tfvars"] }
+            };
 
-            console.log(`      Hits found: ${searchResp.count}`);
+            const response = await fetch(ep.url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': authHeader,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            });
 
-            if (searchResp.count > 0) {
-                // Group by Repository
-                const repoMap = new Map<string, any>();
-                searchResp.results.forEach(r => {
-                    if (!repoMap.has(r.repository.name)) {
-                        repoMap.set(r.repository.name, {
-                            id: r.repository.id,
-                            name: r.repository.name,
-                            project: r.repository.project.name,
-                            files: []
-                        });
+            console.log(`      Status: ${response.status} ${response.statusText}`);
+
+            if (response.ok) {
+                const searchResp = await response.json() as any;
+                console.log(`      Hits found: ${searchResp.count}`);
+
+                if (searchResp.count > 0) {
+                    const repoMap = new Map<string, any>();
+                    searchResp.results.forEach((r: any) => {
+                        if (!repoMap.has(r.repository.name)) {
+                            repoMap.set(r.repository.name, {
+                                id: r.repository.id,
+                                name: r.repository.name,
+                                project: r.repository.project.name
+                            });
+                        }
+                    });
+
+                    const uniqueRepos = Array.from(repoMap.values());
+                    const filtered = uniqueRepos.filter(r => !r.name.toLowerCase().includes('grp'));
+
+                    if (filtered.length > 0) {
+                        matchedRepo = filtered[0];
+                        console.log(`      🎯 SUCCESS! Matched Repo: ${matchedRepo.name} via ${ep.name}`);
+                        break;
                     }
-                    repoMap.get(r.repository.name).files.push(`${r.path} (${r.fileName})`);
-                });
-
-                const uniqueRepos = Array.from(repoMap.values());
-                console.log(`      Found matches in ${uniqueRepos.length} unique repositories:`);
-                uniqueRepos.forEach(r => {
-                    console.log(`        - [${r.name}] (Project: ${r.project})`);
-                    r.files.slice(0, 3).forEach((f: string) => console.log(`            File: ${f}`));
-                });
-
-                // Filter out "GRP" repos
-                const filteredRepos = uniqueRepos.filter(r => !r.name.toLowerCase().includes('grp'));
-
-                if (filteredRepos.length > 0) {
-                    if (filteredRepos.length > 1) {
-                        console.warn(`      ⚠️  AMBIGUITY: Multiple repos found after filtering.`);
-                    }
-                    matchedRepo = filteredRepos[0];
-                    console.log(`      🎯 MATCHED! -> ${matchedRepo.name}`);
-                    break; // Exit strategies loop
-                } else {
-                    console.warn(`      ⚠️  Matches found but all filtered (likely GRP repos).`);
                 }
+            } else if (response.status === 404) {
+                console.log(`      ⚠️  Not Found (404). This endpoint is likely incorrect for this account.`);
             } else {
-                console.log(`      No results for this strategy.`);
+                const txt = await response.text();
+                console.log(`      ❌ Error Details: ${txt.substring(0, 100)}...`);
             }
 
-        } catch (e) {
-            console.error(`      ❌ Strategy failed with error.`, e);
+        } catch (e: any) {
+            console.error(`      ❌ Network error: ${e.message}`);
         }
     }
 
     if (!matchedRepo) {
-        console.error("\n⛔ STOP: No Repository matched. Logic ends here.");
-        console.log("   Check: Does the product name exactly match what's in the .tf file?");
-        console.log("   Check: Does your PAT have 'Code (Read & Search)' scope?");
+        console.error("\n⛔ STOP: All search probes failed or returned 0 results.");
+        console.log("   Suggestion: Verify your PAT has 'Code (Read & Search)' permissions.");
         return;
     }
 
@@ -129,12 +144,7 @@ async function runDebug() {
     );
 
     console.log(`   Found ${pipelines.length} Pipelines.`);
-    pipelines.forEach(p => console.log(`     - [${p.id}] ${p.name}`));
-
-    if (pipelines.length === 0) {
-        console.error(`   ⚠️ Repo has 0 pipelines linked.`);
-        return;
-    }
+    if (pipelines.length === 0) return;
 
     // 3. Determine "Best" Pipeline
     const bestPipeline = pipelines.find(p => p.name.includes(matchedRepo.name) || p.name.toLowerCase().includes('ci')) || pipelines[0];
