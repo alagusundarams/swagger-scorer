@@ -428,8 +428,17 @@ async function fetchApimApis(token: string, azConfig: AzureConfig): Promise<Apim
                     headers: { 'Authorization': `Bearer ${apiConfig.accessToken}` }
                 });
                 if (polRes.ok) {
-                    const json = await polRes.json();
-                    policyXml = json.properties?.value || '';
+                    const text = await polRes.text();
+                    if (text.trim().startsWith('<')) {
+                        policyXml = text;
+                    } else {
+                        try {
+                            const json = JSON.parse(text);
+                            policyXml = json.properties?.value || '';
+                        } catch (e) {
+                            policyXml = text;
+                        }
+                    }
                 } else if (polRes.status === 429) {
                     console.warn(`  ⚠️ Rate Limit Hit for ${a.name}, pausing...`);
                     await new Promise(r => setTimeout(r, 2000));

@@ -29,7 +29,7 @@ const config = loadConfig();
 // --- ARGS ---
 const args = process.argv.slice(2);
 const targetEnv = args.find(a => a.startsWith('--env='))?.split('=')[1]?.toUpperCase();
-const verbose = args.includes('--verbose');
+const verbose = !args.includes('--quiet');
 
 interface ProductIdentity {
     id: string;
