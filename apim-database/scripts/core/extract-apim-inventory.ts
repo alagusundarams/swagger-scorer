@@ -55,13 +55,22 @@ function extractForensicsFromPolicy(xml: string): { guids: string[], nvs: string
     const nvs = new Set<string>();
     const backends = new Set<string>();
 
-    // 0. Backend References (Surgical)
-    // <set-backend-service backend-id="my-backend" />
+    // 0. Backend References
     const backendMatches = xml.match(/backend-id=["']([^"']+)["']/gi);
     if (backendMatches) {
         backendMatches.forEach(m => {
             const id = m.split(/["']/)[1];
             backends.add(id);
+            if (id.startsWith('{{')) nvs.add(id.replace(/[{}]/g, '').trim());
+        });
+    }
+
+    const baseUrlMatches = xml.match(/base-url=["']([^"']+)["']/gi);
+    if (baseUrlMatches) {
+        baseUrlMatches.forEach(m => {
+            const url = m.split(/["']/)[1];
+            backends.add(`Static: ${url}`);
+            if (url.startsWith('{{')) nvs.add(url.replace(/[{}]/g, '').trim());
         });
     }
 

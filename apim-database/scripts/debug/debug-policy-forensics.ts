@@ -34,13 +34,35 @@ function extractForensicsFromPolicy(xml: string): { guids: string[], nvs: string
     const nvs = new Set<string>();
     const backends = new Set<string>();
 
-    // 0. Backend References
+    // 0. Backend References (backend-id and base-url)
     const backendMatches = xml.match(/backend-id=["']([^"']+)["']/gi);
     if (backendMatches) {
         backendMatches.forEach(m => {
             const id = m.split(/["']/)[1];
             backends.add(id);
+            if (id.startsWith('{{')) nvs.add(id.replace(/[{}]/g, '').trim());
         });
+    }
+
+    const baseUrlMatches = xml.match(/base-url=["']([^"']+)["']/gi);
+    if (baseUrlMatches) {
+        baseUrlMatches.forEach(m => {
+            const url = m.split(/["']/)[1];
+            backends.add(`URL: ${url}`);
+            if (url.startsWith('{{')) nvs.add(url.replace(/[{}]/g, '').trim());
+        });
+    }
+
+    // Capture the tag itself just in case
+    if (xml.includes('set-backend-service')) {
+        const tagMatches = xml.match(/<set-backend-service[^>]*>/gi);
+        if (tagMatches && tagMatches.length > backends.size) {
+            tagMatches.forEach(t => {
+                if (!t.includes('backend-id') && !t.includes('base-url')) {
+                    backends.add(`Complex: ${t}`);
+                }
+            });
+        }
     }
 
     // 1. Direct GUIDs
@@ -188,7 +210,8 @@ async function debug() {
     for (const api of apisRes.value || []) {
         console.log(`   🔹 API: ${api.properties.displayName} (${api.name})`);
         try {
-            const apiPolUrl = `https://management.azure.com${api.id}/policies/policy?api-version=2022-08-01&format=rawxml`;
+            const apiPolUrl = `https://management.azure.com${api.id}${api.id.includes('/policies/') ? '' : '/policies/policy'}?api-version=2022-08-01&format=rawxml`;
+            if (verbose) console.log(`      🔗 Fetching API Policy from: ${apiPolUrl}`);
             const polRes = await fetch(apiPolUrl, { headers: { 'Authorization': `Bearer ${azureToken}` } });
             if (polRes.ok) {
                 const text = await polRes.text();
@@ -203,6 +226,11 @@ async function debug() {
                         xml = text;
                     }
                 }
+
+                if (verbose && xml.length < 50) {
+                    console.log(`      ⚠️  Empty or trivial policy found (${xml.length} chars).`);
+                }
+
                 const results = extractForensicsFromPolicy(xml);
                 console.log(`      ✅ App IDs:`, results.guids);
                 console.log(`      ✅ Named Values:`, results.nvs);
