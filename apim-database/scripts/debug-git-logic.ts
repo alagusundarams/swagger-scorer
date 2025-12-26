@@ -127,35 +127,42 @@ async function runDebug() {
     console.log(`\n➡️  Step 2: Locating Pipeline for Repo...`);
 
     // Diagnostic log
-    const cleanBase = devops.baseUrl.replace(/\/+$/, '');
-    const isLegacy = cleanBase.includes('visualstudio.com');
-    const urlBase = isLegacy ? `${cleanBase}/${projectIdentifier}` : `${cleanBase}/${devops.organization}/${projectIdentifier}`;
-    const pipelineUrl = `${urlBase}/_apis/pipelines?api-version=7.1-preview.1&repositoryId=${primaryRepoId}&repositoryType=azureRepo`;
-    console.log(`   📡 Fetching from: ${pipelineUrl}`);
+    // --- PIPELINE DISCOVERY LOOP ---
+    console.log(`\n➡️  Step 2: Starting Exhaustive Pipeline Discovery...`);
+    let pipelines: any[] = []; // Changed to any[] to match original type inference
 
-    let pipelines = await AzureService.fetchADOPipelines(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl);
-    console.log(`   Count via Pipelines API (repo filter): ${pipelines.length}`);
+    // Strategy 1: Modern Pipelines API + azureRepo filter
+    console.log(`   [Strategy 1] Checking Pipelines API (Modern, repoId=${primaryRepoId}, type=azureRepo)...`);
+    pipelines = await AzureService.fetchADOPipelines(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl);
 
+    // Strategy 2: Legacy Build API + TfsGit filter
     if (pipelines.length === 0) {
-        console.log(`   🔎 No Pipelines found. Attempting Build Definitions API (fallback)...`);
+        console.log(`   [Strategy 2] Checking Build API (Legacy, repoId=${primaryRepoId}, type=TfsGit)...`);
         pipelines = await AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl);
-        console.log(`   Count via Build Definitions API: ${pipelines.length}`);
     }
 
+    // Strategy 3: Global Project Fetch (No Filter) - Pipelines API
     if (pipelines.length === 0) {
-        console.log(`   ⚠️  No pipelines found via repo filter. Attempting to fetch ALL pipelines in project to find match...`);
-        // Generic fetch (no repo filter)
-        const allPipelines = await AzureService.fetchADOPipelines(devops.organization, projectIdentifier, "", devops.pat, devops.baseUrl);
-        console.log(`   Total pipelines in project: ${allPipelines.length}`);
-
-        // Manual filter
-        pipelines = allPipelines;
+        console.log(`   [Strategy 3] Checking Pipelines API (Project-wide, no filters)...`);
+        pipelines = await AzureService.fetchADOPipelines(devops.organization, projectIdentifier, "", devops.pat, devops.baseUrl);
     }
 
+    // Strategy 4: Global Project Fetch (No Filter) - Build API
     if (pipelines.length === 0) {
-        console.log(`   ❌ No pipelines found for this project.`);
+        console.log(`   [Strategy 4] Checking Build API (Project-wide, no filters)...`);
+        pipelines = await AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, "", devops.pat, devops.baseUrl);
+    }
+
+    console.log(`\n📊 Discovery Summary: Found ${pipelines.length} possible pipeline matches.`);
+
+    if (pipelines.length === 0) {
+        console.log(`   ❌ FATAL: All discovery strategies returned zero results.`);
+        console.log(`      Possible reasons: 1) PAT lacks Build/Pipeline Read permissions. 2) Incorrect ProjectID/URL.`);
         return;
     }
+
+    // --- PIPELINE MATCHING ---
+    console.log(`\n➡️  Step 3: Matching Pipeline by Name...`);
 
     const matchedPipeline = pipelines.find(p =>
         p.name.toLowerCase().includes(productNameArg!.toLowerCase()) ||

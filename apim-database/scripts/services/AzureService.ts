@@ -254,9 +254,12 @@ export class AzureService {
             if (response.ok) {
                 const data = await response.json() as { value: ADOPipeline[] };
                 return data.value || [];
+            } else {
+                const errorText = await response.text();
+                console.warn(`⚠️ [ADO Pipelines] HTTP ${response.status}: ${errorText}`);
             }
         } catch (err) {
-            console.error(`❌ [ADO] Failed to fetch pipelines for repo ${repoId}:`, err);
+            console.error(`❌ [ADO] Pipelines API Network Error:`, err);
         }
         return [];
     }
@@ -271,14 +274,18 @@ export class AzureService {
         const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
         let url = `${urlBase}/_apis/build/definitions?api-version=7.0`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
+
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
             if (response.ok) {
                 const data = await response.json() as { value: any[] };
                 return (data.value || []).map(b => ({ id: b.id, name: b.name, folder: b.path || '', url: b.url, _links: b._links }));
+            } else {
+                const errorText = await response.text();
+                console.warn(`⚠️ [ADO Builds] HTTP ${response.status}: ${errorText}`);
             }
         } catch (err) {
-            console.error(`❌ [ADO] Build Definitions API failed:`, err);
+            console.error(`❌ [ADO] Build Definitions API Network Error:`, err);
         }
         return [];
     }
