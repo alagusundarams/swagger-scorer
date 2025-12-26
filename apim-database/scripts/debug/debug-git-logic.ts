@@ -15,7 +15,8 @@ const help = args.includes('--help');
 const productNameArg = args.find(a => a.startsWith('--product='))?.split('=')[1];
 const envArg = args.find(a => a.startsWith('--env='))?.split('=')[1] || 'DEV';
 const repoOverride = args.find(a => a.startsWith('--repo='))?.split('=')[1];
-const verbose = args.includes('--verbose');
+const verbose = !args.includes('--quiet'); // Default to verbose unless --quiet is used
+const quiet = args.includes('--quiet');
 
 if (help || !productNameArg) {
     console.log(`

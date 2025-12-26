@@ -79,6 +79,7 @@ async function debug() {
     const args = process.argv.slice(2);
     const targetProduct = args[0]; // e.g. "product-a"
     const targetEnv = args.find(a => a.startsWith('--env='))?.split('=')[1]?.toUpperCase() || 'DEV';
+    const verbose = !args.includes('--quiet');
 
     if (!targetProduct) {
         console.log("Usage: npx tsx scripts/debug/debug-policy-forensics.ts <productId> [--env=DEV|QA|PROD]");
@@ -113,7 +114,7 @@ async function debug() {
     console.log(`   ✅ Found ${allBackends.length} Backends in inventory.`);
 
     // 1.8 Global Policy Forensics
-    console.log(`\n🌎 Inspecting Global Policy...`);
+    if (verbose) console.log(`\n🌎 Inspecting Global Policy...`);
     try {
         const globalUrl = `https://management.azure.com/subscriptions/${env.subscriptionId}/resourceGroups/${env.resourceGroup}/providers/Microsoft.ApiManagement/service/${env.instance}/policies/policy?api-version=2022-08-01&format=rawxml`;
         const gPolRes = await fetch(globalUrl, { headers: { 'Authorization': `Bearer ${azureToken}` } });
@@ -124,11 +125,12 @@ async function debug() {
             console.log(`   ✅ App IDs:`, results.guids);
             console.log(`   ✅ Named Values:`, results.nvs);
             console.log(`   ✅ Backends:`, results.backends);
+            if (verbose && xml) console.log(`      📄 Policy XML Length: ${xml.length} characters`);
         }
     } catch (e) { }
 
     // 2. Fetch Product Policy
-    console.log(`📦 Inspecting Product Policy: ${targetProduct}...`);
+    if (verbose) console.log(`📦 Inspecting Product Policy: ${targetProduct}...`);
     try {
         const prodUrl = `https://management.azure.com/subscriptions/${env.subscriptionId}/resourceGroups/${env.resourceGroup}/providers/Microsoft.ApiManagement/service/${env.instance}/products/${targetProduct}/policies/policy?api-version=2022-08-01&format=rawxml`;
         const pPolRes = await fetch(prodUrl, { headers: { 'Authorization': `Bearer ${azureToken}` } });
