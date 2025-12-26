@@ -204,10 +204,13 @@ async function runDebug() {
     // --- PIPELINE MATCHING ---
     console.log(`\n➡️  Step 3: Matching Pipeline...`);
 
-    const matchedPipeline = pipelines.find(p =>
-        p.name.toLowerCase().includes(productNameArg!.toLowerCase()) ||
-        productNameArg!.toLowerCase().includes(p.name.toLowerCase())
-    );
+    const sanitize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanProduct = sanitize(productNameArg!);
+
+    const matchedPipeline = pipelines.find(p => {
+        const cleanPipe = sanitize(p.name);
+        return cleanPipe.includes(cleanProduct) || cleanProduct.includes(cleanPipe);
+    });
 
     if (!matchedPipeline) {
         console.log(`\n   ⚠️  No direct name match found between product "${productNameArg}" and ${pipelines.length} pipelines.`);
