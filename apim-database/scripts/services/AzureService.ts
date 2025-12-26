@@ -371,25 +371,24 @@ export class AzureService {
         const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
 
         // Determine Search URL
-        // DEV.AZURE.COM -> https://almsearch.dev.azure.com/{org}/_apis/search/codesearchresults
-        // VISUALSTUDIO.COM -> https://{org}.visualstudio.com/_apis/search/codesearchresults
-
-        let searchUrl = '';
+        // DEV.AZURE.COM & VISUALSTUDIO.COM -> Use almsearch sub-domain for REST API
+        let searchOrg = org;
         if (cleanBaseUrl.includes('visualstudio.com')) {
-            // Per user hint: Legacy URLs often require org in path: {org}.visualstudio.com/{org}/
-            searchUrl = `${cleanBaseUrl}/${org}/_apis/search/codesearchresults?api-version=7.1-preview.1`;
-        } else {
-            // Assume dev.azure.com pattern (almsearch host is required for code search)
-            searchUrl = `https://almsearch.dev.azure.com/${org}/_apis/search/codesearchresults?api-version=7.1-preview.1`;
+            const match = cleanBaseUrl.match(/https?:\/\/([^.]+)\.visualstudio\.com/);
+            if (match) searchOrg = match[1];
         }
 
-        const body = {
+        const searchUrl = `https://almsearch.dev.azure.com/${searchOrg}/_apis/search/codesearchresults?api-version=7.1-preview.1`;
+
+        const body: any = {
             searchText: searchTerm.includes(' ') ? `"${searchTerm}"` : searchTerm,
-            $top: 20,
-            filters: filters || {
-                Extension: ["tf", "tfvars"]
-            }
+            $top: 20
         };
+
+        // If specific filters are passed (like project), use them, otherwise stay minimalist
+        if (filters && Object.keys(filters).length > 0) {
+            body.filters = filters;
+        }
 
         try {
             const response = await fetch(searchUrl, {
