@@ -104,17 +104,22 @@ async function runDebug() {
     const primaryRepoName = firstResult.repository.name;
     const primaryRepoId = firstResult.repository.id;
     let project = firstResult.repository.project?.name || "Unknown";
+    let projectId = firstResult.repository.project?.id || "";
 
-    if (project === "Unknown") {
-        console.log(`   🔎 Project missing in search result. Attempting recovery via Repo ID ${primaryRepoId}...`);
+    if (project === "Unknown" || !projectId) {
+        console.log(`   🔎 Project info missing in search result. Attempting recovery via Repo ID ${primaryRepoId}...`);
         try {
             const repoDetails = await AzureService.fetchRepoById(devops.organization, primaryRepoId, devops.pat, devops.baseUrl);
             project = repoDetails.project.name;
-            console.log(`      ✅ Recovered Project Name: ${project}`);
+            projectId = repoDetails.project.id;
+            console.log(`      ✅ Recovered Project: ${project} (ID: ${projectId})`);
         } catch (e) {
-            console.log(`      ⚠️  Failed to recover project name. Repo Object:`, JSON.stringify(firstResult.repository, null, 2));
+            console.log(`      ⚠️  Failed to recover project info. Repo Object:`, JSON.stringify(firstResult.repository, null, 2));
         }
     }
+
+    const projectIdentifier = projectId || project;
+    console.log(`   🎯 Selected Primary Repo: ${primaryRepoName} (ID: ${primaryRepoId}, Project: ${project})`);
 
     console.log(`   🎯 Selected Primary Repo: ${primaryRepoName} (ID: ${primaryRepoId}, Project: ${project})`);
 
@@ -124,17 +129,17 @@ async function runDebug() {
     // Diagnostic log
     const cleanBase = devops.baseUrl.replace(/\/+$/, '');
     const isLegacy = cleanBase.includes('visualstudio.com');
-    const urlBase = isLegacy ? `${cleanBase}/${project}` : `${cleanBase}/${devops.organization}/${project}`;
+    const urlBase = isLegacy ? `${cleanBase}/${projectIdentifier}` : `${cleanBase}/${devops.organization}/${projectIdentifier}`;
     const pipelineUrl = `${urlBase}/_apis/pipelines?api-version=7.1-preview.1&repositoryId=${primaryRepoId}&repositoryType=azureRepo`;
     console.log(`   📡 Fetching from: ${pipelineUrl}`);
 
-    let pipelines = await AzureService.fetchADOPipelines(devops.organization, project, primaryRepoId, devops.pat, devops.baseUrl);
+    let pipelines = await AzureService.fetchADOPipelines(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl);
     console.log(`   Count via Repo ID filter: ${pipelines.length}`);
 
     if (pipelines.length === 0) {
         console.log(`   ⚠️  No pipelines found via repo filter. Attempting to fetch ALL pipelines in project to find match...`);
         // Generic fetch (no repo filter)
-        const allPipelines = await AzureService.fetchADOPipelines(devops.organization, project, "", devops.pat, devops.baseUrl);
+        const allPipelines = await AzureService.fetchADOPipelines(devops.organization, projectIdentifier, "", devops.pat, devops.baseUrl);
         console.log(`   Total pipelines in project: ${allPipelines.length}`);
 
         // Manual filter
@@ -160,12 +165,12 @@ async function runDebug() {
 
     // 3. Fetch Runs & Stage Discovery
     console.log(`\n➡️  Step 3: Fetching Recent Runs & Timelines...`);
-    const runs = await AzureService.fetchPipelineRuns(devops.organization, project, matchedPipeline.id, devops.pat, devops.baseUrl);
+    const runs = await AzureService.fetchPipelineRuns(devops.organization, projectIdentifier, matchedPipeline.id, devops.pat, devops.baseUrl);
     console.log(`   Found ${runs.length} recent runs.`);
 
     for (const run of runs.slice(0, 3)) { // Look at top 3
         console.log(`\n   --- Run ID: ${run.id} (${run.status}, Result: ${run.result}) ---`);
-        const timeline = await AzureService.fetchPipelineRunTimeline(devops.organization, project, run.id, devops.pat, devops.baseUrl);
+        const timeline = await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdentifier, run.id, devops.pat, devops.baseUrl);
 
         // Find environment stage
         const envStage = timeline.find((r: any) =>
