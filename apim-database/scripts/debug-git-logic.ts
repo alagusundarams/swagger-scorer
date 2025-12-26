@@ -77,7 +77,9 @@ async function runDebug() {
     }
 
     const matchedRepos = new Set<string>();
-    searchRes.results.forEach((r: any) => matchedRepos.add(r.repository.name));
+    searchRes.results?.forEach((r: any) => {
+        if (r.repository?.name) matchedRepos.add(r.repository.name);
+    });
 
     console.log(`   Matches found in repos: ${Array.from(matchedRepos).join(', ')}`);
 
@@ -93,9 +95,15 @@ async function runDebug() {
         console.log(`      This increases the risk of 'false positives' in repo matching.`);
     }
 
-    const primaryRepoName = searchRes.results[0].repository.name;
-    const primaryRepoId = searchRes.results[0].repository.id;
-    const project = searchRes.results[0].repository.project.name;
+    const firstResult = searchRes.results?.[0];
+    if (!firstResult || !firstResult.repository) {
+        console.log(`   ❌ No valid repository data in results.`);
+        return;
+    }
+
+    const primaryRepoName = firstResult.repository.name;
+    const primaryRepoId = firstResult.repository.id;
+    const project = firstResult.repository.project?.name || "Unknown";
     console.log(`   🎯 Selected Primary Repo: ${primaryRepoName} (ID: ${primaryRepoId}, Project: ${project})`);
 
     // 2. Locate YAML Pipeline
