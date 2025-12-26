@@ -177,35 +177,68 @@ async function runDebug() {
     }
 
     // --- STEP 4: SURGICAL ENVIRONMENT SYNC ---
-    console.log(`\n➡️  Step 4: Surgical Environment Hash Sync...`);
+    console.log(`\n➡️  Step 4: Surgical Environment Hash Sync (Scale-Optimized)...`);
     const envsToSync = ['DEV', 'QA', 'STAGE', 'PROD'];
     const deployments: Record<string, { hash: string; date: string }> = {};
 
-    console.log(`   ⏳ Fetching latest successful runs from main...`);
+    console.log(`   ⏳ Fetching latest runs from main...`);
     const runs = await AzureService.fetchPipelineRuns(devops.organization, projectIdentifier, matchedPipeline.id, devops.pat, devops.baseUrl, cliToken);
-    const timelineCache = new Map<number, any[]>();
 
-    for (const envName of envsToSync) {
-        let found = false;
-        for (const run of runs.slice(0, 50)) {
-            if (found) break;
-            if (!timelineCache.has(run.id)) {
-                timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdentifier, run.id, devops.pat, devops.baseUrl, cliToken));
-            }
-            const timeline = timelineCache.get(run.id)!;
-            const stage = timeline.find((t: any) => t.type === 'stage' && sanitize(t.name).includes(sanitize(envName)) && t.result === 'succeeded');
+    const SCAN_DEPTH = 15;
+    const timelineCache = new Map<number, any[]>();
+    let apiCyclesAvoided = 0;
+    let timelinesFetched = 0;
+
+    // Optimized Scan: One pass over runs, surgical timeline fetching
+    for (const run of runs.slice(0, SCAN_DEPTH)) {
+        // Early Exit: Stop if we found all environments
+        const foundCount = Object.keys(deployments).length;
+        if (foundCount === envsToSync.length) {
+            apiCyclesAvoided += (SCAN_DEPTH - timelinesFetched - (apiCyclesAvoided));
+            break;
+        }
+
+        // Optimization: Only scan successful/partially successful runs
+        const runResult = (run as any).result || (run as any).state;
+        if (runResult !== 'succeeded' && runResult !== 'partiallySucceeded' && runResult !== 'completed') {
+            apiCyclesAvoided++;
+            continue;
+        }
+
+        if (!timelineCache.has(run.id)) {
+            timelinesFetched++;
+            timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdentifier, run.id, devops.pat, devops.baseUrl, cliToken));
+        }
+
+        const timeline = timelineCache.get(run.id)!;
+        for (const envName of envsToSync) {
+            if (deployments[envName]) continue;
+
+            const stage = timeline.find((t: any) =>
+                t.type === 'stage' &&
+                sanitize(t.name).includes(sanitize(envName)) &&
+                t.result === 'succeeded'
+            );
 
             if (stage) {
                 deployments[envName] = {
                     hash: (run as any).sourceVersion || 'unknown',
                     date: stage.finishTime || run.finishedDate
                 };
-                console.log(`      📍 ${envName}: Captured ${deployments[envName].hash.substring(0, 7)}`);
-                found = true;
+                console.log(`      📍 ${envName.padEnd(5)}: Captured ${deployments[envName].hash.substring(0, 7)} (Run ${run.id})`);
             }
         }
-        if (!found) console.log(`      📍 ${envName}: (No successful deployment found)`);
     }
+
+    // Report missing envs
+    envsToSync.forEach(env => {
+        if (!deployments[env]) console.log(`      📍 ${env.padEnd(5)}: (No successful deployment found in last ${SCAN_DEPTH} runs)`);
+    });
+
+    console.log(`\n📊 Efficiency Report:`);
+    console.log(`   - Timelines Fetched: ${timelinesFetched}`);
+    console.log(`   - API Cycles Avoided: ${apiCyclesAvoided}`);
+    console.log(`   - Scale Readiness: ${apiCyclesAvoided > 3 ? '🟢 OPTIMIZED' : '🟡 SCANNING...'}`);
 
     console.log(`\n✅ Final Seed Data:`);
     console.log(JSON.stringify({

@@ -148,34 +148,38 @@ async function main() {
             meta.status = 'MATCHED';
             console.log(`   ✅ Pipeline: ${matchedPipeline.name} (Score: ${pipeScore})`);
 
-            // C. Surgical Hash Sync
+            // C. Surgical Hash Sync (Scale-Optimized)
             const envsToSync = ['DEV', 'QA', 'STAGE', 'PROD'];
             const projectIdent = repo.project.id || repo.project.name;
             const runs = await AzureService.fetchPipelineRuns(devops.organization, projectIdent, matchedPipeline.id, devops.pat, devops.baseUrl, cliToken);
 
+            const SCAN_DEPTH = 15;
             const timelineCache = new Map<number, any[]>();
 
-            for (const envName of envsToSync) {
-                let found = false;
-                for (const run of runs.slice(0, 50)) {
-                    if (found) break;
+            for (const run of runs.slice(0, SCAN_DEPTH)) {
+                // Early Exit: if we found hashes for all environments, skip remaining runs
+                if (Object.keys(meta.deployments).length === envsToSync.length) break;
 
-                    if (!timelineCache.has(run.id)) {
-                        timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdent, run.id, devops.pat, devops.baseUrl, cliToken));
-                    }
-                    const timeline = timelineCache.get(run.id)!;
+                // Status Filter: Skip runs that didn't at least partially succeed
+                const runResult = (run as any).result || (run as any).state;
+                if (runResult !== 'succeeded' && runResult !== 'partiallySucceeded' && runResult !== 'completed') continue;
+
+                if (!timelineCache.has(run.id)) {
+                    timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdent, run.id, devops.pat, devops.baseUrl, cliToken));
+                }
+
+                const timeline = timelineCache.get(run.id)!;
+                for (const envName of envsToSync) {
+                    if (meta.deployments[envName]) continue;
+
                     const stage = timeline.find(t => t.type === 'stage' && sanitize(t.name).includes(sanitize(envName)) && t.result === 'succeeded');
-
                     if (stage) {
                         meta.deployments[envName] = {
                             hash: (run as any).sourceVersion || 'unknown',
                             date: stage.finishTime || run.finishedDate
                         };
-                        found = true;
+                        console.log(`      📍 ${envName.padEnd(5)}: Captured ${meta.deployments[envName].hash.substring(0, 7)} (Run ${run.id})`);
                     }
-                }
-                if (found) {
-                    console.log(`      📍 ${envName}: ${meta.deployments[envName].hash.substring(0, 7)}`);
                 }
             }
 
