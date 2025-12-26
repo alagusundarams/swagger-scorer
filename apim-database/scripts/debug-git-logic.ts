@@ -14,7 +14,7 @@ Usage:
   npx tsx scripts/debug-git-logic.ts --product="My Product Name"
 
 Purpose:
-  Probe multiple ADO Search endpoints and verify project connectivity.
+  Probe multiple ADO Search endpoints using the correct REST API patterns.
     `);
     process.exit(0);
 }
@@ -48,23 +48,20 @@ async function runDebug() {
     const cleanBaseUrl = (devopsConfig.baseUrl || 'https://dev.azure.com').replace(/\/$/, '');
     const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
 
-    // 0. Verify Connectivity (Fetch Projects)
+    // 0. Verify Connectivity & Discovery
     console.log(`\n➡️  Step 0: Verifying Connectivity (Fetching Projects)...`);
+    let projectList: any[] = [];
     try {
-        const projects = await AzureService.fetchADOProjects(org, pat, cleanBaseUrl);
-        console.log(`   ✅ Connected! Found ${projects.length} projects.`);
-        if (projects.length > 0) {
-            console.log(`   Example Project: ${projects[0].name} (ID: ${projects[0].id})`);
-        }
+        projectList = await AzureService.fetchADOProjects(org, pat, cleanBaseUrl);
+        console.log(`   ✅ Connected! Found ${projectList.length} projects.`);
     } catch (e: any) {
         console.error(`   ❌ FAIL: Could not fetch projects. Your baseUrl/org/pat might be wrong.`);
         console.error(`      Error: ${e.message}`);
-        // Continue anyway to probe search
+        return;
     }
 
     // 1. Content Search Probing
     console.log(`\n➡️  Step 1: Probing Search Endpoints for "${productNameArg}"...`);
-    let matchedRepo = null;
 
     const searchBody = {
         searchText: productNameArg!.includes(' ') ? `"${productNameArg}"` : productNameArg,
@@ -72,24 +69,30 @@ async function runDebug() {
         filters: { Extension: ["tf", "tfvars"] }
     };
 
+    // Refined Endpoints based on REST API standards for Legacy vs Modern
     const searchVariations = [
         {
-            name: "Modern Standard (dev.azure.com host)",
+            name: "Modern Search Host (Official Cloud Endpoint)",
             url: `https://almsearch.dev.azure.com/${org}/_apis/search/codesearchresults?api-version=7.1-preview.1`
         },
         {
-            name: "Legacy Subdomain (visualstudio.com host)",
-            url: `${cleanBaseUrl}/_apis/search/codesearchresults?api-version=6.1-preview.1`
+            name: "Legacy Subdomain (Direct path - No doubled org)",
+            url: `${cleanBaseUrl}/_apis/search/codesearchresults?api-version=5.1`
         },
         {
-            name: "Legacy Subdomain (API 6.0 Stable)",
-            url: `${cleanBaseUrl}/_apis/search/codesearchresults?api-version=6.0`
-        },
-        {
-            name: "Legacy Collection Path",
+            name: "Legacy with DefaultCollection (Common legacy pattern)",
             url: `${cleanBaseUrl}/DefaultCollection/_apis/search/codesearchresults?api-version=5.1`
         }
     ];
+
+    // Add Project-scoped test if we have projects
+    if (projectList.length > 0) {
+        const testProj = projectList[0].name;
+        searchVariations.push({
+            name: `Project-Scoped Search (Testing Project: ${testProj})`,
+            url: `${cleanBaseUrl}/${testProj}/_apis/search/codesearchresults?api-version=5.1`
+        });
+    }
 
     for (const ep of searchVariations) {
         console.log(`\n   📡 Testing: ${ep.name}`);
@@ -112,15 +115,14 @@ async function runDebug() {
                 console.log(`      Hits found: ${searchResp.count}`);
 
                 if (searchResp.count > 0) {
-                    console.log(`      🎯 SUCCESS! Hits found via ${ep.name}`);
-                    // List first hit for verification
+                    console.log(`      🎯 SUCCESS! Hits found.`);
                     const first = searchResp.results[0];
-                    console.log(`      First Result: ${first.path} in Repo [${first.repository.name}]`);
+                    console.log(`      Sample Result: ${first.path} in [${first.repository.name}]`);
                     break;
                 }
             } else {
                 const txt = await response.text();
-                console.log(`      ❌ Response: ${txt.substring(0, 200)}...`);
+                console.log(`      ❌ Error: ${txt.substring(0, 150)}...`);
             }
 
         } catch (e: any) {
@@ -128,7 +130,7 @@ async function runDebug() {
         }
     }
 
-    console.log(`\n🏁 Probe complete. Please check the logs above for any "200 OK".`);
+    console.log(`\n🏁 Probe complete.`);
 }
 
 runDebug();
