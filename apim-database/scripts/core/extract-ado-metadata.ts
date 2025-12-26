@@ -70,15 +70,8 @@ async function main() {
         console.log(`📊 Loaded ${inventory.length} unique products for discovery.`);
     }
 
-    // 2. Setup Auth (CLI Fallback)
-    let cliToken = "";
-    try {
-        console.log(`🔎 [AUTH] Checking for Azure CLI Access Token (499b84ee-1328-4417-95a1-8288018c668b)...`);
-        cliToken = await AzureService.getAzureAccessToken("499b84ee-1328-4417-95a1-8288018c668b");
-        if (cliToken) console.log(`   ✅ CLI Token obtained for broad discovery.`);
-    } catch (e) {
-        console.warn(`   ⚠️  CLI Token unavailable. Falling back to PAT.`);
-    }
+    // 2. Setup Auth (PAT first, CLI as last resort)
+    console.log(`🔐 [AUTH] Using PAT for ADO operations (Azure CLI will be tried as fallback if PAT fails)...`);
 
     // 3. Discovery Loop
     const results: ADOMetadata[] = [];
@@ -87,8 +80,8 @@ async function main() {
 
     for (const prod of inventory) {
         // --- SAFETY THROTTLE ---
-        // Respects ADO/APIM rate limits by adding a 2s delay between products to avoid hitting search API limits.
-        await sleep(2000);
+        // Respects ADO/APIM rate limits by adding a 4s delay between products to avoid hitting search API limits.
+        await sleep(4000);
 
         console.log(`\n🔹 Processing: ${prod.name} (${prod.id})`);
         const meta: ADOMetadata = { productId: prod.id, productName: prod.name, deployments: {}, status: 'ORPHAN' };
@@ -98,7 +91,7 @@ async function main() {
             const cleanProd = sanitize(prod.name);
             const quotedName = prod.name.includes(' ') ? `"${prod.name}"` : prod.name;
             const searchTerm = `${quotedName} (ext:tf OR ext:tfvars)`;
-            const searchResp = await AzureService.searchCode(devops.organization, searchTerm, devops.pat, devops.baseUrl, cliToken);
+            const searchResp = await AzureService.searchCode(devops.organization, searchTerm, devops.pat, devops.baseUrl);
 
             if (!searchResp || searchResp.count === 0) {
                 console.log(`   ⚠️  REPO_MISSING: No TF matches for "${prod.name}"`);
@@ -147,7 +140,7 @@ async function main() {
             console.log(`   ✅ Repo: ${repo.name} (Score: ${repoScore})`);
 
             // B. Pipeline Discovery & Ranking
-            const pipelines = await AzureService.fetchADOPipelines(devops.organization, repo.project.id || repo.project.name, repo.id, devops.pat, devops.baseUrl, cliToken);
+            const pipelines = await AzureService.fetchADOPipelines(devops.organization, repo.project.id || repo.project.name, repo.id, devops.pat, devops.baseUrl);
 
             if (pipelines.length === 0) {
                 console.log(`   ⚠️  PIPELINE_MISSING: No pipelines in repo.`);
@@ -188,7 +181,7 @@ async function main() {
             // Phase 1: Surgical Strikes (Environments API) - Ultra Fast
             for (const envName of envsToSync) {
                 const deploy = await AzureService.fetchLatestEnvironmentDeployment(
-                    devops.organization, projectIdent, matchedPipeline.id, envName, devops.pat, devops.baseUrl, cliToken
+                    devops.organization, projectIdent, matchedPipeline.id, envName, devops.pat, devops.baseUrl
                 );
 
                 if (deploy) {
@@ -210,7 +203,7 @@ async function main() {
 
                 while (Object.keys(meta.deployments).length < envsToSync.length && skip < maxDepth) {
                     const builds = await AzureService.fetchBuildsByDefinition(
-                        devops.organization, projectIdent, matchedPipeline.id, devops.pat, devops.baseUrl, cliToken, pageSize, skip
+                        devops.organization, projectIdent, matchedPipeline.id, devops.pat, devops.baseUrl, undefined, pageSize, skip
                     );
 
                     if (builds.length === 0) break;
@@ -219,7 +212,7 @@ async function main() {
                         if (Object.keys(meta.deployments).length === envsToSync.length) break;
 
                         if (!timelineCache.has(run.id)) {
-                            timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdent, run.id, devops.pat, devops.baseUrl, cliToken));
+                            timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdent, run.id, devops.pat, devops.baseUrl));
                         }
 
                         const timeline = timelineCache.get(run.id)!;
