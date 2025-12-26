@@ -376,9 +376,10 @@ export class AzureService {
 
         let searchUrl = '';
         if (cleanBaseUrl.includes('visualstudio.com')) {
-            searchUrl = `${cleanBaseUrl}/_apis/search/codesearchresults?api-version=7.1-preview.1`;
+            // Per user hint: Legacy URLs often require org in path: {org}.visualstudio.com/{org}/
+            searchUrl = `${cleanBaseUrl}/${org}/_apis/search/codesearchresults?api-version=7.1-preview.1`;
         } else {
-            // Assume dev.azure.com pattern
+            // Assume dev.azure.com pattern (almsearch host is required for code search)
             searchUrl = `https://almsearch.dev.azure.com/${org}/_apis/search/codesearchresults?api-version=7.1-preview.1`;
         }
 
@@ -386,7 +387,7 @@ export class AzureService {
             searchText: searchTerm.includes(' ') ? `"${searchTerm}"` : searchTerm,
             $top: 20,
             filters: filters || {
-                FileExtension: ["tf", "tfvars"]
+                Extension: ["tf", "tfvars"]
             }
         };
 

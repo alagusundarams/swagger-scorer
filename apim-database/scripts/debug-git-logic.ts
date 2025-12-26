@@ -49,12 +49,13 @@ async function runDebug() {
     let repoUrl = '';
 
     const strategies = [
-        { name: "Phrase Search (+ .tf filters)", filters: { FileExtension: ["tf", "tfvars"] } },
+        { name: "Phrase Search (+ .tf filters)", filters: { Extension: ["tf", "tfvars"] } },
         { name: "Global Search (No filters)", filters: {} }
     ];
 
     for (const strategy of strategies) {
         console.log(`\n   🔍 Trying strategy: ${strategy.name}`);
+        console.log(`      Filters: ${JSON.stringify(strategy.filters)}`);
         try {
             const searchResp = await AzureService.searchCode(
                 devopsConfig.organization,
