@@ -226,7 +226,49 @@ async function runDebug() {
     console.log(`   Project:   ${project} (ID: ${projectId})`);
     console.log(`   Pipeline:  ${matchedPipeline.name} (ID: ${matchedPipeline.id})`);
 
-    console.log(`\n✅ Database Seeding Data:`);
+    // --- STEP 4: SURGICAL ENVIRONMENT SYNC ---
+    console.log(`\n➡️  Step 4: Surgical Environment Hash Sync...`);
+    const envsToSync = ['DEV', 'QA', 'STAGE', 'PROD'];
+    const deployments: Record<string, { hash: string; date: string }> = {};
+    const projectIdent = projectId || project;
+
+    // Fetch last 50 successful runs on branch 'main' for surgical precision
+    console.log(`   ⏳ Fetching latest successful runs from main...`);
+    const runs = await AzureService.fetchPipelineRuns(devops.organization, projectIdent, matchedPipeline.id, devops.pat, devops.baseUrl, cliToken);
+
+    // Cache for timelines to avoid redundant calls
+    const timelineCache = new Map<number, any[]>();
+
+    for (const envName of envsToSync) {
+        let found = false;
+        // Optimization: scan only successful runs (filtering would be better but API is limited, so we scan top 50)
+        for (const run of runs.slice(0, 50)) {
+            if (found) break;
+
+            if (!timelineCache.has(run.id)) {
+                timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdent, run.id, devops.pat, devops.baseUrl, cliToken));
+            }
+            const timeline = timelineCache.get(run.id)!;
+
+            const stage = timeline.find(t =>
+                t.type === 'stage' &&
+                sanitize(t.name).includes(sanitize(envName)) &&
+                t.result === 'succeeded'
+            );
+
+            if (stage) {
+                deployments[envName] = {
+                    hash: (run as any).sourceVersion || 'unknown',
+                    date: stage.finishTime || run.finishedDate
+                };
+                console.log(`      📍 ${envName}: Captured ${deployments[envName].hash.substring(0, 7)} (Succeeded: ${deployments[envName].date})`);
+                found = true;
+            }
+        }
+        if (!found) console.log(`      📍 ${envName}: No successful deployment found in recent history.`);
+    }
+
+    console.log(`\n✅ Final Seed Data:`);
     const seedData = {
         product: productNameArg,
         organization: devops.organization,
@@ -234,11 +276,12 @@ async function runDebug() {
         projectId: projectId,
         repositoryId: primaryRepoId,
         pipelineId: matchedPipeline.id,
-        pipelineName: matchedPipeline.name
+        pipelineName: matchedPipeline.name,
+        deployments
     };
     console.log(JSON.stringify(seedData, null, 2));
 
-    console.log(`\n💡 Skipping deep deployment crawl to preserve rate limits.`);
+    console.log(`\n💡 Deep crawl avoided. Surgical sync used (Last 50 runs).`);
 }
 
 runDebug().catch(err => {
