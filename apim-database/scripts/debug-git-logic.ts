@@ -1,7 +1,6 @@
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { AzureService } from './services/AzureService.js';
-import fetch from 'node-fetch';
 
 // --- ARGS ---
 const args = process.argv.slice(2);
