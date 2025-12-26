@@ -216,6 +216,13 @@ async function runDebug() {
             }
         }
 
+        if (verbose && timelinesFetched === 1) {
+            console.log(`      🔍 Run Object Keys: ${Object.keys(run).join(', ')}`);
+            if ((run as any).resources?.repositories?.self) {
+                console.log(`      🔍 Run Commit Version: ${(run as any).resources.repositories.self.version}`);
+            }
+        }
+
         const timeline = timelineCache.get(run.id)!;
         for (const envName of envsToSync) {
             if (deployments[envName]) continue;
@@ -230,11 +237,16 @@ async function runDebug() {
             });
 
             if (record) {
+                // Try multiple potential hash locations from ADO API
+                const commitHash = (run as any).resources?.repositories?.self?.version ||
+                    (run as any).sourceVersion ||
+                    'unknown';
+
                 deployments[envName] = {
-                    hash: (run as any).sourceVersion || 'unknown',
+                    hash: commitHash,
                     date: record.finishTime || run.finishedDate
                 };
-                console.log(`      📍 ${envName.padEnd(5)}: Captured ${deployments[envName].hash.substring(0, 7)} (Run ${run.id} via ${record.name})`);
+                console.log(`      📍 ${envName.padEnd(5)}: Captured ${commitHash.substring(0, 7)} (Run ${run.id} via ${record.name})`);
             }
         }
     }
