@@ -114,7 +114,13 @@ CREATE TABLE IF NOT EXISTS products (
     last_deployed_commit_hash TEXT,
     last_deployed_at TIMESTAMP WITH TIME ZONE,
     
-    -- Universal Production Visibility (Updated by all workers)
+    -- Universal Chain Visibility (Updated by all workers to enable comparison views)
+    dev_deployment_date TIMESTAMP WITH TIME ZONE,
+    dev_hash TEXT,
+    qa_deployment_date TIMESTAMP WITH TIME ZONE,
+    qa_hash TEXT,
+    stage_deployment_date TIMESTAMP WITH TIME ZONE,
+    stage_hash TEXT,
     production_deployment_date TIMESTAMP WITH TIME ZONE,
     production_hash TEXT,
     

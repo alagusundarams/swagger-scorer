@@ -71,7 +71,10 @@ async function main() {
 
             for (const envName of prod.environments) {
                 const uniqueProductId = `${prod.id}:${envName}:Global`;
-                const deploy = ado.deployments[envName];
+                const localDeploy = ado.deployments[envName];
+                const devDeploy = ado.deployments['DEV'];
+                const qaDeploy = ado.deployments['QA'];
+                const stageDeploy = ado.deployments['STAGE'];
                 const prodDeploy = ado.deployments['PROD'];
 
                 await pool.query(`
@@ -79,24 +82,36 @@ async function main() {
                         id, name, display_name, environment, region,
                         last_deployed_commit_hash, last_deployed_at,
                         terraform_pipeline_url, github_url,
+                        dev_hash, dev_deployment_date,
+                        qa_hash, qa_deployment_date,
+                        stage_hash, stage_deployment_date,
                         production_hash, production_deployment_date,
                         management_mode, updated_at
                     )
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW())
                     ON CONFLICT (id) DO UPDATE SET
                         last_deployed_commit_hash = COALESCE(EXCLUDED.last_deployed_commit_hash, products.last_deployed_commit_hash),
                         last_deployed_at = COALESCE(EXCLUDED.last_deployed_at, products.last_deployed_at),
                         terraform_pipeline_url = COALESCE(EXCLUDED.terraform_pipeline_url, products.terraform_pipeline_url),
                         github_url = COALESCE(EXCLUDED.github_url, products.github_url),
-                        production_hash = COALESCE(EXCLUDED.production_hash, products.production_hash),
-                        production_deployment_date = COALESCE(EXCLUDED.production_deployment_date, products.production_deployment_date),
+                        dev_hash = EXCLUDED.dev_hash,
+                        dev_deployment_date = EXCLUDED.dev_deployment_date,
+                        qa_hash = EXCLUDED.qa_hash,
+                        qa_deployment_date = EXCLUDED.qa_deployment_date,
+                        stage_hash = EXCLUDED.stage_hash,
+                        stage_deployment_date = EXCLUDED.stage_deployment_date,
+                        production_hash = EXCLUDED.production_hash,
+                        production_deployment_date = EXCLUDED.production_deployment_date,
                         management_mode = EXCLUDED.management_mode,
                         updated_at = NOW();
                 `, [
                     uniqueProductId, prod.id, prod.name, envName, 'Global',
-                    deploy?.hash || null, deploy?.date || null,
+                    localDeploy?.hash || null, localDeploy?.date || null,
                     ado.pipeline ? `https://dev.azure.com/${config.devops.organization}/${ado.repository.project}/_build?definitionId=${ado.pipeline.id}` : null,
                     ado.repository ? `https://dev.azure.com/${config.devops.organization}/${ado.repository.project}/_git/${ado.repository.name}` : null,
+                    devDeploy?.hash || null, devDeploy?.date || null,
+                    qaDeploy?.hash || null, qaDeploy?.date || null,
+                    stageDeploy?.hash || null, stageDeploy?.date || null,
                     prodDeploy?.hash || null, prodDeploy?.date || null,
                     ado.status === 'MATCHED' ? 'TERRAFORM_MANAGED' : 'MANUAL'
                 ]);
