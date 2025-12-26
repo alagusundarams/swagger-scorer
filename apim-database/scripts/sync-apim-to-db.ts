@@ -300,9 +300,11 @@ async function resolveGitMetadata(productName: string, productTags: Record<strin
     let repoUrl = '';
 
     try {
+        const quotedName = productName.includes(' ') ? `"${productName}"` : productName;
+        const searchTerm = `${quotedName} ext:tf ext:tfvars`;
         const searchResp = await AzureService.searchCode(
             devopsConfig.organization,
-            productName,
+            searchTerm,
             devopsConfig.pat,
             devopsConfig.baseUrl
         );

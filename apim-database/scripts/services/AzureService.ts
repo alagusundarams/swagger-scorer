@@ -416,7 +416,7 @@ export class AzureService {
         const searchUrl = `https://almsearch.dev.azure.com/${searchOrg}/_apis/search/codesearchresults?api-version=7.1-preview.1`;
 
         const body: any = {
-            searchText: searchTerm.includes(' ') ? `"${searchTerm}"` : searchTerm,
+            searchText: searchTerm,
             $top: 20
         };
 

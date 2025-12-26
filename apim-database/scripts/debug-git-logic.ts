@@ -47,7 +47,8 @@ async function runDebug() {
 
     // 1. Repository Discovery via Search
     console.log(`\n➡️  Step 1: Code Search Discovery...`);
-    const searchTerm = `${productNameArg} ext:tf ext:tfvars`;
+    const quotedName = productNameArg!.includes(' ') ? `"${productNameArg}"` : productNameArg;
+    const searchTerm = `${quotedName} ext:tf ext:tfvars`;
     const searchRes = await AzureService.searchCode(devops.organization, searchTerm, devops.pat, devops.baseUrl);
 
     console.log(`   Found ${searchRes.count} hits in ADO Search.`);
