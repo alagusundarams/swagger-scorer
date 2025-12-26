@@ -228,7 +228,10 @@ async function debug() {
         console.log(`      🌐 Default Backend (serviceUrl): ${serviceUrl}`);
 
         try {
-            const apiPolUrl = `https://management.azure.com${api.id}${api.id.includes('/policies/') ? '' : '/policies/policy'}?api-version=2022-08-01&format=rawxml`;
+            // Strip the /products/... part from the ID if we want the actual API-level policy
+            const apiBaseId = api.id.replace(/\/products\/[^/]+\/apis\//, '/apis/');
+            const apiPolUrl = `https://management.azure.com${apiBaseId}${apiBaseId.includes('/policies/') ? '' : '/policies/policy'}?api-version=2022-08-01&format=rawxml`;
+
             if (verbose) console.log(`      🔗 Fetching API Policy from: ${apiPolUrl}`);
             const polRes = await fetch(apiPolUrl, { headers: { 'Authorization': `Bearer ${azureToken}` } });
 

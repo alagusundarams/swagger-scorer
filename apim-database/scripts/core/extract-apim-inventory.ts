@@ -279,7 +279,9 @@ async function main() {
 
                 // 4a. Policy Forensics (Fetch exactly ONCE per API per Env)
                 try {
-                    const polRes = await fetch(`https://management.azure.com${apiFullId}/policies/policy?api-version=2022-08-01&format=rawxml`, {
+                    // Strip the /products/... part from the ID if we want the actual API-level policy
+                    const apiBaseId = apiFullId.replace(/\/products\/[^/]+\/apis\//, '/apis/');
+                    const polRes = await fetch(`https://management.azure.com${apiBaseId}/policies/policy?api-version=2022-08-01&format=rawxml`, {
                         headers: { 'Authorization': `Bearer ${azureToken}` }
                     });
                     if (polRes.ok) {
@@ -300,8 +302,8 @@ async function main() {
                         nvs.forEach((nv: string) => potentialNvs.add(nv));
 
                         // Add serviceUrl as a default backend if present
-                        // We fetch the full API details here to ensure we have the serviceUrl
-                        const apiRes = await fetch(`https://management.azure.com${apiFullId}?api-version=2022-08-01`, {
+                        // Use apiBaseId to ensure we hit the actual API resource
+                        const apiRes = await fetch(`https://management.azure.com${apiBaseId}?api-version=2022-08-01`, {
                             headers: { 'Authorization': `Bearer ${azureToken}` }
                         });
                         if (apiRes.ok) {
@@ -318,7 +320,8 @@ async function main() {
                 // 4b. Global Contract Cache (Deduplication across Regions)
                 if (!metadata.apiContracts[apiName]) {
                     try {
-                        const contractRes = await fetch(`https://management.azure.com${apiFullId}?api-version=2022-08-01&export=true&format=openapi`, {
+                        const apiBaseId = apiFullId.replace(/\/products\/[^/]+\/apis\//, '/apis/');
+                        const contractRes = await fetch(`https://management.azure.com${apiBaseId}?api-version=2022-08-01&export=true&format=openapi`, {
                             headers: { 'Authorization': `Bearer ${azureToken}` }
                         });
                         if (contractRes.ok) {
