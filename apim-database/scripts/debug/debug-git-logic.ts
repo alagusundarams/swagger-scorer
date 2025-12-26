@@ -47,6 +47,25 @@ if (!devops || !devops.pat) {
 
 const sanitize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
+/**
+ * Recursive search for Git SHA (40 char hex) in any object
+ */
+function findGitSha(obj: any, path: string = ''): { path: string; value: string }[] {
+    const shas: { path: string; value: string }[] = [];
+    if (!obj || typeof obj !== 'object') return shas;
+
+    for (const key in obj) {
+        const val = obj[key];
+        const currentPath = path ? `${path}.${key}` : key;
+
+        if (typeof val === 'string' && /^[0-9a-f]{40}$/i.test(val)) {
+            shas.push({ path: currentPath, value: val });
+        } else if (typeof val === 'object' && val !== null) {
+            shas.push(...findGitSha(val, currentPath));
+        }
+    }
+    return shas;
+}
 async function runDebug() {
     console.log(`\n🕵️‍♀️ DEBUG: Git/Pipeline Discovery Test`);
     console.log(`   Target Product: "${productNameArg}"`);
@@ -210,18 +229,17 @@ async function runDebug() {
             const tl = await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdentifier, run.id, devops.pat, devops.baseUrl, cliToken);
             timelineCache.set(run.id, tl);
 
-            if (verbose) {
+            if (verbose && timelinesFetched === 1) {
                 const containers = tl.filter(t => ['stage', 'job', 'phase'].includes(t.type?.toLowerCase()));
                 console.log(`      🔍 Run ${run.id} Containers: ${containers.map(c => `${c.name} (${c.type}:${c.result})`).join(', ')}`);
-            }
-        }
 
-        if (verbose && timelinesFetched === 1) {
-            console.log(`      🔍 DEBUG: Inspecting first Run object structure:`);
-            console.log(JSON.stringify(run, (key, value) => {
-                // Redact things that look like URLs with tokens if any, but usually run objects are fine
-                return value;
-            }, 2));
+                // Forensic Hash Discovery
+                const potentialShas = findGitSha(run);
+                if (potentialShas.length > 0) {
+                    console.log(`      🔍 DEBUG: Forensic SHA Discovery (Top level or nested):`);
+                    potentialShas.forEach(s => console.log(`         - [${s.path}]: ${s.value}`));
+                }
+            }
         }
 
         const timeline = timelineCache.get(run.id)!;
@@ -238,10 +256,9 @@ async function runDebug() {
             });
 
             if (record) {
-                // Try multiple potential hash locations from ADO API
-                const commitHash = (run as any).resources?.repositories?.self?.version ||
-                    (run as any).sourceVersion ||
-                    'unknown';
+                // Determine Hash via findGitSha (Forensic fallback)
+                const shas = findGitSha(run);
+                const commitHash = shas.length > 0 ? shas[0].value : 'unknown';
 
                 deployments[envName] = {
                     hash: commitHash,
