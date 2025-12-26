@@ -123,7 +123,9 @@ async function runDebug() {
 
     // Diagnostic log
     const cleanBase = devops.baseUrl.replace(/\/+$/, '');
-    const pipelineUrl = `${cleanBase}/${devops.organization}/${project}/_apis/pipelines?api-version=7.1-preview.1&repositoryId=${primaryRepoId}&repositoryType=azureRepo`;
+    const isLegacy = cleanBase.includes('visualstudio.com');
+    const urlBase = isLegacy ? `${cleanBase}/${project}` : `${cleanBase}/${devops.organization}/${project}`;
+    const pipelineUrl = `${urlBase}/_apis/pipelines?api-version=7.1-preview.1&repositoryId=${primaryRepoId}&repositoryType=azureRepo`;
     console.log(`   📡 Fetching from: ${pipelineUrl}`);
 
     let pipelines = await AzureService.fetchADOPipelines(devops.organization, project, primaryRepoId, devops.pat, devops.baseUrl);

@@ -195,7 +195,10 @@ export class AzureService {
      */
     static async fetchRepoById(org: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADORepo> {
         const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
-        const url = `${cleanBaseUrl}/${org}/_apis/git/repositories/${repoId}?api-version=7.1-preview.1`;
+        const isLegacy = cleanBaseUrl.includes('visualstudio.com');
+        const url = isLegacy
+            ? `${cleanBaseUrl}/_apis/git/repositories/${repoId}?api-version=7.1-preview.1`
+            : `${cleanBaseUrl}/${org}/_apis/git/repositories/${repoId}?api-version=7.1-preview.1`;
         const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
 
         const response = await fetch(url, { headers: { 'Authorization': authHeader } });
@@ -240,9 +243,10 @@ export class AzureService {
     static async fetchADOPipelines(org: string, project: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADOPipeline[]> {
         const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
         const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const isLegacy = cleanBaseUrl.includes('visualstudio.com');
 
-        // Standard path-based URL. We don't strip org even for visualstudio.com if it's explicitly provided.
-        let url = `${cleanBaseUrl}/${org}/${project}/_apis/pipelines?api-version=7.1-preview.1`;
+        const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
+        let url = `${urlBase}/_apis/pipelines?api-version=7.1-preview.1`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=azureRepo`;
 
         try {
@@ -263,7 +267,10 @@ export class AzureService {
     static async fetchPipelineRuns(org: string, project: string, pipelineId: number, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<PipelineRun[]> {
         const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
         const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-        const url = `${cleanBaseUrl}/${org}/${project}/_apis/pipelines/${pipelineId}/runs?api-version=7.1-preview.1`;
+        const isLegacy = cleanBaseUrl.includes('visualstudio.com');
+
+        const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
+        const url = `${urlBase}/_apis/pipelines/${pipelineId}/runs?api-version=7.1-preview.1`;
 
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
@@ -283,8 +290,11 @@ export class AzureService {
     static async fetchPipelineRunTimeline(org: string, project: string, runId: number, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<TimelineRecord[]> {
         const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
         const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const isLegacy = cleanBaseUrl.includes('visualstudio.com');
+
+        const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
         // Standard ADO builds/timeline endpoint
-        const url = `${cleanBaseUrl}/${org}/${project}/_apis/build/builds/${runId}/timeline?api-version=7.1-preview.2`;
+        const url = `${urlBase}/_apis/build/builds/${runId}/timeline?api-version=7.1-preview.2`;
 
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
