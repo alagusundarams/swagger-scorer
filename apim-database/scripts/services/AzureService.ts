@@ -55,6 +55,17 @@ export interface PipelineRun {
     };
 }
 
+export interface TimelineRecord {
+    id: string;
+    parentId?: string;
+    type: string;
+    name: string;
+    status: string;
+    result: string;
+    startTime: string;
+    finishTime: string;
+}
+
 export interface CodeSearchResponse {
     count: number;
     results: {
@@ -252,6 +263,30 @@ export class AzureService {
             }
         } catch (err) {
             console.error(`❌ [ADO] Failed to fetch runs for pipeline ${pipelineId}:`, err);
+        }
+        return [];
+    }
+
+    /**
+     * Fetch Timeline for a specific Pipeline Run
+     */
+    static async fetchPipelineRunTimeline(org: string, project: string, runId: number, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<TimelineRecord[]> {
+        const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+        const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        // Standard ADO builds/timeline endpoint
+        let url = `${cleanBaseUrl}/${org}/${project}/_apis/build/builds/${runId}/timeline?api-version=7.1-preview.2`;
+        if (cleanBaseUrl.includes('visualstudio.com')) {
+            url = `${cleanBaseUrl}/${project}/_apis/build/builds/${runId}/timeline?api-version=7.1-preview.2`;
+        }
+
+        try {
+            const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+            if (response.ok) {
+                const data = await response.json() as { records: TimelineRecord[] };
+                return data.records;
+            }
+        } catch (err) {
+            console.error(`❌ [ADO] Failed to fetch timeline for run ${runId}:`, err);
         }
         return [];
     }

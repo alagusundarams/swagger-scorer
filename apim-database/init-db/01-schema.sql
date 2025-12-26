@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS products (
     owner_team_id TEXT REFERENCES teams(id),  -- Removed NOT NULL
     
     environment TEXT NOT NULL CHECK (environment IN ('DEV', 'QA', 'STAGE', 'PROD')),
+    region TEXT DEFAULT 'Global',
     
     -- Visibility and authorization
     visibility TEXT CHECK (visibility IN ('public', 'internal', 'private', 'owner-only')) DEFAULT 'internal',
@@ -112,6 +113,10 @@ CREATE TABLE IF NOT EXISTS products (
     -- Deployment Tracking (Git Sync)
     last_deployed_commit_hash TEXT,
     last_deployed_at TIMESTAMP WITH TIME ZONE,
+    
+    -- Universal Production Visibility (Updated by all workers)
+    production_deployment_date TIMESTAMP WITH TIME ZONE,
+    production_hash TEXT,
     
     -- Governance Intelligence
     detected_anomalies JSONB -- e.g. ["MANUAL_CREATION", "ENV_SKIP", "UNOWNED"]

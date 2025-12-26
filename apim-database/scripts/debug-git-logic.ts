@@ -7,128 +7,130 @@ import fetch from 'node-fetch';
 const args = process.argv.slice(2);
 const help = args.includes('--help');
 const productNameArg = args.find(a => a.startsWith('--product='))?.split('=')[1];
+const envArg = args.find(a => a.startsWith('--env='))?.split('=')[1] || 'DEV';
 
 if (help || !productNameArg) {
     console.log(`
 Usage: 
-  npx tsx scripts/debug-git-logic.ts --product="My Product Name"
+  npx tsx scripts/debug-git-logic.ts --product="My Product Name" [--env=DEV|QA|STAGE|PROD]
     `);
     process.exit(0);
 }
 
 // --- CONFIG ---
 function loadConfig() {
-    const rootConfig = join(process.cwd(), 'apim-database', 'config.json');
     const localConfig = join(process.cwd(), 'config.json');
-    if (existsSync(rootConfig)) return JSON.parse(readFileSync(rootConfig, 'utf8'));
     if (existsSync(localConfig)) return JSON.parse(readFileSync(localConfig, 'utf8'));
     console.error("❌ config.json not found.");
     process.exit(1);
 }
 
 const config = loadConfig();
-const devopsConfig = config.devops;
+const devops = config.devops;
 
-if (!devopsConfig || !devopsConfig.pat) {
+if (!devops || !devops.pat) {
     console.error("❌ 'devops' section missing or incomplete in config.json");
     process.exit(1);
 }
 
-// --- MAIN ---
 async function runDebug() {
-    console.log(`\n🕵️‍♀️ DEBUG: Validated Host Payload Probe`);
+    console.log(`\n🕵️‍♀️ DEBUG: Git/Pipeline Discovery Test`);
+    console.log(`   Target Product: "${productNameArg}"`);
+    console.log(`   Querying for: "${productNameArg}" ext:tf ext:tfvars`);
+    console.log(`   Target Env: ${envArg}`);
 
-    const pat = devopsConfig.pat;
-    const cleanBaseUrl = (devopsConfig.baseUrl || 'https://dev.azure.com').replace(/\/$/, '');
-    const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+    // 1. Repository Discovery via Search
+    console.log(`\n➡️  Step 1: Code Search Discovery...`);
+    const searchTerm = `${productNameArg} ext:tf ext:tfvars`;
+    const searchRes = await AzureService.searchCode(devops.organization, searchTerm, devops.pat, devops.baseUrl);
 
-    // Auto-detect Org from URL
-    let detectedOrg = devopsConfig.organization;
-    if (cleanBaseUrl.includes('visualstudio.com')) {
-        const match = cleanBaseUrl.match(/https?:\/\/([^.]+)\.visualstudio\.com/);
-        if (match) detectedOrg = match[1];
-    }
-    console.log(`   Organization: ${detectedOrg}`);
+    console.log(`   Found ${searchRes.count} hits in ADO Search.`);
 
-    // Discovery Step: Fetch Projects (Needed for Scoped Search tests)
-    let projects: any[] = [];
-    try {
-        projects = await AzureService.fetchADOProjects(detectedOrg, pat, cleanBaseUrl);
-        console.log(`   ✅ Connected! Found ${projects.length} projects.`);
-    } catch (e: any) {
-        console.log(`   ⚠️ Project discovery skipped.`);
+    if (searchRes.count === 0) {
+        console.log(`   ❌ No matches found for this product name.`);
+        return;
     }
 
-    // THE MAGIC HOST (Last run gave 400 Bad Request here, meaning host is ALIVE)
-    const validHostUrl = `https://almsearch.dev.azure.com/${detectedOrg}/_apis/search/codesearchresults?api-version=7.1-preview.1`;
+    const matchedRepos = new Set<string>();
+    searchRes.results.forEach(r => matchedRepos.add(r.repository.name));
 
-    console.log(`\n➡️  Step 1: Probing Payload Variations on Validated Host...`);
-    console.log(`   Target URL: ${validHostUrl}`);
+    console.log(`   Matches found in repos: ${Array.from(matchedRepos).join(', ')}`);
 
-    const payloadStrategies = [
-        {
-            name: "1. Minimalist (No filters object)",
-            body: {
-                searchText: productNameArg!.includes(' ') ? `"${productNameArg}"` : productNameArg,
-                $top: 10
+    // COLLISION LOGIC TEST
+    if (matchedRepos.size > 1) {
+        console.log(`   ⚠️  COLLISION DETECTED: Product name appears in ${matchedRepos.size} different repositories.`);
+        console.log(`      This usually happens for non-GRP generic products.`);
+        console.log(`      Strategy: We would log an anomaly but proceed with the first/primary match.`);
+    }
+
+    if (searchRes.count > 25) {
+        console.log(`   ⚠️  HIGH HIT COUNT (${searchRes.count}): Product name is extremely common.`);
+        console.log(`      This increases the risk of 'false positives' in repo matching.`);
+    }
+
+    const primaryRepoName = searchRes.results[0].repository.name;
+    const primaryRepoId = searchRes.results[0].repository.id;
+    const project = searchRes.results[0].repository.project.name;
+    console.log(`   🎯 Selected Primary Repo: ${primaryRepoName} (ID: ${primaryRepoId}, Project: ${project})`);
+
+    // 2. Locate YAML Pipeline
+    console.log(`\n➡️  Step 2: Locating Pipeline for Repo...`);
+    const pipelines = await AzureService.fetchADOPipelines(devops.organization, project, primaryRepoId, devops.pat, devops.baseUrl);
+
+    if (pipelines.length === 0) {
+        console.log(`   ❌ No pipelines found for this repo ID.`);
+        return;
+    }
+
+    const matchedPipeline = pipelines.find(p =>
+        p.name.toLowerCase().includes(primaryRepoName.toLowerCase()) ||
+        p.url.toLowerCase().includes(primaryRepoName.toLowerCase())
+    ) || pipelines[0]; // Fallback to first if only one exists
+
+    console.log(`   ✅ Selected Pipeline: ${matchedPipeline.name} (ID: ${matchedPipeline.id})`);
+
+    // 3. Fetch Runs & Stage Discovery
+    console.log(`\n➡️  Step 3: Fetching Recent Runs & Timelines...`);
+    const runs = await AzureService.fetchPipelineRuns(devops.organization, project, matchedPipeline.id, devops.pat, devops.baseUrl);
+    console.log(`   Found ${runs.length} recent runs.`);
+
+    for (const run of runs.slice(0, 3)) { // Look at top 3
+        console.log(`\n   --- Run ID: ${run.id} (${run.status}, Result: ${run.result}) ---`);
+        const timeline = await AzureService.fetchPipelineRunTimeline(devops.organization, project, run.id, devops.pat, devops.baseUrl);
+
+        // Find environment stage
+        const envStage = timeline.find((r: any) =>
+            r.type === 'Stage' &&
+            r.name.toLowerCase().includes(envArg.toLowerCase())
+        );
+
+        if (envStage) {
+            console.log(`      📍 Env [${envArg}] Stage Found: ${envStage.name} (Result: ${envStage.result})`);
+            if (envStage.result === 'succeeded') {
+                console.log(`      💎 SUCCESS! Captured Hash: ${run.resources?.repositories?.self?.version || 'N/A'}`);
+                console.log(`      📅 Deployed At: ${envStage.finishTime}`);
             }
-        },
-        {
-            name: "2. Search Qualifier (using ext:tf)",
-            body: {
-                searchText: `${productNameArg!.includes(' ') ? `"${productNameArg}"` : productNameArg} ext:tf ext:tfvars`,
-                $top: 10
-            }
-        },
-        {
-            name: "3. Project Filter (Using discovered project)",
-            body: {
-                searchText: productNameArg!.includes(' ') ? `"${productNameArg}"` : productNameArg,
-                $top: 10,
-                filters: projects.length > 0 ? { Project: [projects[0].name] } : {}
+        } else {
+            console.log(`      📍 Env [${envArg}] Stage NOT found in this run.`);
+        }
+
+        // Find Production stage (Universal Visibility)
+        const prodStage = timeline.find((r: any) =>
+            r.type === 'Stage' &&
+            (r.name.toLowerCase().includes('prod') || r.name.toLowerCase().includes('production'))
+        );
+
+        if (prodStage) {
+            console.log(`      🌍 PRODUCTION Stage Found: ${prodStage.name} (Result: ${prodStage.result})`);
+            if (prodStage.result === 'succeeded') {
+                console.log(`      📡 PROD DATA: Hash=${run.resources?.repositories?.self?.version}, Date=${prodStage.finishTime}`);
             }
         }
-    ];
-
-    for (const strategy of payloadStrategies) {
-        if (strategy.name.includes("Project") && projects.length === 0) continue;
-
-        console.log(`\n   📡 Testing Palette: ${strategy.name}`);
-        console.log(`      Body: ${JSON.stringify(strategy.body)}`);
-
-        try {
-            const response = await fetch(validHostUrl, {
-                method: 'POST',
-                headers: {
-                    'Authorization': authHeader,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(strategy.body)
-            });
-
-            console.log(`      Status: ${response.status} ${response.statusText}`);
-
-            if (response.ok) {
-                const searchResp = await response.json() as any;
-                console.log(`      Hits found: ${searchResp.count}`);
-
-                if (searchResp.count > 0) {
-                    console.log(`      🎯 SUCCESS! Found results.`);
-                    const first = searchResp.results[0];
-                    console.log(`      Found in: ${first.path} (Repo: ${first.repository.name})`);
-                    break;
-                }
-            } else {
-                const txt = await response.text();
-                console.log(`      ❌ Response: ${txt.substring(0, 200)}...`);
-            }
-
-        } catch (e: any) {
-            console.error(`      ❌ Network error: ${e.message}`);
-        }
     }
 
-    console.log(`\n🏁 Probe complete.`);
+    console.log(`\n🏁 Debug Complete.`);
 }
 
-runDebug();
+runDebug().catch(err => {
+    console.error(`❌ Fatal Error:`, err);
+});

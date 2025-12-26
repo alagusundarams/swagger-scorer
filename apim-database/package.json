@@ -2,6 +2,7 @@
     "name": "apim-database",
     "version": "1.0.0",
     "description": "Database scripts and schema for APIM Portal",
+    "type": "module",
     "scripts": {
         "setup-db": "tsx scripts/setup-db.ts",
         "fetch": "tsx scripts/fetch-apim-data.ts",
@@ -16,7 +17,6 @@
     },
     "devDependencies": {
         "@types/node": "^20.19.27",
-        "@types/node-fetch": "^2.6.11",
         "@types/pg": "^8.11.0",
         "axios": "^1.13.2",
         "dotenv": "^17.2.3",

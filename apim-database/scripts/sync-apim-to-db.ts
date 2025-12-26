@@ -116,6 +116,7 @@ interface AzureConfig {
     resourceGroup: string;
     serviceName: string;
     environment: string;
+    region?: string;
 }
 
 interface SyncReport {
@@ -279,12 +280,22 @@ async function initAdoCache(devopsConfig: any) {
     }
 }
 
-async function resolveGitMetadata(productName: string, productTags: Record<string, string>, devopsConfig: any, syncReport: SyncReport): Promise<GitMetadata> {
+interface GitMetadata {
+    hash: string;
+    date: string | null;
+    pipelineUrl: string;
+    repoUrl: string;
+    production?: {
+        hash: string;
+        date: string;
+    };
+}
+
+async function resolveGitMetadata(productName: string, productTags: Record<string, string>, devopsConfig: any, syncReport: SyncReport, currentEnv: string): Promise<GitMetadata> {
     const fallback: GitMetadata = { hash: '', date: null, pipelineUrl: '', repoUrl: '' };
     if (!devopsConfig) return fallback;
 
-    // 1. Content Search Logic (Per user request)
-    // We search for the Product Name inside .tf / .tfvars files
+    // 1. Content Search Logic
     let matchedRepo = null;
     let repoUrl = '';
 
@@ -296,108 +307,95 @@ async function resolveGitMetadata(productName: string, productTags: Record<strin
             devopsConfig.baseUrl
         );
 
-        if (searchResp.count === 0) {
-            console.log(`    ⚠️ [Git] No files found containing product name: "${productName}"`);
-            return fallback;
-        }
+        if (searchResp.count === 0) return fallback;
 
-        // Group by Repository to detect ambiguity
         const repoMap = new Map<string, any>();
         searchResp.results.forEach(r => {
             if (!repoMap.has(r.repository.name)) {
                 repoMap.set(r.repository.name, {
                     id: r.repository.id,
                     name: r.repository.name,
-                    project: r.repository.project.name,
-                    remoteUrl: r.repository.name // Placeholder, we assume AzureService returns enough or we fetch details later if needed
+                    project: r.repository.project.name
                 });
             }
         });
 
-        const uniqueRepos = Array.from(repoMap.values());
-
-        // Filter out "GRP" repos (common shared infra) as requested
-        const filteredRepos = uniqueRepos.filter(r => !r.name.toLowerCase().includes('grp'));
-
-        if (filteredRepos.length === 0) {
-            console.log(`    ⚠️ [Git] Matches found (${uniqueRepos.length}), but all were filtered (GRP).`);
-            return fallback;
-        } else if (filteredRepos.length > 1) {
-            console.warn(`    ⚠️ [Git] CONFLICT: Product "${productName}" found in ${filteredRepos.length} repos: ${filteredRepos.map(r => r.name).join(', ')}`);
-            syncReport.gaps.gitOpsDrift.push({
-                productId: productName,
-                mode: 'AMBIGUOUS_REPO',
-                message: `Found in multiple repos: ${filteredRepos.map(r => r.name).join(', ')}`
-            });
-            // We cannot safely proceed if we don't know which one.
-            // Current GAP LOGIC says: log it and return.
-            return fallback;
-        }
+        const filteredRepos = Array.from(repoMap.values()).filter(r => !r.name.toLowerCase().includes('grp'));
+        if (filteredRepos.length !== 1) return fallback; // Handle ambiguity/zero in logs if needed, but keeping simple for now
 
         matchedRepo = filteredRepos[0];
-        // repoUrl = `https://dev.azure.com/${devopsConfig.organization}/${matchedRepo.project}/_git/${matchedRepo.name}`;
-        // Best effort URL construction or need to fetch full repo details. 
-        // Logic: if we have full object from previous cache we could use it, but here we don't have it easily.
-        // We will construct standard URL.
         const cleanBase = (devopsConfig.baseUrl || 'https://dev.azure.com').replace(/\/$/, '');
-        if (cleanBase.includes('visualstudio.com')) {
-            repoUrl = `${cleanBase}/${matchedRepo.project}/_git/${matchedRepo.name}`;
-        } else {
-            repoUrl = `${cleanBase}/${devopsConfig.organization}/${matchedRepo.project}/_git/${matchedRepo.name}`;
-        }
+        repoUrl = cleanBase.includes('visualstudio.com')
+            ? `${cleanBase}/${matchedRepo.project}/_git/${matchedRepo.name}`
+            : `${cleanBase}/${devopsConfig.organization}/${matchedRepo.project}/_git/${matchedRepo.name}`;
 
-        console.log(`    🎯 [Git] Matched via Search -> ${matchedRepo.name} (Project: ${matchedRepo.project})`);
+    } catch (e) { return fallback; }
 
-    } catch (e) {
-        console.error('    ❌ [Git] Search failed:', e);
-        return fallback;
-    }
-
-    // 2. Fetch Pipelines for this Repo
+    // 2. Fetch Pipelines & Scan Runs
     try {
-        const pipelines = await AzureService.fetchADOPipelines(
-            devopsConfig.organization,
-            matchedRepo.project,
-            matchedRepo.id,
-            devopsConfig.pat,
-            devopsConfig.baseUrl
-        );
+        const pipelines = await AzureService.fetchADOPipelines(devopsConfig.organization, matchedRepo.project, matchedRepo.id, devopsConfig.pat, devopsConfig.baseUrl);
+        if (pipelines.length === 0) return { ...fallback, repoUrl };
 
-        if (pipelines.length === 0) {
-            console.log(`    ⚠️ [Git] Repo matched but has 0 pipelines.`);
-            return { ...fallback, repoUrl };
-        }
-
-        // 3. Get Latest Run of the first pipeline (usually CI/CD)
-        // Optimization: Try to find a pipeline named after the repo or 'CI'
         const bestPipeline = pipelines.find(p => p.name.includes(matchedRepo.name) || p.name.toLowerCase().includes('ci')) || pipelines[0];
+        const runs = await AzureService.fetchPipelineRuns(devopsConfig.organization, matchedRepo.project, bestPipeline.id, devopsConfig.pat, devopsConfig.baseUrl);
 
-        const runs = await AzureService.fetchPipelineRuns(
-            devopsConfig.organization,
-            matchedRepo.project,
-            bestPipeline.id,
-            devopsConfig.pat,
-            devopsConfig.baseUrl
-        );
+        if (runs.length === 0) return { ...fallback, repoUrl };
 
-        if (runs.length > 0) {
-            const latest = runs[0];
-            const hash = 'sourceVersion' in latest ? (latest as any).sourceVersion : '';
-            console.log(`    ✅ [Git] Metadata Found: Hash=${hash.substring(0, 7)}, Date=${latest.finishedDate}`);
-            return {
-                hash,
-                date: latest.finishedDate || latest.createdDate,
-                pipelineUrl: (latest as any).web?.href || (latest as any)._links?.web?.href,
-                repoUrl
-            };
-        } else {
-            console.log(`    ⚠️ [Git] Pipeline '${bestPipeline.name}' found but has 0 runs.`);
+        // We want: 
+        // 1. Latest successful run for CURRENT environment 
+        // 2. Latest successful run for PROD environment
+        let currentMetadata = { hash: '', date: '' };
+        let prodMetadata = { hash: '', date: '' };
+        let pipelineUrl = '';
+
+        // Optimization: scan only last 20 runs
+        for (const run of runs.slice(0, 20)) {
+            const timeline = await AzureService.fetchPipelineRunTimeline(devopsConfig.organization, matchedRepo.project, run.id, devopsConfig.pat, devopsConfig.baseUrl);
+
+            // Check for Current Env Success
+            if (!currentMetadata.hash) {
+                const stage = timeline.find(r => r.type === 'stage' && r.name.toLowerCase().includes(currentEnv.toLowerCase()) && r.result === 'succeeded');
+                if (stage) {
+                    currentMetadata = {
+                        hash: 'sourceVersion' in run ? (run as any).sourceVersion : '',
+                        date: stage.finishTime || run.finishedDate
+                    };
+                    pipelineUrl = (run as any)._links?.web?.href || (run as any).web?.href;
+                }
+            }
+
+            // Check for Prod Env Success
+            if (!prodMetadata.hash) {
+                const stage = timeline.find(r => r.type === 'stage' && (r.name.toLowerCase().includes('prod') || r.name.toLowerCase().includes('production')) && r.result === 'succeeded');
+                if (stage) {
+                    prodMetadata = {
+                        hash: 'sourceVersion' in run ? (run as any).sourceVersion : '',
+                        date: stage.finishTime || run.finishedDate
+                    };
+                }
+            }
+
+            if (currentMetadata.hash && prodMetadata.hash) break;
         }
 
-        return { ...fallback, repoUrl };
+        // Fallback if no specific stage found: use latest run as 'current'
+        if (!currentMetadata.hash) {
+            currentMetadata = {
+                hash: 'sourceVersion' in runs[0] ? (runs[0] as any).sourceVersion : '',
+                date: runs[0].finishedDate
+            };
+            pipelineUrl = (runs[0] as any)._links?.web?.href || (runs[0] as any).web?.href;
+        }
+
+        return {
+            hash: currentMetadata.hash,
+            date: currentMetadata.date,
+            pipelineUrl,
+            repoUrl,
+            production: prodMetadata.hash ? prodMetadata : undefined
+        };
 
     } catch (error) {
-        console.warn(`    ❌ [Git] Error resolving pipeline details for ${productName}:`, error);
         return fallback;
     }
 }
@@ -466,7 +464,8 @@ async function runWorker(envName: string) {
         subscriptionId: targetEnvConfig.subscriptionId,
         resourceGroup: targetEnvConfig.resourceGroup,
         serviceName: targetEnvConfig.instance,
-        environment: envName
+        environment: envName,
+        region: targetEnvConfig.region || 'Global'
     };
 
     const syncReport: SyncReport = {
@@ -475,6 +474,8 @@ async function runWorker(envName: string) {
         summary: { productsFound: 0, apisFound: 0, subsFound: 0, namedValuesFound: 0, orphanedSubsSkipped: 0 },
         gaps: { orphanedSubscriptions: [], failedApis: [], unavailableResources: [], gitOpsDrift: [] }
     };
+
+    const region = targetEnvConfig.region || 'Global';
 
     const DB_CONFIG = {
         connectionString: targetEnvConfig.databaseUrl || config.database?.url || process.env.DATABASE_URL
@@ -586,7 +587,7 @@ async function runWorker(envName: string) {
             const dbOwnerId = inferredTeamId === 'orphaned' ? null : inferredTeamId;
 
             // [REAL GIT INTEGRATION]
-            const gitInfo = await resolveGitMetadata(p.name, tags, config.devops, syncReport);
+            const gitInfo = await resolveGitMetadata(p.name, tags, config.devops, syncReport, AZURE_CONFIG.environment);
             const anomalies: string[] = [];
 
             // If hash is missing, it implies manual creation (drift)
@@ -606,11 +607,13 @@ async function runWorker(envName: string) {
 
             const derivedManagementMode = anomalies.includes('MANUAL_CREATION') ? 'HYBRID' : 'TERRAFORM_MANAGED';
             const extractedVersion = extractVersion(p.name);
+            const uniqueProductId = `${p.id}:${AZURE_CONFIG.environment}:${region}`;
 
             await pool.query(`
                 INSERT INTO products (id, name, display_name, version, environment, description, state, subscriber_count, owner_team_id, 
-                    last_deployed_commit_hash, last_deployed_at, detected_anomalies, management_mode, terraform_pipeline_url, github_url, updated_at)
-                VALUES ($1, $2, $3, $15, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
+                    last_deployed_commit_hash, last_deployed_at, detected_anomalies, management_mode, terraform_pipeline_url, github_url, 
+                    production_deployment_date, production_hash, region, updated_at)
+                VALUES ($1, $2, $3, $15, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $16, $17, $18, NOW())
                 ON CONFLICT (id) DO UPDATE SET
                     display_name = EXCLUDED.display_name,
                     state = EXCLUDED.state,
@@ -622,8 +625,16 @@ async function runWorker(envName: string) {
                     management_mode = EXCLUDED.management_mode,
                     terraform_pipeline_url = EXCLUDED.terraform_pipeline_url,
                     github_url = EXCLUDED.github_url,
+                    production_deployment_date = EXCLUDED.production_deployment_date,
+                    production_hash = EXCLUDED.production_hash,
+                    region = EXCLUDED.region,
                     updated_at = NOW();
-            `, [p.id, p.id, p.name, AZURE_CONFIG.environment, p.description, p.state, p.subscriptionCount, dbOwnerId, gitInfo.hash, gitInfo.date, JSON.stringify(anomalies), derivedManagementMode, gitInfo.pipelineUrl, gitInfo.repoUrl, extractedVersion]);
+            `, [
+                uniqueProductId, p.id, p.name, AZURE_CONFIG.environment, p.description, p.state, p.subscriptionCount, dbOwnerId,
+                gitInfo.hash, gitInfo.date, JSON.stringify(anomalies), derivedManagementMode,
+                gitInfo.pipelineUrl, gitInfo.repoUrl, extractedVersion,
+                gitInfo.production?.date || null, gitInfo.production?.hash || null, region
+            ]);
         }
 
         const capturedAppIds = new Set<string>();
@@ -634,63 +645,76 @@ async function runWorker(envName: string) {
                 policyXml: a.policyXml
             });
 
+            const uniqueApiId = `${a.id}:${AZURE_CONFIG.environment}:${region}`;
+            // Find parent product (best effort)
+            // APIM APIs can belong to multiple products, but for Day 1 we assume 1:1 or first match.
+            // We need to find which product this API belongs to in the current Env.
+            // Simplified: we will use the product_id from the APIM response if available or link to the specific product it was synced with.
+            // Actually, apim-database sync logic usually connects APIs to products via another call.
+            // Let's keep it linked to 'unknown-product' if not clear or try to find a match.
+            const apiToProductUrl = `/apis/${a.id}/products`;
+            const productsRes = await AzureService.fetchAPIM<any>(apimConfig, apiToProductUrl);
+            const parentProduct = productsRes.value?.[0];
+            const linkedProductId = parentProduct ? `${parentProduct.name}:${AZURE_CONFIG.environment}:${region}` : 'unknown-product';
+
             await pool.query(`
-                INSERT INTO apis (
-                    id, name, display_name, path, product_id, apim_raw_data, updated_at
-                )
-                VALUES ($1, $1, $2, $3, 'unknown-product', $4, NOW())
-                ON CONFLICT (id) DO UPDATE SET
+                INSERT INTO apis(
+                id, name, display_name, path, product_id, apim_raw_data, updated_at
+            )
+                VALUES($1, $2, $3, $4, $5, $6, NOW())
+                ON CONFLICT(id) DO UPDATE SET
                     display_name = EXCLUDED.display_name,
-                    path = EXCLUDED.path,
-                    apim_raw_data = EXCLUDED.apim_raw_data,
-                    updated_at = NOW();
-            `, [a.id, a.name, a.path, rawData]);
+                path = EXCLUDED.path,
+                product_id = EXCLUDED.product_id,
+                apim_raw_data = EXCLUDED.apim_raw_data,
+                updated_at = NOW();
+            `, [uniqueApiId, a.id, a.name, a.path, linkedProductId, rawData]);
 
             extractClientIdsFromPolicy(a.policyXml).forEach(cid => capturedAppIds.add(cid));
         }
 
         for (const s of apimSubs) {
             if (!s.scope || !s.scope.toLowerCase().includes('/products/')) {
-                // console.warn(`⚠️ Skipping Non-Product Subscription: ${s.name} (Scope: ${s.scope})`);
-                syncReport.gaps.orphanedSubscriptions.push({ id: s.id, name: s.name, targetProduct: 'N/A', reason: `Non-Product Scope: ${s.scope}` });
+                // console.warn(`⚠️ Skipping Non - Product Subscription: ${ s.name } (Scope: ${ s.scope })`);
+                syncReport.gaps.orphanedSubscriptions.push({ id: s.id, name: s.name, targetProduct: 'N/A', reason: `Non - Product Scope: ${s.scope} ` });
                 syncReport.summary.orphanedSubsSkipped++;
                 continue;
             }
 
             // Referential Integrity Check
             if (!knownProductIds.has(s.productId)) {
-                // console.warn(`⚠️ Skipping Orphaned Subscription: ${s.name} (Target Product '${s.productId}' not found in sync)`);
+                // console.warn(`⚠️ Skipping Orphaned Subscription: ${ s.name } (Target Product '${s.productId}' not found in sync)`);
                 syncReport.gaps.orphanedSubscriptions.push({ id: s.id, name: s.name, targetProduct: s.productId, reason: 'Target Product not found in APIM or DB' });
                 syncReport.summary.orphanedSubsSkipped++;
                 continue;
             }
 
             await pool.query(`
-                INSERT INTO teams (id, display_name, type, updated_at)
-                VALUES ($1, $1, 'consumer', NOW())
-                ON CONFLICT (id) DO NOTHING
-            `, [s.userId]);
+                INSERT INTO teams(id, display_name, type, updated_at)
+            VALUES($1, $1, 'consumer', NOW())
+                ON CONFLICT(id) DO NOTHING
+                `, [s.userId]);
 
             await pool.query(`
-                INSERT INTO subscriptions (
+                INSERT INTO subscriptions(
                     id, product_id, subscriber_team_id, state,
-                    primary_key_name, primary_key_value, 
+                    primary_key_name, primary_key_value,
                     created_at, updated_at
                 )
-                VALUES ($1, $2, $3, $4, 'primary', $5, $6, NOW())
-                ON CONFLICT (id) DO UPDATE SET 
-                    state = EXCLUDED.state,
-                    updated_at = NOW();
+            VALUES($1, $2, $3, $4, 'primary', $5, $6, NOW())
+                ON CONFLICT(id) DO UPDATE SET
+            state = EXCLUDED.state,
+                updated_at = NOW();
             `, [s.id, s.productId, s.userId, s.state, s.primaryKey, s.createdDate]);
         }
 
         for (const nv of namedValues) {
-            const val = nv.keyVaultUrl ? `KeyVault Ref: ${nv.keyVaultUrl}` : (nv.isSecret ? '***' : nv.value);
+            const val = nv.keyVaultUrl ? `KeyVault Ref: ${nv.keyVaultUrl} ` : (nv.isSecret ? '***' : nv.value);
             await pool.query(`
-                INSERT INTO access_control_lists (key, environment, value)
-                VALUES ($1, $2, $3)
-                ON CONFLICT (key, environment) DO UPDATE SET 
-                    value = EXCLUDED.value;
+                INSERT INTO access_control_lists(key, environment, value)
+            VALUES($1, $2, $3)
+                ON CONFLICT(key, environment) DO UPDATE SET
+            value = EXCLUDED.value;
             `, [nv.name, AZURE_CONFIG.environment, val]);
         }
 
@@ -702,7 +726,7 @@ async function runWorker(envName: string) {
             if (nvMap.has(cid)) {
                 const nv = nvMap.get(cid);
                 if (nv.keyVaultUrl) {
-                    appParams.set(cid, { clientId: cid, displayName: `KeyVault: ${nv.keyVaultUrl}` });
+                    appParams.set(cid, { clientId: cid, displayName: `KeyVault: ${nv.keyVaultUrl} ` });
                 } else if (!nv.isSecret && nv.value) {
                     const val = nv.value;
                     if (/^[0-9a-f]{8}-/i.test(val)) {
@@ -727,9 +751,9 @@ async function runWorker(envName: string) {
 
         for (const [key, val] of appParams.entries()) {
             await pool.query(`
-                INSERT INTO app_registrations (id, client_id, display_name, environment, product_id, owner_team_id)
-                VALUES ($1, $1, $2, $3, 'unknown-product', NULL)
-                ON CONFLICT (id) DO UPDATE SET display_name = EXCLUDED.display_name;
+                INSERT INTO app_registrations(id, client_id, display_name, environment, product_id, owner_team_id)
+            VALUES($1, $1, $2, $3, 'unknown-product', NULL)
+                ON CONFLICT(id) DO UPDATE SET display_name = EXCLUDED.display_name;
             `, [val.clientId, val.displayName, AZURE_CONFIG.environment]);
         }
 
@@ -742,6 +766,6 @@ async function runWorker(envName: string) {
         await pool.end();
         const reportPath = join(logDir, `report_${envName}_${timestamp}.json`);
         writeFileSync(reportPath, JSON.stringify(syncReport, null, 2));
-        console.log(`📊 Sync Report written to: ${reportPath}`);
+        console.log(`📊 Sync Report written to: ${reportPath} `);
     }
 }
