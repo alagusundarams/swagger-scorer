@@ -13,7 +13,10 @@ import { createWriteStream, mkdirSync, existsSync } from 'fs';
 const args = process.argv.slice(2);
 
 // Setup log file
-const logsDir = join(process.cwd(), 'apim-database', 'scripts', 'logs');
+const cwd = process.cwd();
+const logsDir = cwd.endsWith('apim-database')
+    ? join(cwd, 'scripts', 'logs')
+    : join(cwd, 'apim-database', 'scripts', 'logs');
 if (!existsSync(logsDir)) mkdirSync(logsDir, { recursive: true });
 
 const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
