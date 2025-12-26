@@ -166,7 +166,8 @@ async function main() {
             console.log(`   ✅ Pipeline: ${matchedPipeline.name} (Score: ${pipeScore})`);
 
             // C. Surgical Hash Sync (Hybrid Strategy: Environments API + Adaptive Fallback)
-            const envsToSync = ['DEV', 'QA', 'STAGE', 'PROD'];
+            // If --env is specified, only sync that environment. Otherwise, sync all.
+            const envsToSync = targetEnv ? [targetEnv] : ['DEV', 'QA', 'STAGE', 'PROD'];
             const projectIdent = repo.project.id || repo.project.name;
             const timelineCache = new Map<number, any[]>();
 
