@@ -130,7 +130,16 @@ async function main() {
     console.log(`🚀 [PART 1] Starting APIM Inventory & Metadata Extraction...\n`);
     if (targetEnv) console.log(`🎯 Target Environment: ${targetEnv}\n`);
 
-    const azureToken = await AzureService.getAzureAccessToken();
+    console.log(`🔐 [AUTH] Getting Azure access token for APIM Management API...`);
+    let azureToken: string;
+    try {
+        azureToken = await AzureService.getAzureAccessToken();
+        console.log(`   ✅ Token obtained successfully.\n`);
+    } catch (error: any) {
+        console.error(`\n❌ Failed to get Azure access token.`);
+        console.error(`   ${error.message}\n`);
+        throw error;
+    }
     const uniqueProducts = new Map<string, ProductIdentity>();
     const metadata: MetadataStore = {
         namedValues: {},

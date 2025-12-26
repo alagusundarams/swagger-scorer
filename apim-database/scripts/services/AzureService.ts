@@ -92,13 +92,20 @@ export class AzureService {
      */
     static async getAzureAccessToken(resource: string = 'https://management.azure.com'): Promise<string> {
         try {
-            const token = execSync(`az account get-access-token --resource ${resource} --query accessToken -o tsv 2>/dev/null`, {
-                encoding: 'utf-8'
+            // On Windows, inherit full environment to ensure 'az' is in PATH
+            const token = execSync(`az account get-access-token --resource ${resource} --query accessToken -o tsv`, {
+                encoding: 'utf-8',
+                env: { ...process.env },
+                shell: process.platform === 'win32' ? 'cmd.exe' : undefined
             }).trim();
+
+            if (!token || token.length < 10) {
+                throw new Error('Azure CLI returned empty or invalid token');
+            }
             return token;
-        } catch (error) {
-            // Silently fail - caller will handle fallback (e.g., PAT for ADO)
-            throw new Error(`Failed to get Azure access token for ${resource}`);
+        } catch (error: any) {
+            const errorMsg = error.stderr?.toString() || error.stdout?.toString() || error.message || 'Unknown error';
+            throw new Error(`Failed to get Azure access token. ${errorMsg}. Ensure 'az login' was successful.`);
         }
     }
 
