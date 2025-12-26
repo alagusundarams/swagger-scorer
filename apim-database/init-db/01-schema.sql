@@ -331,3 +331,19 @@ SELECT
 FROM subscriptions s
 LEFT JOIN products p ON s.product_id = p.id
 LEFT JOIN teams t ON s.subscriber_team_id = t.id;
+
+-- Product Backends Hierarchical View
+CREATE OR REPLACE VIEW product_backends_view AS
+SELECT DISTINCT
+    p.id as product_id,
+    p.name as product_name,
+    p.display_name as product_display_name,
+    p.environment,
+    b.id as backend_id,
+    b.url as backend_url,
+    b.title as backend_title,
+    b.protocol
+FROM products p
+JOIN apis a ON a.product_id = p.id
+JOIN api_backends ab ON ab.api_id = a.id
+JOIN governance_backends b ON b.id = ab.backend_id AND b.environment = p.environment;

@@ -26,7 +26,8 @@ interface MetadataStore {
     appIds: Record<string, string[]>;
     apiContracts: Record<string, any>;
     backends: Record<string, any[]>;
-    backendAssociations: Record<string, string[]>;
+    apiForensics: Record<string, Record<string, { guids: string[], backends: string[] }>>;
+    productApiLinks: Record<string, Record<string, string[]>>;
 }
 
 // --- CONFIG LOADER ---
@@ -79,6 +80,12 @@ async function main() {
 
         const backKey = Object.keys(apimMeta.backends).find(k => k.toUpperCase() === targetEnv);
         apimMeta.backends = backKey ? { [backKey]: apimMeta.backends[backKey] } : {};
+
+        const forensicsKey = Object.keys(apimMeta.apiForensics).find(k => k.toUpperCase() === targetEnv);
+        apimMeta.apiForensics = forensicsKey ? { [forensicsKey]: apimMeta.apiForensics[forensicsKey] } : {};
+
+        const linksKey = Object.keys(apimMeta.productApiLinks).find(k => k.toUpperCase() === targetEnv);
+        apimMeta.productApiLinks = linksKey ? { [linksKey]: apimMeta.productApiLinks[linksKey] } : {};
 
         console.log(`📊 Filtered to ${inventory.length} products associated with ${targetEnv}.`);
     }
@@ -145,6 +152,33 @@ async function main() {
                     prodDeploy?.hash || null, prodDeploy?.date || null,
                     ado.status === 'MATCHED' ? 'TERRAFORM_MANAGED' : 'MANUAL'
                 ]);
+
+                // --- A.2 APIS RECONCILIATION (Hierarchical) ---
+                const apiNames = apimMeta.productApiLinks[envName]?.[prod.id] || [];
+                for (const apiName of apiNames) {
+                    const uniqueApiId = `${uniqueProductId}:${apiName}`;
+                    await pool.query(`
+                        INSERT INTO apis (id, product_id, name, display_name, path, updated_at)
+                        VALUES ($1, $2, $3, $4, $5, NOW())
+                        ON CONFLICT (id) DO UPDATE SET
+                            name = EXCLUDED.name,
+                            display_name = EXCLUDED.display_name,
+                            path = EXCLUDED.path,
+                            updated_at = NOW();
+                    `, [uniqueApiId, uniqueProductId, apiName, apiName, `/${apiName}`]);
+
+                    // Link to Backends
+                    const forensics = apimMeta.apiForensics[envName]?.[apiName];
+                    if (forensics) {
+                        for (const bId of forensics.backends) {
+                            await pool.query(`
+                                INSERT INTO api_backends (api_id, backend_id, environment)
+                                VALUES ($1, $2, $3)
+                                ON CONFLICT (api_id, backend_id, environment) DO NOTHING;
+                            `, [uniqueApiId, bId, envName]);
+                        }
+                    }
+                }
             }
         }
 
@@ -186,7 +220,6 @@ async function main() {
             }
         }
 
-        // --- D. BACKENDS RECONCILIATION ---
         console.log(`🔌 Reconciling Backend inventory...`);
         for (const [env, backends] of Object.entries(apimMeta.backends || {})) {
             for (const b of backends) {
@@ -204,20 +237,7 @@ async function main() {
             }
         }
 
-        console.log(`🔗 Linking API to Backends...`);
-        for (const [apiId, backendIds] of Object.entries(apimMeta.backendAssociations || {})) {
-            for (const bId of backendIds) {
-                // Determine environment for this association (we'll use the target or all if multiple)
-                const envs = targetEnv ? [targetEnv] : Object.keys(apimMeta.backends);
-                for (const envName of envs) {
-                    await pool.query(`
-                        INSERT INTO api_backends (api_id, backend_id, environment)
-                        VALUES ($1, $2, $3)
-                        ON CONFLICT (api_id, backend_id, environment) DO NOTHING;
-                    `, [apiId, bId, envName]);
-                }
-            }
-        }
+        // Backends linked via APIs already handled in A.2 loop for better context
 
         console.log(`\n✅ Reconciliation Complete!`);
 

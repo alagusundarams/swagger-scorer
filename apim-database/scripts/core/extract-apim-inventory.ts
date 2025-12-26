@@ -39,10 +39,11 @@ interface ProductIdentity {
 
 interface MetadataStore {
     namedValues: Record<string, any[]>; // env -> nv[]
-    appIds: Record<string, string[]>;   // env -> unique_guids[]
+    appIds: Record<string, string[]>;   // env -> unique_guids[] (rolled up for Graph resolution)
     apiContracts: Record<string, any>;  // apiId -> { displayName: string, definition: any }
     backends: Record<string, any[]>;    // env -> backend[]
-    backendAssociations: Record<string, string[]>; // apiId -> backendId[]
+    apiForensics: Record<string, Record<string, { guids: string[], backends: string[] }>>; // env -> apiName -> forensics
+    productApiLinks: Record<string, Record<string, string[]>>; // env -> productId -> apiNames[]
 }
 
 /**
@@ -107,7 +108,8 @@ async function main() {
         appIds: {},
         apiContracts: {},
         backends: {},
-        backendAssociations: {}
+        apiForensics: {},
+        productApiLinks: {}
     };
 
     let envConfigs = config.azure?.environments || [];
@@ -209,7 +211,7 @@ async function main() {
             }));
 
             // --- 2.5 Backends ---
-            console.log(`      🔌 Fetching Backend Entities...`);
+            console.log(`      🔌 Fetching Backend Entities (Region Registry)...`);
             const backendRes = await AzureService.fetchAPIM<any>(apimConfig, '/backends');
             metadata.backends[env.name] = (backendRes.value || []).map((b: any) => ({
                 id: b.name,
@@ -220,15 +222,35 @@ async function main() {
                 protocol: b.properties.protocol
             }));
 
-            // --- 3. API Policies & Contracts (Smart Fetch) ---
-            console.log(`      📄 Scanning API Policies & Contracts...`);
-            const apiRes = await AzureService.fetchAPIM<any>(apimConfig, '/apis');
-            for (const api of apiRes.value || []) {
-                const apiId = api.name;
+            // --- 3. Product-API Associations ---
+            console.log(`      🔗 Mapping Product-API Associations...`);
+            metadata.productApiLinks[env.name] = {};
+            const uniqueApiNamesInEnv = new Set<string>();
+            const apiIdMap = new Map<string, string>(); // name -> fullId
 
-                // 3a. Policy Forensics
+            for (const p of products) {
                 try {
-                    const polRes = await fetch(`https://management.azure.com${api.id}/policies/policy?api-version=2022-08-01&format=rawxml`, {
+                    const pApis = await AzureService.fetchAPIM<any>(apimConfig, `/products/${p.name}/apis`);
+                    const apiNames = (pApis.value || []).map((api: any) => {
+                        uniqueApiNamesInEnv.add(api.name);
+                        apiIdMap.set(api.name, api.id);
+                        return api.name;
+                    });
+                    metadata.productApiLinks[env.name][p.name] = apiNames;
+                } catch (e) { }
+            }
+
+            // --- 4. Deduplicated API Policies & Contracts ---
+            console.log(`      📄 Scanning ${uniqueApiNamesInEnv.size} unique API Policies...`);
+            metadata.apiForensics[env.name] = {};
+
+            for (const apiName of uniqueApiNamesInEnv) {
+                const apiFullId = apiIdMap.get(apiName)!;
+                const apiDisplayName = apiName; // We'll update this if we fetch the contract
+
+                // 4a. Policy Forensics (Fetch exactly ONCE per API per Env)
+                try {
+                    const polRes = await fetch(`https://management.azure.com${apiFullId}/policies/policy?api-version=2022-08-01&format=rawxml`, {
                         headers: { 'Authorization': `Bearer ${azureToken}` }
                     });
                     if (polRes.ok) {
@@ -248,29 +270,25 @@ async function main() {
                         guids.forEach((id: string) => envAppIds.add(id));
                         nvs.forEach((nv: string) => potentialNvs.add(nv));
 
-                        if (backends.length > 0) {
-                            metadata.backendAssociations[apiId] = Array.from(new Set([...(metadata.backendAssociations[apiId] || []), ...backends]));
-                        }
+                        metadata.apiForensics[env.name][apiName] = { guids, backends };
                     }
                 } catch (e) { }
 
-                // 3b. Global Contract Cache (Deduplication)
-                if (!metadata.apiContracts[apiId]) {
+                // 4b. Global Contract Cache (Deduplication across Regions)
+                if (!metadata.apiContracts[apiName]) {
                     try {
-                        const contractRes = await fetch(`https://management.azure.com${api.id}?api-version=2022-08-01&export=true&format=openapi`, {
+                        const contractRes = await fetch(`https://management.azure.com${apiFullId}?api-version=2022-08-01&export=true&format=openapi`, {
                             headers: { 'Authorization': `Bearer ${azureToken}` }
                         });
                         if (contractRes.ok) {
                             const contractJson = await contractRes.json() as any;
-                            metadata.apiContracts[apiId] = {
-                                displayName: api.properties.displayName,
+                            metadata.apiContracts[apiName] = {
+                                displayName: apiName, // Optimization: skip extra display name fetch for now
                                 definition: contractJson.value || contractJson
                             };
-                            if (verbose) console.log(`         ✅ Cached Contract: ${api.properties.displayName}`);
+                            if (verbose) console.log(`         ✅ Cached Contract: ${apiName}`);
                         }
-                    } catch (e) {
-                        if (verbose) console.warn(`         ⚠️  Contract fetch failed for ${apiId}`);
-                    }
+                    } catch (e) { }
                 }
             }
 
