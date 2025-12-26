@@ -77,7 +77,8 @@ async function main() {
         const meta: ADOMetadata = { productId: prod.id, productName: prod.name, deployments: {}, status: 'ORPHAN' };
 
         try {
-            // A. Repository Search (Simplified "One Best Way")
+            // A. Repository Search (Exhaustive & Ranked)
+            const cleanProd = sanitize(prod.name);
             const quotedName = prod.name.includes(' ') ? `"${prod.name}"` : prod.name;
             const searchTerm = `${quotedName} (ext:tf OR ext:tfvars)`;
             const searchResp = await AzureService.searchCode(devops.organization, searchTerm, devops.pat, devops.baseUrl, cliToken);
@@ -89,27 +90,55 @@ async function main() {
                 continue;
             }
 
-            // Pick primary repo (exclude GRP)
-            const repo = searchResp.results.find(r => !r.repository.name.toLowerCase().includes('grp'))?.repository;
-            if (!repo) {
-                meta.status = 'REPO_MISSING';
+            // --- RANKING LOGIC ---
+            const repoCandidates = searchResp.results.map(r => {
+                const rName = r.repository.name;
+                const cleanRepo = sanitize(rName);
+                let score = 0;
+
+                if (cleanRepo === cleanProd) score += 100; // Perfect match
+                else if (cleanRepo.includes(cleanProd)) score += 50; // Name included
+
+                if (cleanRepo.includes('grp')) score -= 20;
+                if (cleanRepo.includes('shared') || cleanRepo.includes('common')) score -= 30;
+
+                return { repo: r.repository, score, name: rName };
+            }).sort((a, b) => b.score - a.score);
+
+            const repo = repoCandidates[0].repo;
+            const repoScore = repoCandidates[0].score;
+
+            if (repoScore < 30) {
+                console.log(`   ⚠️  LOW_CONFIDENCE_REPO: Nearest match "${repo.name}" has score ${repoScore}.`);
+            }
+
+            meta.repository = { id: repo.id, name: repo.name, project: repo.project.name, projectId: repo.project.id };
+            console.log(`   ✅ Repo: ${repo.name} (Score: ${repoScore})`);
+
+            // B. Pipeline Discovery & Ranking
+            const pipelines = await AzureService.fetchADOPipelines(devops.organization, repo.project.id || repo.project.name, repo.id, devops.pat, devops.baseUrl, cliToken);
+
+            if (pipelines.length === 0) {
+                console.log(`   ⚠️  PIPELINE_MISSING: No pipelines in repo.`);
+                meta.status = 'PIPELINE_MISSING';
                 results.push(meta);
                 continue;
             }
 
-            meta.repository = { id: repo.id, name: repo.name, project: repo.project.name, projectId: repo.project.id };
-            console.log(`   ✅ Repo: ${repo.name} (${repo.project.name})`);
-
-            // B. Pipeline Match
-            const pipelines = await AzureService.fetchADOPipelines(devops.organization, repo.project.id || repo.project.name, repo.id, devops.pat, devops.baseUrl, cliToken);
-            const cleanProduct = sanitize(prod.name);
-            const matchedPipeline = pipelines.find(p => {
+            const pipeCandidates = pipelines.map(p => {
                 const cleanPipe = sanitize(p.name);
-                return cleanPipe.includes(cleanProduct) || cleanProduct.includes(cleanPipe);
-            });
+                let score = 0;
+                if (cleanPipe.includes(cleanProd)) score += 50;
+                if (cleanPipe.includes('deploy') || cleanPipe.includes('iac')) score += 10;
+                if (cleanPipe.includes('apim')) score += 5;
+                return { pipe: p, score, name: p.name };
+            }).sort((a, b) => b.score - a.score);
 
-            if (!matchedPipeline) {
-                console.log(`   ⚠️  PIPELINE_MISSING: No matching pipeline found.`);
+            const matchedPipeline = pipeCandidates[0].pipe;
+            const pipeScore = pipeCandidates[0].score;
+
+            if (pipeScore < 10) {
+                console.log(`   ⚠️  PIPELINE_MISSING: Only low-confidence matching pipelines found.`);
                 meta.status = 'PIPELINE_MISSING';
                 results.push(meta);
                 continue;
@@ -117,7 +146,7 @@ async function main() {
 
             meta.pipeline = { id: matchedPipeline.id, name: matchedPipeline.name };
             meta.status = 'MATCHED';
-            console.log(`   ✅ Pipeline: ${matchedPipeline.name} (ID: ${matchedPipeline.id})`);
+            console.log(`   ✅ Pipeline: ${matchedPipeline.name} (Score: ${pipeScore})`);
 
             // C. Surgical Hash Sync
             const envsToSync = ['DEV', 'QA', 'STAGE', 'PROD'];
