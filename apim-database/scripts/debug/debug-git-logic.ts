@@ -200,8 +200,8 @@ async function runDebug() {
     const envsToSync = ['DEV', 'QA', 'STAGE', 'PROD'];
     const deployments: Record<string, { hash: string; date: string }> = {};
 
-    console.log(`   ⏳ Fetching latest runs from main...`);
-    const runs = await AzureService.fetchPipelineRuns(devops.organization, projectIdentifier, matchedPipeline.id, devops.pat, devops.baseUrl, cliToken);
+    console.log(`   ⏳ Fetching latest builds from main (rich metadata)...`);
+    const runs = await AzureService.fetchBuildsByDefinition(devops.organization, projectIdentifier, matchedPipeline.id, devops.pat, devops.baseUrl, cliToken);
 
     const SCAN_DEPTH = 15;
     const timelineCache = new Map<number, any[]>();

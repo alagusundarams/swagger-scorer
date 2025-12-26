@@ -325,6 +325,30 @@ export class AzureService {
     }
 
     /**
+     * Fetch Recent Builds for a specific Definition (Pipeline ID)
+     * Richer metadata than the Runs API
+     */
+    static async fetchBuildsByDefinition(org: string, project: string, definitionId: number, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<any[]> {
+        const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
+        const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const isLegacy = cleanBaseUrl.includes('visualstudio.com');
+        const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
+
+        const url = `${urlBase}/_apis/build/builds?api-version=7.0&definitions=${definitionId}&$top=15`;
+
+        try {
+            const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+            if (response.ok) {
+                const data = await response.json() as { value: any[] };
+                return data.value || [];
+            }
+        } catch (err) {
+            console.error(`❌ [ADO] Failed to fetch builds for definition ${definitionId}:`, err);
+        }
+        return [];
+    }
+
+    /**
      * Fetch Recent Runs for a Pipeline
      */
     static async fetchPipelineRuns(org: string, project: string, pipelineId: number, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<PipelineRun[]> {
