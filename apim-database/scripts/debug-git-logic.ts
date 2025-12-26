@@ -122,7 +122,8 @@ async function runDebug() {
     console.log(`\n➡️  Step 2: Locating Pipeline for Repo...`);
 
     // Diagnostic log
-    const pipelineUrl = `${devops.baseUrl}/${devops.organization}/${project}/_apis/pipelines?api-version=7.1-preview.1&repositoryId=${primaryRepoId}&repositoryType=azureRepo`;
+    const cleanBase = devops.baseUrl.replace(/\/+$/, '');
+    const pipelineUrl = `${cleanBase}/${devops.organization}/${project}/_apis/pipelines?api-version=7.1-preview.1&repositoryId=${primaryRepoId}&repositoryType=azureRepo`;
     console.log(`   📡 Fetching from: ${pipelineUrl}`);
 
     let pipelines = await AzureService.fetchADOPipelines(devops.organization, project, primaryRepoId, devops.pat, devops.baseUrl);

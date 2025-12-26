@@ -194,7 +194,7 @@ export class AzureService {
      * Fetch Repository by ID (Global Org Scope)
      */
     static async fetchRepoById(org: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADORepo> {
-        const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+        const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
         const url = `${cleanBaseUrl}/${org}/_apis/git/repositories/${repoId}?api-version=7.1-preview.1`;
         const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
 
@@ -238,18 +238,18 @@ export class AzureService {
      * Fetch Pipelines for a specific repository
      */
     static async fetchADOPipelines(org: string, project: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADOPipeline[]> {
-        const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+        const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
         const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-        let url = `${cleanBaseUrl}/${org}/${project}/_apis/pipelines?api-version=7.1-preview.1&repositoryId=${repoId}&repositoryType=azureRepo`;
-        if (cleanBaseUrl.includes('visualstudio.com')) {
-            url = `${cleanBaseUrl}/${project}/_apis/pipelines?api-version=7.1-preview.1&repositoryId=${repoId}&repositoryType=azureRepo`;
-        }
+
+        // Standard path-based URL. We don't strip org even for visualstudio.com if it's explicitly provided.
+        let url = `${cleanBaseUrl}/${org}/${project}/_apis/pipelines?api-version=7.1-preview.1`;
+        if (repoId) url += `&repositoryId=${repoId}&repositoryType=azureRepo`;
 
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
             if (response.ok) {
                 const data = await response.json() as { value: ADOPipeline[] };
-                return data.value;
+                return data.value || [];
             }
         } catch (err) {
             console.error(`❌ [ADO] Failed to fetch pipelines for repo ${repoId}:`, err);
@@ -261,12 +261,9 @@ export class AzureService {
      * Fetch Recent Runs for a Pipeline
      */
     static async fetchPipelineRuns(org: string, project: string, pipelineId: number, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<PipelineRun[]> {
-        const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+        const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
         const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-        let url = `${cleanBaseUrl}/${org}/${project}/_apis/pipelines/${pipelineId}/runs?api-version=7.1-preview.1`;
-        if (cleanBaseUrl.includes('visualstudio.com')) {
-            url = `${cleanBaseUrl}/${project}/_apis/pipelines/${pipelineId}/runs?api-version=7.1-preview.1`;
-        }
+        const url = `${cleanBaseUrl}/${org}/${project}/_apis/pipelines/${pipelineId}/runs?api-version=7.1-preview.1`;
 
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
@@ -284,13 +281,10 @@ export class AzureService {
      * Fetch Timeline for a specific Pipeline Run
      */
     static async fetchPipelineRunTimeline(org: string, project: string, runId: number, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<TimelineRecord[]> {
-        const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+        const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
         const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
         // Standard ADO builds/timeline endpoint
-        let url = `${cleanBaseUrl}/${org}/${project}/_apis/build/builds/${runId}/timeline?api-version=7.1-preview.2`;
-        if (cleanBaseUrl.includes('visualstudio.com')) {
-            url = `${cleanBaseUrl}/${project}/_apis/build/builds/${runId}/timeline?api-version=7.1-preview.2`;
-        }
+        const url = `${cleanBaseUrl}/${org}/${project}/_apis/build/builds/${runId}/timeline?api-version=7.1-preview.2`;
 
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
