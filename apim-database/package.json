@@ -9,7 +9,8 @@
         "discover-sync": "tsx scripts/core/discover-sync.ts",
         "fetch": "tsx scripts/utils/fetch-apim-data.ts",
         "fetch-ad-groups": "tsx scripts/utils/fetch-ad-groups.ts",
-        "migrate": "tsx scripts/utils/migrate-to-postgres.ts"
+        "migrate": "tsx scripts/utils/migrate-to-postgres.ts",
+        "orphaned-report": "tsx scripts/core/generate-orphaned-report.ts"
     },
     "main": "index.js",
     "dependencies": {

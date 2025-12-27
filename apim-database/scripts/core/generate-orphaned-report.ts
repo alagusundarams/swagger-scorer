@@ -10,7 +10,7 @@
  */
 
 import { Pool } from 'pg';
-import { writeFileSync, readFileSync, existsSync } from 'fs';
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
 // --- CONFIG LOADER ---
@@ -210,6 +210,10 @@ async function main() {
         const dataDir = cwd.endsWith('apim-database')
             ? join(cwd, 'scripts', 'data')
             : join(cwd, 'apim-database', 'scripts', 'data');
+
+        if (!existsSync(dataDir)) {
+            mkdirSync(dataDir, { recursive: true });
+        }
 
         const reportPath = join(dataDir, `orphaned-resources-${targetEnv || 'ALL'}-${timestamp}.json`);
         writeFileSync(reportPath, JSON.stringify(report, null, 2));
