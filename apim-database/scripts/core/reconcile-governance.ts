@@ -47,6 +47,7 @@ const config = loadConfig();
 // --- ARGS ---
 const args = process.argv.slice(2);
 const targetEnv = args.find(a => a.startsWith('--env='))?.split('=')[1]?.toUpperCase();
+const verbose = !args.includes('--quiet');
 
 async function main() {
     console.log(`🚀 [PART 3] Starting Governance Reconciliation...\n`);
@@ -153,8 +154,18 @@ async function main() {
                     ado.status === 'MATCHED' ? 'TERRAFORM_MANAGED' : 'PORTAL_MANAGED'
                 ]);
 
+                if (verbose) {
+                    const mode = ado.status === 'MATCHED' ? '🔧 TERRAFORM' : '📦 PORTAL';
+                    const hash = localDeploy?.hash?.substring(0, 7) || 'none';
+                    console.log(`   📦 Product: "${prod.name}" (${envName}) - ${mode} - Hash: ${hash}`);
+                }
+
                 // --- A.2 APIS RECONCILIATION (Hierarchical) ---
                 const apiNames = apimMeta.productApiLinks[envName]?.[prod.id] || [];
+                if (verbose && apiNames.length > 0) {
+                    console.log(`      🔌 APIs: ${apiNames.length} linked to product`);
+                }
+
                 for (const apiName of apiNames) {
                     const uniqueApiId = `${uniqueProductId}:${apiName}`;
                     await pool.query(`
@@ -167,6 +178,10 @@ async function main() {
                             updated_at = NOW();
                     `, [uniqueApiId, uniqueProductId, apiName, apiName, `/${apiName}`]);
 
+                    if (verbose) {
+                        console.log(`         📄 API: "${apiName}"`);
+                    }
+
                     // Link to Backends
                     const forensics = apimMeta.apiForensics[envName]?.[apiName];
                     if (forensics) {
@@ -176,6 +191,10 @@ async function main() {
                                 VALUES ($1, $2, $3)
                                 ON CONFLICT (api_id, backend_id, environment) DO NOTHING;
                             `, [uniqueApiId, bId, envName]);
+
+                            if (verbose) {
+                                console.log(`            🔌 Backend: ${bId}`);
+                            }
                         }
                     }
                 }
@@ -201,10 +220,12 @@ async function main() {
         console.log(`🔗 Resolving App Identities via Graph...`);
         const allAppIds = new Set<string>();
         Object.values(apimMeta.appIds).forEach(list => list.forEach(id => allAppIds.add(id)));
+        console.log(`   Found ${allAppIds.size} unique App IDs to resolve`);
 
         if (allAppIds.size > 0) {
             const resolved = await AzureService.fetchAppRegistrations(Array.from(allAppIds));
             const appMap = new Map<string, string>(resolved.map(r => [r.appId, r.displayName]));
+            console.log(`   ✅ Resolved ${appMap.size} App Registrations via Microsoft Graph`);
 
             for (const [env, ids] of Object.entries(apimMeta.appIds)) {
                 for (const id of ids) {
@@ -216,6 +237,10 @@ async function main() {
                             display_name = EXCLUDED.display_name,
                             updated_at = NOW();
                     `, [id, name, env]);
+
+                    if (verbose) {
+                        console.log(`      🔑 ${id.substring(0, 8)}... -> "${name}" (${env})`);
+                    }
                 }
             }
         }
@@ -240,6 +265,16 @@ async function main() {
         // Backends linked via APIs already handled in A.2 loop for better context
 
         console.log(`\n✅ Reconciliation Complete!`);
+        console.log(`\n📊 Summary:`);
+        const productCount = await pool.query(`SELECT COUNT(*) FROM products${targetEnv ? ` WHERE environment = '${targetEnv}'` : ''}`);
+        const apiCount = await pool.query(`SELECT COUNT(*) FROM apis`);
+        const terraformManaged = await pool.query(`SELECT COUNT(*) FROM products WHERE management_mode = 'TERRAFORM_MANAGED'${targetEnv ? ` AND environment = '${targetEnv}'` : ''}`);
+        const portalManaged = await pool.query(`SELECT COUNT(*) FROM products WHERE management_mode = 'PORTAL_MANAGED'${targetEnv ? ` AND environment = '${targetEnv}'` : ''}`);
+
+        console.log(`   Products: ${productCount.rows[0].count}`);
+        console.log(`   APIs: ${apiCount.rows[0].count}`);
+        console.log(`   🔧 Terraform-Managed: ${terraformManaged.rows[0].count}`);
+        console.log(`   📦 Portal-Managed: ${portalManaged.rows[0].count}`);
 
     } catch (e: any) {
         console.error(`\n❌ Reconciliation Failed:`, e.message);

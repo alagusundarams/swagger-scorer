@@ -19,7 +19,7 @@ const logsDir = cwd.endsWith('apim-database')
     : join(cwd, 'apim-database', 'scripts', 'logs');
 if (!existsSync(logsDir)) mkdirSync(logsDir, { recursive: true });
 
-const timestamp = new Date().toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replace(/[\/,: ]/g, '-');
+const timestamp = new Date().toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replace(/[\\/,: ]/g, '-');
 const envSuffix = args.find(a => a.startsWith('--env='))?.split('=')[1] || 'ALL';
 const logFile = join(logsDir, `discover-sync_${envSuffix}_${timestamp}.log`);
 const logStream = createWriteStream(logFile, { flags: 'a' });
@@ -86,6 +86,11 @@ async function main() {
         log(`\n✅ [COMPLETE] All discovery and sync phases finished successfully.`);
         log(`⏰ End time: ${endDate}`);
         log(`⏱️  Total duration: ${durationSec}s (${durationMin} minutes)`);
+
+        // Generate comprehensive orphaned resources report
+        log(`\n📊 Generating comprehensive orphaned resources report...`);
+        await runScript('scripts/core/generate-orphaned-report.ts');
+
         log(`📄 Full log saved to: ${logFile}`);
     } catch (err) {
         const endTime = Date.now();

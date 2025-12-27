@@ -201,11 +201,18 @@ async function main() {
             } catch (e) { }
 
             // --- 1. Products & Product Policies ---
+            console.log(`      📦 Fetching Products...`);
             const prodRes = await AzureService.fetchAPIM<any>(apimConfig, '/products');
             const products = prodRes.value || [];
+            console.log(`         Found ${products.length} products in ${env.name}`);
+
             for (const p of products) {
                 const prodId = p.name;
                 const prodName = p.properties.displayName;
+                if (verbose) {
+                    console.log(`         📦 Product: "${prodName}" (ID: ${prodId})`);
+                }
+
                 if (!uniqueProducts.has(prodId)) {
                     uniqueProducts.set(prodId, { id: prodId, name: prodName, environments: [env.name] });
                 } else {
@@ -232,6 +239,9 @@ async function main() {
                         const { guids, nvs, backends: _b } = extractForensicsFromPolicy(xml);
                         guids.forEach((id: string) => envAppIds.add(id));
                         nvs.forEach((nv: string) => potentialNvs.add(nv));
+                        if (verbose && (guids.length > 0 || nvs.length > 0)) {
+                            console.log(`            📄 Product Policy: ${guids.length} GUIDs, ${nvs.length} NVs`);
+                        }
                     }
                 } catch (e) { }
             }
@@ -247,6 +257,13 @@ async function main() {
                 isSecret: nv.properties.secret,
                 keyVaultUrl: nv.properties.keyVault ? nv.properties.keyVault.secretIdentifier : null
             }));
+            console.log(`         ✅ Found ${envNvs.length} Named Values`);
+            if (verbose) {
+                envNvs.forEach((nv: any) => {
+                    const type = nv.properties.keyVault ? '🔐 KeyVault' : nv.properties.secret ? '🔒 Secret' : '📝 PlainText';
+                    console.log(`            ${type}: ${nv.name}`);
+                });
+            }
 
             // --- 2.5 Backends ---
             console.log(`      🔌 Fetching Backend Entities (Region Registry)...`);
@@ -259,6 +276,12 @@ async function main() {
                 resourceId: b.properties.resourceId,
                 protocol: b.properties.protocol
             }));
+            console.log(`         ✅ Found ${backendRes.value?.length || 0} Backends`);
+            if (verbose) {
+                (backendRes.value || []).forEach((b: any) => {
+                    console.log(`            🔌 ${b.name}: ${b.properties.url || 'N/A'} (${b.properties.protocol || 'http'})`);
+                });
+            }
 
             // --- 3. Product-API Associations ---
             console.log(`      🔗 Mapping Product-API Associations...`);
@@ -281,6 +304,7 @@ async function main() {
             // --- 4. Deduplicated API Policies & Contracts ---
             console.log(`      📄 Scanning ${uniqueApiNamesInEnv.size} unique API Policies...`);
             metadata.apiForensics[env.name] = {};
+            let apiProcessedCount = 0;
 
             for (const apiName of uniqueApiNamesInEnv) {
                 const apiFullId = apiIdMap.get(apiName)!;
@@ -323,6 +347,10 @@ async function main() {
                         }
 
                         metadata.apiForensics[env.name][apiName] = { guids, backends };
+                        apiProcessedCount++;
+                        if (verbose) {
+                            console.log(`         📄 API "${apiName}": ${guids.length} GUIDs, ${backends.length} Backends`);
+                        }
                     }
                 } catch (e) { }
 
