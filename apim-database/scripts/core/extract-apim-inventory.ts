@@ -295,9 +295,18 @@ async function main() {
                     const apiDetails = (pApis.value || []).map((api: any) => {
                         uniqueApiNamesInEnv.add(api.name);
                         apiIdMap.set(api.name, api.id);
+
+                        // Extract the path from APIM response (this is the relative URL path)
+                        const apiPath = api.properties?.path || api.name; // Use path from response, fallback to name only
+
+                        // Log if path is missing (should be rare)
+                        if (!api.properties?.path && verbose) {
+                            console.log(`         ⚠️  API "${api.name}" missing path property, using name as fallback`);
+                        }
+
                         return {
                             name: api.name,
-                            path: api.properties?.path || `/${api.name}` // Use APIM path, fallback to constructed
+                            path: apiPath
                         };
                     });
                     metadata.productApiLinks[env.name][p.name] = apiDetails;
