@@ -10,10 +10,24 @@
  */
 
 import { Pool } from 'pg';
-import { writeFileSync } from 'fs';
+import { writeFileSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/apim_governance';
+// --- CONFIG LOADER ---
+function loadConfig() {
+    const configPaths = [
+        join(process.cwd(), 'apim-database', 'config.json'),
+        join(process.cwd(), 'config.json')
+    ];
+    for (const path of configPaths) {
+        if (existsSync(path)) return JSON.parse(readFileSync(path, 'utf8'));
+    }
+    return {};
+}
+
+const config = loadConfig();
+const DATABASE_URL = config.azure?.environments[0]?.databaseUrl || config.database?.url;
+
 const args = process.argv.slice(2);
 const targetEnv = args.find(a => a.startsWith('--env='))?.split('=')[1]?.toUpperCase();
 

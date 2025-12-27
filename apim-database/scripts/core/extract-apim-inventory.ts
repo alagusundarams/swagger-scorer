@@ -43,7 +43,7 @@ interface MetadataStore {
     apiContracts: Record<string, any>;  // apiId -> { displayName: string, definition: any }
     backends: Record<string, any[]>;    // env -> backend[]
     apiForensics: Record<string, Record<string, { guids: string[], backends: string[] }>>; // env -> apiName -> forensics
-    productApiLinks: Record<string, Record<string, string[]>>; // env -> productId -> apiNames[]
+    productApiLinks: Record<string, Record<string, Array<{ name: string, path: string }>>>; // env -> productId -> { name, path }[]
 }
 
 /**
@@ -292,12 +292,15 @@ async function main() {
             for (const p of products) {
                 try {
                     const pApis = await AzureService.fetchAPIM<any>(apimConfig, `/products/${p.name}/apis`);
-                    const apiNames = (pApis.value || []).map((api: any) => {
+                    const apiDetails = (pApis.value || []).map((api: any) => {
                         uniqueApiNamesInEnv.add(api.name);
                         apiIdMap.set(api.name, api.id);
-                        return api.name;
+                        return {
+                            name: api.name,
+                            path: api.properties?.path || `/${api.name}` // Use APIM path, fallback to constructed
+                        };
                     });
-                    metadata.productApiLinks[env.name][p.name] = apiNames;
+                    metadata.productApiLinks[env.name][p.name] = apiDetails;
                 } catch (e) { }
             }
 

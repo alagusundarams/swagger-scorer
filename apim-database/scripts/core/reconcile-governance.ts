@@ -27,7 +27,7 @@ interface MetadataStore {
     apiContracts: Record<string, any>;
     backends: Record<string, any[]>;
     apiForensics: Record<string, Record<string, { guids: string[], backends: string[] }>>;
-    productApiLinks: Record<string, Record<string, string[]>>;
+    productApiLinks: Record<string, Record<string, Array<{ name: string, path: string }>>>; // Updated to match extract-apim-inventory
 }
 
 // --- CONFIG LOADER ---
@@ -143,10 +143,10 @@ async function main() {
                         management_mode = EXCLUDED.management_mode,
                         updated_at = NOW();
                 `, [
-                    uniqueProductId, prod.id, prod.name, '1.0', 'published', envName, 'Global',
+                    uniqueProductId, prod.id, prod.name, null, 'published', envName, 'Global',  // version set to NULL (APIM doesn't have version)
                     localDeploy?.hash || null, localDeploy?.date || null,
-                    ado.pipeline ? `https://dev.azure.com/${config.devops.organization}/${ado.repository.project}/_build?definitionId=${ado.pipeline.id}` : null,
-                    ado.repository ? `https://dev.azure.com/${config.devops.organization}/${ado.repository.project}/_git/${ado.repository.name}` : null,
+                    ado.pipeline ? `${config.devops.baseUrl}/${config.devops.organization}/${ado.repository.project}/_build?definitionId=${ado.pipeline.id}` : null,
+                    ado.repository ? `${config.devops.baseUrl}/${config.devops.organization}/${ado.repository.project}/_git/${ado.repository.name}` : null,
                     devDeploy?.hash || null, devDeploy?.date || null,
                     qaDeploy?.hash || null, qaDeploy?.date || null,
                     stageDeploy?.hash || null, stageDeploy?.date || null,
@@ -161,12 +161,14 @@ async function main() {
                 }
 
                 // --- A.2 APIS RECONCILIATION (Hierarchical) ---
-                const apiNames = apimMeta.productApiLinks[envName]?.[prod.id] || [];
-                if (verbose && apiNames.length > 0) {
-                    console.log(`      🔌 APIs: ${apiNames.length} linked to product`);
+                const apiDetails = apimMeta.productApiLinks[envName]?.[prod.id] || [];
+                if (verbose && apiDetails.length > 0) {
+                    console.log(`      🔌 APIs: ${apiDetails.length} linked to product`);
                 }
 
-                for (const apiName of apiNames) {
+                for (const api of apiDetails) {
+                    const apiName = typeof api === 'string' ? api : api.name;  // Backward compatibility (Option B)
+                    const apiPath = typeof api === 'string' ? `/${api}` : (api.path || null);  // Use captured path or NULL (hybrid approach)
                     const uniqueApiId = `${uniqueProductId}:${apiName}`;
                     await pool.query(`
                         INSERT INTO apis (id, product_id, name, display_name, path, updated_at)
@@ -176,7 +178,7 @@ async function main() {
                             display_name = EXCLUDED.display_name,
                             path = EXCLUDED.path,
                             updated_at = NOW();
-                    `, [uniqueApiId, uniqueProductId, apiName, apiName, `/${apiName}`]);
+                    `, [uniqueApiId, uniqueProductId, apiName, apiName, apiPath]);
 
                     if (verbose) {
                         console.log(`         📄 API: "${apiName}"`);

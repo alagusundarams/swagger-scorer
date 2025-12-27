@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS products (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     display_name TEXT NOT NULL,
-    version TEXT NOT NULL,
+    version TEXT,  -- Made nullable - APIM products don't have version field
     description TEXT,
     state TEXT NOT NULL CHECK (state IN ('published', 'notPublished')),
     

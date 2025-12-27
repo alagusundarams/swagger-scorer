@@ -87,7 +87,8 @@ async function main() {
 
     for (const prod of inventory) {
         // --- SAFETY THROTTLE ---
-        // Respects ADO/APIM rate limits by adding a 4s delay between products to avoid hitting search API limits.
+        // User-specified 4-second delay to stay well within ADO API limits
+        // This prevents 429 rate limit errors without needing retry logic
         await sleep(4000);
 
         console.log(`\n🔹 Processing: ${prod.name} (${prod.id})`);
