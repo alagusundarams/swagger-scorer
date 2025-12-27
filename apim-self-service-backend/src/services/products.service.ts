@@ -34,10 +34,9 @@ export async function getAllProducts(environment?: string, userRole?: string, te
         ? `WHERE ${whereConditions.join(' AND ')}`
         : '';
 
-    // 1. Fetch products with calculated subscriber count
     const productRes = await query(`
         SELECT p.*, 
-               t.name as owner_team_name,
+               t.display_name as owner_team_name,
                COALESCE(sub_counts.active_subscribers, 0) as calculated_subscriber_count
         FROM products p
         LEFT JOIN teams t ON p.owner_team_id = t.id

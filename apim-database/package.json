@@ -6,6 +6,7 @@
     "scripts": {
         "setup-db": "tsx scripts/utils/setup-db.ts",
         "reset-db": "tsx scripts/utils/reset-db.ts",
+        "seed-data": "tsx scripts/utils/seed-data.ts",
         "discover-sync": "tsx scripts/core/discover-sync.ts",
         "fetch": "tsx scripts/utils/fetch-apim-data.ts",
         "fetch-ad-groups": "tsx scripts/utils/fetch-ad-groups.ts",
