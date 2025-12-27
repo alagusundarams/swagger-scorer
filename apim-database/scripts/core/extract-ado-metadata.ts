@@ -115,8 +115,20 @@ async function main() {
 
             // --- RANKING LOGIC ---
             // More lenient filter: only require repository and repository.name
+            console.log(`   🔍 DEBUG: Starting filter/ranking for cleanProd="${cleanProd}"...`);
+
             const repoCandidates = searchResp.results
-                .filter(r => r.repository && r.repository.name) // Only require name, not project
+                .map((r, idx) => {
+                    console.log(`   🔍 DEBUG: Result ${idx}: hasRepository=${!!r.repository}, repoName=${r.repository?.name || 'MISSING'}`);
+                    return r;
+                })
+                .filter(r => {
+                    const hasRepo = r.repository && r.repository.name;
+                    if (!hasRepo) {
+                        console.log(`   🔍 DEBUG: ❌ Filtered out - missing repository.name`);
+                    }
+                    return hasRepo;
+                })
                 .map(r => {
                     const rName = r.repository.name;
                     const cleanRepo = sanitize(rName);
@@ -128,8 +140,14 @@ async function main() {
                     if (cleanRepo.includes('grp')) score -= 20;
                     if (cleanRepo.includes('shared') || cleanRepo.includes('common')) score -= 30;
 
+                    console.log(`   🔍 DEBUG: Repo "${rName}" -> cleanRepo="${cleanRepo}", score=${score}`);
                     return { repo: r.repository, score, name: rName };
                 }).sort((a, b) => b.score - a.score);
+
+            console.log(`   🔍 DEBUG: After filter/rank: ${repoCandidates.length} candidates`);
+            if (repoCandidates.length > 0) {
+                console.log(`   🔍 DEBUG: Top candidate: ${repoCandidates[0].name} (score: ${repoCandidates[0].score})`);
+            }
 
             if (repoCandidates.length === 0) {
                 console.log(`   ⚠️  REPO_MISSING: All ${searchResp.results.length} search results had missing repository data for "${prod.name}"`);
