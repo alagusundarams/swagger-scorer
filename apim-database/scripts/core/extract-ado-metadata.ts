@@ -163,16 +163,35 @@ async function main() {
                 console.log(`   ⚠️  LOW_CONFIDENCE_REPO: Nearest match "${repo.name}" has score ${repoScore}.`);
             }
 
+            // Null safety for repo fields - same pattern as debug-git-logic
+            const repoId = repo.id || repo.name; // Fallback to name if ID missing
+            let project = repo.project?.name || "Unknown";
+            let projectId = repo.project?.id || "";
+
+            // If project details are missing, attempt to fetch them
+            if (project === "Unknown" || !projectId) {
+                try {
+                    console.log(`   🔍 DEBUG: Project info missing, fetching repo details for ${repoId}...`);
+                    const repoDetails = await AzureService.fetchRepoById(devops.organization, repoId, devops.pat, devops.baseUrl);
+                    project = repoDetails.project.name;
+                    projectId = repoDetails.project.id;
+                    console.log(`      ✅ Recovered Project: ${project}`);
+                } catch (e) {
+                    console.log(`      ⚠️  Could not fetch repo details: ${e instanceof Error ? e.message : String(e)}`);
+                }
+            }
+
             meta.repository = {
-                id: repo.id,
+                id: repoId,
                 name: repo.name,
-                project: repo.project?.name || 'Unknown',
-                projectId: repo.project?.id || repo.project?.name || 'Unknown'
+                project: project,
+                projectId: projectId || project
             };
             console.log(`   ✅ Repo: ${repo.name} (Score: ${repoScore})`);
 
             // B. Pipeline Discovery & Ranking
-            const pipelines = await AzureService.fetchADOPipelines(devops.organization, repo.project.id || repo.project.name, repo.id, devops.pat, devops.baseUrl);
+            const projectIdentifier = projectId || project;
+            const pipelines = await AzureService.fetchADOPipelines(devops.organization, projectIdentifier, repoId, devops.pat, devops.baseUrl);
 
             if (pipelines.length === 0) {
                 console.log(`   ⚠️  PIPELINE_MISSING: No pipelines in repo.`);
@@ -207,13 +226,12 @@ async function main() {
             // C. Surgical Hash Sync (Hybrid Strategy: Environments API + Adaptive Fallback)
             // If --env is specified, only sync that environment. Otherwise, sync all.
             const envsToSync = targetEnv ? [targetEnv] : ['DEV', 'QA', 'STAGE', 'PROD'];
-            const projectIdent = repo.project.id || repo.project.name;
             const timelineCache = new Map<number, any[]>();
 
             // Phase 1: Surgical Strikes (Environments API) - Ultra Fast
             for (const envName of envsToSync) {
                 const deploy = await AzureService.fetchLatestEnvironmentDeployment(
-                    devops.organization, projectIdent, matchedPipeline.id, envName, devops.pat, devops.baseUrl
+                    devops.organization, projectIdentifier, matchedPipeline.id, envName, devops.pat, devops.baseUrl
                 );
 
                 if (deploy) {
@@ -235,7 +253,7 @@ async function main() {
 
                 while (Object.keys(meta.deployments).length < envsToSync.length && skip < maxDepth) {
                     const builds = await AzureService.fetchBuildsByDefinition(
-                        devops.organization, projectIdent, matchedPipeline.id, devops.pat, devops.baseUrl, undefined, pageSize, skip
+                        devops.organization, projectIdentifier, matchedPipeline.id, devops.pat, devops.baseUrl, undefined, pageSize, skip
                     );
 
                     if (builds.length === 0) break;
@@ -244,7 +262,7 @@ async function main() {
                         if (Object.keys(meta.deployments).length === envsToSync.length) break;
 
                         if (!timelineCache.has(run.id)) {
-                            timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdent, run.id, devops.pat, devops.baseUrl));
+                            timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdentifier, run.id, devops.pat, devops.baseUrl));
                         }
 
                         const timeline = timelineCache.get(run.id)!;
