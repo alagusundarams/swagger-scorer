@@ -28,6 +28,8 @@ const config = loadConfig();
 // --- ARGS ---
 const args = process.argv.slice(2);
 const targetEnv = args.find(a => a.startsWith('--env='))?.split('=')[1]?.toUpperCase();
+const verbose = !args.includes('--quiet');
+const limit = parseInt(args.find(a => a.startsWith('--limit='))?.split('=')[1] || '0', 10);
 
 interface ProductIdentity {
     id: string;
@@ -64,8 +66,13 @@ async function main() {
 
     // Filter by environment if flag is provided
     if (targetEnv) {
-        inventory = inventory.filter(p => p.environments.map(e => e.toUpperCase()).includes(targetEnv));
-        console.log(`📊 Filtered to ${inventory.length} products associated with ${targetEnv}.`);
+        inventory = inventory.filter((p: ProductIdentity) => p.environments.map(e => e.toUpperCase()).includes(targetEnv));
+        console.log(`🎯 Filtered to ${inventory.length} products for ${targetEnv}.\n`);
+    }
+
+    if (limit > 0) {
+        inventory = inventory.slice(0, limit);
+        console.log(`⚠️  LIMIT MODE: Processing only ${limit} product(s) for testing.\n`);
     } else {
         console.log(`📊 Loaded ${inventory.length} unique products for discovery.`);
     }
@@ -100,9 +107,16 @@ async function main() {
                 continue;
             }
 
+            // DEBUG: Log what we actually got from ADO
+            console.log(`   📊 DEBUG: Search returned ${searchResp.results.length} results`);
+            if (searchResp.results.length > 0 && verbose) {
+                console.log(`   📊 DEBUG: First result structure:`, JSON.stringify(searchResp.results[0], null, 2));
+            }
+
             // --- RANKING LOGIC ---
+            // More lenient filter: only require repository and repository.name
             const repoCandidates = searchResp.results
-                .filter(r => r.repository && r.repository.name && r.repository.project) // Filter out malformed results
+                .filter(r => r.repository && r.repository.name) // Only require name, not project
                 .map(r => {
                     const rName = r.repository.name;
                     const cleanRepo = sanitize(rName);
@@ -118,7 +132,7 @@ async function main() {
                 }).sort((a, b) => b.score - a.score);
 
             if (repoCandidates.length === 0) {
-                console.log(`   ⚠️  REPO_MISSING: Search returned malformed results for "${prod.name}"`);
+                console.log(`   ⚠️  REPO_MISSING: All ${searchResp.results.length} search results had missing repository data for "${prod.name}"`);
                 meta.status = 'REPO_MISSING';
                 results.push(meta);
                 continue;

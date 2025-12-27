@@ -150,7 +150,7 @@ async function main() {
                     qaDeploy?.hash || null, qaDeploy?.date || null,
                     stageDeploy?.hash || null, stageDeploy?.date || null,
                     prodDeploy?.hash || null, prodDeploy?.date || null,
-                    ado.status === 'MATCHED' ? 'TERRAFORM_MANAGED' : 'MANUAL'
+                    ado.status === 'MATCHED' ? 'TERRAFORM_MANAGED' : 'PORTAL_MANAGED'
                 ]);
 
                 // --- A.2 APIS RECONCILIATION (Hierarchical) ---
