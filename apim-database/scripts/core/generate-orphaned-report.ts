@@ -249,7 +249,7 @@ async function main() {
         }
 
     } catch (err: any) {
-        console.error(`\n❌ Failed to generate orphaned resources report:`, err.message);
+        console.error(`\n❌ Failed to generate orphaned resources report:`, err);
         process.exit(1);
     } finally {
         await pool.end();
