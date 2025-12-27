@@ -1,190 +1,253 @@
+/**
+ * @fileoverview Drafts Routes
+ * 
+ * Routes for managing draft files (contracts, policies, configs)
+ * Comprehensive file management with database tracking
+ */
+
 import { FastifyPluginAsync } from 'fastify';
-import fs from 'fs/promises';
-import path from 'path';
-import os from 'os';
-
-// Configuration
-const DRAFTS_DIR = path.join(os.tmpdir(), 'swagger-drafts');
-const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
-
-/**
- * Initialize drafts directory
- */
-const initializeDraftsDir = async () => {
-    try {
-        await fs.mkdir(DRAFTS_DIR, { recursive: true });
-        console.log(`[Drafts] Initialized directory: ${DRAFTS_DIR}`);
-    } catch (error) {
-        console.error('[Drafts] Failed to create drafts directory:', error);
-    }
-};
-
-/**
- * Clean up expired drafts (older than 7 days)
- */
-const cleanupExpiredDrafts = async () => {
-    try {
-        const users = await fs.readdir(DRAFTS_DIR);
-        const now = Date.now();
-
-        for (const userId of users) {
-            const userDir = path.join(DRAFTS_DIR, userId);
-            const stats = await fs.stat(userDir);
-
-            if (stats.isDirectory()) {
-                const files = await fs.readdir(userDir);
-
-                for (const file of files) {
-                    const filePath = path.join(userDir, file);
-                    const fileStats = await fs.stat(filePath);
-
-                    // Delete files older than 7 days
-                    if (now - fileStats.mtimeMs > DRAFT_TTL_MS) {
-                        await fs.unlink(filePath);
-                        console.log(`[Drafts] Deleted expired draft: ${filePath}`);
-                    }
-                }
-
-                // Remove empty user directories
-                const remainingFiles = await fs.readdir(userDir);
-                if (remainingFiles.length === 0) {
-                    await fs.rmdir(userDir);
-                    console.log(`[Drafts] Removed empty user directory: ${userDir}`);
-                }
-            }
-        }
-    } catch (error) {
-        console.error('[Drafts] Error during cleanup:', error);
-    }
-};
+import {
+    createDraft,
+    getDraft,
+    getUserDrafts,
+    downloadDraft,
+    deleteDraft,
+    cleanupExpiredDrafts
+} from '../services/drafts.service.js';
+import { initBlobStorage } from '../services/blobStorage.service.js';
 
 const draftsRoute: FastifyPluginAsync = async (fastify) => {
-    // Initialize on startup
-    await initializeDraftsDir();
+    // Initialize blob storage on startup
+    initBlobStorage();
 
     // Run cleanup on startup and then every hour
-    await cleanupExpiredDrafts();
-    setInterval(cleanupExpiredDrafts, 60 * 60 * 1000);
+    cleanupExpiredDrafts().catch(err => console.error('[Drafts] Initial cleanup failed:', err));
+    setInterval(() => {
+        cleanupExpiredDrafts().catch(err => console.error('[Drafts] Cleanup failed:', err));
+    }, 60 * 60 * 1000);
 
     /**
-     * Save draft to local filesystem
-     * POST /api/v1/drafts
+     * POST /api/v1/drafts/upload
+     * Upload a new draft file
      */
-    fastify.post('/drafts', async (request, reply) => {
-        const { spec, apiTitle } = request.body as {
-            spec: string;
-            apiTitle?: string;
-        };
-
-        // Extract user ID from Authorization header
-        const authHeader = request.headers.authorization;
-        const userId = authHeader ? extractUserIdFromToken(authHeader) : 'user-123';
-
-        const draftData = {
-            spec,
-            apiTitle: apiTitle || 'Untitled Draft',
-            updatedAt: new Date().toISOString()
-        };
-
+    fastify.post('/drafts/upload', async (request, reply) => {
         try {
-            // Create user-specific directory
-            const userDir = path.join(DRAFTS_DIR, userId);
-            await fs.mkdir(userDir, { recursive: true });
+            // Get file from multipart data
+            const data = await request.file();
 
-            // Save with timestamp
-            const filename = `draft-${Date.now()}.json`;
-            const filePath = path.join(userDir, filename);
+            if (!data) {
+                return reply.code(400).send({
+                    error: 'Bad Request',
+                    message: 'No file provided'
+                });
+            }
 
-            await fs.writeFile(filePath, JSON.stringify(draftData, null, 2), 'utf-8');
+            // Get file buffer
+            const buffer = await data.toBuffer();
 
-            const expiryDate = new Date(Date.now() + DRAFT_TTL_MS);
+            // Get metadata from fields
+            const fileType = (data.fields['fileType'] as any)?.value || 'other';
+            const productId = (data.fields['productId'] as any)?.value;
+            const apiId = (data.fields['apiId'] as any)?.value;
+            const contextNotes = (data.fields['contextNotes'] as any)?.value;
 
-            console.log(`[Drafts] Saved draft: ${filePath}`);
+            // TODO: Get real user ID from auth
+            const userId = 'user-admin'; // Mock for now
+
+            // Create draft
+            const draft = await createDraft({
+                userId,
+                file: buffer,
+                fileName: data.filename,
+                fileType,
+                mimeType: data.mimetype,
+                productId,
+                apiId,
+                contextNotes
+            });
+
+            fastify.log.info({ draftId: draft.id }, 'Draft uploaded successfully');
 
             return {
                 success: true,
-                requestId: filename,
-                expiresAt: expiryDate.toISOString(),
-                path: filePath
+                draft: {
+                    id: draft.id,
+                    fileName: draft.fileName,
+                    fileType: draft.fileType,
+                    fileSizeBytes: draft.fileSizeBytes,
+                    uploadedAt: draft.uploadedAt,
+                    expiresAt: draft.expiresAt,
+                    status: draft.status
+                }
             };
         } catch (error) {
-            console.error('[Drafts] Error saving draft:', error);
+            fastify.log.error({ err: error }, 'Failed to upload draft');
             return reply.code(500).send({
-                error: 'Failed to save draft',
-                message: error instanceof Error ? error.message : 'Unknown error'
+                error: 'Internal Server Error',
+                message: 'Failed to upload draft file'
             });
         }
     });
 
     /**
-     * Get latest draft from local filesystem
-     * GET /api/v1/drafts/latest
+     * GET /api/v1/drafts
+     * Get all drafts for current user
      */
-    fastify.get('/drafts/latest', async (request, reply) => {
-        const authHeader = request.headers.authorization;
-        const userId = authHeader ? extractUserIdFromToken(authHeader) : 'user-123';
-
+    fastify.get('/drafts', async (request, reply) => {
         try {
-            const userDir = path.join(DRAFTS_DIR, userId);
+            // TODO: Get real user ID from auth
+            const userId = 'user-admin';
 
-            // Check if user directory exists
-            try {
-                await fs.access(userDir);
-            } catch {
-                return reply.code(404).send({
-                    error: 'No drafts found'
-                });
-            }
+            const drafts = await getUserDrafts(userId);
 
-            // Get all draft files
-            const files = await fs.readdir(userDir);
-            const draftFiles = files.filter(f => f.startsWith('draft-') && f.endsWith('.json'));
-
-            if (draftFiles.length === 0) {
-                return reply.code(404).send({
-                    error: 'No drafts found'
-                });
-            }
-
-            // Find the most recent file
-            let latestFile = draftFiles[0];
-            let latestMtime = 0;
-
-            for (const file of draftFiles) {
-                const filePath = path.join(userDir, file);
-                const stats = await fs.stat(filePath);
-                if (stats.mtimeMs > latestMtime) {
-                    latestMtime = stats.mtimeMs;
-                    latestFile = file;
-                }
-            }
-
-            // Read the latest draft
-            const latestPath = path.join(userDir, latestFile);
-            const content = await fs.readFile(latestPath, 'utf-8');
-            const draftData = JSON.parse(content);
-
-            console.log(`[Drafts] Retrieved latest draft: ${latestPath}`);
-
-            return draftData;
+            return {
+                success: true,
+                count: drafts.length,
+                drafts: drafts.map(d => ({
+                    id: d.id,
+                    fileName: d.fileName,
+                    fileType: d.fileType,
+                    fileSizeBytes: d.fileSizeBytes,
+                    uploadedAt: d.uploadedAt,
+                    expiresAt: d.expiresAt,
+                    status: d.status,
+                    productId: d.productId,
+                    apiId: d.apiId
+                }))
+            };
         } catch (error) {
-            console.error('[Drafts] Error retrieving draft:', error);
+            fastify.log.error({ err: error }, 'Failed to get drafts');
             return reply.code(500).send({
-                error: 'Failed to retrieve draft',
-                message: error instanceof Error ? error.message : 'Unknown error'
+                error: 'Internal Server Error',
+                message: 'Failed to retrieve drafts'
+            });
+        }
+    });
+
+    /**
+     * GET /api/v1/drafts/:id
+     * Get draft details
+     */
+    fastify.get('/drafts/:id', async (request, reply) => {
+        try {
+            const { id } = request.params as { id: string };
+
+            const draft = await getDraft(id);
+
+            if (!draft) {
+                return reply.code(404).send({
+                    error: 'Not Found',
+                    message: 'Draft not found'
+                });
+            }
+
+            return {
+                success: true,
+                draft: {
+                    id: draft.id,
+                    fileName: draft.fileName,
+                    fileType: draft.fileType,
+                    fileSizeBytes: draft.fileSizeBytes,
+                    mimeType: draft.mimeType,
+                    uploadedAt: draft.uploadedAt,
+                    expiresAt: draft.expiresAt,
+                    status: draft.status,
+                    productId: draft.productId,
+                    apiId: draft.apiId,
+                    contextNotes: draft.contextNotes
+                }
+            };
+        } catch (error) {
+            fastify.log.error({ err: error }, 'Failed to get draft');
+            return reply.code(500).send({
+                error: 'Internal Server Error',
+                message: 'Failed to retrieve draft'
+            });
+        }
+    });
+
+    /**
+     * GET /api/v1/drafts/:id/download
+     * Download draft file
+     */
+    fastify.get('/drafts/:id/download', async (request, reply) => {
+        try {
+            const { id } = request.params as { id: string };
+
+            const { draft, buffer } = await downloadDraft(id);
+
+            // Set appropriate headers
+            reply.header('Content-Type', draft.mimeType || 'application/octet-stream');
+            reply.header('Content-Disposition', `attachment; filename="${draft.fileName}"`);
+            reply.header('Content-Length', buffer.length);
+
+            return buffer;
+        } catch (error) {
+            fastify.log.error({ err: error }, 'Failed to download draft');
+            return reply.code(404).send({
+                error: 'Not Found',
+                message: error instanceof Error ? error.message : 'Draft not found'
+            });
+        }
+    });
+
+    /**
+     * DELETE /api/v1/drafts/:id
+     * Delete a draft
+     */
+    fastify.delete('/drafts/:id', async (request, reply) => {
+        try {
+            const { id } = request.params as { id: string };
+
+            // TODO: Get real user ID from auth
+            const userId = 'user-admin';
+
+            await deleteDraft(id, userId);
+
+            return {
+                success: true,
+                message: 'Draft deleted successfully'
+            };
+        } catch (error) {
+            fastify.log.error({ err: error }, 'Failed to delete draft');
+
+            if (error instanceof Error && error.message.includes('Unauthorized')) {
+                return reply.code(403).send({
+                    error: 'Forbidden',
+                    message: error.message
+                });
+            }
+
+            return reply.code(500).send({
+                error: 'Internal Server Error',
+                message: 'Failed to delete draft'
+            });
+        }
+    });
+
+    /**
+     * POST /api/v1/drafts/cleanup
+     * Manually trigger cleanup (admin only)
+     */
+    fastify.post('/drafts/cleanup', async (request, reply) => {
+        try {
+            // TODO: Check admin role
+
+            const deletedCount = await cleanupExpiredDrafts();
+
+            return {
+                success: true,
+                deletedCount,
+                message: `Cleaned up ${deletedCount} expired drafts`
+            };
+        } catch (error) {
+            fastify.log.error({ err: error }, 'Failed to cleanup drafts');
+            return reply.code(500).send({
+                error: 'Internal Server Error',
+                message: 'Failed to cleanup drafts'
             });
         }
     });
 };
-
-/**
- * Extract user ID from JWT token
- * TODO: Integrate with actual auth implementation
- */
-function extractUserIdFromToken(_authHeader: string): string {
-    // TODO: Remove "Bearer " prefix, decode and validate JWT
-    // For now, returning a mock user ID
-    return 'user-123';
-}
 
 export default draftsRoute;
