@@ -1,34 +1,15 @@
 /**
- * Policy Builder - REFACTORED
+ * Policy Builder - MFE COMPLIANT
  * 
- * FULLY API-DRIVEN: Fetches templates from backend
- * NO hardcoded templates
+ * FULLY API-DRIVEN: Uses custom hooks for templates and XML generation
+ * NO hardcoded templates, NO direct fetch() calls
+ * Follows proper MFE architecture
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { usePolicyTemplates, useGeneratePolicyXml } from './hooks/usePolicyStudio';
+import type { PolicyTemplate, PolicyField } from './api/policyClient';
 import './PolicyBuilder.css';
-
-interface PolicyTemplate {
-    id: string;
-    name: string;
-    description: string;
-    category: string;
-    section: string;
-    templateSchema: {
-        fields: PolicyField[];
-        xmlTemplate: string;
-    };
-}
-
-interface PolicyField {
-    name: string;
-    label: string;
-    type: 'text' | 'number' | 'select' | 'textarea' | 'array';
-    required?: boolean;
-    options?: { value: string; label: string }[];
-    placeholder?: string;
-    defaultValue?: any;
-}
 
 interface PolicyBuilderProps {
     section: 'inbound' | 'backend' | 'outbound' | 'on-error';
@@ -36,24 +17,13 @@ interface PolicyBuilderProps {
 }
 
 export const PolicyBuilder: React.FC<PolicyBuilderProps> = ({ section, onAddPolicy }) => {
-    const [templates, setTemplates] = useState<PolicyTemplate[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [selectedTemplate, setSelectedTemplate] = useState<PolicyTemplate | null>(null);
-    const [formValues, setFormValues] = useState<Record<string, any>>({});
-    const [generatedXml, setGeneratedXml] = useState<string>('');
+    // Use custom hooks for data fetching (MFE pattern)
+    const { templates, loading } = usePolicyTemplates(section);
+    const { generate: generateXml, loading: generating } = useGeneratePolicyXml();
 
-    // Fetch templates from backend
-    useEffect(() => {
-        fetch(`/api/v1/policy/templates/by-section?section=${section}`)
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    setTemplates(data.templates);
-                }
-            })
-            .catch(err => console.error('Failed to load templates:', err))
-            .finally(() => setLoading(false));
-    }, [section]);
+    const [selectedTemplate, setSelectedTemplate] = useState<PolicyTemplate | null>(null);
+    const [formValues, setFormValues] = useState<Record<string, unknown>>({});
+    const [generatedXml, setGeneratedXml] = useState<string>('');
 
     const handleTemplateSelect = (templateId: string) => {
         const template = templates.find(t => t.id === templateId);
