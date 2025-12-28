@@ -25,6 +25,7 @@ import { policyRoutes } from './routes/policyRoutes.js';
 import { mockRoutes } from './routes/mockRoutes.js';
 import { validationRoutes } from './routes/validation.js';
 import onboardingRoutes from './routes/onboarding.js';
+import policyHelpRoutes from './routes/policy-help.routes.js';
 import multipart from '@fastify/multipart';
 import { AppConfig } from './types/index.js';
 
@@ -139,6 +140,7 @@ export async function build() {
     await fastify.register(mockRoutes, { prefix: '/api/v1' });
     await fastify.register(validationRoutes, { prefix: '/api/v1/validate' });
     await fastify.register(onboardingRoutes, { ...config, prefix: '/api/v1/onboarding' });
+    await fastify.register(policyHelpRoutes, { prefix: '/api/v1' });
 
     // Error handler for uncaught errors
     fastify.setErrorHandler((error, _request, reply) => {
