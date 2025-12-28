@@ -2,12 +2,13 @@ import { create } from 'zustand';
 import { createAuthSlice, AuthSlice } from './slices/authSlice';
 import { createDataSlice, DataSlice } from './slices/dataSlice';
 import { createUISlice, UISlice } from './slices/uiSlice';
+import { createValidationSlice, ValidationSlice } from './slices/validationSlice';
 
 /**
  * Root Store Type
  * Combines all modular slices into a single state object.
  */
-export type AppState = AuthSlice & DataSlice & UISlice;
+export type AppState = AuthSlice & DataSlice & UISlice & ValidationSlice;
 
 /**
  * Global application store.
@@ -21,4 +22,5 @@ export const useStore = create<AppState>()((...a) => ({
     ...createAuthSlice(...a),
     ...createDataSlice(...a),
     ...createUISlice(...a),
+    ...createValidationSlice(...a),
 }));
