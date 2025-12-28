@@ -1,0 +1,246 @@
+/**
+ * Policy Builder Styles
+ * 
+ * Visual styling for policy builder form
+ */
+
+.policy-builder {
+    background: var(--surface-primary);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    padding: 20px;
+}
+
+.policy-builder-header h3 {
+    margin: 0 0 20px 0;
+    color: var(--text-primary);
+    font-size: 18px;
+}
+
+/* Template Selector */
+.template-selector-label {
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+.template-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+.template-card {
+    background: var(--surface-secondary);
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    padding: 16px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.template-card:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.template-card-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.template-card-description {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.template-category-security {
+    border-left: 4px solid #ef4444;
+}
+
+.template-category-transformation {
+    border-left: 4px solid #f59e0b;
+}
+
+.template-category-traffic {
+    border-left: 4px solid #3b82f6;
+}
+
+.template-category-backend {
+    border-left: 4px solid #8b5cf6;
+}
+
+/* Policy Form */
+.policy-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.policy-form-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.policy-form-header h4 {
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.policy-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.policy-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.policy-field-label {
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.required-indicator {
+    color: var(--error-color);
+    margin-left: 4px;
+}
+
+.policy-input,
+.policy-select,
+.policy-textarea {
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 14px;
+    background: var(--surface-primary);
+    color: var(--text-primary);
+    transition: border-color 0.2s ease;
+}
+
+.policy-input:focus,
+.policy-select:focus,
+.policy-textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.policy-textarea {
+    resize: vertical;
+    font-family: 'Courier New', monospace;
+}
+
+/* Array Field */
+.policy-array-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.policy-array-item {
+    display: flex;
+    gap: 8px;
+}
+
+.policy-array-item .policy-input {
+    flex: 1;
+}
+
+/* Policy Preview */
+.policy-preview {
+    background: var(--surface-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 16px;
+}
+
+.policy-preview-header h5 {
+    margin: 0 0 12px 0;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.policy-preview-code {
+    background: var(--surface-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: var(--text-primary);
+    overflow-x: auto;
+    margin: 0 0 12px 0;
+}
+
+.policy-preview-actions,
+.policy-form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+/* Buttons */
+.btn-primary,
+.btn-secondary,
+.btn-success,
+.btn-danger {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 13px;
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--primary-color-hover);
+}
+
+.btn-secondary {
+    background: var(--surface-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+    background: var(--surface-tertiary);
+}
+
+.btn-success {
+    background: #10b981;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #059669;
+}
+
+.btn-danger {
+    background: #ef4444;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+}
