@@ -15,7 +15,7 @@ import { useState, useEffect } from 'react';
 export function useContract(productId: string) {
     const [contract, setContract] = useState<string>('');
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string>(null > (null);
+    const [error, setError] = useState<string | null>(null);
 
     // TODO: Integrate with  contractClient.ts
     return { contract, loading, error, setContract };
