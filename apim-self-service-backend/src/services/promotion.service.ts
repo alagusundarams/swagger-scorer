@@ -91,11 +91,11 @@ export async function autoPromoteProduct(
 
         console.log(`[Promotion] Updated ${hashColumn} to ${sourceHash}`);
 
-        // 4. Log to audit trail
+        // 4. Log SUCCESS to audit_log DATABASE TABLE (permanent record)
         await query(`
             INSERT INTO audit_log (
-                entity_type, entity_id, action, performed_by,
-                details, timestamp
+                entity_type, entity_id, action, user_id,
+                changes, timestamp
             ) VALUES ($1, $2, $3, $4, $5, NOW())
         `, [
             'product',
@@ -123,11 +123,11 @@ export async function autoPromoteProduct(
     } catch (error: any) {
         console.error(`[Promotion] Failed:`, error);
 
-        // Log failure to audit
+        // Log FAILURE to audit_log DATABASE TABLE (permanent record)
         await query(`
             INSERT INTO audit_log (
-                entity_type, entity_id, action, performed_by,
-                details, timestamp
+                entity_type, entity_id, action, user_id,
+                changes, timestamp
             ) VALUES ($1, $2, $3, $4, $5, NOW())
         `, [
             'product',
@@ -136,7 +136,8 @@ export async function autoPromoteProduct(
             requesterId,
             JSON.stringify({
                 targetEnvironment,
-                error: error.message
+                error: error.message,
+                approvalId
             })
         ]).catch(err => console.error('[Promotion] Failed to log error:', err));
 
@@ -162,8 +163,8 @@ export async function getPromotionHistory(productId: string) {
     return result.rows.map(row => ({
         timestamp: row.timestamp,
         action: row.action,
-        performedBy: row.performed_by,
-        details: row.details,
-        environment: row.details?.targetEnvironment
+        performedBy: row.user_id,
+        details: row.changes,
+        environment: row.changes?.targetEnvironment
     }));
 }
