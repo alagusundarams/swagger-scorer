@@ -52,8 +52,12 @@ export function useProductNameValidation(environment: string = 'DEV') {
                     }
                 } catch (error) {
                     console.error('Validation error:', error);
-                    // Don't block user on validation errors
-                    clearValidation('productName');
+                    // Show service error instead of clearing
+                    setValidationError('productName', {
+                        field: 'productName',
+                        message: 'Unable to validate at this time. Please try again.',
+                        conflicts: []
+                    });
                 } finally {
                     setValidating('productName', false);
                 }
@@ -109,7 +113,12 @@ export function useApiPathValidation(environment: string = 'DEV') {
                     }
                 } catch (error) {
                     console.error('Validation error:', error);
-                    clearValidation('apiPath');
+                    // Show service error instead of clearing
+                    setValidationError('apiPath', {
+                        field: 'apiPath',
+                        message: 'Unable to validate at this time. Please try again.',
+                        conflicts: []
+                    });
                 } finally {
                     setValidating('apiPath', false);
                 }
