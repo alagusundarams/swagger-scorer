@@ -1,13 +1,34 @@
 /**
- * Visual Policy Builder Component
+ * Policy Builder - REFACTORED
  * 
- * Form-based UI to build policies visually
- * NO inline styles - uses CSS classes
+ * FULLY API-DRIVEN: Fetches templates from backend
+ * NO hardcoded templates
  */
 
-import React, { useState } from 'react';
-import { policyTemplates, PolicyTemplate, getPolicyTemplate } from './policyTemplates';
+import React, { useState, useEffect } from 'react';
 import './PolicyBuilder.css';
+
+interface PolicyTemplate {
+    id: string;
+    name: string;
+    description: string;
+    category: string;
+    section: string;
+    templateSchema: {
+        fields: PolicyField[];
+        xmlTemplate: string;
+    };
+}
+
+interface PolicyField {
+    name: string;
+    label: string;
+    type: 'text' | 'number' | 'select' | 'textarea' | 'array';
+    required?: boolean;
+    options?: { value: string; label: string }[];
+    placeholder?: string;
+    defaultValue?: any;
+}
 
 interface PolicyBuilderProps {
     section: 'inbound' | 'backend' | 'outbound' | 'on-error';
@@ -15,22 +36,34 @@ interface PolicyBuilderProps {
 }
 
 export const PolicyBuilder: React.FC<PolicyBuilderProps> = ({ section, onAddPolicy }) => {
-    const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+    const [templates, setTemplates] = useState<PolicyTemplate[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedTemplate, setSelectedTemplate] = useState<PolicyTemplate | null>(null);
     const [formValues, setFormValues] = useState<Record<string, any>>({});
     const [generatedXml, setGeneratedXml] = useState<string>('');
 
-    const availableTemplates = policyTemplates.filter(t => t.section === section);
-    const currentTemplate = selectedTemplate ? getPolicyTemplate(selectedTemplate) : null;
+    // Fetch templates from backend
+    useEffect(() => {
+        fetch(`/api/v1/policy/templates/by-section?section=${section}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    setTemplates(data.templates);
+                }
+            })
+            .catch(err => console.error('Failed to load templates:', err))
+            .finally(() => setLoading(false));
+    }, [section]);
 
     const handleTemplateSelect = (templateId: string) => {
-        const template = getPolicyTemplate(templateId);
+        const template = templates.find(t => t.id === templateId);
         if (!template) return;
 
-        setSelectedTemplate(templateId);
+        setSelectedTemplate(template);
 
         // Set default values
         const defaults: Record<string, any> = {};
-        template.fields.forEach(field => {
+        template.templateSchema.fields.forEach(field => {
             defaults[field.name] = field.defaultValue || '';
         });
         setFormValues(defaults);
@@ -61,11 +94,27 @@ export const PolicyBuilder: React.FC<PolicyBuilderProps> = ({ section, onAddPoli
         setFormValues(prev => ({ ...prev, [fieldName]: current }));
     };
 
-    const handleGenerateXml = () => {
-        if (!currentTemplate) return;
+    const handleGenerateXml = async () => {
+        if (!selectedTemplate) return;
 
-        const xml = currentTemplate.generateXml(formValues);
-        setGeneratedXml(xml);
+        try {
+            // Call backend to generate XML
+            const response = await fetch('/api/v1/policy/templates/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    templateId: selectedTemplate.id,
+                    values: formValues
+                })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                setGeneratedXml(data.xml);
+            }
+        } catch (error) {
+            console.error('Failed to generate XML:', error);
+        }
     };
 
     const handleAddPolicy = () => {
@@ -78,6 +127,10 @@ export const PolicyBuilder: React.FC<PolicyBuilderProps> = ({ section, onAddPoli
         }
     };
 
+    if (loading) {
+        return <div className="policy-builder-loading">Loading templates...</div>;
+    }
+
     return (
         <div className="policy-builder">
             <div className="policy-builder-header">
@@ -87,23 +140,27 @@ export const PolicyBuilder: React.FC<PolicyBuilderProps> = ({ section, onAddPoli
             {!selectedTemplate ? (
                 <div className="template-selector">
                     <p className="template-selector-label">Select a policy template:</p>
-                    <div className="template-grid">
-                        {availableTemplates.map(template => (
-                            <button
-                                key={template.id}
-                                className={`template-card template-category-${template.category}`}
-                                onClick={() => handleTemplateSelect(template.id)}
-                            >
-                                <div className="template-card-title">{template.name}</div>
-                                <div className="template-card-description">{template.description}</div>
-                            </button>
-                        ))}
-                    </div>
+                    {templates.length === 0 ? (
+                        <p className="no-templates">No templates available for this section</p>
+                    ) : (
+                        <div className="template-grid">
+                            {templates.map(template => (
+                                <button
+                                    key={template.id}
+                                    className={`template-card template-category-${template.category}`}
+                                    onClick={() => handleTemplateSelect(template.id)}
+                                >
+                                    <div className="template-card-title">{template.name}</div>
+                                    <div className="template-card-description">{template.description}</div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
             ) : (
                 <div className="policy-form">
                     <div className="policy-form-header">
-                        <h4>{currentTemplate?.name}</h4>
+                        <h4>{selectedTemplate.name}</h4>
                         <button
                             className="btn-secondary btn-sm"
                             onClick={() => setSelectedTemplate(null)}
@@ -113,7 +170,7 @@ export const PolicyBuilder: React.FC<PolicyBuilderProps> = ({ section, onAddPoli
                     </div>
 
                     <div className="policy-fields">
-                        {currentTemplate?.fields.map(field => (
+                        {selectedTemplate.templateSchema.fields.map(field => (
                             <div key={field.name} className="policy-field">
                                 <label className="policy-field-label">
                                     {field.label}
