@@ -1,33 +1,68 @@
 /**
- * Policy Blocks Display Component
+ * Policy Blocks Display Component - REFACTORED
  * 
- * Displays parsed policy XML in visual blocks
- * NO inline styles - uses CSS classes
+ * DUMB RENDERER: Fetches display structure from backend
+ * NO parsing logic in frontend
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import './PolicyBlocksDisplay.css';
 
-interface PolicyBlock {
-    section: 'inbound' | 'backend' | 'outbound' | 'on-error';
-    policies: PolicyElement[];
+interface PolicyElementDisplay {
+    id: string;
+    type: string;
+    displayName: string;
+    icon: string;
+    attributes: Array<{ key: string; value: string }>;
+    snippet?: string;
 }
 
-interface PolicyElement {
-    type: string;
-    attributes?: Record<string, string>;
-    value?: string;
-    xml: string;
+interface PolicySectionDisplay {
+    name: string;
+    policies: PolicyElementDisplay[];
+}
+
+interface PolicyDisplayStructure {
+    gatewayType: string;
+    originalPolicy: string;
+    sections: PolicySectionDisplay[];
 }
 
 interface PolicyBlocksDisplayProps {
-    policyXml: string;
+    productId: string;
 }
 
-export const PolicyBlocksDisplay: React.FC<PolicyBlocksDisplayProps> = ({ policyXml }) => {
-    const blocks = parsePolicyBlocks(policyXml);
+export const PolicyBlocksDisplay: React.FC<PolicyBlocksDisplayProps> = ({ productId }) => {
+    const [displayStructure, setDisplayStructure] = useState<PolicyDisplayStructure | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    if (!blocks || blocks.length === 0) {
+    useEffect(() => {
+        // Fetch parsed structure from backend
+        fetch(`/api/v1/products/${productId}/policy-display`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    setDisplayStructure(data.displayStructure);
+                } else {
+                    setError('Failed to load policy');
+                }
+            })
+            .catch(err => {
+                setError(err.message);
+            })
+            .finally(() => setLoading(false));
+    }, [productId]);
+
+    if (loading) {
+        return <div className="policy-blocks-loading">Loading policy...</div>;
+    }
+
+    if (error) {
+        return <div className="policy-blocks-error">Error: {error}</div>;
+    }
+
+    if (!displayStructure || displayStructure.sections.length === 0) {
         return (
             <div className="policy-blocks-empty">
                 <p>No policies configured</p>
@@ -37,40 +72,40 @@ export const PolicyBlocksDisplay: React.FC<PolicyBlocksDisplayProps> = ({ policy
 
     return (
         <div className="policy-blocks-container">
-            {blocks.map((block, index) => (
-                <div key={index} className={`policy-block policy-block-${block.section}`}>
+            {displayStructure.sections.map((section, index) => (
+                <div key={index} className={`policy-block policy-block-${section.name}`}>
                     <div className="policy-block-header">
-                        <span className="policy-block-icon">{getSectionIcon(block.section)}</span>
-                        <h3>{block.section.toUpperCase()}</h3>
+                        <span className="policy-block-icon">{getSectionIcon(section.name)}</span>
+                        <h3>{section.name.toUpperCase()}</h3>
                     </div>
 
                     <div className="policy-block-content">
-                        {block.policies.length === 0 ? (
+                        {section.policies.length === 0 ? (
                             <div className="policy-element policy-empty">
                                 <span className="policy-empty-indicator">—  empty —</span>
                             </div>
                         ) : (
-                            block.policies.map((policy, policyIndex) => (
-                                <div key={policyIndex} className={`policy-element policy-type-${policy.type}`}>
+                            section.policies.map((policy) => (
+                                <div key={policy.id} className={`policy-element policy-type-${policy.type}`}>
                                     <div className="policy-element-header">
-                                        <span className="policy-type-badge">{getPolicyIcon(policy.type)}</span>
-                                        <span className="policy-type-name">{formatPolicyName(policy.type)}</span>
+                                        <span className="policy-type-badge">{getIconEmoji(policy.icon)}</span>
+                                        <span className="policy-type-name">{policy.displayName}</span>
                                     </div>
 
-                                    {policy.attributes && Object.keys(policy.attributes).length > 0 && (
+                                    {policy.attributes && policy.attributes.length > 0 && (
                                         <div className="policy-attributes">
-                                            {Object.entries(policy.attributes).map(([key, value]) => (
-                                                <div key={key} className="policy-attribute">
-                                                    <span className="attribute-key">{key}:</span>
-                                                    <span className="attribute-value">{value}</span>
+                                            {policy.attributes.map((attr, idx) => (
+                                                <div key={idx} className="policy-attribute">
+                                                    <span className="attribute-key">{attr.key}:</span>
+                                                    <span className="attribute-value">{attr.value}</span>
                                                 </div>
                                             ))}
                                         </div>
                                     )}
 
-                                    {policy.value && (
+                                    {policy.snippet && (
                                         <div className="policy-value">
-                                            {policy.value}
+                                            {policy.snippet}
                                         </div>
                                     )}
                                 </div>
@@ -83,59 +118,6 @@ export const PolicyBlocksDisplay: React.FC<PolicyBlocksDisplayProps> = ({ policy
     );
 };
 
-function parsePolicyBlocks(xml: string): PolicyBlock[] {
-    if (!xml) return [];
-
-    const blocks: PolicyBlock[] = [];
-    const sections = ['inbound', 'backend', 'outbound', 'on-error'];
-
-    sections.forEach(section => {
-        const regex = new RegExp(`<${section}>(.*?)</${section}>`, 's');
-        const match = xml.match(regex);
-
-        if (match) {
-            const content = match[1];
-            const policies = parsePolicyElements(content);
-            blocks.push({ section: section as any, policies });
-        }
-    });
-
-    return blocks;
-}
-
-function parsePolicyElements(content: string): PolicyElement[] {
-    const elements: PolicyElement[] = [];
-    const policyRegex = /<(\w+(?:-\w+)*)([^>]*)(?:\/>|>(.*?)<\/\1>)/gs;
-
-    let match;
-    while ((match = policyRegex.exec(content)) !== null) {
-        const [fullMatch, type, attributesStr, value] = match;
-
-        // Skip base element (special case)
-        if (type === 'base') {
-            elements.push({ type: 'base', xml: fullMatch });
-            continue;
-        }
-
-        // Parse attributes
-        const attributes: Record<string, string> = {};
-        const attrRegex = /(\w+(?:-\w+)*)="([^"]*)"/g;
-        let attrMatch;
-        while ((attrMatch = attrRegex.exec(attributesStr)) !== null) {
-            attributes[attrMatch[1]] = attrMatch[2];
-        }
-
-        elements.push({
-            type,
-            attributes: Object.keys(attributes).length > 0 ? attributes : undefined,
-            value: value?.trim(),
-            xml: fullMatch
-        });
-    }
-
-    return elements;
-}
-
 function getSectionIcon(section: string): string {
     const icons: Record<string, string> = {
         'inbound': '⬇️',
@@ -146,25 +128,22 @@ function getSectionIcon(section: string): string {
     return icons[section] || '📦';
 }
 
-function getPolicyIcon(type: string): string {
+function getIconEmoji(icon: string): string {
     const icons: Record<string, string> = {
-        'base': '✓',
-        'rate-limit': '⚡',
-        'cors': '🌐',
-        'set-header': '🔧',
-        'set-backend-service': '🔗',
-        'validate-jwt': '🔒',
-        'check-header': '📋',
-        'rewrite-uri': '🔄'
+        'check': '✓',
+        'zap': '⚡',
+        'globe': '🌐',
+        'tool': '🔧',
+        'link': '🔗',
+        'lock': '🔒',
+        'clipboard': '📋',
+        'refresh-cw': '🔄',
+        'database': '💾',
+        'save': '💾',
+        'git-branch': '🌿',
+        'code': '💻'
     };
-    return icons[type] || '📄';
-}
-
-function formatPolicyName(type: string): string {
-    return type
-        .split('-')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
+    return icons[icon] || '📄';
 }
 
 export default PolicyBlocksDisplay;
