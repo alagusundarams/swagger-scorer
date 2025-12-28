@@ -114,15 +114,10 @@ export const createInventorySlice: StateCreator<InventorySlice, [], [], Inventor
             // Note: We need to cast to any or use the UISlice specifically to set notifications
             (set as any)({ notifications: mockNotifications });
 
-            // Map user teams (Group IDs) to Team Entity IDs
-            const currentUser = get().user;
-            if (currentUser) {
-                const mappedTeamIds = currentUser.teams.map((groupIdOrId: string) => {
-                    const team = allTeams.find((t: Team) => t.azureAdGroupId === groupIdOrId || t.id === groupIdOrId);
-                    return team ? team.id : groupIdOrId;
-                });
-                set({ user: { ...currentUser, teams: mappedTeamIds } });
-            }
+            // TODO: User-team mapping should be handled by auth feature, not inventory
+            // Inventory should receive teams already mapped
+            // This violates MFE autonomy - removing cross-slice dependency
+
 
             if (getToken) {
                 const token = await getToken();
