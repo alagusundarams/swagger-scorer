@@ -19,7 +19,7 @@ interface PolicyBuilderProps {
 export const PolicyBuilder: React.FC<PolicyBuilderProps> = ({ section, onAddPolicy }) => {
     // Use custom hooks for data fetching (MFE pattern)
     const { templates, loading } = usePolicyTemplates(section);
-    const { generate: generateXml, loading: generating } = useGeneratePolicyXml();
+    const { generate: generateXml } = useGeneratePolicyXml();
 
     const [selectedTemplate, setSelectedTemplate] = useState<PolicyTemplate | null>(null);
     const [formValues, setFormValues] = useState<Record<string, any>>({});
@@ -67,23 +67,10 @@ export const PolicyBuilder: React.FC<PolicyBuilderProps> = ({ section, onAddPoli
     const handleGenerateXml = async () => {
         if (!selectedTemplate) return;
 
-        try {
-            // Call backend to generate XML
-            const response = await fetch('/api/v1/policy/templates/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    templateId: selectedTemplate.id,
-                    values: formValues
-                })
-            });
-
-            const data = await response.json();
-            if (data.success) {
-                setGeneratedXml(data.xml);
-            }
-        } catch (error) {
-            console.error('Failed to generate XML:', error);
+        // Use custom hook for XML generation (MFE pattern)
+        const xml = await generateXml(selectedTemplate.id, formValues);
+        if (xml) {
+            setGeneratedXml(xml);
         }
     };
 
