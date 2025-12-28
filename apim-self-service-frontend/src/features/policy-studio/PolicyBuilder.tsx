@@ -8,7 +8,7 @@
 
 import React, { useState } from 'react';
 import { usePolicyTemplates, useGeneratePolicyXml } from './hooks/usePolicyStudio';
-import type { PolicyTemplate, PolicyField } from './api/policyClient';
+import type { PolicyTemplate } from './api/policyClient';
 import './PolicyBuilder.css';
 
 interface PolicyBuilderProps {
@@ -22,7 +22,7 @@ export const PolicyBuilder: React.FC<PolicyBuilderProps> = ({ section, onAddPoli
     const { generate: generateXml, loading: generating } = useGeneratePolicyXml();
 
     const [selectedTemplate, setSelectedTemplate] = useState<PolicyTemplate | null>(null);
-    const [formValues, setFormValues] = useState<Record<string, unknown>>({});
+    const [formValues, setFormValues] = useState<Record<string, any>>({});
     const [generatedXml, setGeneratedXml] = useState<string>('');
 
     const handleTemplateSelect = (templateId: string) => {
