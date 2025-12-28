@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
-import { useStore } from '../../../store/useStore';
+import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
 import { TeamManager } from '../components/TeamManager';
 import { OrphanProductManager } from '../components/OrphanProductManager';
 
 export const AdminGovernancePage = () => {
-    const { user, setPageTitle } = useStore();
+    const { user, setPageTitle } = useInventoryStore();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'teams' | 'orphans'>('teams');
 

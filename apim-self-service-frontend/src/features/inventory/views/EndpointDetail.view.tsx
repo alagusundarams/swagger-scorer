@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
-import { useStore } from '../../../store/useStore';
+import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
 import { EndpointHeader } from '../components/EndpointHeader';
 import { RequestDefinitionCard } from '../components/RequestDefinitionCard';
 import { ResponseStatesCard } from '../components/ResponseStatesCard';
@@ -22,7 +22,7 @@ export const EndpointDetailPage = () => {
     const navigate = useNavigate();
 
     // --- Store Integration ---
-    const { products } = useStore();
+    const { products } = useInventoryStore();
 
     // --- Data Selectors (Hierarchical Resolution) ---
     const product = useMemo(() => products.find(p => p.id === productId), [products, productId]);

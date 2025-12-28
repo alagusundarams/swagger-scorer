@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, lazy, Suspense } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { Product, User, Subscription, API } from '../../../types/entities';
-import { useStore } from '../../../store/useStore';
+import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
 import { ManageProductModal } from '../components/ManageProductModal';
 import { SubscriberCard } from '../components/SubscriberCard';
 import { ProducerHeader } from '../components/ProducerHeader';
@@ -42,7 +42,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
         addNotification,
         requestProductPromotion,
         approvalRequests
-    } = useStore();
+    } = useInventoryStore();
     const navigate = useNavigate();
 
     // === Modal State ===
@@ -462,7 +462,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                         if (pendingReq) {
                             console.log(`[ProducerAuditLog] Found pending request ${pendingReq.id}. Processing...`);
                             // Call store action
-                            const { processApproval } = useStore.getState();
+                            const { processApproval } = useInventoryStore.getState();
                             await processApproval(pendingReq.id, decision, justification, (() => Promise.resolve('mock-token')) as any);
 
                             setLocalToast({

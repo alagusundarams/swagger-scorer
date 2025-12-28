@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { useStore } from '../../../store/useStore';
+import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
 import { LoginButton } from '../../../layouts/Header/LoginButton';
 import { SSO_DOMAINS } from '../../../config/env';
 import '../auth.css';
@@ -14,7 +14,7 @@ type LoginStep = 'email' | 'password';
 export const LoginPage: React.FC = () => {
     const { isAuthenticated, login, isMock } = useAuth();
     const navigate = useNavigate();
-    const { setPageTitle } = useStore();
+    const { setPageTitle } = useInventoryStore();
 
     useEffect(() => {
         setPageTitle('Sign In');

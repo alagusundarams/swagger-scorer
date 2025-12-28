@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
-import { useStore } from '../../../store/useStore';
+import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
 
 /**
  * BrowsePage: Discovery portal for API products.
@@ -20,7 +20,7 @@ import '../discovery.css';
 
 export const BrowsePage = () => {
     const navigate = useNavigate();
-    const { setPageTitle } = useStore();
+    const { setPageTitle } = useInventoryStore();
 
     useEffect(() => {
         setPageTitle('Browse APIs');
@@ -34,7 +34,7 @@ export const BrowsePage = () => {
         subscriptions: allSubscriptions,
         teams: allTeams,
         addSubscription
-    } = useStore();
+    } = useInventoryStore();
 
     // --- UI State ---
     const [selectedTeamId, setSelectedTeamId] = useState<string>(user?.teams[0] || '');

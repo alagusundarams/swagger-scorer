@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
-import { useStore } from '../../../store/useStore';
+import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
 import { getGlobalInventory } from '../../inventory/api/inventoryClient';
 import { GlobalProduct, GlobalAPI } from '../../../types/entities';
 import toast from 'react-hot-toast';
 
 export const GlobalInventoryView = () => {
-    const { user, setPageTitle } = useStore();
+    const { user, setPageTitle } = useInventoryStore();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'products' | 'apis'>('products');
     const [loading, setLoading] = useState(true);

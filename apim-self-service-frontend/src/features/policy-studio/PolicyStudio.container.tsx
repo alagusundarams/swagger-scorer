@@ -5,7 +5,7 @@ import { PolicyPalette } from './components/PolicyPalette';
 import { PolicyStepCard } from './components/PolicyStepCard';
 import { RateLimitProperties } from './components/properties/RateLimitProperties';
 import { DeploymentConfirmationModal } from './components/DeploymentConfirmationModal';
-import { useStore } from '../../store/useStore';
+import { useInventoryStore } from '../../store/useInventoryStore';
 import { api } from '../../api/baseClient';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -55,7 +55,7 @@ export const PolicyStudioContainer = ({
     isReadOnly = false
 }: Props) => {
     const [selectedScope, setSelectedScope] = useState<PolicyScope>(level as PolicyScope);
-    const { addNotification } = useStore();
+    const { addNotification } = useInventoryStore();
 
     // State
     const [flow, setFlow] = useState<PolicyFlow>(MOCK_FLOW);

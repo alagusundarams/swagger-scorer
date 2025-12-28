@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
 import { useAuth } from '../../../hooks/useAuth';
-import { useStore } from '../../../store/useStore';
+import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
 import { getUserRoleForProduct, canAccessProduct } from '../../../utils/productRoleDetection';
 import { ProductDetailProducer } from './ProductDetailProducer.view';
 import { ProductDetailConsumer } from './ProductDetailConsumer.view';
@@ -31,7 +31,7 @@ export const ProductDetailPage = () => {
         fetchAppRegistrations,
         isLoading,
         error
-    } = useStore();
+    } = useInventoryStore();
 
     // --- State ---
     const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);

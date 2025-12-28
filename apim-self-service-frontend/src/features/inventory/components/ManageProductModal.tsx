@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useStore } from '../../../store/useStore';
+import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
 import { TeamSearch } from '../../provisioning/components/TeamSearch';
 import { type Product } from '../../../types/entities';
 
@@ -25,7 +25,7 @@ export const ManageProductModal = ({
         user,
         teams: allTeams,
         addNotification
-    } = useStore();
+    } = useInventoryStore();
 
     // --- Local State ---
     const [activeTab, setActiveTab] = useState<'metadata' | 'access'>('metadata');

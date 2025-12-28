@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, ReactNode, useMemo, useEffe
 import { useMsal, MsalProvider } from "@azure/msal-react";
 import { PublicClientApplication } from "@azure/msal-browser";
 import { msalConfig, loginRequest } from "./authConfig";
-import { useStore } from '../../../store/useStore';
+import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
 
 // === TYPES ===
 import { type User } from '../../../types/entities';
@@ -68,7 +68,7 @@ const MockAuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const baseUser: User = MOCK_USERS[selectedUserType];
 
     // Access the data store to find real teams
-    const allTeams = useStore((state) => state.teams);
+    const allTeams = useInventoryStore((state) => state.teams);
 
     // Smart Identity Resolution:
     // If we have real teams in the store, try to map the mock user to them.

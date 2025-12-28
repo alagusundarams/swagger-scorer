@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { Product, User, Subscription } from '../../../types/entities';
-import { useStore } from '../../../store/useStore';
+import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
 import { ProductConsumerHeader } from '../components/ProductConsumerHeader';
 import { ProductGettingStarted } from '../components/ProductGettingStarted';
 import { ConfigurationTab } from '../components/ConfigurationTab';
@@ -47,7 +47,7 @@ export const ProductDetailConsumer = ({
     hasPendingRequest,
     onRequestAccess
 }: ProductDetailConsumerProps) => {
-    const { teams: allTeams } = useStore();
+    const { teams: allTeams } = useInventoryStore();
     const [activeTab, setActiveTab] = useState<'overview' | 'config'>('overview');
 
     // === Memoized Helpers ===

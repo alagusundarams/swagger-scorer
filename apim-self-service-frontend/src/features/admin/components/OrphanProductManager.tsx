@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
-import { useStore } from '../../../store/useStore';
+import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
 import toast from 'react-hot-toast';
 
 export const OrphanProductManager = () => {
-    const { products, teams, updateProduct } = useStore();
+    const { products, teams, updateProduct } = useInventoryStore();
     const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
     const [targetTeamId, setTargetTeamId] = useState<string>('');
     const [targetAdGroupId, setTargetAdGroupId] = useState<string>('');

@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { type Product, type Subscription, type Environment } from '../../../types/entities';
 import { type ApprovalRequest } from '../../../types/workflow';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
-import { useStore } from '../../../store/useStore';
+import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
 import { DashboardPagination } from '../components/DashboardPagination';
 import { DashboardHero } from '../components/DashboardHero';
 import { DashboardFilters } from '../components/DashboardFilters';
@@ -17,7 +17,7 @@ type ProductWithSubscription = Product & { subscription: Subscription };
 
 export const DashboardPage = () => {
     const navigate = useNavigate();
-    const { setPageTitle } = useStore();
+    const { setPageTitle } = useInventoryStore();
 
     const {
         user,
@@ -29,7 +29,7 @@ export const DashboardPage = () => {
         approvalRequests: enhancedApprovals,
         error,
         isLoading
-    } = useStore();
+    } = useInventoryStore();
 
     useEffect(() => {
         setPageTitle('Dashboard');

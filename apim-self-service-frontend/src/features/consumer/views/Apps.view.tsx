@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
-import { useStore } from '../../../store/useStore';
+import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
 import { toast } from 'react-hot-toast';
 
 export const AppsPage = () => {
-    const { user, appRegistrations, fetchAppRegistrations, addAppRegistration, setPageTitle } = useStore();
+    const { user, appRegistrations, fetchAppRegistrations, addAppRegistration, setPageTitle } = useInventoryStore();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({
         displayName: '',

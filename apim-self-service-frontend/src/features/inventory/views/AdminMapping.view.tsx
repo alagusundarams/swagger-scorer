@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
 import { Typeahead } from '../../../components/ui/Typeahead';
-import { useStore } from '../../../store/useStore';
+import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
 import { toast } from 'react-hot-toast';
 
 interface ExtractedResource {
@@ -15,7 +15,7 @@ interface ExtractedResource {
 }
 
 export const AdminMappingView = () => {
-    const { teams, addTeam, updateProduct } = useStore();
+    const { teams, addTeam, updateProduct } = useInventoryStore();
     const [orphans, setOrphans] = useState<ExtractedResource[]>([]);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [selectedTeamId, setSelectedTeamId] = useState('');

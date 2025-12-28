@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { useStore } from '../../../store/useStore';
+import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
 import { type Team } from '../../../types/entities';
 import { Input } from '../../../core/ui/Input';
 import toast from 'react-hot-toast';
 
 export const TeamManager = () => {
-    const { teams, updateTeam } = useStore();
+    const { teams, updateTeam } = useInventoryStore();
     const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState<Partial<Team>>({});
 

@@ -1,7 +1,7 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
-import { useStore } from '../../../store/useStore';
+import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
 import { OnboardingProgressBar } from '../components/OnboardingProgressBar';
 import { OnboardingPhase1Definition } from '../components/OnboardingPhase1Definition';
 // Lazy load PolicyStudio to reduce bundle size
@@ -15,7 +15,7 @@ export const OnboardingWizard = () => {
     const navigate = useNavigate();
 
     // --- Store Integration ---
-    const { user, products: allProducts, teams: allTeams, setPageTitle } = useStore();
+    const { user, products: allProducts, teams: allTeams, setPageTitle } = useInventoryStore();
 
     useEffect(() => {
         setPageTitle('Onboard Product');
