@@ -9,11 +9,7 @@
 
 import { useState, useEffect } from 'react';
 import {
-    getProducts,
-    getAdminProducts,
-    getOrphanedResources,
-    getAdGroups,
-    getPermissionMatrix
+    getProducts
 } from '../api/inventoryClient';
 import type { Product } from '../../../types/entities';
 
