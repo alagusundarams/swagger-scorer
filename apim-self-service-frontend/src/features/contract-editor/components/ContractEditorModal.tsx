@@ -183,7 +183,7 @@ ${api.operations.map(op => `  ${op.urlTemplate}:
                             <div>
                                 <p className="text-sm font-bold text-gray-700 dark:text-gray-300">Read-Only Mode</p>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                    This contract is managed by {product.management_mode === 'HYBRID' ? 'Terraform (Hybrid)' : 'Terraform'}.
+                                    This contract is managed by {product.managementMode === 'HYBRID' ? 'Terraform (Hybrid)' : 'Terraform'}.
                                     Edits must be made via the IaC pipeline.
                                 </p>
                             </div>

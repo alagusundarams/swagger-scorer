@@ -112,8 +112,8 @@ export const ConfigurationTab = ({ product, isReadOnly = false }: Props) => {
     const apiConfigs = MOCK_NAMED_VALUES.filter(i => i.scope === 'API');
 
     const handleEdit = (key: string) => {
-        if (product.management_mode === 'TERRAFORM_MANAGED') {
-            alert(`🔒 GitOps Locked\n\nThis value is managed by Terraform.\n\nTo edit "${key}", you must submit a Pull Request to:\n${product.git_repo_url || 'generated-repo'}`);
+        if (product.managementMode === 'TERRAFORM_MANAGED') {
+            alert(`🔒 GitOps Locked\n\nThis value is managed by Terraform.\n\nTo edit "${key}", you must submit a Pull Request to:\n${product.gitRepoUrl || 'generated-repo'}`);
         } else {
             alert(`📝 Edit Mode\n\nEditing "${key}" directly in APIM (Manual Mode).\n\nAudit log will record this action.`);
         }

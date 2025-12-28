@@ -19,7 +19,7 @@ describe('ConfigurationTab', () => {
         apis: [],
         // subscriptions: [], // Removed as not part of Product type
         environment: 'PROD',
-        management_mode: 'PORTAL_MANAGED',
+        managementMode: 'PORTAL_MANAGED',
         qualityScore: 100,
         subscriberCount: 0,
         // tags: [], // Removed as not part of Product type
@@ -66,7 +66,7 @@ describe('ConfigurationTab', () => {
 
     it('handles edit clicks correctly for TERRAFORM_MANAGED mode', () => {
         window.alert = vi.fn();
-        const gitOpsProduct = { ...mockProduct, management_mode: 'TERRAFORM_MANAGED' as const };
+        const gitOpsProduct = { ...mockProduct, managementMode: 'TERRAFORM_MANAGED' as const };
 
         render(<ConfigurationTab product={gitOpsProduct} />);
 

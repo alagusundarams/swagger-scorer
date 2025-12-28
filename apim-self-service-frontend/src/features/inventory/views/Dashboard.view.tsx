@@ -177,7 +177,7 @@ export const DashboardPage = () => {
                 { label: 'Global Inventory', value: adminProducts.length, icon: '🌐' },
                 { label: 'Avg Quality', value: `${Math.round(adminProducts.reduce((acc, p) => acc + (p.qualityScore || 0), 0) / (adminProducts.length || 1))}%`, icon: '⚖️' },
                 { label: 'Production APIs', value: adminProducts.filter(p => p.environment === 'PROD').length, icon: '🚀' },
-                { label: 'Draft APIs', value: adminProducts.filter(p => p.state === 'draft').length, icon: '📝' }
+                { label: 'Draft APIs', value: adminProducts.filter(p => p.state === 'notPublished').length, icon: '📝' }
             ];
         }
         if (activeTab === 'approvals') {

@@ -19,7 +19,7 @@ const VALIDATION_DEBOUNCE_MS = 300;
  */
 export function useProductNameValidation(environment: string = 'DEV') {
     const { setValidationError, setValidating, clearValidation } = useStore();
-    const timeoutRef = useRef<NodeJS.Timeout>();
+    const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
     const validate = useCallback(
         async (name: string) => {
@@ -72,8 +72,9 @@ export function useProductNameValidation(environment: string = 'DEV') {
             if (timeoutRef.current) {
                 clearTimeout(timeoutRef.current);
             }
+            clearValidation('productName');
         };
-    }, []);
+    }, [clearValidation]);
 
     return validate;
 }
@@ -83,7 +84,7 @@ export function useProductNameValidation(environment: string = 'DEV') {
  */
 export function useApiPathValidation(environment: string = 'DEV') {
     const { setValidationError, setValidating, clearValidation } = useStore();
-    const timeoutRef = useRef<NodeJS.Timeout>();
+    const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
     const validate = useCallback(
         async (path: string) => {

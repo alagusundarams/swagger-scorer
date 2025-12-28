@@ -26,7 +26,7 @@ export const ContractCommitForm: React.FC<ContractCommitFormProps> = ({
 }) => {
     return (
         <div className="border-t border-gray-200 dark:border-slate-700 p-6 space-y-4">
-            {product.management_mode === 'TERRAFORM_MANAGED' && (
+            {product.managementMode === 'TERRAFORM_MANAGED' && (
                 <div className="flex items-start gap-3 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
                     <span className="text-blue-500 text-lg">🚀</span>
                     <div className="flex-1">

@@ -1,15 +1,22 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
-import { MOCK_ORPHANED_DATA, ExtractedResource } from '../api/mockOrphanedData';
 import { Typeahead } from '../../../components/ui/Typeahead';
-import { MOCK_AD_GROUPS } from '../api/mockAdGroups';
 import { useStore } from '../../../store/useStore';
 import { toast } from 'react-hot-toast';
 
+interface ExtractedResource {
+    id: string;
+    name: string;
+    type: 'Product' | 'API' | 'Subscription';
+    environment: string;
+    details: any;
+    isOrphaned: boolean;
+}
+
 export const AdminMappingView = () => {
     const { teams, addTeam, updateProduct } = useStore();
-    const [orphans, setOrphans] = useState<ExtractedResource[]>(MOCK_ORPHANED_DATA);
+    const [orphans, setOrphans] = useState<ExtractedResource[]>([]);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [selectedTeamId, setSelectedTeamId] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
@@ -36,7 +43,7 @@ export const AdminMappingView = () => {
     const adGroupOptions = useMemo(() => {
         // In a real app, this would merge Directory Search results with User's Token Groups
         // For demo, we prioritize MOCK items but could highlight if they matched user groups
-        return MOCK_AD_GROUPS.map(g => ({
+        return [].map((g: any) => ({
             id: g.id,
             label: g.displayName,
             subLabel: g.description
@@ -44,7 +51,7 @@ export const AdminMappingView = () => {
     }, []);
 
     const filteredOrphans = useMemo(() => {
-        return orphans.filter(o =>
+        return orphans.filter((o: any) =>
             o.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             o.id.toLowerCase().includes(searchTerm.toLowerCase())
         );
@@ -52,7 +59,7 @@ export const AdminMappingView = () => {
 
     const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.checked) {
-            setSelectedIds(new Set(filteredOrphans.map(o => o.id)));
+            setSelectedIds(new Set(filteredOrphans.map((o: any) => o.id)));
         } else {
             setSelectedIds(new Set());
         }
@@ -150,7 +157,7 @@ export const AdminMappingView = () => {
         // 2. If Standard Product -> Update Product Owner AND associated APIs.
         // 3. If Standalone API -> Update API Owner (if supported by backend model, else just log).
 
-        const resourcesToProcess = orphans.filter(o => selectedIds.has(o.id));
+        const resourcesToProcess = orphans.filter((o: any) => selectedIds.has(o.id));
         console.log(`[AdminMapping] Processing ${resourcesToProcess.length} items for assignment to team ${selectedTeamId}`);
 
         for (const res of resourcesToProcess) {
@@ -187,7 +194,7 @@ export const AdminMappingView = () => {
         }
 
         // Remove processed items from the list
-        setOrphans(prev => prev.filter(o => !selectedIds.has(o.id)));
+        setOrphans(prev => prev.filter((o: any) => !selectedIds.has(o.id)));
         setSelectedIds(new Set());
 
         toast.success(`Allocated ${successCount} resources to ${team?.name}. GRP rules applied.`);
@@ -497,7 +504,7 @@ export const AdminMappingView = () => {
                                                     options={adGroupOptions}
                                                     value={entry.adGroupId}
                                                     onChange={(val) => {
-                                                        const label = adGroupOptions.find(o => o.id === val)?.label;
+                                                        const label = adGroupOptions.find((o: any) => o.id === val)?.label;
                                                         updateMatrixEntry(idx, { adGroupId: val, adGroupName: label });
                                                     }}
                                                 />

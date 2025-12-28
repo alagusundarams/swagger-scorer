@@ -68,7 +68,7 @@ export function ProducerHeader({
             )}
 
             {/* Terraform Management Mode Banner (Only if NO Anomalies) */}
-            {product.management_mode === 'TERRAFORM_MANAGED' && (!product.detectedAnomalies || product.detectedAnomalies.length === 0) && (
+            {product.managementMode === 'TERRAFORM_MANAGED' && (!product.detectedAnomalies || product.detectedAnomalies.length === 0) && (
                 <div className="mb-6 p-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-3xl flex items-center gap-4 animate-slide-up">
                     <span className="text-3xl">🔧</span>
                     <div className="flex-1">
@@ -151,7 +151,7 @@ export function ProducerHeader({
                     </span>
                     {product.lastDeployedCommitHash && (
                         <a
-                            href={product.terraform_pipeline_url || '#'}
+                            href={product.terraformPipelineUrl || '#'}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-1 flex items-center gap-2 hover:bg-gray-200 dark:hover:bg-slate-700 transition"
@@ -177,7 +177,7 @@ export function ProducerHeader({
                     onClick={onPromoteClick}
                     className="px-4 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-900 dark:text-white rounded-lg font-semibold text-sm transition"
                 >
-                    {product.management_mode === 'TERRAFORM_MANAGED' ? 'View Pipeline' : 'Deploy'}
+                    {product.managementMode === 'TERRAFORM_MANAGED' ? 'View Pipeline' : 'Deploy'}
                 </button>
                 {product.state === 'published' && (
                     <button

@@ -72,7 +72,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
 
     // === Governance / Role Logic ===
     const isOwnerLead = user?.leadsTeams.includes(product.ownerTeamId) || user?.role === 'admin';
-    const isInfraLocked = product.management_mode === 'TERRAFORM_MANAGED' || product.management_mode === 'HYBRID';
+    const isInfraLocked = product.managementMode === 'TERRAFORM_MANAGED' || product.managementMode === 'HYBRID';
 
     // === Memoized Computations ===
     const productSubscriptions = useMemo<Subscription[]>(() =>
@@ -297,7 +297,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                 )}
 
                 {/* 3. Draft Mode Warning */}
-                {(product.state === 'draft' || product.state === 'notPublished') && (
+                {product.state === "notPublished" && (
                     <div className="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-6 rounded-r-xl shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-fade-in">
                         <div>
                             <h3 className="text-lg font-black text-blue-800 dark:text-blue-400 flex items-center gap-2">

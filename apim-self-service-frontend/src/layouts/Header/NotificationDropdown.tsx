@@ -20,7 +20,9 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
 
     const handleNotificationClick = (notification: Notification) => {
         onMarkAsRead(notification.id);
-        navigate(notification.navigateTo);
+        if (notification.navigateTo) {
+            navigate(notification.navigateTo);
+        }
         onClose();
     };
 
