@@ -1,58 +1,22 @@
 /**
- * Policy Blocks Display Component - REFACTORED
+ * Policy Blocks Display Component - MFE COMPLIANT
  * 
- * DUMB RENDERER: Fetches display structure from backend
+ * DUMB RENDERER: Displays parsed policy structure from backend
+ * Uses custom hooks for data fetching (MFE pattern)
  * NO parsing logic in frontend
  */
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { usePolicyDisplay } from './hooks/usePolicyStudio';
 import './PolicyBlocksDisplay.css';
-
-interface PolicyElementDisplay {
-    id: string;
-    type: string;
-    displayName: string;
-    icon: string;
-    attributes: Array<{ key: string; value: string }>;
-    snippet?: string;
-}
-
-interface PolicySectionDisplay {
-    name: string;
-    policies: PolicyElementDisplay[];
-}
-
-interface PolicyDisplayStructure {
-    gatewayType: string;
-    originalPolicy: string;
-    sections: PolicySectionDisplay[];
-}
 
 interface PolicyBlocksDisplayProps {
     productId: string;
 }
 
 export const PolicyBlocksDisplay: React.FC<PolicyBlocksDisplayProps> = ({ productId }) => {
-    const [displayStructure, setDisplayStructure] = useState<PolicyDisplayStructure | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        // Fetch parsed structure from backend
-        fetch(`/api/v1/products/${productId}/policy-display`)
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    setDisplayStructure(data.displayStructure);
-                } else {
-                    setError('Failed to load policy');
-                }
-            })
-            .catch(err => {
-                setError(err.message);
-            })
-            .finally(() => setLoading(false));
-    }, [productId]);
+    // Use custom hook for data fetching (MFE pattern)
+    const { displayStructure, loading, error } = usePolicyDisplay(productId);
 
     if (loading) {
         return <div className="policy-blocks-loading">Loading policy...</div>;
