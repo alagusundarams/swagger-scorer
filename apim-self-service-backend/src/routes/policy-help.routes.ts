@@ -14,6 +14,7 @@ import {
     updateHelpRequestStatus,
     getOpenHelpRequests
 } from '../services/policy-help.service.js';
+import { getUserContext } from '../middleware/auth.js';
 
 const policyHelpRoutes: FastifyPluginAsync = async (fastify) => {
     /**
@@ -23,9 +24,11 @@ const policyHelpRoutes: FastifyPluginAsync = async (fastify) => {
     fastify.post('/policy-help/requests', async (request, reply) => {
         const { issueDescription, productId, apiId, policyXml, priority } = request.body as any;
 
-        // TODO: Get real user from auth
-        const userId = 'user-admin';
-        const teamId = 'team-payments';
+        // Get authenticated user
+        const { userId, teamId } = getUserContext(request);
+        if (!teamId) {
+            return reply.code(400).send({ error: 'Team ID required. Set X-Team-Id header.' });
+        }
 
         try {
             const helpRequest = await createHelpRequest({
@@ -124,9 +127,9 @@ const policyHelpRoutes: FastifyPluginAsync = async (fastify) => {
         const { id } = request.params as { id: string };
         const { message } = request.body as { message: string };
 
-        // TODO: Get real user from auth + check if super_admin
-        const userId = 'user-admin';
-        const isApimDev = true; // TODO: Check role
+        // Get authenticated user (TODO: check super_admin role)
+        const { userId } = getUserContext(request);
+        const isApimDev = true; // TODO: Check role from user record
 
         try {
             const newMessage = await addHelpMessage({
@@ -151,8 +154,8 @@ const policyHelpRoutes: FastifyPluginAsync = async (fastify) => {
         const { id } = request.params as { id: string };
         const { status } = request.body as { status: string };
 
-        // TODO: Get real user from auth + check super_admin role
-        const userId = 'user-admin';
+        // Get authenticated user (requires super_admin role)
+        const { userId } = getUserContext(request);
 
         try {
             await updateHelpRequestStatus(id, status as any, userId);

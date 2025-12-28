@@ -15,6 +15,7 @@ import {
     cleanupExpiredDrafts
 } from '../services/drafts.service.js';
 import { initBlobStorage } from '../services/blobStorage.service.js';
+import { getUserId } from '../middleware/auth.js';
 
 const draftsRoute: FastifyPluginAsync = async (fastify) => {
     // Initialize blob storage on startup
@@ -51,8 +52,8 @@ const draftsRoute: FastifyPluginAsync = async (fastify) => {
             const apiId = (data.fields['apiId'] as any)?.value;
             const contextNotes = (data.fields['contextNotes'] as any)?.value;
 
-            // TODO: Get real user ID from auth
-            const userId = 'user-admin'; // Mock for now
+            // Get authenticated user ID
+            const userId = getUserId(request);
 
             // Create draft
             const draft = await createDraft({
@@ -95,8 +96,7 @@ const draftsRoute: FastifyPluginAsync = async (fastify) => {
      */
     fastify.get('/drafts', async (request, reply) => {
         try {
-            // TODO: Get real user ID from auth
-            const userId = 'user-admin';
+            const userId = getUserId(request);
 
             const drafts = await getUserDrafts(userId);
 
