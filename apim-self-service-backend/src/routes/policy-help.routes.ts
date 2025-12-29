@@ -70,7 +70,7 @@ const policyHelpRoutes: FastifyPluginAsync = async (fastify) => {
      * GET /api/v1/policy-help/requests/open
      * Get open requests (APIM DEV team view)
      */
-    fastify.get('/policy-help/requests/open', async (request, reply) => {
+    fastify.get('/policy-help/requests/open', async (_request, reply) => {
         // TODO: Check super_admin role
 
         try {

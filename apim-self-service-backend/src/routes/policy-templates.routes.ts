@@ -18,7 +18,7 @@ const policyTemplatesRoutes: FastifyPluginAsync = async (fastify) => {
      * GET /api/v1/policy/templates
      * Get all active policy templates
      */
-    fastify.get('/policy/templates', async (request, reply) => {
+    fastify.get('/policy/templates', async (_request, reply) => {
         try {
             const templates = await getAllPolicyTemplates();
             return { success: true, count: templates.length, templates };

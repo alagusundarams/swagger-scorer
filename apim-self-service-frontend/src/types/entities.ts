@@ -66,7 +66,7 @@ export interface Product {
     qualityScore?: number;
     createdAt: string;
     updatedAt: string;
-    environment?: 'DEV' | 'QA' | 'STAGE' | 'PROD';
+    environment?: Environment;
     visibility?: 'public' | 'internal' | 'private' | 'owner-only';
     authorizedTeams?: string[]; // Teams authorized to view/subscribe to this product
     identity?: {

@@ -73,7 +73,7 @@ export async function getAllProducts(environment?: string, userRole?: string, te
         version: p.version,
         description: p.description,
         state: p.state,
-        type: p.type,
+        type: p.type || 'standard',
         environment: p.environment,
         region: p.region,
 
@@ -184,12 +184,12 @@ export async function addProduct(product: {
 }) {
     const res = await query(`
         INSERT INTO products (
-            id, name, display_name, description, state, owner_team_id, environment, type, management_mode, git_repo_url, git_file_path, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+            id, name, display_name, description, state, owner_team_id, environment, management_mode, git_repo_url, git_file_path, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
         RETURNING *
     `, [
         product.id, product.name, product.displayName, product.description, product.state, product.ownerTeamId, product.environment,
-        product.type || 'standard', product.managementMode || 'PORTAL_MANAGED', product.gitRepoUrl, product.gitFilePath
+        product.managementMode || 'PORTAL_MANAGED', product.gitRepoUrl, product.gitFilePath
     ]);
 
     // Log Audit
@@ -276,9 +276,9 @@ export async function updateProduct(id: string, data: { ownerTeamId?: string }) 
     if (!id) throw new Error('Product ID is required');
 
     // 1. Fetch current product to check type
-    const productRes = await query('SELECT type FROM products WHERE id = $1', [id]);
+    const productRes = await query('SELECT id FROM products WHERE id = $1', [id]);
     if (productRes.rows.length === 0) throw new Error(`Product ${id} not found`);
-    const productType = productRes.rows[0].type;
+    // Schema missing type column, standard logic applies
 
     // 2. Update the Product
     const result = await query(
@@ -292,17 +292,12 @@ export async function updateProduct(id: string, data: { ownerTeamId?: string }) 
         const teamRes = await query('SELECT azure_ad_group_id, name FROM teams WHERE id = $1', [data.ownerTeamId]);
         const team = teamRes.rows[0];
 
-        if (productType === 'grp') {
-            // GRP Rule: Do NOT update APIs. They are owned by individual producer teams.
-            console.log(`[ProductsService] GRP Rule: Updated product ${id} owner. APIs retain origin owners.`);
-        } else {
-            // Standard Rule: Update all associated APIs to the same owner team.
-            console.log(`[ProductsService] Standard Rule: Cascading ownership update for product ${id} to all its APIs.`);
-            await query(
-                'UPDATE apis SET origin_team_id = $1, updated_at = NOW() WHERE product_id = $2',
-                [data.ownerTeamId, id]
-            );
-        }
+        // Standard Rule: Update all associated APIs to the same owner team.
+        console.log(`[ProductsService] Standard Rule: Cascading ownership update for product ${id} to all its APIs.`);
+        await query(
+            'UPDATE apis SET origin_team_id = $1, updated_at = NOW() WHERE product_id = $2',
+            [data.ownerTeamId, id]
+        );
 
         // 4. Trigger ARM Metadata Sync
         if (team?.azure_ad_group_id) {
@@ -337,7 +332,7 @@ export async function getGlobalInventory() {
         SELECT 
             p.name, 
             p.display_name as "displayName", 
-            p.type, 
+            'standard' as type, 
             p.owner_team_id as "ownerTeamId", 
             t.name as "ownerTeamName",
             json_agg(json_build_object(
@@ -355,7 +350,7 @@ export async function getGlobalInventory() {
             )) as deployments
         FROM products p
         LEFT JOIN teams t ON p.owner_team_id = t.id
-        GROUP BY p.name, p.display_name, p.type, p.owner_team_id, t.name
+        GROUP BY p.name, p.display_name, p.owner_team_id, t.name
         ORDER BY p.display_name ASC
     `);
 

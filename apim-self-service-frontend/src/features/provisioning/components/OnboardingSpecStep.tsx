@@ -68,7 +68,7 @@ export const OnboardingSpecStep = ({ onBack, onNext }: OnboardingSpecStepProps) 
         }
     };
 
-    const handleEditorMount = (editor: any, monaco: any) => {
+    const handleEditorMount = (_editor: any, _monaco: any) => {
         // Optional: configure editor further
     };
 
@@ -89,8 +89,8 @@ export const OnboardingSpecStep = ({ onBack, onNext }: OnboardingSpecStepProps) 
                             key={type}
                             onClick={() => setInputType(type)}
                             className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${inputType === type
-                                    ? 'bg-white dark:bg-slate-600 shadow-sm text-blue-600'
-                                    : 'text-slate-400 hover:text-slate-600'
+                                ? 'bg-white dark:bg-slate-600 shadow-sm text-blue-600'
+                                : 'text-slate-400 hover:text-slate-600'
                                 }`}
                         >
                             {type}
@@ -208,9 +208,9 @@ export const OnboardingSpecStep = ({ onBack, onNext }: OnboardingSpecStepProps) 
                                 {parsedOperations.map((op, idx) => (
                                     <div key={idx} className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-600">
                                         <span className={`px-2 py-1 rounded text-[10px] font-black uppercase w-16 text-center shrink-0 ${op.method === 'GET' ? 'bg-blue-100 text-blue-700' :
-                                                op.method === 'POST' ? 'bg-green-100 text-green-700' :
-                                                    op.method === 'DELETE' ? 'bg-red-100 text-red-700' :
-                                                        'bg-orange-100 text-orange-700'
+                                            op.method === 'POST' ? 'bg-green-100 text-green-700' :
+                                                op.method === 'DELETE' ? 'bg-red-100 text-red-700' :
+                                                    'bg-orange-100 text-orange-700'
                                             }`}>
                                             {op.method}
                                         </span>

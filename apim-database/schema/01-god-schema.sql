@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS products (
     
     environment TEXT NOT NULL CHECK (environment IN ('DEV', 'QA', 'STAGE', 'PROD')),
     region TEXT DEFAULT 'Global',
+    type TEXT DEFAULT 'standard' CHECK (type IN ('standard', 'grp')),
     
     -- Visibility and authorization
     visibility TEXT CHECK (visibility IN ('public', 'internal', 'private', 'owner-only')) DEFAULT 'internal',
@@ -146,6 +147,7 @@ CREATE TABLE IF NOT EXISTS apis (
     display_name TEXT NOT NULL,
     description TEXT,
     path TEXT NOT NULL,
+    origin_team_id TEXT REFERENCES teams(id),
     quality_score DECIMAL(5,2),
     
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -178,6 +180,23 @@ CREATE INDEX idx_operations_api ON operations(api_id);
 CREATE INDEX idx_operations_method ON operations(method);
 
 -- =============================================================================
+-- APP REGISTRATIONS (Linked Identities)
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS app_registrations (
+    id TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    display_name TEXT NOT NULL, -- Resolved from Graph or 'KeyVault:...'
+    environment TEXT NOT NULL,
+    product_id TEXT REFERENCES products(id),
+    owner_team_id TEXT REFERENCES teams(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_app_reg_client_id ON app_registrations(client_id);
+
+-- =============================================================================
 -- SUBSCRIPTIONS
 -- =============================================================================
 
@@ -185,6 +204,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     id TEXT PRIMARY KEY,
     product_id TEXT REFERENCES products(id) ON DELETE CASCADE NOT NULL,
     subscriber_team_id TEXT REFERENCES teams(id) NOT NULL,
+    app_registration_id TEXT REFERENCES app_registrations(id), -- Optional link to App Registration
     state TEXT NOT NULL CHECK (state IN ('active', 'suspended', 'submitted', 'pending', 'rejected', 'cancelled', 'expired')),
     
     -- Keys
@@ -256,22 +276,6 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE INDEX idx_audit_entity ON audit_log(entity_type, entity_id);
 CREATE INDEX idx_audit_timestamp ON audit_log(timestamp DESC);
 
--- =============================================================================
--- APP REGISTRATIONS (Linked Identities)
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS app_registrations (
-    id TEXT PRIMARY KEY,
-    client_id TEXT NOT NULL,
-    display_name TEXT NOT NULL, -- Resolved from Graph or 'KeyVault:...'
-    environment TEXT NOT NULL,
-    product_id TEXT REFERENCES products(id),
-    owner_team_id TEXT REFERENCES teams(id),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX idx_app_reg_client_id ON app_registrations(client_id);
 
 -- =============================================================================
 -- BACKENDS

@@ -27,7 +27,7 @@ function loadConfig() {
 }
 
 const config = loadConfig();
-const DATABASE_URL = process.env.DATABASE_URL || config.azure?.environments?.[0]?.databaseUrl || config.database?.url || 'postgresql://postgres:postgres@localhost:5432/apim';
+const DATABASE_URL = process.env.DATABASE_URL || config.database?.url || 'postgresql://postgres:postgrespassword@127.0.0.1:5432/apim_portal';
 
 async function seed() {
     console.log('🌱 Starting Database Seeding (DB Project standalone)...');
@@ -113,6 +113,12 @@ async function seed() {
                 description: 'Consumer-owned GRP product bundling Payment and Identity APIs.',
                 state: 'published', owner_team_id: 'team-mobile', environment: 'DEV',
                 quality_score: 85, subscriber_count: 5, type: 'grp'
+            },
+            {
+                id: 'prod-orphan-001', name: 'ghost-service', display_name: 'Ghost Service (Orphaned)', version: 'v0.9.0',
+                description: 'A product with no owner group assigned in AD.',
+                state: 'published', owner_team_id: null, environment: 'PROD',
+                quality_score: 45, subscriber_count: 0, type: 'standard'
             }
         ];
 
@@ -175,6 +181,14 @@ async function seed() {
                 environment: 'PROD',
                 owner_team_id: 'team-mobile',
                 product_id: 'prod-grp-001'
+            },
+            {
+                id: 'app-orphan-001',
+                display_name: 'Legacy Integration App (Orphaned)',
+                client_id: 'client-orphan-001',
+                environment: 'DEV',
+                owner_team_id: null,
+                product_id: null
             }
         ];
 

@@ -11,6 +11,7 @@ import { join } from 'path';
 import { createWriteStream, mkdirSync, existsSync } from 'fs';
 
 const args = process.argv.slice(2);
+console.log('DEBUG: discover-sync received args:', args);
 
 // Setup log file
 const cwd = process.cwd();

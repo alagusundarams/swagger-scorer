@@ -20,7 +20,7 @@ export const ConfigurationManifestModal = ({ product, isOpen, onClose }: Configu
             setError(null);
             try {
                 const res = await inventoryApi.getManifest(product.id, format);
-                setContent(res.content);
+                setContent(res.data.content);
             } catch (err) {
                 setError('Failed to load manifest.');
                 console.error(err);

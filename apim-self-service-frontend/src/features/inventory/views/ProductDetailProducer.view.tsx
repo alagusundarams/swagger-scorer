@@ -540,7 +540,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                     product={product}
                     isOpen={isManageModalOpen}
                     onClose={() => setIsManageModalOpen(false)}
-                    currentStage={product.environment || 'DEV'}
+                    currentStage={(product.environment as any) || 'DEV'}
                     onPromote={handlePromote}
                     onUpdate={handleUpdateProduct}
                 />

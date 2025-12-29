@@ -79,7 +79,7 @@ export async function deployProductToEnvironment(
         if (config.apiPath) {
             const apiId = `${productId}-api-${environment.toLowerCase()}`;
 
-            await client.api.createOrUpdate(
+            await (client as any).api.createOrUpdate(
                 RESOURCE_GROUP,
                 APIM_SERVICE_NAME,
                 apiId,

@@ -30,8 +30,6 @@ export function DashboardFilters({
     onTeamChange,
     userTeams,
     accessibleEnvironments,
-    selectedRegion = 'ALL',
-    onRegionChange,
     isFiltersDisabled
 }: DashboardFiltersProps) {
     return (

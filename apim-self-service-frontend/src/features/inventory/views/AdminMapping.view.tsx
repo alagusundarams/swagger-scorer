@@ -39,7 +39,7 @@ export const AdminMappingView = () => {
                 id: p.id,
                 name: p.displayName,
                 type: 'Product' as const,
-                environment: p.environment,
+                environment: p.environment || 'DEV', // Default to DEV if missing to satisfy type
                 region: p.region || 'Global',
                 details: p,
                 isOrphaned: true
@@ -129,7 +129,7 @@ export const AdminMappingView = () => {
 
         try {
             import('../api/inventoryClient').then(async ({ getPermissionMatrix }) => {
-                const res = await getPermissionMatrix(product.id);
+                const res = (await getPermissionMatrix(product.id)) as any;
                 setMatrixEntries(res.data);
             });
         } catch (err) {
@@ -290,133 +290,135 @@ export const AdminMappingView = () => {
                         )}
 
                         {!isLoading && (
-                            <div className="overflow-y-auto flex-1">
-                                <table className="w-full text-left text-sm">
-                                <thead className="bg-gray-50 dark:bg-slate-900 sticky top-0">
-                                    <tr>
-                                        <th className="p-4 w-10">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedIds.size === filteredOrphans.length && filteredOrphans.length > 0}
-                                                onChange={handleSelectAll}
-                                                className="rounded border-gray-300 dark:border-slate-600 focus:ring-blue-500"
-                                            />
-                                        </th>
-                                        <th className="p-4 font-bold text-gray-500 uppercase tracking-wider text-xs">Name</th>
-                                        <th className="p-4 font-bold text-gray-500 uppercase tracking-wider text-xs">Type</th>
-                                        <th className="p-4 font-bold text-gray-500 uppercase tracking-wider text-xs">Env</th>
-                                        <th className="p-4 font-bold text-gray-500 uppercase tracking-wider text-xs">Region</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
-                                    {filteredOrphans.map(orphan => (
-                                        <tr
-                                            key={orphan.id}
-                                            className={`hover:bg-gray-50 dark:hover:bg-slate-700/50 transition cursor-pointer ${selectedIds.has(orphan.id) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
-                                            onClick={() => handleSelectOne(orphan.id)}
-                                        >
-                                            <td className="p-4">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedIds.has(orphan.id)}
-                                                    onChange={() => { }} // Handled by row click
-                                                    className="rounded border-gray-300 dark:border-slate-600 focus:ring-blue-500"
-                                                />
-                                            </td>
-                                            <td className="p-4 font-medium text-gray-900 dark:text-white">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-sm font-bold">{orphan.details?.displayName || orphan.name}</span>
-                                                    {orphan.type === 'Product' && (
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); handleOpenMatrix(orphan); }}
-                                                            className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-black uppercase rounded hover:bg-blue-100 transition"
-                                                        >
-                                                            Matrix
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                <div className="text-[10px] text-cool-gray-400 font-mono mt-0.5">{orphan.name}</div>
-
-                                                {/* Meta Info: Git & Type */}
-                                                <div className="flex items-center gap-2 mt-2">
-                                                    {orphan.details?.type === 'grp' && (
-                                                        <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[9px] font-black uppercase rounded shadow-sm border border-purple-200">GRP Bundle</span>
-                                                    )}
-                                                    {orphan.details?.managementMode === 'TERRAFORM_MANAGED' ? (
-                                                        <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase rounded shadow-sm border border-emerald-200">Terraform Managed</span>
-                                                    ) : (
-                                                        <span className={`px-1.5 py-0.5 text-[9px] font-black uppercase rounded shadow-sm border ${(!orphan.details?.gitRepoUrl)
-                                                            ? 'bg-red-50 text-red-700 border-red-200'
-                                                            : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
-                                                            {(!orphan.details?.gitRepoUrl) ? 'Portal Managed - Ghost' : 'Portal Managed'}
-                                                        </span>
-                                                    )}
-                                                </div>
-
-                                                {/* Action Links */}
-                                                {(orphan.details?.gitRepoUrl || orphan.details?.pipelineInfo?.url) && (
-                                                    <div className="flex items-center gap-3 mt-2">
-                                                        {orphan.details?.gitRepoUrl && (
-                                                            <div className="flex items-center gap-2">
-                                                                <a
-                                                                    href={orphan.details.gitRepoUrl}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                    className="text-[10px] text-blue-600 hover:text-blue-800 flex items-center gap-1 font-bold"
+                            <>
+                                <div className="overflow-y-auto flex-1">
+                                    <table className="w-full text-left text-sm">
+                                        <thead className="bg-gray-50 dark:bg-slate-900 sticky top-0">
+                                            <tr>
+                                                <th className="p-4 w-10">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedIds.size === filteredOrphans.length && filteredOrphans.length > 0}
+                                                        onChange={handleSelectAll}
+                                                        className="rounded border-gray-300 dark:border-slate-600 focus:ring-blue-500"
+                                                    />
+                                                </th>
+                                                <th className="p-4 font-bold text-gray-500 uppercase tracking-wider text-xs">Name</th>
+                                                <th className="p-4 font-bold text-gray-500 uppercase tracking-wider text-xs">Type</th>
+                                                <th className="p-4 font-bold text-gray-500 uppercase tracking-wider text-xs">Env</th>
+                                                <th className="p-4 font-bold text-gray-500 uppercase tracking-wider text-xs">Region</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                                            {filteredOrphans.map(orphan => (
+                                                <tr
+                                                    key={orphan.id}
+                                                    className={`hover:bg-gray-50 dark:hover:bg-slate-700/50 transition cursor-pointer ${selectedIds.has(orphan.id) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
+                                                    onClick={() => handleSelectOne(orphan.id)}
+                                                >
+                                                    <td className="p-4">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedIds.has(orphan.id)}
+                                                            onChange={() => { }} // Handled by row click
+                                                            className="rounded border-gray-300 dark:border-slate-600 focus:ring-blue-500"
+                                                        />
+                                                    </td>
+                                                    <td className="p-4 font-medium text-gray-900 dark:text-white">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm font-bold">{orphan.details?.displayName || orphan.name}</span>
+                                                            {orphan.type === 'Product' && (
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleOpenMatrix(orphan); }}
+                                                                    className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-black uppercase rounded hover:bg-blue-100 transition"
                                                                 >
-                                                                    <span>REPO</span>
-                                                                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                                                                </a>
-                                                                {orphan.details?.lastDeployedCommitHash && (
-                                                                    <span className="text-[9px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200" title="Last Deployed Hash">
-                                                                        #{orphan.details.lastDeployedCommitHash.substring(0, 7)}
-                                                                    </span>
+                                                                    Matrix
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-[10px] text-cool-gray-400 font-mono mt-0.5">{orphan.name}</div>
+
+                                                        {/* Meta Info: Git & Type */}
+                                                        <div className="flex items-center gap-2 mt-2">
+                                                            {orphan.details?.type === 'grp' && (
+                                                                <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[9px] font-black uppercase rounded shadow-sm border border-purple-200">GRP Bundle</span>
+                                                            )}
+                                                            {orphan.details?.managementMode === 'TERRAFORM_MANAGED' ? (
+                                                                <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase rounded shadow-sm border border-emerald-200">Terraform Managed</span>
+                                                            ) : (
+                                                                <span className={`px-1.5 py-0.5 text-[9px] font-black uppercase rounded shadow-sm border ${(!orphan.details?.gitRepoUrl)
+                                                                    ? 'bg-red-50 text-red-700 border-red-200'
+                                                                    : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                                                                    {(!orphan.details?.gitRepoUrl) ? 'Portal Managed - Ghost' : 'Portal Managed'}
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Action Links */}
+                                                        {(orphan.details?.gitRepoUrl || orphan.details?.pipelineInfo?.url) && (
+                                                            <div className="flex items-center gap-3 mt-2">
+                                                                {orphan.details?.gitRepoUrl && (
+                                                                    <div className="flex items-center gap-2">
+                                                                        <a
+                                                                            href={orphan.details.gitRepoUrl}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                            className="text-[10px] text-blue-600 hover:text-blue-800 flex items-center gap-1 font-bold"
+                                                                        >
+                                                                            <span>REPO</span>
+                                                                            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                                                        </a>
+                                                                        {orphan.details?.lastDeployedCommitHash && (
+                                                                            <span className="text-[9px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200" title="Last Deployed Hash">
+                                                                                #{orphan.details.lastDeployedCommitHash.substring(0, 7)}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                                {orphan.details?.pipelineInfo?.url && (
+                                                                    <a
+                                                                        href={orphan.details.pipelineInfo.url}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                        className="text-[10px] text-emerald-600 hover:text-emerald-800 flex items-center gap-1 font-bold"
+                                                                    >
+                                                                        <span>PIPELINE</span>
+                                                                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                                                    </a>
                                                                 )}
                                                             </div>
                                                         )}
-                                                        {orphan.details?.pipelineInfo?.url && (
-                                                            <a
-                                                                href={orphan.details.pipelineInfo.url}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                className="text-[10px] text-emerald-600 hover:text-emerald-800 flex items-center gap-1 font-bold"
-                                                            >
-                                                                <span>PIPELINE</span>
-                                                                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                                                            </a>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="p-4">
-                                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${orphan.type === 'Product' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' :
-                                                    orphan.type === 'API' ? 'bg-cyan-50 text-cyan-700 border border-cyan-100' :
-                                                        'bg-gray-50 text-gray-700 border border-gray-100'
-                                                    }`}>
-                                                    {orphan.type}
-                                                </span>
-                                            </td>
-                                            <td className="p-4 text-xs font-mono text-slate-400 font-bold">{orphan.environment}</td>
-                                            <td className="p-4 text-xs font-mono text-slate-400 font-bold">{orphan.region}</td>
-                                        </tr>
-                                    ))}
-                                    {filteredOrphans.length === 0 && (
-                                        <tr>
-                                            <td colSpan={4} className="p-8 text-center text-gray-400">
-                                                No orphans found matching your search.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                        <div className="p-4 border-t border-gray-100 dark:border-slate-700 text-xs text-gray-400 flex justify-between">
-                            <span>{selectedIds.size} selected</span>
-                            <span>Total: {orphans.length}</span>
-                        </div>
-                    </div>
+                                                    </td>
+                                                    <td className="p-4">
+                                                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${orphan.type === 'Product' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' :
+                                                            orphan.type === 'API' ? 'bg-cyan-50 text-cyan-700 border border-cyan-100' :
+                                                                'bg-gray-50 text-gray-700 border border-gray-100'
+                                                            }`}>
+                                                            {orphan.type}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-4 text-xs font-mono text-slate-400 font-bold">{orphan.environment}</td>
+                                                    <td className="p-4 text-xs font-mono text-slate-400 font-bold">{orphan.region}</td>
+                                                </tr>
+                                            ))}
+                                            {filteredOrphans.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={4} className="p-8 text-center text-gray-400">
+                                                        No orphans found matching your search.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div className="p-4 border-t border-gray-100 dark:border-slate-700 text-xs text-gray-400 flex justify-between">
+                                    <span>{selectedIds.size} selected</span>
+                                    <span>Total: {orphans.length}</span>
+                                </div>
+                            </>
+                        )}</div>
 
                     {/* RIGHT: Action Panel */}
                     <div className="space-y-6">

@@ -229,7 +229,7 @@ const draftsRoute: FastifyPluginAsync = async (fastify) => {
      * POST /api/v1/drafts/cleanup
      * Manually trigger cleanup (admin only)
      */
-    fastify.post('/drafts/cleanup', async (request, reply) => {
+    fastify.post('/drafts/cleanup', async (_request, reply) => {
         try {
             // TODO: Check admin role
 

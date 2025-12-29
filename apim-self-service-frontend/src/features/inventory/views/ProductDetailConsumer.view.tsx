@@ -128,7 +128,7 @@ export const ProductDetailConsumer = ({
             )}
 
             {activeTab === 'config' && (
-                <ConfigurationTab product={product} isReadOnly={true} />
+                <ConfigurationTab product={product} />
             )}
 
             {/* Contract Viewer Modal (Read-only for consumers) */}
