@@ -56,7 +56,29 @@ async function patch() {
             END $$;
         `);
 
-        // 3. Ensure environment exists everywhere
+        // 3. Add region to products if missing
+        await pool.query(`
+            DO $$ 
+            BEGIN 
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_name='products' AND column_name='region') THEN
+                    ALTER TABLE products ADD COLUMN region TEXT DEFAULT 'Global';
+                END IF;
+            END $$;
+        `);
+
+        // 4. Add origin_team_id to apis if missing
+        await pool.query(`
+            DO $$ 
+            BEGIN 
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_name='apis' AND column_name='origin_team_id') THEN
+                    ALTER TABLE apis ADD COLUMN origin_team_id TEXT REFERENCES teams(id);
+                END IF;
+            END $$;
+        `);
+
+        // 5. Ensure environment exists everywhere
         console.log('   Verifying environment consistency...');
         await pool.query(`UPDATE products SET environment = 'DEV' WHERE environment IS NULL`);
         await pool.query(`UPDATE apis SET environment = 'DEV' WHERE environment IS NULL`);
