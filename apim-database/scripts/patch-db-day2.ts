@@ -78,10 +78,40 @@ async function patch() {
             END $$;
         `);
 
-        // 5. Ensure environment exists everywhere
+        // 5. Add environment to products if missing
+        await pool.query(`
+            DO $$ 
+            BEGIN 
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_name='products' AND column_name='environment') THEN
+                    ALTER TABLE products ADD COLUMN environment TEXT NOT NULL DEFAULT 'DEV';
+                END IF;
+            END $$;
+        `);
+
+        // 6. Add environment to apis if missing
+        await pool.query(`
+            DO $$ 
+            BEGIN 
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_name='apis' AND column_name='environment') THEN
+                    ALTER TABLE apis ADD COLUMN environment TEXT;
+                END IF;
+            END $$;
+        `);
+
         console.log('   Verifying environment consistency...');
         await pool.query(`UPDATE products SET environment = 'DEV' WHERE environment IS NULL`);
-        await pool.query(`UPDATE apis SET environment = 'DEV' WHERE environment IS NULL`);
+        // Only update apis.environment if the column exists (was just added or already there)
+        await pool.query(`
+            DO $$ 
+            BEGIN 
+                IF EXISTS (SELECT 1 FROM information_schema.columns 
+                           WHERE table_name='apis' AND column_name='environment') THEN
+                    UPDATE apis SET environment = 'DEV' WHERE environment IS NULL;
+                END IF;
+            END $$;
+        `);
 
         console.log('✅ Patch Applied Successfully!');
     } catch (error) {
