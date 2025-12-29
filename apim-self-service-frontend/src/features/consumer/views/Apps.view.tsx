@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
-import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
+import { useStore } from '../../../store/useStore';
+import { useConsumerStore } from '../../consumer/store/consumerStore';
 import { toast } from 'react-hot-toast';
 
 export const AppsPage = () => {
-    const { user, appRegistrations, fetchAppRegistrations, addAppRegistration, setPageTitle } = useInventoryStore();
+    const { user, setPageTitle } = useStore();
+    const { appRegistrations, fetchAppRegistrations, registerApp: addAppRegistration } = useConsumerStore();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({
         displayName: '',
@@ -61,8 +63,8 @@ export const AppsPage = () => {
                                             📱
                                         </div>
                                         <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border ${app.environment === 'PROD' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                                                app.environment === 'STAGE' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                                                    'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                            app.environment === 'STAGE' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                                'bg-emerald-50 text-emerald-600 border-emerald-100'
                                             }`}>
                                             {app.environment}
                                         </span>

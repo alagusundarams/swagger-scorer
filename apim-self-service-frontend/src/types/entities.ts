@@ -5,22 +5,6 @@
  * These types are shared across the application and align with the backend API.
  */
 
-export interface Team {
-    id: string;
-    name: string;
-    azureAdGroupId: string;
-    type: 'producer' | 'consumer' | 'both';
-    description: string;
-    memberCount: number;
-    additionalAdGroups?: string[]; // Secondary AD Groups (e.g. Legacy identities)
-    adGroupMapping?: {
-        DEV?: string; // AD Group ID for Dev access
-        QA?: string;
-        STAGE?: string;
-        PROD?: string;
-    };
-}
-
 export interface User {
     id: string;
     email: string;
@@ -118,42 +102,26 @@ export interface Product {
     // Governance
     detectedAnomalies?: string[];
     reconciliationStatus?: 'GHOST' | 'RECONCILED' | 'MANUAL';
+
+    // Config
+    region?: string;
+    ownerTeamName?: string;
+    namedValues?: NamedValue[];
 }
 
-export type Environment = 'ALL' | 'DEV' | 'QA' | 'STAGE' | 'PROD';
-
-export interface SubscriptionKey {
-    name: string;
-    value: string;
-}
-
-export interface AppRegistration {
+export interface NamedValue {
     id: string;
     displayName: string;
-    clientId: string;
-    environment: 'DEV' | 'QA' | 'STAGE' | 'PROD';
-    ownerTeamId: string;
-    productId?: string;
-    appIdUri?: string;
-    secretExpiryDate?: string;
+    systemName: string;
+    value: string; // Masked if secret
+    type: 'literal' | 'key_vault';
+    isSecret: boolean;
+    scopeId?: string; // If present, scoped to specific API ID
+    scopeName?: string; // Resolved display name of scope
     createdAt?: string;
 }
 
-export interface Subscription {
-    id: string;
-    productId: string;
-    subscriberTeamId: string;
-    state: 'active' | 'suspended' | 'submitted' | 'pending' | 'rejected' | 'cancelled' | 'expired';
-    primaryKey: SubscriptionKey;
-    secondaryKey: SubscriptionKey;
-    createdAt: string;
-    updatedAt?: string;
-    expirationDate?: string;
-    keysGeneratedAt?: string;
-    lastSyncedAt?: string;
-    appRegistrationId?: string;
-    appRegistration?: AppRegistration;
-}
+export type Environment = 'ALL' | 'DEV' | 'QA' | 'STAGE' | 'PROD';
 
 export interface ConfigurationItem {
     key: string;

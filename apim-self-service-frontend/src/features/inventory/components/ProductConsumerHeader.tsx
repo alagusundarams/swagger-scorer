@@ -1,4 +1,5 @@
-import { type Product, type Team } from '../../../types/entities';
+import { type Product } from '../../../types/entities';
+import { type Team } from '../../teams/types/teamTypes';
 
 interface ProductConsumerHeaderProps {
     product: Product;
@@ -47,8 +48,8 @@ export function ProductConsumerHeader({
                             disabled={hasPendingRequest}
                             onClick={onRequestAccess}
                             className={`w-full md:w-auto font-black text-[10px] uppercase tracking-[0.2em] py-5 px-10 rounded-2xl transition-all shadow-xl hover:scale-[1.02] ${hasPendingRequest
-                                    ? 'bg-amber-50 text-amber-600 cursor-not-allowed border border-amber-100'
-                                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'
+                                ? 'bg-amber-50 text-amber-600 cursor-not-allowed border border-amber-100'
+                                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'
                                 }`}
                         >
                             {hasPendingRequest ? '⌛ Request Pending Review' : '🚀 Request Integration Access'}

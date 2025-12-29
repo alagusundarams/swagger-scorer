@@ -25,9 +25,12 @@ export const ContractEditorHeader: React.FC<ContractEditorHeaderProps> = ({
             <div>
                 <ContractBreadcrumb productName={product.displayName} apiName={api.displayName} />
                 <div className="flex items-center gap-4 mt-2">
-                    <h2 className="text-2xl font-black text-gray-900 dark:text-white">
-                        ⚙️ Edit Contract
-                    </h2>
+                    <h1
+                        className="text-xl font-black text-gray-900 dark:text-white truncate"
+                        data-testid="modal-title"
+                    >
+                        Edit Contract: {api.displayName}
+                    </h1>
                     <span className={`px-3 py-1 text-xs font-black rounded-lg ${product.environment === 'PROD'
                         ? 'bg-emerald-500/10 text-emerald-500'
                         : 'bg-blue-500/10 text-blue-500'

@@ -4,8 +4,9 @@ import { type PolicyScope, type PolicyFlow, type PolicyStep, type PolicySection,
 import { PolicyPalette } from './components/PolicyPalette';
 import { PolicyStepCard } from './components/PolicyStepCard';
 import { RateLimitProperties } from './components/properties/RateLimitProperties';
+import { GenericPolicyProperties } from './components/properties/GenericPolicyProperties';
 import { DeploymentConfirmationModal } from './components/DeploymentConfirmationModal';
-import { useInventoryStore } from '../../store/useInventoryStore';
+import { useStore } from '../../store/useStore';
 import { api } from '../../api/baseClient';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -16,8 +17,8 @@ import {
     useSensor,
     useSensors,
     PointerSensor,
-    DragStartEvent,
-    DragEndEvent
+    type DragStartEvent,
+    type DragEndEvent
 } from '@dnd-kit/core';
 import {
     SortableContext,
@@ -55,7 +56,7 @@ export const PolicyStudioContainer = ({
     isReadOnly = false
 }: Props) => {
     const [selectedScope, setSelectedScope] = useState<PolicyScope>(level as PolicyScope);
-    const { addNotification } = useInventoryStore();
+    const { addNotification } = useStore();
 
     // State
     const [flow, setFlow] = useState<PolicyFlow>(MOCK_FLOW);
@@ -69,30 +70,51 @@ export const PolicyStudioContainer = ({
     // DnD State
     const [activeDragItem, setActiveDragItem] = useState<any | null>(null);
 
-    const sensors = useSensors(
-        useSensor(PointerSensor, {
-            activationConstraint: {
-                distance: 8,
-            },
-        })
-    );
 
-    // Fetch Parsed Policy from Backend when initialXml changes
+    // Actually simpler list of sensors is better
+    const mouseSensor = useSensor(PointerSensor, { activationConstraint: { distance: 5 } });
+    const touchSensor = useSensor(PointerSensor, { activationConstraint: { delay: 250, tolerance: 5 } });
+    const dndSensors = useSensors(mouseSensor, touchSensor);
+
+    // Fetch Parsed Policy from Backend when Scope or Initial changes
     useEffect(() => {
         const fetchPolicy = async () => {
-            const xmlToParse = editMode === 'code' ? rawXml : initialXml;
-            if (!xmlToParse) return;
+            // If we switched scope, we want to fetch that scope's policy.
+            // If it's initial load, we use initialXml if available AND scope matches level
+            // BUT, user wants to see "Global" -> "Product" -> "API" separation.
+            // So we should strictly fetch based on `selectedScope`.
 
             setIsLoading(true);
             try {
-                const response = await api.post('/policy/analyze', { xml: xmlToParse });
-                if (response.data) {
-                    setFlow(response.data);
+                // Determine what to fetch.
+                // If selectedScope == level (prop), and we have initialXml, maybe use that?
+                // But for "Gap verification", fresh fetch is safer.
+
+                // We need resourceId for the scope. 
+                // Assumption: resourceId passed in props works for all scopes (e.g. it's the API ID, and backend knows how to find parent Product).
+                // If it's 'global', resourceId might be ignored or special.
+
+                const response = await api.get(`/policy/fetch/${resourceId}`, {
+                    params: { level: selectedScope }
+                });
+
+                if (response.data && response.data.xml) {
+                    setRawXml(response.data.xml);
+                    // Then analyze it to get the flow
+                    const analysis = await api.post('/policy/analyze', { xml: response.data.xml });
+                    if (analysis.data) {
+                        setFlow(analysis.data);
+                    }
+                } else {
+                    // Empty or 404
+                    setFlow({ inbound: [], backend: [], outbound: [], onError: [] });
+                    setRawXml('');
                 }
-                // If it was initial load, set rawXml too
-                if (!rawXml && initialXml) setRawXml(initialXml);
+
             } catch (error) {
-                console.error('Policy Parsing Failed:', error);
+                console.error('Policy Fetch Failed:', error);
+                // Fallback to empty flow
+                setFlow({ inbound: [], backend: [], outbound: [], onError: [] });
             } finally {
                 setIsLoading(false);
             }
@@ -101,7 +123,8 @@ export const PolicyStudioContainer = ({
         if (editMode === 'visual') {
             fetchPolicy();
         }
-    }, [initialXml, editMode]);
+
+    }, [selectedScope, resourceId, editMode]); // Dependencies updated
 
     const activeStep = selectedStepId
         ? Object.values(flow).flat().find(s => s.id === selectedStepId)
@@ -249,7 +272,7 @@ export const PolicyStudioContainer = ({
 
     return (
         <DndContext
-            sensors={sensors}
+            sensors={dndSensors}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
         >
@@ -428,9 +451,7 @@ export const PolicyStudioContainer = ({
                             {activeStep.type === 'rate-limit' ? (
                                 <RateLimitProperties step={activeStep} onChange={handleUpdateStep} />
                             ) : (
-                                <div className="p-6 bg-slate-50 dark:bg-slate-900 rounded-3xl border border-dashed border-gray-200 dark:border-slate-700 text-sm italic text-gray-500">
-                                    This policy is currently read-only in visual mode.
-                                </div>
+                                <GenericPolicyProperties step={activeStep} onChange={handleUpdateStep} />
                             )}
                         </div>
                     ) : (

@@ -1,13 +1,13 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
+import { useStore } from '../../../store/useStore';
 import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
+import { useTeamsStore } from '../../teams/store/teamsStore';
 import { OnboardingProgressBar } from '../components/OnboardingProgressBar';
-import { OnboardingPhase1Definition } from '../components/OnboardingPhase1Definition';
-// Lazy load PolicyStudio to reduce bundle size
-const PolicyStudioContainer = lazy(() => import('../../policy-studio/PolicyStudio.container').then(module => ({ default: module.PolicyStudioContainer })));
-
-import { OnboardingPhase3Fulfillment } from '../components/OnboardingPhase3Fulfillment';
+import { OnboardingIdentityStep } from '../components/OnboardingIdentityStep';
+import { OnboardingFulfillmentStep } from '../components/OnboardingFulfillmentStep';
+import { OnboardingSpecStep } from '../components/OnboardingSpecStep';
 import '../provisioning.css';
 
 
@@ -15,7 +15,9 @@ export const OnboardingWizard = () => {
     const navigate = useNavigate();
 
     // --- Store Integration ---
-    const { user, products: allProducts, teams: allTeams, setPageTitle } = useInventoryStore();
+    const { user, setPageTitle } = useStore();
+    const { products: allProducts } = useInventoryStore();
+    const { teams: allTeams } = useTeamsStore();
 
     useEffect(() => {
         setPageTitle('Onboard Product');
@@ -31,10 +33,11 @@ export const OnboardingWizard = () => {
         visibility: 'public' as 'public' | 'private' | 'owner-only',
         selectedTeams: [] as string[],
         requiresAuth: false,
+        specContent: '' // Store the raw OpenAPI spec
     });
 
     // Derived teams for the current user
-    const userTeams = allTeams.filter(t => user?.teams.includes(t.id));
+    const userTeams = allTeams.filter((t: any) => user?.teams.includes(t.id));
 
     // Validations
     const isNameDuplicate = allProducts.some(p => p.name.toLowerCase() === formData.name.toLowerCase() || p.displayName.toLowerCase() === formData.name.toLowerCase());
@@ -68,46 +71,36 @@ export const OnboardingWizard = () => {
 
                     <div className="bg-white dark:bg-slate-800 rounded-[3rem] shadow-premium border border-gray-100 dark:border-slate-700/40 relative overflow-hidden min-h-[600px] flex flex-col">
 
-                        {/* Phase 1: Definition */}
+                        {/* Step 1: Identity */}
                         {step === 1 && (
-                            <OnboardingPhase1Definition
+                            <OnboardingIdentityStep
                                 onNext={handleNext}
                                 isNameDuplicate={isNameDuplicate}
                                 formData={formData}
                                 onChange={setFormData}
                                 userTeams={userTeams}
+                                environment="DEV"
                             />
                         )}
 
-                        {/* Phase 2: Policy Studio (Visualizer) */}
+                        {/* Step 2: Contract Definition (Advanced) */}
                         {step === 2 && (
-                            <div className="flex-1 flex flex-col h-[800px]"> {/* Fixed height for visualizer */}
-                                <Suspense fallback={<div className="flex-1 flex items-center justify-center text-gray-400">Loading Visualizer...</div>}>
-                                    <PolicyStudioContainer />
-                                </Suspense>
-                                <div className="p-4 border-t border-gray-200 dark:border-slate-700 flex justify-between bg-white dark:bg-slate-800">
-
-                                    <button
-                                        onClick={handleBack}
-                                        className="px-6 py-2 text-gray-500 font-bold hover:text-gray-900"
-                                    >
-                                        Back to Definition
-                                    </button>
-                                    <button
-                                        onClick={() => setStep(3)}
-                                        className="px-6 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700"
-                                    >
-                                        Continue to Review →
-                                    </button>
-                                </div>
-                            </div>
+                            <OnboardingSpecStep
+                                onBack={handleBack}
+                                onNext={(spec) => {
+                                    setFormData({ ...formData, specContent: spec });
+                                    setStep(3);
+                                }}
+                            />
                         )}
 
-                        {/* Phase 3: Fulfillment */}
+                        {/* Step 3: Fulfillment */}
                         {step === 3 && (
-                            <OnboardingPhase3Fulfillment
+                            <OnboardingFulfillmentStep
                                 onBack={handleBack}
                                 onSubmit={handleSubmit}
+                                productName={formData.name}
+                                productVersion={formData.version}
                             />
                         )}
 

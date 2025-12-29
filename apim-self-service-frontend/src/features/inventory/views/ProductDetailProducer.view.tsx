@@ -1,14 +1,20 @@
 import { useState, useMemo, useCallback, useEffect, lazy, Suspense } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import type { Product, User, Subscription, API } from '../../../types/entities';
+import type { Product, User, API } from '../../../types/entities';
+import type { Subscription } from '../../consumer/types/consumerTypes';
+import { useStore } from '../../../store/useStore';
 import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
+import { useConsumerStore } from '../../consumer/store/consumerStore';
+import { useTeamsStore } from '../../teams/store/teamsStore';
+import { useGovernanceStore } from '../../governance/store/governanceStore';
 import { ManageProductModal } from '../components/ManageProductModal';
 import { SubscriberCard } from '../components/SubscriberCard';
 import { ProducerHeader } from '../components/ProducerHeader';
 import { ProducerMetrics } from '../components/ProducerMetrics';
 import { ProducerAuditLog } from '../components/ProducerAuditLog';
 import { RevokeAccessModal } from '../components/RevokeAccessModal';
-import { ConfigurationTab } from '../components/ConfigurationTab'; // ADDED
+import { ConfigurationTab } from '../components/ConfigurationTab';
+import { AddApiModal } from '../components/AddApiModal';
 
 // Lazy load Contract Editor (only loads Monaco when needed)
 const ContractEditorModal = lazy(() =>
@@ -35,20 +41,18 @@ interface ProductDetailProducerProps {
  * ProductDetailProducer Component
  */
 export const ProductDetailProducer = ({ product, user }: ProductDetailProducerProps) => {
-    const {
-        subscriptions: allSubscriptions,
-        teams: allTeams,
-        updateProduct,
-        addNotification,
-        requestProductPromotion,
-        approvalRequests
-    } = useInventoryStore();
+    const { addNotification } = useStore();
+    const { updateProduct, removeApiFromProduct } = useInventoryStore();
+    const { subscriptions: allSubscriptions } = useConsumerStore();
+    const { teams: allTeams } = useTeamsStore();
+    const { approvalRequests, requestProductPromotion, processApproval } = useGovernanceStore();
     const navigate = useNavigate();
 
     // === Modal State ===
     const [isManageModalOpen, setIsManageModalOpen] = useState(false);
     const [isEditorOpen, setIsEditorOpen] = useState(false);
     const [isPolicyStudioOpen, setIsPolicyStudioOpen] = useState(false);
+    const [isAddApiOpen, setIsAddApiOpen] = useState(false);
     const [selectedApi, setSelectedApi] = useState<API | null>(null);
 
     const [revokeModalOpen, setRevokeModalOpen] = useState(false);
@@ -145,7 +149,6 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
             if (!nextStage) return; // Should not happen due to check above but TS safety
 
             // 1. Check for Pending Request
-            // Note: approvalRequests comes from store, need to add it to destructuring first
             const hasPending = approvalRequests.some(r =>
                 r.productId === product.id &&
                 r.type === 'PROMOTION_REQUEST' &&
@@ -159,8 +162,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
 
             try {
                 // 2. Submit Request
-                // Note: assuming useAuth provide getToken is available in scope or added to store destructuring
-                await requestProductPromotion(product.id, nextStage, (() => Promise.resolve('mock-token')) as any); // Mock token for now or use useAuth
+                await requestProductPromotion(product.id, nextStage);
 
                 addNotification({
                     type: 'info',
@@ -329,7 +331,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                 {[
                     { id: 'subscribers', label: 'Subscribers' },
                     { id: 'apis', label: 'API Inventory' },
-                    { id: 'configuration', label: 'Configuration' }, // ADDED
+                    { id: 'configuration', label: 'Configuration' },
                     { id: 'audit', label: 'Audit Log' }
                 ].map(tab => (
                     <button
@@ -345,9 +347,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                 ))}
             </div>
 
-            {/* ============================================
-                TAB CONTENT
-                ============================================ */}
+            {/* Content: Subscribers */}
             {activeTab === 'subscribers' && (
                 <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-slate-700 mb-8 animate-fade-in">
                     <h2 className="text-xl font-black text-gray-900 dark:text-white mb-4">All Subscribers</h2>
@@ -374,9 +374,18 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                 </div>
             )}
 
+            {/* Content: APIs */}
             {activeTab === 'apis' && (
                 <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-slate-700 animate-fade-in">
-                    <h2 className="text-xl font-black text-gray-900 dark:text-white mb-4">APIs in this Product</h2>
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-black text-gray-900 dark:text-white">APIs in this Product</h2>
+                        <button
+                            onClick={() => setIsAddApiOpen(true)}
+                            className="px-4 py-2 bg-blue-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-blue-700 transition"
+                        >
+                            + Add API
+                        </button>
+                    </div>
                     <div className="space-y-3">
                         {product.apis.map((api) => (
                             <div
@@ -411,6 +420,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                                             ? 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
                                             : 'bg-blue-500 text-white hover:bg-blue-600'
                                             }`}
+                                        data-testid="edit-contract-btn"
                                     >
                                         {isInfraLocked ? (
                                             <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -419,10 +429,10 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                                         ) : (
                                             <span>✏️</span>
                                         )}
-                                        {isInfraLocked ? 'View Contract' : 'Edit & Analyze'}
+                                        {isInfraLocked ? 'View Contract' : 'Edit Contract'}
                                     </button>
 
-                                    {/* NEW: Policy Visualizer Button */}
+                                    {/* Policy Visualizer Button */}
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -434,6 +444,24 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                                         <span className="text-lg">👓</span>
                                         {product.type === 'grp' ? 'View API Policy' : 'Visual Policy'}
                                     </button>
+
+                                    {/* DELETE ACTION - Corrected Logic */}
+                                    {!isInfraLocked && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (confirm(`Are you sure you want to remove ${api.displayName}? This action cannot be undone.`)) {
+                                                    removeApiFromProduct(product.id, api.id)
+                                                        .then(() => setLocalToast({ message: 'API removed successfully', type: 'success' }))
+                                                        .catch((err: any) => setLocalToast({ message: 'Failed to remove API: ' + err.message, type: 'warning' }));
+                                                }
+                                            }}
+                                            className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
+                                            title="Remove API"
+                                        >
+                                            🗑️
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -441,10 +469,12 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                 </div>
             )}
 
+            {/* Content: Configuration */}
             {activeTab === 'configuration' && (
                 <ConfigurationTab product={product} />
             )}
 
+            {/* Content: Audit Log */}
             {activeTab === 'audit' && (
                 <ProducerAuditLog
                     onAction={(msg, type) => {
@@ -454,16 +484,13 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                     onDecide={async (decision, justification) => {
                         console.log(`[ProducerAuditLog] Decision: ${decision}, Justification: ${justification}`);
 
-                        // Find the pending request for this product (assuming single active request for demo)
+                        // Find the pending request for this product
                         const pendingReq = approvalRequests.find(r =>
                             r.productId === product.id && r.status === 'PENDING'
                         );
 
                         if (pendingReq) {
-                            console.log(`[ProducerAuditLog] Found pending request ${pendingReq.id}. Processing...`);
-                            // Call store action
-                            const { processApproval } = useInventoryStore.getState();
-                            await processApproval(pendingReq.id, decision, justification, (() => Promise.resolve('mock-token')) as any);
+                            await processApproval(pendingReq.id, decision, justification);
 
                             setLocalToast({
                                 message: `Request ${decision}D successfully.`,
@@ -490,8 +517,8 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
             )}
 
             {/* ============================================
-                MODALS: Revoke, Modify Permissions, Manage Product
-                ============================================ */}
+                MODALS
+            ============================================ */}
 
             <RevokeAccessModal
                 isOpen={revokeModalOpen}
@@ -502,112 +529,98 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                 apiCount={product.apis.length}
             />
 
-            {/* Manage Product Modal */}
-            {
-                isManageModalOpen && (
-                    <ManageProductModal
+            <AddApiModal
+                productId={product.id}
+                isOpen={isAddApiOpen}
+                onClose={() => setIsAddApiOpen(false)}
+            />
+
+            {isManageModalOpen && (
+                <ManageProductModal
+                    product={product}
+                    isOpen={isManageModalOpen}
+                    onClose={() => setIsManageModalOpen(false)}
+                    currentStage={product.environment || 'DEV'}
+                    onPromote={handlePromote}
+                    onUpdate={handleUpdateProduct}
+                />
+            )}
+
+            {isEditorOpen && selectedApi && (
+                <Suspense fallback={
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
+                        <div className="text-white text-lg">Loading editor...</div>
+                    </div>
+                }>
+                    <ContractEditorModal
                         product={product}
-                        isOpen={isManageModalOpen}
-                        onClose={() => setIsManageModalOpen(false)}
-                        currentStage={product.environment || 'DEV'}
-                        onPromote={handlePromote}
-                        onUpdate={handleUpdateProduct}
+                        api={selectedApi}
+                        isOpen={isEditorOpen}
+                        readOnly={isInfraLocked || product.type === 'grp'}
+                        onClose={() => {
+                            setIsEditorOpen(false);
+                            setSelectedApi(null);
+                        }}
+                        onCommit={async (message, description) => {
+                            console.log('[Contract Editor] Create PR:', {
+                                product: product.id,
+                                api: selectedApi.id,
+                                message,
+                                description
+                            });
+
+                            addNotification({
+                                type: 'success',
+                                title: 'Pull Request Created',
+                                message: `PR created for ${selectedApi.displayName}. View in Azure DevOps to merge.`,
+                                navigateTo: `/products/${product.id}`
+                            });
+                        }}
                     />
-                )
-            }
+                </Suspense>
+            )}
 
-            {/* Contract Editor Modal - Lazy Loaded */}
-            {
-                isEditorOpen && selectedApi && (
-                    <Suspense fallback={
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
-                            <div className="text-white text-lg">Loading editor...</div>
-                        </div>
-                    }>
-                        <ContractEditorModal
-                            product={product}
-                            api={selectedApi}
-                            isOpen={isEditorOpen}
-                            readOnly={isInfraLocked || product.type === 'grp'}
-                            onClose={() => {
-                                setIsEditorOpen(false);
-                                setSelectedApi(null);
-                            }}
-                            onCommit={async (message, description) => {
-                                // TODO: Call Git API to create PR
-                                console.log('[Contract Editor] Create PR:', {
-                                    product: product.id,
-                                    api: selectedApi.id,
-                                    message,
-                                    description
-                                });
-
-                                addNotification({
-                                    type: 'success',
-                                    title: 'Pull Request Created',
-                                    message: `PR created for ${selectedApi.displayName}. View in Azure DevOps to merge.`,
-                                    navigateTo: `/products/${product.id}`
-                                });
-                            }}
-                        />
-                    </Suspense>
-                )
-            }
-
-            {/* Policy Studio Modal (Legacy Lens) */}
-            {
-                selectedApi && (
-                    <Suspense fallback={null}>
-                        <PolicyStudioModal
-                            isOpen={isPolicyStudioOpen}
-                            onClose={() => {
-                                setIsPolicyStudioOpen(false);
-                                setSelectedApi(null);
-                            }}
-                            apiName={selectedApi?.displayName || 'Product Level'}
-                            productName={product.displayName}
-                            isReadOnly={product.type === 'grp' && !!selectedApi}
-                            resourceId={selectedApi?.id || product.id}
-                            level={selectedApi ? 'api' : 'product'}
-                            // [DEMO MAGICAL MOMENT]: We inject a known Legacy API Policy XML to show off the Parser.
-                            // In a real app, this comes from selectedApi.apim_raw_data.policyXml
-                            initialXml={`
-<policies>
-    <inbound>
-        <base />
-        <rate-limit calls="50" renewal-period="60" />
-        <validate-jwt header-name="Authorization" failed-validation-error-message="Access token is missing or invalid.">
-            <openid-config url="https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration" />
-            <required-claims>
-                <claim name="aud">
-                    <value>api://my-api</value>
-                </claim>
-            </required-claims>
-        </validate-jwt>
-        <set-header name="X-Legacy-Header" exists-action="override">
-            <value>LegacyValue</value>
-        </set-header>
-        <choose>
-            <when condition="@(context.Request.Headers.GetValueOrDefault("Environment") == "Beta")">
-                <set-backend-service base-url="https://beta-api.contoso.com" />
-            </when>
-        </choose>
-    </inbound>
-    <backend>
-        <base />
-    </backend>
-    <outbound>
-        <base />
-    </outbound>
-    <on-error>
-        <base />
-    </on-error>
-</policies>
-                            `}
-                        />
-                    </Suspense>
-                )
-            }
-        </div >
+            {selectedApi && (
+                <Suspense fallback={null}>
+                    <PolicyStudioModal
+                        isOpen={isPolicyStudioOpen}
+                        onClose={() => {
+                            setIsPolicyStudioOpen(false);
+                            setSelectedApi(null);
+                        }}
+                        apiName={selectedApi?.displayName || 'Product Level'}
+                        productName={product.displayName}
+                        isReadOnly={product.type === 'grp' && !!selectedApi}
+                        resourceId={selectedApi?.id || product.id}
+                        level={selectedApi ? 'api' : 'product'}
+                        initialXml={`
+                            <policies>
+                                <inbound>
+                                    <base />
+                                    <rate-limit calls="50" renewal-period="60" />
+                                    <validate-jwt header-name="Authorization" failed-validation-error-message="Access token is missing or invalid.">
+                                        <openid-config url="https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration" />
+                                        <required-claims>
+                                            <claim name="aud">
+                                                <value>api://my-api</value>
+                                            </claim>
+                                        </required-claims>
+                                    </validate-jwt>
+                                </inbound>
+                                <backend>
+                                    <base />
+                                </backend>
+                                <outbound>
+                                    <base />
+                                </outbound>
+                                <on-error>
+                                    <base />
+                                </on-error>
+                            </policies>
+                        `}
+                    />
+                </Suspense>
+            )}
+        </div>
     );
 };

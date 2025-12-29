@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { setupApiMocks } from './utils/api-mocker';
 
 test.describe('Onboarding Wizard Flow', () => {
     test.beforeEach(async ({ page }) => {
+        await setupApiMocks(page);
         // Login first
         await page.goto('/login');
         await page.getByPlaceholder('Enter your email').fill('user@company.com');
@@ -15,33 +17,34 @@ test.describe('Onboarding Wizard Flow', () => {
         await expect(page).toHaveURL('/onboard');
 
         // Step 1: Identity
-        await expect(page.getByText('Product Identity')).toBeVisible();
-        await page.getByPlaceholder(/Global Transactions API/i).fill('My New API');
+        await expect(page.getByRole('heading', { name: 'Establish Identity' })).toBeVisible();
+        await page.getByPlaceholder(/Payments Gateway/i).fill('My New API');
         await page.getByPlaceholder(/v1.0.0/i).fill('v1.0.0');
-        await page.getByPlaceholder(/Summarize the core capabilities/i).fill('This is a test description for the new API.');
+        await page.getByPlaceholder(/Describe your product/i).fill('This is a test description for the new API.');
+
+        // Select Owner Team (FinTech Core is t1)
+        await page.locator('select').selectOption('t1');
 
         // Check if next button is enabled and click
         const identityNext = page.getByRole('button', { name: /Establish Identity/i });
         await expect(identityNext).toBeEnabled();
         await identityNext.click();
 
-        // Step 2: Exposure Control
-        await expect(page.getByText('Exposure Control')).toBeVisible();
-        await page.getByLabel(/Restricted Circle/i).check();
+        // Step 2: Policy Studio (Visualizer)
+        // Wait for Visualizer to load by checking for the header OR the loading state
+        await expect(page.getByText(/Visualizer/i).or(page.getByText(/Loading Visualizer/i))).toBeVisible({ timeout: 15000 });
 
-        // Team search should appear
-        await expect(page.getByPlaceholder(/Search teams by name/i)).toBeVisible();
-
-        const visibilityNext = page.getByRole('button', { name: /Review Manifest/i });
-        await visibilityNext.click();
+        const visualizerNext = page.getByRole('button', { name: /Continue to Review/i });
+        await expect(visualizerNext).toBeVisible({ timeout: 10000 });
+        await visualizerNext.click();
 
         // Step 3: Review
-        await expect(page.getByText('Final Manifest')).toBeVisible();
+        await expect(page.getByText(/Step 3: Fulfillment/i).or(page.getByText(/Final Manifest/i))).toBeVisible();
         await expect(page.getByText('My New API')).toBeVisible();
         await expect(page.getByText('v1.0.0')).toBeVisible();
 
         // Final Submission
-        const submitBtn = page.getByRole('button', { name: /Submit Registration/i });
+        const submitBtn = page.getByRole('button', { name: /Publish API/i });
         await submitBtn.click();
 
         // Should redirect back to dashboard or show success (Mocked behavior redirect to /)

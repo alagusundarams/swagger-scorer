@@ -1,4 +1,4 @@
-import { type AppRegistration } from '../../../types/entities';
+import { type AppRegistration } from '../../consumer/types/consumerTypes';
 
 interface RequestAccessModalProps {
     isOpen: boolean;

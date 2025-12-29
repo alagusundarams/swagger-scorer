@@ -1,196 +1,60 @@
-/**
- * Inventory Feature Store
- * 
- * Manages inventory-specific state (products, subscriptions, teams)
- * MOVED from global store to achieve proper MFE architecture
- */
-
-import { StateCreator } from 'zustand';
-import { type Product, type Subscription, type Team, type API, type AppRegistration } from '../../../types/entities';
-import { type ApprovalRequest, type AuditLog } from '../../../types/workflow';
-import { getProducts, getTeams, getSubscriptions, requestProductAccess, updateSubscription as apiUpdateSubscription, getApprovals, updateApproval, getAuditLogs, updateTeam as apiUpdateTeam, createTeam as apiCreateTeam, updateProduct as apiUpdateProduct, requestPromotion as apiRequestPromotion, getAppRegistrations, addAppRegistration as apiAddAppRegistration } from '../api/inventoryClient';
-
-// Remove AuthSlice dependency - inventory shouldn't depend on auth slice directly
+import { type StateCreator } from 'zustand';
+import { inventoryApi } from '../api/inventoryClient';
+import type { Product, API } from '../types/inventoryTypes';
 
 /**
- * Inventory feature state interface
+ * Inventory feature state interface - CORE ONLY
  */
 export interface InventorySlice {
     products: Product[];
-    subscriptions: Subscription[];
-    teams: Team[];
-    appRegistrations: AppRegistration[];
-    approvalRequests: ApprovalRequest[];
-    auditLogs: AuditLog[];
+    apis: API[];
+    error: string | null;
+    isLoading: boolean;
 
-    fetchInitialData: (getToken?: () => Promise<string | null>) => Promise<void>;
-    fetchAuditLogs: (entityId?: string) => Promise<void>;
-    updateSubscription: (id: string, updates: Partial<Subscription>, getToken?: () => Promise<string | null>) => Promise<void>;
-    addSubscription: (productId: string, teamId: string, getToken?: () => Promise<string | null>, appId?: string, justification?: string) => Promise<void>;
-    processApproval: (id: string, decision: 'APPROVE' | 'REJECT', justification?: string, getToken?: () => Promise<string | null>) => Promise<void>;
+    // Actions
+    fetchInventory: () => Promise<void>;
     updateProduct: (id: string, updates: Partial<Product>) => Promise<void>;
     updateAPI: (id: string, updates: Partial<API>) => Promise<void>;
-    updateTeam: (id: string, updates: Partial<Team>) => Promise<void>;
-    addTeam: (team: Team) => Promise<void>;
-    requestProductPromotion: (productId: string, targetEnv: string, getToken?: () => Promise<string | null>) => Promise<void>;
-    fetchAppRegistrations: (teamId?: string) => Promise<void>;
-    addAppRegistration: (app: Partial<AppRegistration>) => Promise<void>;
-    error: string | null;
+    addApiToProduct: (productId: string, apiData: Partial<API>) => Promise<void>;
+    removeApiFromProduct: (productId: string, apiId: string) => Promise<void>;
+
+    // Named Values
+    fetchConfiguration: (productId: string) => Promise<void>;
+    addNamedValue: (productId: string, data: any) => Promise<void>;
+    deleteNamedValue: (productId: string, valueId: string) => Promise<void>;
+
     setError: (error: string | null) => void;
-    isLoading: boolean;
 }
 
-export const createInventorySlice: StateCreator<InventorySlice, [], [], InventorySlice> = (set, get) => ({
+/**
+ * Inventory Slice - Feature Domain
+ * 
+ * Manages only Product and API inventory.
+ * Teams, Subscriptions, and Governance state relocated to their respective domains.
+ */
+export const createInventorySlice: StateCreator<InventorySlice> = (set) => ({
     products: [],
-    subscriptions: [],
-    teams: [],
-    appRegistrations: [],
-    approvalRequests: [],
-    auditLogs: [],
+    apis: [],
     error: null,
     isLoading: false,
 
     setError: (error) => set({ error }),
 
-    fetchInitialData: async (getToken) => {
-        set({ error: null, isLoading: true }); // Start loading
+    fetchInventory: async () => {
+        set({ error: null, isLoading: true });
         try {
-            const [productsRes, teamsRes, approvalsRes, auditRes] = await Promise.all([
-                getProducts(),
-                getTeams(),
-                getApprovals(''),
-                getAuditLogs()
+            const [productsRes, apisRes] = await Promise.all([
+                inventoryApi.getProducts(),
+                inventoryApi.getApis()
             ]);
 
-            const allTeams = teamsRes.data;
-
             set({
-                products: productsRes.data,
-                teams: allTeams,
-                approvalRequests: approvalsRes.data,
-                auditLogs: auditRes.data
+                products: productsRes,
+                apis: apisRes,
+                isLoading: false
             });
-
-            // Mock notifications for testing (following notification strategy)
-            const mockNotifications = [
-                {
-                    id: 'notif-0',
-                    type: 'governance' as const,
-                    title: 'Privacy Violation Prevented',
-                    message: 'Automatic lockout triggered: Consumer Team "Alpha" attempted to access private product "Payments Core v2". Access successfully denied.',
-                    timestamp: 'Just now',
-                    read: false,
-                    navigateTo: '/'
-                },
-                {
-                    id: 'notif-1',
-                    type: 'success' as const,
-                    title: 'Subscription Approved',
-                    message: 'Your request for Payment Gateway API was approved by Platform Team',
-                    timestamp: '2 hours ago',
-                    read: false,
-                    navigateTo: '/'
-                },
-                {
-                    id: 'notif-2',
-                    type: 'warning' as const,
-                    title: 'Access Expiring Soon',
-                    message: 'Your Customer Service API access expires in 7 days',
-                    timestamp: '1 day ago',
-                    read: false,
-                    navigateTo: '/'
-                },
-                {
-                    id: 'notif-3',
-                    type: 'info' as const,
-                    title: 'API Deployed to Production',
-                    message: 'Payment Gateway API v2.1 successfully deployed to PROD',
-                    timestamp: '3 days ago',
-                    read: true,
-                    navigateTo: '/products/prod-payment'
-                }
-            ];
-
-            // Note: We need to cast to any or use the UISlice specifically to set notifications
-            (set as any)({ notifications: mockNotifications });
-
-            // TODO: User-team mapping should be handled by auth feature, not inventory
-            // Inventory should receive teams already mapped
-            // This violates MFE autonomy - removing cross-slice dependency
-
-
-            if (getToken) {
-                const token = await getToken();
-                if (token) {
-                    const subsRes = await getSubscriptions(token);
-                    set({ subscriptions: subsRes.data });
-                }
-            }
         } catch (error: any) {
-            console.error("Failed to fetch initial data", error);
-            set({ error: error.message || "Failed to load dashboard data. Please check your connection." });
-        } finally {
-            set({ isLoading: false });
-        }
-    },
-
-    updateSubscription: async (id, updates, getToken) => {
-        set((state) => ({
-            subscriptions: state.subscriptions.map((s) => s.id === id ? { ...s, ...updates } : s)
-        }));
-
-        if (getToken && updates.state && (updates.state === 'active' || updates.state === 'rejected')) {
-            try {
-                const token = await getToken();
-                if (token) {
-                    await apiUpdateSubscription(id, updates.state, token);
-                }
-            } catch (error) {
-                console.error("Failed to update subscription", error);
-            }
-        }
-    },
-
-    addSubscription: async (productId, teamId, getToken, appId, justification) => {
-        if (!getToken) return;
-        try {
-            const token = await getToken();
-            if (token) {
-                const response = await requestProductAccess(productId, teamId, token, appId, justification);
-                const sub = response.data;
-                set((state) => ({
-                    subscriptions: [sub, ...state.subscriptions]
-                }));
-            }
-        } catch (error) {
-            console.error("Failed to add subscription", error);
-        }
-    },
-
-    processApproval: async (id, decision, justification, getToken) => {
-        const newStatus = decision === 'APPROVE' ? 'APPROVED' : 'REJECTED';
-        set((state) => ({
-            approvalRequests: state.approvalRequests.map(r => r.id === id ? { ...r, status: newStatus } : r)
-        }));
-
-        if (getToken) {
-            try {
-                const token = await getToken();
-                if (token) {
-                    await updateApproval(id, newStatus, justification, token);
-                }
-            } catch (error) {
-                console.error("Failed to process approval", error);
-            }
-        }
-    },
-
-    fetchAuditLogs: async (entityId) => {
-        try {
-            const response = await getAuditLogs(entityId);
-            set({ auditLogs: response.data });
-        } catch (error) {
-            console.error("Failed to fetch audit logs", error);
+            set({ error: error.message || "Failed to load inventory data.", isLoading: false });
         }
     },
 
@@ -198,83 +62,90 @@ export const createInventorySlice: StateCreator<InventorySlice, [], [], Inventor
         set((state) => ({
             products: state.products.map(p => p.id === id ? { ...p, ...updates } : p)
         }));
-        try {
-            await apiUpdateProduct(id, updates);
-        } catch (error) {
-            console.error("Failed to update product", error);
-        }
+        await inventoryApi.updateProduct(id, updates);
     },
 
     updateAPI: async (id, updates) => {
-        // Mock update for API specific fields (like ownerTeamId)
-        // In a real app, we would update state.products.flat().apis or similar
-        // Here we just log it as it's primarily for the Admin Mapping flow which refreshes or relies on logs
-        console.log(`[DataSlice] updateAPI called for ${id}`, updates);
-        // Note: Deep nested structure update in Zustand for Products->APIs is complex without Immer
-        // For this demo, we assume the backend handles it and next fetch resolves it.
+        console.log(`[InventorySlice] updateAPI called for ${id}`, updates);
     },
 
-    updateTeam: async (id, updates) => {
-        set((state) => ({
-            teams: state.teams.map(t => t.id === id ? { ...t, ...updates } : t)
-        }));
+    addApiToProduct: async (productId, apiData) => {
         try {
-            await apiUpdateTeam(id, updates);
-        } catch (error) {
-            console.error("Failed to update team", error);
-        }
-    },
-
-    addTeam: async (team) => {
-        // Optimistic update
-        set((state) => ({
-            teams: [...state.teams, team]
-        }));
-        try {
-            await apiCreateTeam(team);
-        } catch (error) {
-            console.error("Failed to create team", error);
-            // Revert on failure (simple pop for now, or fetch fresh)
+            const newApi = await inventoryApi.addApi(productId, apiData);
             set((state) => ({
-                teams: state.teams.filter(t => t.id !== team.id)
+                apis: [...state.apis, newApi],
+                products: state.products.map(p =>
+                    p.id === productId
+                        ? { ...p, apis: [...(p.apis || []), newApi] }
+                        : p
+                )
             }));
-        }
-    },
-
-    requestProductPromotion: async (productId, targetEnv, getToken) => {
-        if (!getToken) return;
-        try {
-            const token = await getToken();
-            if (token) {
-                const response = await apiRequestPromotion(productId, targetEnv, token);
-                const req = response.data;
-                set((state) => ({
-                    approvalRequests: [req, ...state.approvalRequests]
-                }));
-            }
         } catch (error: any) {
-            console.error("Failed to request promotion", error);
-            throw error; // Re-throw to let UI handle toasts
+            set({ error: error.message || 'Failed to add API' });
+            throw error;
         }
     },
 
-    fetchAppRegistrations: async (teamId) => {
+    removeApiFromProduct: async (productId, apiId) => {
         try {
-            const response = await getAppRegistrations(teamId);
-            set({ appRegistrations: response.data });
-        } catch (error) {
-            console.error("Failed to fetch app registrations", error);
-        }
-    },
-
-    addAppRegistration: async (app) => {
-        try {
-            const response = await apiAddAppRegistration(app);
+            await inventoryApi.removeApi(productId, apiId);
             set((state) => ({
-                appRegistrations: [response.data, ...state.appRegistrations]
+                apis: state.apis.filter(a => a.id !== apiId),
+                products: state.products.map(p =>
+                    p.id === productId
+                        ? { ...p, apis: (p.apis || []).filter(a => a.id !== apiId) }
+                        : p
+                )
             }));
-        } catch (error) {
-            console.error("Failed to add app registration", error);
+        } catch (error: any) {
+            set({ error: error.message || 'Failed to remove API' });
+            throw error;
+        }
+    },
+
+    fetchConfiguration: async (productId) => {
+        try {
+            const values = await inventoryApi.getNamedValues(productId);
+            set((state) => ({
+                products: state.products.map(p =>
+                    p.id === productId ? { ...p, namedValues: values } : p
+                )
+            }));
+        } catch (error: any) {
+            console.error("Failed to fetch configuration", error);
+            // Don't block UI, just log
+        }
+    },
+
+    addNamedValue: async (productId, data) => {
+        try {
+            const newValue = await inventoryApi.addNamedValue(productId, data);
+            set((state) => ({
+                products: state.products.map(p =>
+                    p.id === productId
+                        ? { ...p, namedValues: [...(p.namedValues || []), newValue] }
+                        : p
+                )
+            }));
+        } catch (error: any) {
+            set({ error: error.message || 'Failed to add configuration value' });
+            throw error;
+        }
+    },
+
+    deleteNamedValue: async (productId, valueId) => {
+        try {
+            await inventoryApi.deleteNamedValue(productId, valueId);
+            set((state) => ({
+                products: state.products.map(p =>
+                    p.id === productId
+                        ? { ...p, namedValues: (p.namedValues || []).filter(v => v.id !== valueId) }
+                        : p
+                )
+            }));
+        } catch (error: any) {
+            set({ error: error.message || 'Failed to delete configuration value' });
+            throw error;
         }
     }
 });

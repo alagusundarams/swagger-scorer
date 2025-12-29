@@ -6,6 +6,32 @@
 
 import { query } from './db.js';
 import { updateProductMetadata } from './apim.service.js';
+import { logAudit } from './audit.service.js';
+
+// Ensure Named Values table exists
+// In a real production app, this would be a migration.
+(async () => {
+    try {
+        await query(`
+            CREATE TABLE IF NOT EXISTS named_values (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+                scope_id UUID, -- If null/empty, it's Product Level. Else, it must be an API ID.
+                display_name TEXT NOT NULL,
+                system_name TEXT NOT NULL,
+                value TEXT NOT NULL,
+                type TEXT CHECK (type IN ('literal', 'key_vault')),
+                is_secret BOOLEAN DEFAULT false,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW(),
+                UNIQUE(product_id, system_name, scope_id) -- Prevent duplicates in same scope
+            );
+        `);
+        console.log('✅ Named Values Table Verified');
+    } catch (err) {
+        console.error('❌ Failed to verify Named Values table:', err);
+    }
+})();
 
 /**
  * Fetch all products with their associated APIs and calculated subscriber counts
@@ -36,7 +62,7 @@ export async function getAllProducts(environment?: string, userRole?: string, te
 
     const productRes = await query(`
         SELECT p.*, 
-               t.display_name as owner_team_name,
+               t.name as owner_team_name,
                COALESCE(sub_counts.active_subscribers, 0) as calculated_subscriber_count
         FROM products p
         LEFT JOIN teams t ON p.owner_team_id = t.id
@@ -72,6 +98,7 @@ export async function getAllProducts(environment?: string, userRole?: string, te
         state: p.state,
         type: p.type,
         environment: p.environment,
+        region: p.region,
 
         // Team ownership
         ownerTeamId: p.owner_team_id,
@@ -143,6 +170,127 @@ export async function getRepoUrlForResource(resourceId: string): Promise<string 
 }
 
 /**
+ * Fetch all APIs with their parent product display names
+ */
+export async function getAllApis() {
+    const res = await query(`
+        SELECT a.*, p.display_name as product_display_name
+        FROM apis a
+        JOIN products p ON a.product_id = p.id
+        ORDER BY a.display_name ASC
+    `);
+
+    return res.rows.map(a => ({
+        ...a,
+        productId: a.product_id,
+        displayName: a.display_name,
+        productDisplayName: a.product_display_name,
+        qualityScore: a.quality_score
+    }));
+}
+
+/**
+ * Add a new product to the catalog
+ */
+export async function addProduct(product: {
+    id: string,
+    name: string,
+    displayName: string,
+    description: string,
+    state: string,
+    ownerTeamId: string,
+    environment: string,
+    type?: string,
+    managementMode?: string,
+    gitRepoUrl?: string,
+    gitFilePath?: string
+}) {
+    const res = await query(`
+        INSERT INTO products (
+            id, name, display_name, description, state, owner_team_id, environment, type, management_mode, git_repo_url, git_file_path, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+        RETURNING *
+    `, [
+        product.id, product.name, product.displayName, product.description, product.state, product.ownerTeamId, product.environment,
+        product.type || 'standard', product.managementMode || 'PORTAL_MANAGED', product.gitRepoUrl, product.gitFilePath
+    ]);
+
+    // Log Audit
+    await logAudit({
+        entityType: 'PRODUCT',
+        entityId: product.id,
+        action: 'CREATE_PRODUCT',
+        userId: 'system-user',
+        changes: product
+    });
+
+    return res.rows[0];
+}
+
+/**
+ * Add a new API to a product
+ */
+export async function addApi(api: {
+    id: string,
+    productId: string,
+    name: string,
+    displayName: string,
+    description: string,
+    path: string,
+    qualityScore?: number,
+    originTeamId?: string,
+    gitRepoUrl?: string,
+    gitFilePath?: string
+}) {
+    const res = await query(`
+        INSERT INTO apis (
+            id, product_id, name, display_name, description, path, quality_score, origin_team_id, git_repo_url, git_file_path, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+        RETURNING *
+    `, [
+        api.id, api.productId, api.name, api.displayName, api.description, api.path,
+        api.qualityScore || 0, api.originTeamId, api.gitRepoUrl, api.gitFilePath
+    ]);
+
+    // Log Audit
+    await logAudit({
+        entityType: 'API',
+        entityId: api.id,
+        action: 'CREATE_API',
+        userId: 'system-user',
+        changes: api
+    });
+
+    return res.rows[0];
+}
+
+/**
+ * Remove an API from a product
+ */
+export async function removeApi(apiId: string, productId: string) {
+    const res = await query(`
+        DELETE FROM apis 
+        WHERE id = $1 AND product_id = $2
+        RETURNING *
+    `, [apiId, productId]);
+
+    if (res.rowCount === 0) {
+        throw new Error('API not found or does not belong to this product');
+    }
+
+    // Log Audit
+    await logAudit({
+        entityType: 'API',
+        entityId: apiId,
+        action: 'DELETE_API',
+        userId: 'system-user',
+        changes: { productId }
+    });
+
+    return true;
+}
+
+/**
  * Update a product's metadata (e.g. ownership assignment)
  * @param id The product ID
  * @param data Partial product data
@@ -189,6 +337,15 @@ export async function updateProduct(id: string, data: { ownerTeamId?: string }) 
                 .catch(err => console.error('[ProductsService] ARM Sync Failed Background:', err));
         }
     }
+
+    // 5. Log Audit (Mock user ID for now)
+    await logAudit({
+        entityType: 'PRODUCT',
+        entityId: id,
+        action: 'UPDATE_PRODUCT',
+        userId: 'system-user',
+        changes: data
+    });
 
     return result.rows[0];
 }
@@ -300,5 +457,227 @@ export async function updatePermissionMatrix(productId: string, entries: { adGro
             .catch(err => console.error('[ProductsService] Matrix ARM Sync Failed Background:', err));
     }
 
+    // 4. Log Audit
+    await logAudit({
+        entityType: 'PRODUCT',
+        entityId: productId,
+        action: 'UPDATE_PERMISSION_MATRIX',
+        userId: 'system-user',
+        changes: { entryCount: entries.length }
+    });
+
     return results;
+}
+
+/**
+ * NAMED VALUES (Configuration & Secrets)
+ */
+
+export async function getNamedValues(productId: string) {
+    const res = await query(`
+        SELECT nv.*, 
+               CASE 
+                   WHEN nv.scope_id IS NULL THEN 'Product Level'
+                   ELSE a.display_name 
+               END as scope_name
+        FROM named_values nv
+        LEFT JOIN apis a ON nv.scope_id = a.id
+        WHERE nv.product_id = $1
+        ORDER BY nv.scope_id NULLS FIRST, nv.display_name ASC
+    `, [productId]);
+
+    return res.rows.map(row => ({
+        ...row,
+        scopeName: row.scope_name,
+        // If secret, mask the value loosely (frontend should assume masked)
+        value: row.is_secret ? '*****' : row.value
+    }));
+}
+
+export async function addNamedValue(productId: string, data: {
+    displayName: string,
+    systemName: string,
+    value: string,
+    type: 'literal' | 'key_vault',
+    isSecret: boolean,
+    scopeId?: string, // Optional API ID
+    allowOverwrite?: boolean
+}) {
+    // 1. If scoped to API, verify API belongs to Product
+    if (data.scopeId) {
+        const apiCheck = await query('SELECT id FROM apis WHERE id = $1 AND product_id = $2', [data.scopeId, productId]);
+        if (apiCheck.rowCount === 0) throw new Error('Invalid Scope: API does not belong to this Product.');
+    }
+
+    // 1b. Value Collision Check (Audit Only)
+    // Warn/Audit if this exact value is used elsewhere (risk of shared secret sprawl)
+    if (!data.isSecret) { // Skip strict secret comparison for now, focus on configs
+        const collision = await query(
+            'SELECT product_id, system_name FROM named_values WHERE value = $1 LIMIT 1',
+            [data.value]
+        );
+        if (collision.rowCount > 0) {
+            await logAudit({
+                entityType: 'NAMED_VALUE',
+                entityId: 'potential-collision',
+                action: 'VALUE_COLLISION_DETECTED',
+                userId: 'system-user',
+                changes: {
+                    newSystemName: data.systemName,
+                    existingMatch: `${collision.rows[0].product_id}/${collision.rows[0].system_name}`,
+                    note: 'Identical value detected across different keys.'
+                }
+            });
+        }
+    }
+
+    // 2. Check for Duplicates
+    const existing = await query(
+        'SELECT id FROM named_values WHERE product_id = $1 AND system_name = $2 AND (scope_id = $3 OR (scope_id IS NULL AND $3 IS NULL))',
+        [productId, data.systemName, data.scopeId || null]
+    );
+
+    if (existing.rowCount > 0) {
+        if (!data.allowOverwrite) {
+            throw new Error('DUPLICATE_CONFIRMATION_REQUIRED: Value exists. Confirm overwrite?');
+        }
+
+        // 3a. Overwrite (Update)
+        const idToUpdate = existing.rows[0].id;
+        const res = await query(`
+            UPDATE named_values 
+            SET display_name = $1, value = $2, type = $3, is_secret = $4, updated_at = NOW()
+            WHERE id = $5
+            RETURNING *
+        `, [data.displayName, data.value, data.type, data.isSecret, idToUpdate]);
+
+        await logAudit({
+            entityType: 'NAMED_VALUE',
+            entityId: idToUpdate,
+            action: 'OVERWRITE_NAMED_VALUE',
+            userId: 'system-user',
+            changes: { productId, scopeId: data.scopeId, systemName: data.systemName, note: 'User explicitly confirmed overwrite.' }
+        });
+
+        return res.rows[0];
+    }
+
+    // 3b. Insert New
+    const res = await query(`
+        INSERT INTO named_values (
+            product_id, scope_id, display_name, system_name, value, type, is_secret
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING *
+    `, [productId, data.scopeId || null, data.displayName, data.systemName, data.value, data.type, data.isSecret]);
+
+    await logAudit({
+        entityType: 'NAMED_VALUE',
+        entityId: res.rows[0].id,
+        action: 'CREATE_NAMED_VALUE',
+        userId: 'system-user',
+        changes: { productId, scopeId: data.scopeId, systemName: data.systemName }
+    });
+
+    return res.rows[0];
+}
+
+export async function deleteNamedValue(productId: string, valueId: string) {
+    const res = await query(`
+        DELETE FROM named_values WHERE id = $1 AND product_id = $2 RETURNING *
+    `, [valueId, productId]);
+
+    if (res.rowCount === 0) throw new Error('Named Value not found.');
+
+    await logAudit({
+        entityType: 'NAMED_VALUE',
+        entityId: valueId,
+        action: 'DELETE_NAMED_VALUE',
+        userId: 'system-user',
+        changes: { productId }
+    });
+
+    return true;
+}
+
+/**
+ * Generate GitOps Manifest (JSON or TFVars)
+ * This ensures the backend is the source of truth for the export format.
+ */
+export async function generateManifest(productId: string, format: 'json' | 'tfvars') {
+    // 1. Fetch Data
+    const productRes = await query('SELECT * FROM products WHERE id = $1', [productId]);
+    if (productRes.rows.length === 0) throw new Error('Product not found');
+    const product = productRes.rows[0];
+
+    const apisRes = await query('SELECT * FROM apis WHERE product_id = $1', [productId]);
+    const apis = apisRes.rows;
+
+    const valuesRes = await query('SELECT * FROM named_values WHERE product_id = $1', [productId]);
+    const values = valuesRes.rows;
+
+    // 2. Group Values
+    const productValues = values.filter(v => !v.scope_id);
+    const apiValues = values.filter(v => v.scope_id);
+
+    // 3. Generate Format
+    if (format === 'json') {
+        const payload = {
+            product: product.name,
+            environment: product.environment,
+            configuration: {
+                shared: productValues.reduce((acc, nv) => ({
+                    ...acc,
+                    [nv.system_name]: {
+                        displayName: nv.display_name,
+                        value: nv.type === 'key_vault' ? `[KV Reference]` : nv.value,
+                        isSecret: nv.is_secret,
+                        type: nv.type
+                    }
+                }), {}),
+                apis: apis.map(api => ({
+                    apiName: api.name,
+                    values: apiValues
+                        .filter(nv => nv.scope_id === api.id)
+                        .reduce((acc, nv) => ({
+                            ...acc,
+                            [nv.system_name]: {
+                                displayName: nv.display_name,
+                                value: nv.type === 'key_vault' ? `[KV Reference]` : nv.value,
+                                isSecret: nv.is_secret
+                            }
+                        }), {})
+                })).filter((a: any) => Object.keys(a.values).length > 0)
+            }
+        };
+        return JSON.stringify(payload, null, 2);
+    } else {
+        let tf = `# Product Configuration: ${product.display_name}\n\n`;
+
+        // Product Level
+        tf += `product_named_values = {\n`;
+        productValues.forEach(nv => {
+            tf += `  "${nv.system_name}" = {\n`;
+            tf += `    display_name = "${nv.display_name}"\n`;
+            tf += `    value        = "${nv.type === 'key_vault' ? '<KV_REF>' : nv.value}"\n`;
+            tf += `    secret       = ${nv.is_secret}\n`;
+            tf += `  }\n`;
+        });
+        tf += `}\n\n`;
+
+        // API Level
+        tf += `api_named_values = {\n`;
+        apis.forEach(api => {
+            const myValues = apiValues.filter(nv => nv.scope_id === api.id);
+            if (myValues.length > 0) {
+                tf += `  "${api.name}" = {\n`;
+                myValues.forEach(nv => {
+                    tf += `    "${nv.system_name}" = "${nv.type === 'key_vault' ? '<KV_REF>' : nv.value}"\n`;
+                });
+                tf += `  }\n`;
+            }
+        });
+        tf += `}\n`;
+
+        return tf;
+    }
 }

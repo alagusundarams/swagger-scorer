@@ -26,6 +26,11 @@ export interface AnalysisResult {
         severity: 'error' | 'warning' | 'info' | 'hint';
         category: string;
     }>;
+    operations?: Array<{
+        method: string;
+        path: string;
+        summary: string;
+    }>;
 }
 
 // === ANALYZER ENDPOINTS ===

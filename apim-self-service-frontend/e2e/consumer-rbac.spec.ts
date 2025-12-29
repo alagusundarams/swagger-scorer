@@ -1,11 +1,15 @@
 import { test, expect } from '@playwright/test';
+import { setupApiMocks } from './utils/api-mocker';
 
-test.describe('Consumer RBAC Restrictions', () => {
-
+test.describe('Consumer RBAC & Visibility', () => {
     test.beforeEach(async ({ page }) => {
-        // 1. Login as a Consumer (Developer Persona)
+        await setupApiMocks(page);
+        await page.goto('/');
+        await page.evaluate(() => localStorage.clear());
+
+        // 1. Login as a Consumer
         await page.goto('/login');
-        await page.getByRole('button', { name: /DEVELOPER/i }).click();
+        await page.getByRole('button', { name: /CONSUMER/i }).click();
         await expect(page).toHaveURL('/', { timeout: 15000 });
     });
 
@@ -13,16 +17,14 @@ test.describe('Consumer RBAC Restrictions', () => {
         // 2. Navigate to "Active Subscriptions" tab
         await page.getByText(/ACTIVE SUBSCRIPTIONS/i).click();
 
-        // 3. Click "View Details" on the first card (e.g., Identity Service)
-        const firstCard = page.locator('.shadow-premium').first();
-        await expect(firstCard).toBeVisible();
-        await firstCard.click();
+        // 3. Click one to view details - target the text directly for robustness
+        await page.getByText(/Identity Service/i).first().click();
 
         // 4. Verify we are on Product Detail Page
-        await expect(page).toHaveURL(/\/products\//);
+        await expect(page).toHaveURL(/\/products\//, { timeout: 15000 });
 
         // 5. Verify "Rate Limit Status" is visible (Consumer specific feature)
-        await expect(page.getByText(/Rate Limit Status/i)).toBeVisible();
+        await expect(page.getByTestId('rate-limit-status')).toBeVisible();
 
         // 6. Verify "Quality Score" is NOT visible (Producer specific feature)
         // Note: Use .count() logic to avoid waiting for timeout if we expect absence

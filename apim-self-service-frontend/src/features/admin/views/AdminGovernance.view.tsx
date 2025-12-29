@@ -1,25 +1,26 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
-import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
+import { useStore } from '../../../store/useStore';
 import { TeamManager } from '../components/TeamManager';
+import { useGovernanceStore } from '../../governance/store/governanceStore';
 import { OrphanProductManager } from '../components/OrphanProductManager';
 
 export const AdminGovernancePage = () => {
-    const { user, setPageTitle } = useInventoryStore();
+    const { user, setPageTitle } = useStore();
+    const { approvalRequests: _approvalRequests } = useGovernanceStore();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'teams' | 'orphans'>('teams');
 
     useEffect(() => {
         setPageTitle('Admin Governance');
-        // Double check admin role, though ProtectedRoute should handle it
         if (user && user.role !== 'admin') {
             navigate('/');
         }
     }, [user, navigate, setPageTitle]);
 
     if (!user || user.role !== 'admin') {
-        return null; // or loading spinner
+        return null;
     }
 
     return (
@@ -39,8 +40,8 @@ export const AdminGovernancePage = () => {
                     <button
                         onClick={() => setActiveTab('teams')}
                         className={`pb-4 text-sm font-bold tracking-wide uppercase transition-all duration-200 border-b-2 ${activeTab === 'teams'
-                                ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
-                                : 'text-gray-500 hover:text-gray-800 dark:text-slate-500 dark:hover:text-slate-200 border-transparent'
+                            ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
+                            : 'text-gray-500 hover:text-gray-800 dark:text-slate-500 dark:hover:text-slate-200 border-transparent'
                             }`}
                     >
                         Team & Identity Map
@@ -48,8 +49,8 @@ export const AdminGovernancePage = () => {
                     <button
                         onClick={() => setActiveTab('orphans')}
                         className={`pb-4 text-sm font-bold tracking-wide uppercase transition-all duration-200 border-b-2 ${activeTab === 'orphans'
-                                ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
-                                : 'text-gray-500 hover:text-gray-800 dark:text-slate-500 dark:hover:text-slate-200 border-transparent'
+                            ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
+                            : 'text-gray-500 hover:text-gray-800 dark:text-slate-500 dark:hover:text-slate-200 border-transparent'
                             }`}
                     >
                         Orphan Reclamation

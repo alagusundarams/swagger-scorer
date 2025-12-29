@@ -21,6 +21,7 @@ async function seed() {
 
         await query('ALTER TABLE app_registrations ADD COLUMN IF NOT EXISTS product_id TEXT');
         await query('ALTER TABLE app_registrations ADD COLUMN IF NOT EXISTS secret_expiry_date TEXT');
+        await query('ALTER TABLE app_registrations ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()');
 
         // 2. Clean Slate (Order matters for FKs)
         console.log('🧹 Cleaning existing data...');
@@ -170,6 +171,58 @@ async function seed() {
                 INSERT INTO app_registrations (id, display_name, client_id, environment, owner_team_id, product_id, created_at)
                 VALUES ($1, $2, $3, $4, $5, $6, NOW())
             `, [a.id, a.display_name, a.client_id, a.environment, a.owner_team_id, a.product_id]);
+        }
+
+        // 8. Seed Named Values (Configuration)
+        console.log('⚙️ Seeding Named Values (Configuration)...');
+        await query('DELETE FROM named_values'); // Clear existing
+
+        // Ensure table exists (Fixing UUID/TEXT mismatch from service)
+        // Note: Table definition moved to 01-schema.sql (The God File)
+
+        const namedValues = [
+            // Product Level for 'prod-001'
+            { id: 'nv-001', product_id: 'prod-001', scope_id: null, display_name: 'Backend URL', system_name: 'backend_url', value: 'https://api.payments.com', type: 'literal', is_secret: false },
+            { id: 'nv-002', product_id: 'prod-001', scope_id: null, display_name: 'Max Retries', system_name: 'max_retries', value: '3', type: 'literal', is_secret: false },
+            { id: 'nv-003', product_id: 'prod-001', scope_id: null, display_name: 'DB Connection', system_name: 'db_conn', value: 'https://vault.azure.net/secrets/db-conn', type: 'key_vault', is_secret: true },
+
+            // API Level for 'prod-grp-001' -> 'api-pay'
+            { id: 'nv-grp-001', product_id: 'prod-grp-001', scope_id: 'api-pay', display_name: 'Payment Provider Key', system_name: 'stripe_key', value: 'sk_test_12345', type: 'literal', is_secret: true }
+        ];
+
+        for (const nv of namedValues) {
+            await query(`
+                INSERT INTO named_values (id, product_id, scope_id, display_name, system_name, value, type, is_secret)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                ON CONFLICT DO NOTHING
+            `, [nv.id, nv.product_id, nv.scope_id, nv.display_name, nv.system_name, nv.value, nv.type, nv.is_secret]);
+        }
+
+        // 9. Seed Permission Matrix (RBAC)
+        console.log('🛡️ Seeding Permission Matrix...');
+        await query('DELETE FROM permission_matrix');
+
+
+
+        const permissions = [
+            // Platform Team (Admins) - Owner everywhere
+            { product_id: 'prod-001', ad_group_id: 'group-platform', environment: 'DEV', role: 'Owner' },
+            { product_id: 'prod-001', ad_group_id: 'group-platform', environment: 'PROD', role: 'Owner' },
+
+            // Payments Team - Contributor in DEV, Reader in PROD (Simulating restriction)
+            { product_id: 'prod-001', ad_group_id: 'group-payments', environment: 'DEV', role: 'Contributor' },
+            { product_id: 'prod-001', ad_group_id: 'group-payments', environment: 'PROD', role: 'Reader' },
+
+            // GRP Product - Mobile Team
+            { product_id: 'prod-grp-001', ad_group_id: 'group-mobile', environment: 'DEV', role: 'Contributor' },
+            { product_id: 'prod-grp-001', ad_group_id: 'group-mobile', environment: 'PROD', role: 'Reader' } // Strict PROD
+        ];
+
+        for (const p of permissions) {
+            await query(`
+                INSERT INTO permission_matrix (product_id, ad_group_id, environment, role)
+                VALUES ($1, $2, $3, $4)
+            `, [p.product_id, p.ad_group_id, p.environment, p.role]);
         }
 
         console.log('✅ Seeding Complete!');

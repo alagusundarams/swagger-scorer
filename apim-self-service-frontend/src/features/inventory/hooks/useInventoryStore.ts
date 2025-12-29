@@ -8,7 +8,8 @@
  */
 
 import { create } from 'zustand';
-import { createInventorySlice, InventorySlice } from '../store/inventorySlice';
+import { createInventorySlice } from '../store/inventorySlice';
+import type { InventorySlice } from '../store/inventorySlice';
 
 /**
  * Inventory feature store

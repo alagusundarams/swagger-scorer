@@ -12,7 +12,7 @@
  */
 
 import { FastifyInstance } from 'fastify';
-import { parseOpenAPI, validateOpenAPIStructure, detectOpenAPIVersion } from '../services/parser.js';
+import { parseOpenAPI, validateOpenAPIStructure, detectOpenAPIVersion, extractOperations } from '../services/parser.js';
 import { createSpectral, analyzeWithSpectral } from '../services/spectral.js';
 import { calculateScore } from '../services/scorer.js';
 import { AnalyzeRequest, ScoringConfig } from '../types/index.js';
@@ -106,8 +106,11 @@ export async function analyzeRoutes(
                     'Score calculation complete'
                 );
 
+                // Step 4.5: Extract operations for UI preview (Dumb UI requirement)
+                const operations = extractOperations(spec);
+
                 // Step 5: Return result
-                return reply.send(result);
+                return reply.send({ ...result, operations });
             } catch (error) {
                 // Handle different types of errors
                 if (error instanceof Error) {

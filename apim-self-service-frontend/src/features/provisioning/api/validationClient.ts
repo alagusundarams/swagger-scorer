@@ -18,6 +18,20 @@ export interface ValidationResult {
 }
 
 /**
+ * Validate Product name for duplicates
+ */
+export async function validateProductName(
+    name: string,
+    environment: string
+): Promise<ValidationResult> {
+    const response = await api.post('/validate/product-name', {
+        name,
+        environment
+    });
+    return response.data;
+}
+
+/**
  * Validate API path for duplicates
  */
 export async function validateApiPath(

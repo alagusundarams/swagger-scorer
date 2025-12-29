@@ -54,13 +54,13 @@ async function resetDb() {
         console.log(`   Target: ${safeUrl}`);
 
         const getSchema = () => {
-            const rootPath = join(process.cwd(), 'apim-database', 'init-db', '01-schema.sql');
+            const rootPath = join(process.cwd(), 'apim-database', 'schema', '01-god-schema.sql');
             if (existsSync(rootPath)) return readFileSync(rootPath, 'utf8');
 
-            const relPath = join(__dirname, '..', '..', 'init-db', '01-schema.sql');
+            const relPath = join(__dirname, '..', '..', 'schema', '01-god-schema.sql');
             if (existsSync(relPath)) return readFileSync(relPath, 'utf8');
 
-            throw new Error('Schema file (01-schema.sql) not found.');
+            throw new Error('Schema file (01-god-schema.sql) not found.');
         };
 
         const schemaSql = getSchema();

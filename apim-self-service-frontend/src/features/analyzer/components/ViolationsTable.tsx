@@ -41,18 +41,6 @@ export const ViolationsTable: React.FC = () => {
         return [...violations].sort((a, b) => a.line - b.line);
     };
 
-    // Vibrant category colors for dark theme
-    const getCategoryColor = (category: string): string => {
-        const colors: Record<string, string> = {
-            'security': '#f87171',
-            'structural': '#22d3ee',
-            'documentation': '#60a5fa',
-            'apiDesign': '#a78bfa',
-            'dataModels': '#fbbf24',
-            'errorHandling': '#34d399',
-        };
-        return colors[category] || '#94a3b8';
-    };
 
     return (
         <div className="w-full bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex flex-col shadow-lg shadow-slate-900/50">
@@ -107,7 +95,6 @@ export const ViolationsTable: React.FC = () => {
             <div className="overflow-y-auto max-h-[400px]">
                 {Object.entries(groupedViolations).map(([category, violations]) => {
                     const isExpanded = expandedGroups[category];
-                    const categoryColor = getCategoryColor(category);
 
                     return (
                         <div key={category} className="border-b border-slate-700 last:border-b-0">
@@ -134,13 +121,7 @@ export const ViolationsTable: React.FC = () => {
                                     </div>
 
                                     {/* Category Color Dot with Glow */}
-                                    <div
-                                        className="category-dot"
-                                        style={{
-                                            '--dot-color': categoryColor,
-                                            '--dot-glow': categoryColor
-                                        } as React.CSSProperties}
-                                    />
+                                    <div className={`category-dot ${category}`} />
 
                                     {/* Category Name */}
                                     <span className="text-[15px] font-semibold text-slate-100 capitalize">

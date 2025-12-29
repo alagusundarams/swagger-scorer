@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import type { ApprovalRequest } from '../../../types/workflow';
+import type { ApprovalRequest } from '../../governance/types/governanceTypes';
 
 interface ApprovalRequestCardProps {
     request: ApprovalRequest;

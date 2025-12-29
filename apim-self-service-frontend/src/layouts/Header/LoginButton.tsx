@@ -3,7 +3,7 @@ interface LoginButtonProps {
 }
 
 import React from "react";
-import { useAuth } from "../../hooks/useAuth";
+import { useAuth } from "../../features/auth/hooks/useAuth";
 
 export const LoginButton: React.FC<LoginButtonProps> = ({ fullWidth = false }) => {
     const { login, isMock } = useAuth();

@@ -1,19 +1,29 @@
-/**
- * Provisioning - Custom Hooks
- * 
- * React hooks for provisioning data fetching using MFE pattern.
- * 
- * @module features/provisioning/hooks
- */
-
-import { useState } from 'react';
+import { useCallback, useMemo } from 'react';
 
 /**
- * Hook for product provisioning (placeholder)
+ * Hook for managing the onboarding workflow state and validation.
+ * Stubbed version to resolve build errors while maintaining the hook's existence.
  */
 export function useProvisioning() {
-    const [provisioning, setProvisioning] = useState(false);
-    const [result, setResult] = useState<any>(null);
+    // Return empty/mocked state since this hook is currently unused 
+    // and its store state was refactored/moved.
+    const provisioning = {};
+    const result = null;
+    const isLoading = false;
+    const error = null;
 
-    return { provisioning, result };
+    const isSubmitting = useMemo(() => isLoading, [isLoading]);
+
+    const submit = useCallback(async () => {
+        console.log('[useProvisioning] submit called (stub)');
+    }, []);
+
+    return {
+        provisioning,
+        result,
+        isLoading,
+        isSubmitting,
+        error,
+        submit
+    };
 }

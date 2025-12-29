@@ -1,5 +1,6 @@
 import React from 'react';
-import { type Product, type Subscription } from '../../../types/entities';
+import { type Product } from '../../../types/entities';
+import { type Subscription } from '../../consumer/types/consumerTypes';
 import '../inventory.css';
 
 interface ProductConsumerCardProps {
@@ -68,7 +69,7 @@ export const ProductConsumerCard: React.FC<ProductConsumerCardProps> = ({
                                 {isRevealed ? '👁️' : '👁️‍🗨️'}
                             </button>
                             <button
-                                onClick={(e) => { e.stopPropagation(); onCopyKey(subscription.primaryKey.value); }}
+                                onClick={(e) => { e.stopPropagation(); onCopyKey(subscription.primaryKey?.value || ''); }}
                                 className="text-xs text-blue-500 hover:text-blue-600 transition-colors"
                                 title="Copy Key"
                             >
@@ -77,7 +78,9 @@ export const ProductConsumerCard: React.FC<ProductConsumerCardProps> = ({
                         </div>
                     </div>
                     <div className="font-mono text-xs tracking-widest text-gray-600 dark:text-slate-300 break-all bg-white dark:bg-slate-950/50 p-3 rounded-xl border border-gray-100 dark:border-slate-800 shadow-inner">
-                        {isRevealed ? subscription.primaryKey.value : maskKey(subscription.primaryKey.value)}
+                        {isRevealed
+                            ? (subscription.primaryKey?.value || 'N/A')
+                            : maskKey(subscription.primaryKey?.value || '••••••••••••')}
                     </div>
                 </div>
 
@@ -87,7 +90,7 @@ export const ProductConsumerCard: React.FC<ProductConsumerCardProps> = ({
                         <div className="text-[9px] uppercase font-black text-gray-400 dark:text-slate-500 tracking-widest">Avg Latency</div>
                         <div className="flex items-center gap-2">
                             <div className="health-meter-container">
-                                <div className="health-meter-fill latency" style={{ width: '85%' }} />
+                                <div className="health-meter-fill latency" />
                             </div>
                             <span className="text-[10px] font-black text-emerald-500">124ms</span>
                         </div>
@@ -96,7 +99,7 @@ export const ProductConsumerCard: React.FC<ProductConsumerCardProps> = ({
                         <div className="text-[9px] uppercase font-black text-gray-400 dark:text-slate-500 tracking-widest">SLA Uptime</div>
                         <div className="flex items-center gap-2">
                             <div className="health-meter-container">
-                                <div className="health-meter-fill uptime" style={{ width: '99%' }} />
+                                <div className="health-meter-fill uptime" />
                             </div>
                             <span className="text-[10px] font-black text-blue-500">99.9%</span>
                         </div>

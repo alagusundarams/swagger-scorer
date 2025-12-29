@@ -4,6 +4,8 @@ import { parseOpenAPI, detectOpenAPIVersion } from '../services/parser.js';
 import { createSpectral, analyzeWithSpectral } from '../services/spectral.js';
 import { calculateScore } from '../services/scorer.js';
 import { query } from '../services/db.js';
+import { addProduct, addApi } from '../services/products.service.js';
+import { logAudit } from '../services/audit.service.js';
 import { v4 as uuidv4 } from 'uuid';
 import { ScoringConfig } from '../types/index.js';
 
@@ -110,6 +112,77 @@ export default async function onboardingRoutes(fastify: FastifyInstance, config:
         } catch (error) {
             fastify.log.error(error);
             return reply.status(500).send({ error: 'Failed to analyze staged API' });
+        }
+    });
+
+    /**
+     * POST /api/v1/onboarding/staging/:id/fulfill
+     * Move a staged API to the actual catalog (Products/APIs tables)
+     */
+    fastify.post('/staging/:id/fulfill', async (request: FastifyRequest, reply: FastifyReply) => {
+        const { id } = request.params as { id: string };
+        const body = request.body as { environment: string, ownerTeamId: string, displayName?: string };
+
+        try {
+            // 1. Get staged data
+            const res = await query('SELECT * FROM api_onboarding_staging WHERE id = $1', [id]);
+            if (res.rows.length === 0) {
+                return reply.status(404).send({ error: 'Staging record not found' });
+            }
+
+            const staging = res.rows[0];
+            if (staging.status !== 'ANALYZED') {
+                return reply.status(400).send({ error: 'API must be analyzed before fulfillment' });
+            }
+
+            // 2. Create Product (Authoritative record)
+            const productId = `prod-${staging.api_name.toLowerCase()}-${body.environment.toLowerCase()}`;
+            const productName = staging.api_name.toLowerCase();
+            const productDisplayName = body.displayName || staging.api_name;
+
+            await addProduct({
+                id: productId,
+                name: productName,
+                displayName: productDisplayName,
+                description: `Onboarded API: ${productDisplayName}`,
+                state: 'published',
+                ownerTeamId: body.ownerTeamId,
+                environment: body.environment,
+                managementMode: 'PORTAL_MANAGED'
+            });
+
+            // 3. Create API (Attached to Product)
+            const apiId = `api-${staging.api_name.toLowerCase()}-${body.environment.toLowerCase()}`;
+            await addApi({
+                id: apiId,
+                productId: productId,
+                name: staging.api_name,
+                displayName: productDisplayName,
+                description: `Implementation for ${productDisplayName}`,
+                path: `/api/v1/${staging.api_name.toLowerCase()}`,
+                originTeamId: body.ownerTeamId
+            });
+
+            // 4. Update Staging Record
+            await query('UPDATE api_onboarding_staging SET status = $1, updated_at = NOW() WHERE id = $2', ['FULFILLED', id]);
+
+            // 5. Log Audit (High level)
+            await logAudit({
+                entityType: 'ONBOARDING',
+                entityId: id,
+                action: 'FULFILL_ONBOARDING',
+                userId: staging.user_id,
+                changes: { productId, apiId, status: 'FULFILLED' }
+            });
+
+            return {
+                message: 'API Onboarded Successfully',
+                productId,
+                apiId
+            };
+        } catch (error) {
+            fastify.log.error(error);
+            return reply.status(500).send({ error: 'Failed to fulfill onboarding' });
         }
     });
 

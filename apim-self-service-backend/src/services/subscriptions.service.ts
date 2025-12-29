@@ -5,6 +5,7 @@
  */
 
 import { query } from './db.js';
+import { logAudit } from './audit.service.js';
 
 /**
  * Fetch all subscriptions with app registration data
@@ -32,8 +33,7 @@ export async function getAllSubscriptions(userRole?: string, teamId?: string) {
                ar.id as app_id,
                ar.display_name as app_display_name,
                ar.client_id as app_client_id,
-               ar.environment as app_environment,
-               ar.secret_expiry_date as app_secret_expiry
+               ar.environment as app_environment
         FROM subscriptions s
         JOIN products p ON s.product_id = p.id
         JOIN teams t ON s.subscriber_team_id = t.id
@@ -56,8 +56,7 @@ export async function getAllSubscriptions(userRole?: string, teamId?: string) {
             id: s.app_id,
             displayName: s.app_display_name,
             clientId: s.app_client_id,
-            environment: s.app_environment,
-            secretExpiryDate: s.app_secret_expiry
+            environment: s.app_environment
         } : null
     }));
 }
@@ -82,6 +81,15 @@ export async function addSubscription(productId: string, teamId: string, request
         RETURNING *
     `, [subId, productId, teamId, appId]);
 
+    // 3. Log Audit
+    await logAudit({
+        entityType: 'SUBSCRIPTION',
+        entityId: subId,
+        action: 'CREATE_SUBSCRIPTION',
+        userId: requester.email,
+        changes: { productId, teamId, appId }
+    });
+
     return {
         ...res.rows[0],
         productId: res.rows[0].product_id,
@@ -99,4 +107,13 @@ export async function updateSubscriptionState(id: string, state: string) {
         SET state = $1, updated_at = NOW()
         WHERE id = $2
     `, [state, id]);
+
+    // 2. Log Audit
+    await logAudit({
+        entityType: 'SUBSCRIPTION',
+        entityId: id,
+        action: `UPDATE_STATE_${state.toUpperCase()}`,
+        userId: 'system-user',
+        changes: { state }
+    });
 }

@@ -53,15 +53,17 @@ const DraggablePaletteItem = ({ item, isCollapsed }: { item: PaletteItem; isColl
         }
     });
 
-    const style = {
-        transform: CSS.Translate.toString(transform),
-        opacity: isDragging ? 0.6 : 1,
+    const combinedRef = (node: HTMLDivElement | null) => {
+        setNodeRef(node);
+        if (node) {
+            node.style.transform = CSS.Translate.toString(transform) || '';
+            node.style.opacity = isDragging ? '0.6' : '1';
+        }
     };
 
     return (
         <div
-            ref={setNodeRef}
-            style={style}
+            ref={combinedRef}
             {...listeners}
             {...attributes}
             title={isCollapsed ? item.label : undefined}

@@ -5,7 +5,7 @@
  */
 
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
-import { getAllProducts, updateProduct, getGlobalInventory, getPermissionMatrix, updatePermissionMatrix } from '../services/products.service.js';
+import { getAllProducts, getAllApis, updateProduct, getGlobalInventory, getPermissionMatrix, updatePermissionMatrix } from '../services/products.service.js';
 import { getAllTeams } from '../services/teams.service.js';
 import { getAllSubscriptions, addSubscription, updateSubscriptionState } from '../services/subscriptions.service.js';
 import { getAllApprovals, updateApproval } from '../services/approvals.service.js';
@@ -50,7 +50,6 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         }
     });
 
-    // PATCH /api/v1/products/:id (Update product metadata/ownership)
     fastify.patch('/products/:id', async (request, reply) => {
         const { id } = request.params as any;
         const body = request.body as any;
@@ -63,8 +62,36 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         }
     });
 
+    // POST /api/v1/products/:id/apis (Add API)
+    fastify.post('/products/:id/apis', async (request, reply) => {
+        const { id } = request.params as any;
+        const body = request.body as any;
+        try {
+            // Ensure productId matches path param
+            const { addApi } = await import('../services/products.service.js');
+            const api = await addApi({ ...body, productId: id });
+            return api;
+        } catch (error: any) {
+            fastify.log.error({ err: error }, 'Error adding API');
+            return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
+        }
+    });
+
+    // DELETE /api/v1/products/:id/apis/:apiId (Remove API)
+    fastify.delete('/products/:id/apis/:apiId', async (request, reply) => {
+        const { id, apiId } = request.params as any;
+        try {
+            const { removeApi } = await import('../services/products.service.js');
+            await removeApi(apiId, id);
+            return { success: true };
+        } catch (error: any) {
+            fastify.log.error({ err: error }, 'Error removing API');
+            return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
+        }
+    });
+
     // GET /api/v1/api-teams (Matching frontend expected path)
-    fastify.get('/api-teams', async (_request, reply) => {
+    fastify.get('/teams', async (_request, reply) => {
         try {
             const teams = await getAllTeams();
             return teams;
@@ -75,6 +102,16 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     });
 
     // GET /api/v1/subscriptions?role=admin&teamId=xxx (with role-based filtering)
+    fastify.get('/apis', async (_request, reply) => {
+        try {
+            const apis = await getAllApis();
+            return apis;
+        } catch (error: any) {
+            fastify.log.error({ err: error }, 'Failed to get APIs');
+            return reply.code(500).send({ error: error.message });
+        }
+    });
+
     fastify.get('/subscriptions', async (request, reply) => {
         try {
             const { role, teamId } = request.query as any;
@@ -234,6 +271,50 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         } catch (error) {
             fastify.log.error({ err: error }, 'Error linking app registration');
             return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to link app' });
+        }
+    });
+
+    /**
+     * NAMED VALUES ROUTES
+     */
+
+    // GET /api/v1/products/:id/named-values
+    fastify.get('/products/:id/named-values', async (request, reply) => {
+        const { id } = request.params as any;
+        try {
+            const { getNamedValues } = await import('../services/products.service.js');
+            const values = await getNamedValues(id);
+            return values;
+        } catch (error) {
+            fastify.log.error({ err: error }, 'Error fetching named values');
+            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to fetch named values' });
+        }
+    });
+
+    // POST /api/v1/products/:id/named-values
+    fastify.post('/products/:id/named-values', async (request, reply) => {
+        const { id } = request.params as any;
+        const body = request.body as any;
+        try {
+            const { addNamedValue } = await import('../services/products.service.js');
+            const value = await addNamedValue(id, body);
+            return value;
+        } catch (error: any) {
+            fastify.log.error({ err: error }, 'Error adding named value');
+            return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
+        }
+    });
+
+    // DELETE /api/v1/products/:id/named-values/:valueId
+    fastify.delete('/products/:id/named-values/:valueId', async (request, reply) => {
+        const { id, valueId } = request.params as any;
+        try {
+            const { deleteNamedValue } = await import('../services/products.service.js');
+            await deleteNamedValue(id, valueId);
+            return { success: true };
+        } catch (error: any) {
+            fastify.log.error({ err: error }, 'Error deleting named value');
+            return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
         }
     });
 }

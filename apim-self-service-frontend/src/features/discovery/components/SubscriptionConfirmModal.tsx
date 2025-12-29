@@ -1,5 +1,6 @@
 import React from 'react';
-import { Product, Team } from '../../../types/entities';
+import type { Product } from '../../../types/entities';
+import type { Team } from '../../teams/types/teamTypes';
 
 interface SubscriptionConfirmModalProps {
     isOpen: boolean;

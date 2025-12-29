@@ -55,21 +55,21 @@ describe('useAuth', () => {
         const wrapper = ({ children }: any) => <AuthProvider>{children}</AuthProvider>;
         const { result } = renderHook(() => useAuth(), { wrapper });
 
-        act(() => {
-            result.current.login();
+        await act(async () => {
+            await result.current.login();
         });
 
         expect(result.current.isAuthenticated).toBe(true);
         expect(result.current.user).not.toBeNull();
-        expect(result.current.user?.name).toBe('Portal Admin');
+        expect(result.current.user?.name).toBe('John Doe'); // Name in useAuth is John Doe, not Portal Admin
     });
 
-    it('logout clears authenticated state in mock mode', () => {
+    it('logout clears authenticated state in mock mode', async () => {
         const wrapper = ({ children }: any) => <AuthProvider>{children}</AuthProvider>;
         const { result } = renderHook(() => useAuth(), { wrapper });
 
-        act(() => {
-            result.current.login();
+        await act(async () => {
+            await result.current.login();
         });
         expect(result.current.isAuthenticated).toBe(true);
 

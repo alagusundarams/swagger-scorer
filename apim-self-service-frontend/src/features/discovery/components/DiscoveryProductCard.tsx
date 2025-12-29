@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Product, Team } from '../../../types/entities';
+import type { Product } from '../../../types/entities';
+import type { Team } from '../../teams/types/teamTypes';
 
 interface DiscoveryProductCardProps {
     product: Product;

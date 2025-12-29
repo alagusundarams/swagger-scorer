@@ -1,4 +1,4 @@
-import { type Team } from '../../../types/entities';
+import { type Team } from '../../teams/types/teamTypes';
 
 interface ProductComplianceInfoProps {
     activeTeam?: Team;

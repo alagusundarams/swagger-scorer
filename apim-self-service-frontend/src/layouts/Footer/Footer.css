@@ -38,6 +38,10 @@
     color: white;
 }
 
+.footer-icon-letter {
+    font-family: 'Inter, system-ui, sans-serif';
+}
+
 .copyright-text {
     font-size: 14px;
     color: #94a3b8;

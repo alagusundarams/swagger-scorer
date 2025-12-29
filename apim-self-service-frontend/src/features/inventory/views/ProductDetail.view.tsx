@@ -1,53 +1,66 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
-import { useAuth } from '../../../hooks/useAuth';
+import { useAuth } from '../../auth/hooks/useAuth';
 import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
-import { getUserRoleForProduct, canAccessProduct } from '../../../utils/productRoleDetection';
+import { useConsumerStore } from '../../consumer/store/consumerStore';
+import { getUserRoleForProduct, canAccessProduct } from '../../inventory/utils/productRoleDetection';
 import { ProductDetailProducer } from './ProductDetailProducer.view';
 import { ProductDetailConsumer } from './ProductDetailConsumer.view';
 import { RequestAccessModal } from '../components/RequestAccessModal';
 
 /**
  * ProductDetailPage: Controller view that routes to role-specific layouts.
- * 
- * **Responsibility**:
- * - Data fetching (Store integration)
- * - Role detection
- * - Global UI state (Toasts, Request Modal)
- * - High-level routing (Producer vs Consumer)
  */
 export const ProductDetailPage = () => {
     const { productId } = useParams<{ productId: string }>();
 
     // --- Store Integration ---
-    const { getToken } = useAuth();
+    const { user } = useAuth();
+
     const {
-        user,
         products: allProducts,
+        isLoading: invLoading,
+        error: invError
+    } = useInventoryStore();
+
+    const {
         subscriptions: allSubscriptions,
-        addSubscription,
+        requestAccess,
+        isLoading: subLoading,
+        error: subError
+    } = useConsumerStore();
+
+    const {
         appRegistrations,
         fetchAppRegistrations,
-        isLoading,
-        error
-    } = useInventoryStore();
+        isLoading: appLoading
+    } = useConsumerStore();
+
+    const isLoading = invLoading || subLoading || appLoading;
+    const error = invError || subError;
 
     // --- State ---
     const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
-    const [requestTeamId, setRequestTeamId] = useState(user?.defaultTeamId || '');
+    const [requestTeamId, setRequestTeamId] = useState(user?.defaultTeamId || (user?.teams ? user.teams[0] : ''));
     const [selectedAppId, setSelectedAppId] = useState('');
-    const [isPending, setIsPending] = useState(false);
     const [businessReason, setBusinessReason] = useState('');
+    const [isPending, setIsPending] = useState(false);
     const [toast, setToast] = useState<{ message: string; show: boolean }>({ message: '', show: false });
 
     // --- Effects ---
     useEffect(() => {
         if (user && user.teams.length > 0) {
-            // Fetch apps for the first team by default, or all teams
-            fetchAppRegistrations();
+            fetchAppRegistrations(user.teams[0]);
         }
     }, [user, fetchAppRegistrations]);
+
+    // Update requestTeamId when user is loaded
+    useEffect(() => {
+        if (user && !requestTeamId) {
+            setRequestTeamId(user.defaultTeamId || user.teams[0] || '');
+        }
+    }, [user, requestTeamId]);
 
     // --- Data Selectors ---
     const product = useMemo(() => allProducts.find(p => p.id === productId), [allProducts, productId]);
@@ -70,13 +83,11 @@ export const ProductDetailPage = () => {
         setIsRequestModalOpen(false);
 
         // --- Store Update ---
-        addSubscription(productId, requestTeamId, getToken, selectedAppId, businessReason);
+        requestAccess(productId, requestTeamId);
 
         setToast({ message: 'Access request submitted for review.', show: true });
         setTimeout(() => setToast({ message: '', show: false }), 4000);
     };
-
-    // --- Render Logic ---
 
     // --- Render Logic ---
 

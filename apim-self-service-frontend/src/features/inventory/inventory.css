@@ -24,9 +24,11 @@
 .health-meter-fill.latency {
   background-color: #10b981;
   /* emerald-500 */
+  width: 85%;
 }
 
 .health-meter-fill.uptime {
   background-color: #3b82f6;
   /* blue-500 */
+  width: 99%;
 }

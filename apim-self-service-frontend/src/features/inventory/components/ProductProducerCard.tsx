@@ -30,6 +30,7 @@ export const ProductProducerCard: React.FC<ProductProducerCardProps> = ({
         <div
             className="group bg-white dark:bg-slate-800/90 rounded-3xl shadow-premium border border-gray-100 dark:border-slate-700/50 overflow-hidden hover:shadow-premium-hover transition-all duration-500 transform hover:-translate-y-2 cursor-pointer flex flex-col"
             onClick={onClick}
+            data-testid="producer-card"
         >
             <div className="p-7 flex-1">
                 <div className="flex justify-between items-start mb-6">

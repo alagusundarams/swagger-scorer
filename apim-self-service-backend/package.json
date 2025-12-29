@@ -12,7 +12,10 @@
         "test:coverage": "vitest --coverage",
         "test:ui": "vitest --ui",
         "lint": "eslint src --ext .ts",
-        "format": "prettier --write \"src/**/*.ts\""
+        "format": "prettier --write \"src/**/*.ts\"",
+        "db:reset": "tsx ../apim-database/scripts/utils/reset-db.ts",
+        "db:seed": "tsx src/scripts/seed-db.ts",
+        "db:sync": "tsx ../apim-database/scripts/core/sync-apim-to-db.ts"
     },
     "keywords": [
         "openapi",

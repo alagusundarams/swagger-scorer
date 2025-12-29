@@ -11,10 +11,13 @@ import { useStore } from '../../store/useStore';
  * 3. Resolves Product/API entities if IDs are in the URL.
  * 4. Falls back to the global pageTitle.
  */
+import { useInventoryStore } from '../../features/inventory/hooks/useInventoryStore';
+
 export const Breadcrumbs: React.FC = () => {
     const location = useLocation();
     const { productId, apiId, operationId } = useParams<{ productId: string; apiId: string; operationId: string }>();
-    const { products, pageTitle } = useStore();
+    const { pageTitle } = useStore();
+    const { products } = useInventoryStore();
 
     const breadcrumbs = useMemo(() => {
         const items = [
@@ -37,7 +40,7 @@ export const Breadcrumbs: React.FC = () => {
             });
 
             if (apiId) {
-                const api = product?.apis.find(a => a.id === apiId);
+                const api = (product as any)?.apis.find((a: any) => a.id === apiId);
                 items.push({
                     label: api?.name || 'API',
                     href: `/products/${productId}/apis/${apiId}`,
@@ -45,7 +48,7 @@ export const Breadcrumbs: React.FC = () => {
                 });
 
                 if (operationId) {
-                    const operation = api?.operations.find(o => o.id === operationId);
+                    const operation = (api as any)?.operations.find((o: any) => o.id === operationId);
                     items.push({
                         label: operation?.urlTemplate || 'Operation',
                         href: location.pathname,

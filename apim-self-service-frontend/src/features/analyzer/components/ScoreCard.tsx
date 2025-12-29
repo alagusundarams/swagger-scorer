@@ -17,6 +17,26 @@ import React from 'react';
 import { useAnalysis } from '../store/useAnalysis';
 import '../analyzer.css';
 
+/**
+ * Sub-component to handle dynamic score bar width without inline styles.
+ */
+const ScoreBar = ({ score, categoryName }: { score: number; categoryName: string }) => {
+    const barRef = (node: HTMLDivElement | null) => {
+        if (node) {
+            node.style.setProperty('--score-width', `${score}%`);
+        }
+    };
+
+    return (
+        <div className="score-bar-container">
+            <div
+                ref={barRef}
+                className={`score-bar-fill ${categoryName}`}
+            />
+        </div>
+    );
+};
+
 export const ScoreCard: React.FC = () => {
     const { result } = useAnalysis();
 
@@ -65,21 +85,6 @@ export const ScoreCard: React.FC = () => {
         return colorMap[categoryName] || ['#ef4444', '#8b5cf6', '#3b82f6', '#f59e0b', '#10b981', '#06b6d4'][index % 6];
     };
 
-    /**
-     * Get vibrant category colors for progress bars.
-     * These are slightly brighter versions for better visibility.
-     */
-    const getBarColor = (categoryName: string) => {
-        const colors: Record<string, string> = {
-            'security': '#f87171',      // Bright red
-            'structural': '#22d3ee',    // Bright cyan
-            'documentation': '#60a5fa', // Bright blue
-            'apiDesign': '#a78bfa',     // Bright violet
-            'dataModels': '#fbbf24',    // Bright amber
-            'errorHandling': '#34d399', // Bright emerald
-        };
-        return colors[categoryName] || '#94a3b8';
-    };
 
     // === RENDER ===
     return (
@@ -150,8 +155,6 @@ export const ScoreCard: React.FC = () => {
 
                 <div className="flex flex-col gap-4">
                     {categoryArray.map((category) => {
-                        const barColor = getBarColor(category.name);
-
                         return (
                             <div key={category.name} className="flex items-center gap-4">
                                 {/* Category Name */}
@@ -162,16 +165,7 @@ export const ScoreCard: React.FC = () => {
                                 </div>
 
                                 {/* Progress Bar */}
-                                <div className="score-bar-container">
-                                    <div
-                                        className="score-bar-fill"
-                                        style={{
-                                            '--score-width': `${category.score}%`,
-                                            '--score-color': barColor,
-                                            '--score-glow': `${barColor}50`
-                                        } as React.CSSProperties}
-                                    />
-                                </div>
+                                <ScoreBar score={category.score} categoryName={category.name} />
 
                                 {/* Percentage */}
                                 <div className="w-12 text-right flex-shrink-0">

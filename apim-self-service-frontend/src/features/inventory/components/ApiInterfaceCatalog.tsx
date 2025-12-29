@@ -1,18 +1,19 @@
 import { useState } from 'react';
-import { type Product } from '../../../types/entities';
+import { type Product, type API } from '../../../types/entities';
 
 interface ApiInterfaceCatalogProps {
     product: Product;
+    onViewContract?: (api: API) => void;
 }
 
 /**
  * ApiInterfaceCatalog Component
  * 
  * **Purpose**: Consumer-facing list of APIs.
- * **Permission**: READ-ONLY. No edit buttons, no score analysis (Producer only).
- * **Features**: Drill-down to operations, copy URL, view documentation.
+ * **Permission**: READ-ONLY.
+ * **Features**: Drill-down to operations, view documentation, and VIEW CONTRACT.
  */
-export function ApiInterfaceCatalog({ product }: ApiInterfaceCatalogProps) {
+export function ApiInterfaceCatalog({ product, onViewContract }: ApiInterfaceCatalogProps) {
     const [expandedApi, setExpandedApi] = useState<string | null>(null);
 
     return (
@@ -28,7 +29,7 @@ export function ApiInterfaceCatalog({ product }: ApiInterfaceCatalogProps) {
                     return (
                         <div
                             key={api.id}
-                            className={`bg-white dark:bg-slate-800 rounded-[2rem] shadow-sm border border-gray-100 dark:border-slate-700/30 overflow-hidden transition-all duration-300 ${isExpanded ? 'ring-2 ring-emerald-500/20' : 'hover:border-emerald-100 dark:hover:border-emerald-900/30'
+                            className={`bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-slate-700/30 overflow-hidden transition-all duration-300 ${isExpanded ? 'ring-2 ring-emerald-500/20 shadow-xl' : 'hover:border-emerald-100 dark:hover:border-emerald-900/30'
                                 }`}
                         >
                             <div
@@ -49,11 +50,22 @@ export function ApiInterfaceCatalog({ product }: ApiInterfaceCatalogProps) {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-8">
-                                    <div className="text-right">
+                                    {onViewContract && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onViewContract(api);
+                                            }}
+                                            className="px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-widest rounded-xl border border-emerald-100 dark:border-emerald-800/50 hover:bg-emerald-100 transition-colors"
+                                        >
+                                            View Source ⚡
+                                        </button>
+                                    )}
+                                    <div className="text-right hidden md:block">
                                         <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">Endpoints</p>
                                         <span className="text-sm font-bold text-gray-500">{api.operations.length} Managed</span>
                                     </div>
-                                    <div className={`w-8 h-8 rounded-full border border-gray-100 flex items-center justify-center transition-transform duration-300 ${isExpanded ? 'rotate-180 bg-emerald-50 border-emerald-200 text-emerald-600' : 'text-gray-300'}`}>
+                                    <div className={`w-8 h-8 rounded-full border border-gray-100 dark:border-slate-700 flex items-center justify-center transition-transform duration-300 ${isExpanded ? 'rotate-180 bg-emerald-50 dark:bg-slate-700 border-emerald-200 text-emerald-600' : 'text-gray-300'}`}>
                                         ↓
                                     </div>
                                 </div>

@@ -9,7 +9,7 @@ export const Footer = () => {
                     <div className="footer-icon-box">
                         <svg className="footer-icon" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            <text x="12" y="14.5" fill="#fbbf24" fontSize="16" fontWeight="900" textAnchor="middle" dominantBaseline="middle" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>A</text>
+                            <text x="12" y="14.5" fill="#fbbf24" fontSize="16" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="footer-icon-letter">A</text>
                         </svg>
                     </div>
 

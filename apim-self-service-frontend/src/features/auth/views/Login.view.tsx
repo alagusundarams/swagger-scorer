@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
+import { useStore } from '../../../store/useStore';
 import { LoginButton } from '../../../layouts/Header/LoginButton';
 import { SSO_DOMAINS } from '../../../config/env';
 import '../auth.css';
@@ -14,7 +14,7 @@ type LoginStep = 'email' | 'password';
 export const LoginPage: React.FC = () => {
     const { isAuthenticated, login, isMock } = useAuth();
     const navigate = useNavigate();
-    const { setPageTitle } = useInventoryStore();
+    const { setPageTitle } = useStore();
 
     useEffect(() => {
         setPageTitle('Sign In');
@@ -96,7 +96,7 @@ export const LoginPage: React.FC = () => {
                     <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-sm">
                         <svg className="w-7 h-7" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            <text x="12" y="14.5" fill="#fbbf24" fontSize="16" fontWeight="900" textAnchor="middle" dominantBaseline="middle" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>A</text>
+                            <text x="12" y="14.5" fill="#fbbf24" fontSize="16" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="apim-icon-letter">A</text>
                         </svg>
                     </div>
                     <h1 className="text-xl font-bold text-gray-900 tracking-tight">APIM Self Service</h1>

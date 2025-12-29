@@ -107,3 +107,34 @@ export function detectOpenAPIVersion(spec: Record<string, unknown>): string {
 
     return 'unknown';
 }
+
+/**
+ * Extract operations from parsed OpenAPI spec
+ * 
+ * @param spec - Parsed OpenAPI object
+ * @returns Array of operations with method, path, and summary
+ */
+export function extractOperations(spec: Record<string, unknown>): Array<{ method: string; path: string; summary: string }> {
+    const operations: Array<{ method: string; path: string; summary: string }> = [];
+
+    if (!spec.paths || typeof spec.paths !== 'object') {
+        return operations;
+    }
+
+    Object.entries(spec.paths as Record<string, any>).forEach(([path, pathItem]) => {
+        if (!pathItem || typeof pathItem !== 'object') return;
+
+        ['get', 'post', 'put', 'delete', 'patch', 'options', 'head', 'trace'].forEach(method => {
+            if (pathItem[method]) {
+                const op = pathItem[method];
+                operations.push({
+                    method: method.toUpperCase(),
+                    path,
+                    summary: op.summary || 'No summary provided'
+                });
+            }
+        });
+    });
+
+    return operations;
+}

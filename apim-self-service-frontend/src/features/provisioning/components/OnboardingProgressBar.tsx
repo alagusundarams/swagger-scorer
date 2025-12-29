@@ -20,7 +20,7 @@ export const OnboardingProgressBar: React.FC<OnboardingProgressBarProps> = ({ cu
                 })}
             </div>
             <p className="text-[10px] font-black text-gray-400 text-center uppercase tracking-[0.3em]">
-                PHASE {currentStep} <span className="opacity-30 inline-block mx-2">/</span> 0{totalSteps}
+                STEP {currentStep} <span className="opacity-30 inline-block mx-2">/</span> 0{totalSteps}
             </p>
         </div>
     );

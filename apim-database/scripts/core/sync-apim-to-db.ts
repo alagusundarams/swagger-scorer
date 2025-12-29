@@ -719,14 +719,42 @@ async function runWorker(envName: string) {
             `, [s.id, s.productId, s.userId, s.state, s.primaryKey, s.createdDate]);
         }
 
+        // Ensure Table Exists (Self-Healing Schema)
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS named_values (
+                id TEXT PRIMARY KEY,
+                product_id TEXT REFERENCES products(id) ON DELETE CASCADE,
+                scope_id TEXT, -- Null for Product Level, API ID for API Scope
+                display_name TEXT NOT NULL,
+                system_name TEXT NOT NULL,
+                value TEXT NOT NULL,
+                type TEXT CHECK (type IN ('literal', 'key_vault')),
+                is_secret BOOLEAN DEFAULT false,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW(),
+                UNIQUE(product_id, system_name, scope_id)
+            )
+        `);
+
         for (const nv of namedValues) {
-            const val = nv.keyVaultUrl ? `KeyVault Ref: ${nv.keyVaultUrl} ` : (nv.isSecret ? '***' : nv.value);
+            const isKv = !!nv.keyVaultUrl;
+            const val = isKv ? nv.keyVaultUrl : nv.value;
+            const type = isKv ? 'key_vault' : 'literal';
+            const id = `nv-${AZURE_CONFIG.environment}-${nv.name}`; // Deterministic ID
+
+            // Note: Sync script usually pulls Service-Level named values.
+            // We map these to GLOBAL (product_id='unknown-product', scope_id=NULL) 
+            // unless we can infer strict ownership later.
             await pool.query(`
-                INSERT INTO access_control_lists(key, environment, value)
-            VALUES($1, $2, $3)
-                ON CONFLICT(key, environment) DO UPDATE SET
-            value = EXCLUDED.value;
-            `, [nv.name, AZURE_CONFIG.environment, val]);
+                INSERT INTO named_values(id, product_id, scope_id, display_name, system_name, value, type, is_secret, updated_at)
+                VALUES($1, 'unknown-product', NULL, $2, $3, $4, $5, $6, NOW())
+                ON CONFLICT(product_id, system_name, scope_id) DO UPDATE SET
+                    display_name = EXCLUDED.display_name,
+                    value = EXCLUDED.value,
+                    type = EXCLUDED.type,
+                    is_secret = EXCLUDED.is_secret,
+                    updated_at = NOW();
+            `, [id, nv.name, nv.name, val, type, nv.isSecret]);
         }
 
         console.log(`🔗 Resolving ${capturedAppIds.size} potential App Identities...`);

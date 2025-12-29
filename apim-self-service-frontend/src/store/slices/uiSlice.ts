@@ -1,4 +1,4 @@
-import { StateCreator } from 'zustand';
+import { type StateCreator } from 'zustand';
 import type { Notification } from '../../types/notifications';
 
 export interface UISlice {

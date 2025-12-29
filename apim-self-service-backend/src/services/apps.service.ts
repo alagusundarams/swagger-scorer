@@ -5,6 +5,7 @@
  */
 
 import { query } from './db.js';
+import { logAudit } from './audit.service.js';
 
 /**
  * Fetch all app registrations for a team
@@ -57,6 +58,15 @@ export async function addAppRegistration(app: {
     `, [
         id, app.displayName, app.clientId, app.environment, app.ownerTeamId, app.appIdUri, app.secretExpiryDate, app.productId
     ]);
+
+    // 3. Log Audit
+    await logAudit({
+        entityType: 'APP_REGISTRATION',
+        entityId: id,
+        action: 'LINK_APP',
+        userId: 'system-user',
+        changes: app
+    });
 
     return {
         ...res.rows[0],

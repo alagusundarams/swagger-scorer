@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { Subscription, Team } from '../../../types/entities';
+import type { Team } from '../../teams/types/teamTypes';
+import type { Subscription } from '../../consumer/types/consumerTypes';
 
 interface SubscriberCardProps {
     subscription: Subscription;
@@ -29,10 +30,10 @@ export function SubscriberCard({ subscription, team, isOwnerLead, onRevokeAccess
                                 {subscription.appRegistration.displayName}
                             </div>
                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${subscription.appRegistration.environment === 'PROD'
-                                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                    : subscription.appRegistration.environment === 'QA'
-                                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                                        : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                : subscription.appRegistration.environment === 'QA'
+                                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                    : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
                                 }`}>
                                 {subscription.appRegistration.environment}
                             </span>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { type Product, type Subscription } from '../../../types/entities';
+import { type Product } from '../../../types/entities';
+import { type Subscription } from '../../consumer/types/consumerTypes';
 
 interface ProductGettingStartedProps {
     product: Product;
@@ -69,8 +70,8 @@ export function ProductGettingStarted({ product, subscription }: ProductGettingS
                                     key={env}
                                     onClick={() => setSelectedEnv(env)}
                                     className={`w-full text-left px-4 py-3 rounded-xl transition-all font-bold text-sm ${selectedEnv === env
-                                            ? 'bg-emerald-600 text-white shadow-lg'
-                                            : 'text-slate-400 hover:bg-white/5'
+                                        ? 'bg-emerald-600 text-white shadow-lg'
+                                        : 'text-slate-400 hover:bg-white/5'
                                         }`}
                                 >
                                     {env} Environment

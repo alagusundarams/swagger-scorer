@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
 import { Typeahead } from '../../../components/ui/Typeahead';
 import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
+import { useTeamsStore } from '../../teams/store/teamsStore';
 import { toast } from 'react-hot-toast';
 
 interface ExtractedResource {
@@ -10,16 +11,44 @@ interface ExtractedResource {
     name: string;
     type: 'Product' | 'API' | 'Subscription';
     environment: string;
+    region: string;
     details: any;
     isOrphaned: boolean;
 }
 
 export const AdminMappingView = () => {
-    const { teams, addTeam, updateProduct } = useInventoryStore();
+    const { updateProduct } = useInventoryStore();
+    const { teams, addTeam } = useTeamsStore();
     const [orphans, setOrphans] = useState<ExtractedResource[]>([]);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [selectedTeamId, setSelectedTeamId] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const { products, fetchInventory, isLoading } = useInventoryStore();
+
+    useEffect(() => {
+        fetchInventory();
+    }, [fetchInventory]);
+
+    // Compute orphans from real inventory
+    useEffect(() => {
+        if (!products || products.length === 0) return;
+
+        const orphanedProducts = products
+            .filter(p => !p.ownerTeamId || !teams.find(t => t.id === p.ownerTeamId))
+            .map(p => ({
+                id: p.id,
+                name: p.displayName,
+                type: 'Product' as const,
+                environment: p.environment,
+                region: p.region || 'Global',
+                details: p,
+                isOrphaned: true
+            }));
+
+        // In a real app we would also fetch orphaned APIs not attached to products
+        // For now, we focus on Products as the primary unit of ownership
+        setOrphans(orphanedProducts);
+    }, [products, teams]);
 
     // Permission Matrix State
     const [selectedProductForMatrix, setSelectedProductForMatrix] = useState<ExtractedResource | null>(null);
@@ -254,8 +283,15 @@ export const AdminMappingView = () => {
                             />
                         </div>
 
-                        <div className="overflow-y-auto flex-1">
-                            <table className="w-full text-left text-sm">
+                        {isLoading && (
+                            <div className="p-8 text-center text-gray-400">
+                                Loading inventory...
+                            </div>
+                        )}
+
+                        {!isLoading && (
+                            <div className="overflow-y-auto flex-1">
+                                <table className="w-full text-left text-sm">
                                 <thead className="bg-gray-50 dark:bg-slate-900 sticky top-0">
                                     <tr>
                                         <th className="p-4 w-10">
@@ -269,6 +305,7 @@ export const AdminMappingView = () => {
                                         <th className="p-4 font-bold text-gray-500 uppercase tracking-wider text-xs">Name</th>
                                         <th className="p-4 font-bold text-gray-500 uppercase tracking-wider text-xs">Type</th>
                                         <th className="p-4 font-bold text-gray-500 uppercase tracking-wider text-xs">Env</th>
+                                        <th className="p-4 font-bold text-gray-500 uppercase tracking-wider text-xs">Region</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
@@ -362,6 +399,7 @@ export const AdminMappingView = () => {
                                                 </span>
                                             </td>
                                             <td className="p-4 text-xs font-mono text-slate-400 font-bold">{orphan.environment}</td>
+                                            <td className="p-4 text-xs font-mono text-slate-400 font-bold">{orphan.region}</td>
                                         </tr>
                                     ))}
                                     {filteredOrphans.length === 0 && (

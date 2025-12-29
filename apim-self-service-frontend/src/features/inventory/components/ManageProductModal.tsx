@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
+import { useStore } from '../../../store/useStore';
+import { useTeamsStore } from '../../teams/store/teamsStore';
 import { TeamSearch } from '../../provisioning/components/TeamSearch';
 import { type Product } from '../../../types/entities';
 
@@ -21,11 +22,8 @@ export const ManageProductModal = ({
     onUpdate
 }: ManageProductModalProps) => {
     // --- Store Content ---
-    const {
-        user,
-        teams: allTeams,
-        addNotification
-    } = useInventoryStore();
+    const { user, addNotification } = useStore();
+    const { teams: allTeams } = useTeamsStore();
 
     // --- Local State ---
     const [activeTab, setActiveTab] = useState<'metadata' | 'access'>('metadata');
@@ -317,7 +315,7 @@ export const ManageProductModal = ({
                                     <div className="border border-gray-200 dark:border-slate-700 rounded-2xl p-4 bg-gray-50/30 dark:bg-slate-900/40">
                                         <TeamSearch
                                             allTeams={allTeams}
-                                            selectedTeamIds={formData.authorizedTeams}
+                                            selectedTeams={formData.authorizedTeams}
                                             onToggleTeam={(id: string) => {
                                                 const current = formData.authorizedTeams;
                                                 setFormData({

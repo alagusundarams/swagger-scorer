@@ -1,18 +1,11 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../../hooks/useAuth';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
+import { useStore } from '../../../store/useStore';
+import { useAuth } from '../../auth/hooks/useAuth';
 import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
-
-/**
- * BrowsePage: Discovery portal for API products.
- * 
- * FEATURES:
- * - Real-time filtering across the enterprise catalog.
- * - Integration with the centralized store for subscription state.
- * - Multi-team subscription support.
- */
-
+import { useConsumerStore } from '../../consumer/store/consumerStore';
+import { useTeamsStore } from '../../teams/store/teamsStore';
 import { DiscoveryHero } from '../components/DiscoveryHero';
 import { DiscoveryProductCard } from '../components/DiscoveryProductCard';
 import { SubscriptionConfirmModal } from '../components/SubscriptionConfirmModal';
@@ -20,21 +13,23 @@ import '../discovery.css';
 
 export const BrowsePage = () => {
     const navigate = useNavigate();
-    const { setPageTitle } = useInventoryStore();
+    const { setPageTitle } = useStore();
+    const { user } = useAuth();
 
     useEffect(() => {
         setPageTitle('Browse APIs');
     }, [setPageTitle]);
 
     // --- Store Integration ---
-    const { getToken } = useAuth();
-    const {
-        user,
-        products: allProducts,
-        subscriptions: allSubscriptions,
-        teams: allTeams,
-        addSubscription
-    } = useInventoryStore();
+    const { products: allProducts, fetchInventory } = useInventoryStore();
+    const { subscriptions: allSubscriptions, fetchSubscriptions, requestAccess } = useConsumerStore();
+    const { teams: allTeams, fetchTeams } = useTeamsStore();
+
+    useEffect(() => {
+        fetchInventory();
+        fetchSubscriptions();
+        fetchTeams();
+    }, [fetchInventory, fetchSubscriptions, fetchTeams]);
 
     // --- UI State ---
     const [selectedTeamId, setSelectedTeamId] = useState<string>(user?.teams[0] || '');
@@ -73,7 +68,7 @@ export const BrowsePage = () => {
     const handleConfirmSubscription = () => {
         if (!selectedProductId || !selectedTeamId) return;
 
-        addSubscription(selectedProductId, selectedTeamId, getToken);
+        requestAccess(selectedProductId, selectedTeamId);
         setShowSubscribeModal(false);
 
         // Navigation gives feedback of progress
@@ -128,4 +123,3 @@ export const BrowsePage = () => {
         </MainLayout>
     );
 };
-

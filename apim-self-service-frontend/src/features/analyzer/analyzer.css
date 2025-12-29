@@ -53,6 +53,55 @@
     box-shadow: 0 0 10px var(--score-glow, transparent);
 }
 
+/* Category Specific Styles */
+.score-bar-fill.security,
+.category-dot.security {
+    --score-color: #f87171;
+    --score-glow: #f8717150;
+    --dot-color: #f87171;
+    --dot-glow: #f87171;
+}
+
+.score-bar-fill.structural,
+.category-dot.structural {
+    --score-color: #22d3ee;
+    --score-glow: #22d3ee50;
+    --dot-color: #22d3ee;
+    --dot-glow: #22d3ee;
+}
+
+.score-bar-fill.documentation,
+.category-dot.documentation {
+    --score-color: #60a5fa;
+    --score-glow: #60a5fa50;
+    --dot-color: #60a5fa;
+    --dot-glow: #60a5fa;
+}
+
+.score-bar-fill.apiDesign,
+.category-dot.apiDesign {
+    --score-color: #a78bfa;
+    --score-glow: #a78bfa50;
+    --dot-color: #a78bfa;
+    --dot-glow: #a78bfa;
+}
+
+.score-bar-fill.dataModels,
+.category-dot.dataModels {
+    --score-color: #fbbf24;
+    --score-glow: #fbbf2450;
+    --dot-color: #fbbf24;
+    --dot-glow: #fbbf24;
+}
+
+.score-bar-fill.errorHandling,
+.category-dot.errorHandling {
+    --score-color: #34d399;
+    --score-glow: #34d39950;
+    --dot-color: #34d399;
+    --dot-glow: #34d399;
+}
+
 /* ViolationsTable Styles */
 .category-dot {
     width: 12px;

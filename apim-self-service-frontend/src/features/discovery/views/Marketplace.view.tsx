@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
+import { useStore } from '../../../store/useStore';
 import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
 
 /**
@@ -13,7 +14,8 @@ import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
  */
 export const MarketplacePage = () => {
     const navigate = useNavigate();
-    const { user, products, setPageTitle } = useInventoryStore();
+    const { user, setPageTitle } = useStore();
+    const { products } = useInventoryStore();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedType, setSelectedType] = useState<string>('ALL');
     const [selectedEnv, setSelectedEnv] = useState<string>('ALL');

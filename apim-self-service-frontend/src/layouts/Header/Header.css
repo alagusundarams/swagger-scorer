@@ -51,6 +51,11 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    cursor: pointer;
+}
+
+.apim-icon-letter {
+    font-family: 'Inter, system-ui, sans-serif';
 }
 
 .apim-icon-box {
@@ -234,4 +239,9 @@
 
 .sign-out-button:hover {
     background-color: #7f1d1d;
+}
+
+.header-menu-icon {
+    width: 20px;
+    height: 20px;
 }

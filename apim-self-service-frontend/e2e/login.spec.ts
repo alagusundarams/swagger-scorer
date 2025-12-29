@@ -1,7 +1,11 @@
-
 import { test, expect } from '@playwright/test';
+import { setupApiMocks } from './utils/api-mocker';
 
 test.describe('Authentication Flow', () => {
+    test.beforeEach(async ({ page }) => {
+        await setupApiMocks(page);
+    });
+
     test('should redirect to login when unauthenticated', async ({ page }) => {
         await page.goto('/');
         await expect(page).toHaveURL(/.*login/);

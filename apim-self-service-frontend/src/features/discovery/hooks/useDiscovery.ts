@@ -1,19 +1,27 @@
-/**
- * Discovery - Custom Hooks
- * 
- * React hooks for discovery data fetching using MFE pattern.
- * 
- * @module features/discovery/hooks
- */
+import { useState, useCallback } from 'react';
 
-import { useState } from 'react';
+export const useDiscovery = () => {
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-/**
- * Hook for API search (placeholder)
- */
-export function useDiscovery() {
-    const [searching, setSearching] = useState(false);
-    const [results, setResults] = useState<any[]>([]);
+    const searchProducts = useCallback(async (_query: string) => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            // Placeholder for discovery search logic
+            // Will integrate with inventoryClient when ready
+            return [];
+        } catch (err: any) {
+            setError(err.message || 'Failed to search products');
+            return [];
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
 
-    return { searching, results };
-}
+    return {
+        isLoading,
+        error,
+        searchProducts
+    };
+};

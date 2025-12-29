@@ -18,6 +18,11 @@
     margin-top: 1.25rem !important;
 }
 
+.apim-icon-letter {
+    font-family: 'Inter, system-ui, sans-serif';
+}
+
+/* Base login card styling */
 .login-card {
     padding: 3rem;
     border-radius: 1rem;

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useAnalysis } from '../store/useAnalysis';
-import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
+import { useStore } from '../../../store/useStore';
 import { MainLayout } from '../../../layouts/MainLayout/MainLayout.view';
 import { AnalyzerForm } from '../components/AnalyzerForm';
 import { ScoreCard } from '../components/ScoreCard';
@@ -9,7 +9,7 @@ import '../analyzer.css';
 
 export function AnalyzerPage() {
     const { isMaximized } = useAnalysis();
-    const { setPageTitle } = useInventoryStore();
+    const { setPageTitle } = useStore();
 
     useEffect(() => {
         setPageTitle('API Analyzer');

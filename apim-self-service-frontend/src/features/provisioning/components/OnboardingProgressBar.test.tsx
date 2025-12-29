@@ -12,9 +12,9 @@ describe('OnboardingProgressBar', () => {
         expect(segments.length).toBe(3);
     });
 
-    it('renders the correct phase text', () => {
+    it('renders the correct step text', () => {
         render(<OnboardingProgressBar currentStep={2} totalSteps={3} />);
-        expect(screen.getByText(/PHASE 2/i)).toBeTruthy();
+        expect(screen.getByText(/STEP 2/i)).toBeTruthy();
         expect(screen.getByText(/03/i)).toBeTruthy();
     });
 

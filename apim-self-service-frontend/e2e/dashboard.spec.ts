@@ -1,10 +1,16 @@
 import { test, expect } from '@playwright/test';
+import { setupApiMocks } from './utils/api-mocker';
 
 test.describe('Dashboard End-to-End', () => {
     test.beforeEach(async ({ page }) => {
-        // Login as ADMIN to have maximum visibility
+        await setupApiMocks(page);
+        // Clear storage to avoid state leakage
+        await page.goto('/');
+        await page.evaluate(() => localStorage.clear());
+
+        // Login as PRODUCER for dashboard visibility
         await page.goto('/login');
-        await page.getByRole('button', { name: /ADMIN/i }).click();
+        await page.getByRole('button', { name: /PRODUCER/i }).click();
         await expect(page).toHaveURL('/', { timeout: 15000 });
     });
 
@@ -17,25 +23,23 @@ test.describe('Dashboard End-to-End', () => {
         await page.getByText(/ACTIVE SUBSCRIPTIONS/i).click();
         await expect(page.getByText(/Identity Service/i).first()).toBeVisible();
 
-        // 3. Pending Approvals
-        await page.getByText(/PENDING APPROVALS/i).click();
+        // 3. Approvals
+        await page.getByText(/APPROVALS/i).click();
         await expect(page.getByText(/Audit Decisions/i)).toBeVisible();
         await expect(page.getByText(/Decision Queue/i)).toBeVisible();
 
-        // 4. Global Inventory (Admin only)
-        await page.getByText(/GLOBAL INVENTORY/i).click();
-        await expect(page.getByText(/Enterprise/i).first()).toBeVisible();
+        // 4. Global Inventory (Admin only - skip in this Producer-focused test as it's covered in visibility.spec.ts)
     });
 
     test('should filter products by search', async ({ page }) => {
-        const searchInput = page.getByPlaceholder(/Universal Search/i);
+        const searchInput = page.getByPlaceholder(/Find an interface/i);
         await searchInput.fill('Identity');
 
         // Should show Identity Service
         await expect(page.getByText(/Identity Service/i).first()).toBeVisible();
 
         // Clear search
-        await searchInput.fill('');
+        await searchInput.clear();
         await expect(page.getByText(/Payment Gateway/i).first()).toBeVisible();
     });
 });

@@ -2,7 +2,7 @@ import React from 'react';
 import { ProductProducerCard } from './ProductProducerCard';
 import { ProductConsumerCard } from './ProductConsumerCard';
 import { ApprovalRequestCard } from './ApprovalRequestCard';
-import { type ApprovalRequest } from '../../../types/workflow';
+import { type ApprovalRequest } from '../../governance/types/governanceTypes';
 
 interface DashboardContentProps {
     isLoading: boolean;
@@ -45,7 +45,7 @@ export const DashboardContent: React.FC<DashboardContentProps> = ({
         // This is a simplified check; ideally we check 'totalItems' before filtering.
         // For now, we assume if filter is empty, it's a search issue, but we can make it friendlier.
         return (
-            <div className="flex flex-col items-center justify-center py-32 bg-slate-50/50 dark:bg-slate-800/30 rounded-3xl border-2 border-dashed border-gray-200 dark:border-slate-700/50">
+            <div className="flex flex-col items-center justify-center w-full min-h-[400px] py-16 bg-slate-50/50 dark:bg-slate-800/30 rounded-3xl border-2 border-dashed border-gray-200 dark:border-slate-700/50">
                 <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-3xl shadow-lg flex items-center justify-center text-4xl mb-6">✨</div>
                 <h3 className="text-gray-900 dark:text-white text-xl font-bold mb-2">No APIs Found</h3>
                 <p className="text-gray-500 dark:text-slate-400 text-sm mb-8 text-center max-w-sm">
@@ -68,6 +68,10 @@ export const DashboardContent: React.FC<DashboardContentProps> = ({
     if (activeTab === 'approvals') {
         return (
             <div className="grid grid-cols-1 gap-6">
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">Audit Decisions</h2>
+                    <span className="text-xs text-gray-400">Decision Queue</span>
+                </div>
                 {paginatedItems.map((item: any) => (
                     <ApprovalRequestCard
                         key={item.id}

@@ -1,16 +1,40 @@
-/**
- * Consumer - API Client
- * 
- * API calls for consumer operations.
- * 
- * @module features/consumer/api
- */
-
-import { api } from '../../../api/baseClient';
+import { api as baseClient } from '../../../api/baseClient';
+import type { Subscription, AppRegistration } from '../types/consumerTypes';
 
 /**
- * Browse marketplace
+ * Consumer API Client
+ * 
+ * Decentralized from inventory module.
  */
-export async function browseMarketplace() {
-    return api.get('/marketplace');
-}
+export const getSubscriptions = async (): Promise<Subscription[]> => {
+    const res = await baseClient.get('/subscriptions');
+    return res.data;
+};
+
+export const requestProductAccess = async (productId: string, teamId: string): Promise<Subscription> => {
+    const res = await baseClient.post('/subscriptions', { productId, teamId });
+    return res.data;
+};
+
+export const updateSubscription = async (subId: string, updates: Partial<Subscription>): Promise<Subscription> => {
+    const res = await baseClient.put(`/subscriptions/${subId}`, updates);
+    return res.data;
+};
+
+export const getAppRegistrations = async (teamId?: string): Promise<AppRegistration[]> => {
+    const res = await baseClient.get(`/apps${teamId ? `?teamId=${teamId}` : ''}`);
+    return res.data;
+};
+
+export const addAppRegistration = async (data: Partial<AppRegistration>): Promise<AppRegistration> => {
+    const res = await baseClient.post('/apps', data);
+    return res.data;
+};
+
+export const consumerApi = {
+    getSubscriptions,
+    requestProductAccess,
+    updateSubscription,
+    getAppRegistrations,
+    addAppRegistration
+};

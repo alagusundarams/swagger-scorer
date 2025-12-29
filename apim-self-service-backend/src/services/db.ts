@@ -26,7 +26,8 @@ let pool = new Pool({
  * This should be called once the application configuration is loaded.
  */
 export async function initDb(connectionString: string) {
-    console.log('🔌 Initializing Database Connection...');
+    const maskedUrl = connectionString.replace(/:([^:@]+)@/, ':****@');
+    console.log(`🔌 Initializing Database Connection to: ${maskedUrl}`);
     const oldPool = pool;
     pool = new Pool({
         connectionString,
@@ -34,6 +35,14 @@ export async function initDb(connectionString: string) {
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 2000,
     });
+
+    // Verify connection immediately
+    try {
+        await pool.query('SELECT 1');
+        console.log('✅ Database Connected Successfully');
+    } catch (err) {
+        console.error('❌ Database Connection Failed:', err);
+    }
 
     // Close the old pool if it was active
     if (oldPool) {
