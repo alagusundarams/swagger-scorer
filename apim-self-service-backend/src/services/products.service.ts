@@ -8,30 +8,7 @@ import { query } from './db.js';
 import { updateProductMetadata } from './apim.service.js';
 import { logAudit } from './audit.service.js';
 
-// Ensure Named Values table exists
-// In a real production app, this would be a migration.
-(async () => {
-    try {
-        await query(`
-            CREATE TABLE IF NOT EXISTS named_values (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                product_id UUID REFERENCES products(id) ON DELETE CASCADE,
-                scope_id UUID, -- If null/empty, it's Product Level. Else, it must be an API ID.
-                display_name TEXT NOT NULL,
-                system_name TEXT NOT NULL,
-                value TEXT NOT NULL,
-                type TEXT CHECK (type IN ('literal', 'key_vault')),
-                is_secret BOOLEAN DEFAULT false,
-                created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW(),
-                UNIQUE(product_id, system_name, scope_id) -- Prevent duplicates in same scope
-            );
-        `);
-        console.log('✅ Named Values Table Verified');
-    } catch (err) {
-        console.error('❌ Failed to verify Named Values table:', err);
-    }
-})();
+
 
 /**
  * Fetch all products with their associated APIs and calculated subscriber counts

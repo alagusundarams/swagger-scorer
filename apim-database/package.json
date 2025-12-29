@@ -8,6 +8,7 @@
         "reset": "tsx scripts/utils/reset-db.ts",
         "seed-data": "tsx scripts/utils/seed-data.ts",
         "sync": "tsx scripts/core/sync-apim-to-db.ts",
+        "discover": "tsx scripts/core/discover-sync.ts",
         "fetch": "tsx scripts/utils/fetch-apim-data.ts",
         "fetch-ad-groups": "tsx scripts/utils/fetch-ad-groups.ts",
         "migrate": "tsx scripts/utils/migrate-to-postgres.ts",

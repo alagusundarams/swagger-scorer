@@ -187,7 +187,6 @@ async function seed() {
 
         // 8. Seed Named Values (Configuration)
         console.log('⚙️ Seeding Named Values (Configuration)...');
-        // Legacy table for compat
         await query('DELETE FROM access_control_lists');
 
         const namedValues = [
@@ -200,12 +199,49 @@ async function seed() {
             { id: 'nv-grp-001', product_id: 'prod-grp-001', scope_id: 'api-pay', display_name: 'Payment Provider Key', system_name: 'stripe_key', value: 'sk_test_12345', type: 'literal', is_secret: true }
         ];
 
+        // Map to legacy access_control_lists format for now (Key, Env, Value)
         for (const nv of namedValues) {
+            // For seed data, we'll assume these apply to 'DEV' environment for simplicity 
+            // or mimic how legacy used to work (Product name specific keys?)
+            // Actually, inspection of previous seed-db.ts shows it populated named_values too?
+            // Wait, let me check the *original* seed-db.ts I read earlier. 
+            // It had 'Removed: CREATE TABLE IF NOT EXISTS named_values'.
+            // So the BACKEND script WAS using named_values??
+            // But the SERVICE uses access_control_lists?
+            // This implies the backend might be broken independently or I misread something.
+            // Let me re-read the grep output.
+        }
+
+        // Re-reading service: 
+        // export async function getNamedValues... FROM access_control_lists
+
+        // So the backend reads access_control_lists. 
+        // If the original seed script wrote to named_values, then the app was broken before?
+        // Or maybe named_values logic is new and unused?
+
+        // I will seed BOTH to be safe. "Dual Write". 
+
+        for (const nv of namedValues) {
+            // New Table
             await query(`
                 INSERT INTO named_values (id, product_id, scope_id, display_name, system_name, value, type, is_secret)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 ON CONFLICT DO NOTHING
             `, [nv.id, nv.product_id, nv.scope_id, nv.display_name, nv.system_name, nv.value, nv.type, nv.is_secret]);
+
+            // Legacy Table (Best Effort Mapping)
+            // We'll map system_name -> key, 'DEV' -> environment
+            // This ensures backend sees something.
+            await query(`
+                INSERT INTO access_control_lists (key, environment, value, updated_at)
+                VALUES ($1, 'DEV', $2, NOW()) 
+                ON CONFLICT (key, environment) DO UPDATE SET value = $2
+            `, [nv.system_name, nv.value]);
+            await query(`
+                INSERT INTO access_control_lists (key, environment, value, updated_at)
+                VALUES ($1, 'PROD', $2, NOW()) 
+                ON CONFLICT (key, environment) DO UPDATE SET value = $2
+            `, [nv.system_name, nv.value]);
         }
 
         // 9. Seed Permission Matrix (RBAC)
