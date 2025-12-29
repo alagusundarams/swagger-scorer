@@ -84,7 +84,7 @@ export const GlobalInventory = ({ embedded = false }: { embedded?: boolean }) =>
                                         <div className="flex -space-x-2">
                                             {p.deployments.map((d: any) => (
                                                 <div
-                                                    key={d.environment}
+                                                    key={d.id}
                                                     title={`${d.environment}: ${d.state}`}
                                                     className={`w-8 h-8 rounded-lg border-2 border-white dark:border-slate-900 flex items-center justify-center text-[10px] font-black ${d.environment === 'PROD' ? 'bg-indigo-600 text-white' :
                                                         d.environment === 'QA' ? 'bg-amber-500 text-white' : 'bg-slate-400 text-white'
@@ -134,7 +134,7 @@ export const GlobalInventory = ({ embedded = false }: { embedded?: boolean }) =>
                                             <td className="px-6 py-4">
                                                 <div className="flex gap-2">
                                                     {a.deployments.map((d: any) => (
-                                                        <span key={d.environment} className="text-[10px] font-black text-slate-400 uppercase">{d.environment}</span>
+                                                        <span key={d.id} className="text-[10px] font-black text-slate-400 uppercase">{d.environment}</span>
                                                     ))}
                                                 </div>
                                             </td>
