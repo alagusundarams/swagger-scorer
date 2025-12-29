@@ -27,7 +27,7 @@
         "baseUrl": "https://dev.azure.com"
     },
     "database": {
-        "url": "postgresql://postgres:password@localhost:5432/apim"
+        "url": "postgresql://postgres:password@127.0.0.1:5432/apim"
     },
     "backend": {
         "url": "http://localhost:3001"

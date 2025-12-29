@@ -550,7 +550,7 @@ SELECT
     h.status,
     h.created_at,
     u.name as requester_name,
-    t.display_name as team_name,
+    t.name as team_name,
     (SELECT COUNT(*) FROM policy_help_messages WHERE request_id = h.id) as message_count,
     (SELECT MAX(created_at) FROM policy_help_messages WHERE request_id = h.id) as last_message_at
 FROM policy_help_requests h
