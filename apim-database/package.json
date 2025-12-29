@@ -5,13 +5,14 @@
     "type": "module",
     "scripts": {
         "setup-db": "tsx scripts/utils/setup-db.ts",
-        "reset-db": "tsx scripts/utils/reset-db.ts",
+        "reset": "tsx scripts/utils/reset-db.ts",
         "seed-data": "tsx scripts/utils/seed-data.ts",
-        "discover-sync": "tsx scripts/core/discover-sync.ts",
+        "sync": "tsx scripts/core/sync-apim-to-db.ts",
         "fetch": "tsx scripts/utils/fetch-apim-data.ts",
         "fetch-ad-groups": "tsx scripts/utils/fetch-ad-groups.ts",
         "migrate": "tsx scripts/utils/migrate-to-postgres.ts",
-        "orphaned-report": "tsx scripts/core/generate-orphaned-report.ts"
+        "orphaned-report": "tsx scripts/core/generate-orphaned-report.ts",
+        "test": "echo \"Error: no test specified\" && exit 1"
     },
     "main": "index.js",
     "dependencies": {
