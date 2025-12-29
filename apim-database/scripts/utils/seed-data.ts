@@ -1,19 +1,24 @@
 /**
  * @fileoverview Seed Data Script for Development
  * 
- * Populates database with realistic test data for local development
+ * Populates database with realistic test data for local development.
+ * Migrated from backend/src/scripts/seed-db.ts.
+ * 
  * Run: npm run seed-data
  */
 
+import 'dotenv/config';
 import { Pool } from 'pg';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
-// Load config
+// Load config to find Database URL
 function loadConfig() {
+    // Try multiple paths for robustness
     const configPaths = [
         join(process.cwd(), 'apim-database', 'config.json'),
-        join(process.cwd(), 'config.json')
+        join(process.cwd(), 'config.json'),
+        join(process.cwd(), '..', 'config.json') // relative if running from scripts/utils
     ];
     for (const path of configPaths) {
         if (existsSync(path)) return JSON.parse(readFileSync(path, 'utf8'));
@@ -22,292 +27,219 @@ function loadConfig() {
 }
 
 const config = loadConfig();
-const DATABASE_URL = config.azure?.environments[0]?.databaseUrl || config.database?.url;
+const DATABASE_URL = process.env.DATABASE_URL || config.azure?.environments?.[0]?.databaseUrl || config.database?.url || 'postgresql://postgres:postgres@localhost:5432/apim';
 
-async function main() {
-    console.log('🌱 Seeding database with test data...\n');
+async function seed() {
+    console.log('🌱 Starting Database Seeding (DB Project standalone)...');
+    console.log(`   Target: ${DATABASE_URL.replace(/:[^:@]+@/, ':***@')}`);
 
     const pool = new Pool({ connectionString: DATABASE_URL });
+    const query = (text: string, params?: any[]) => pool.query(text, params);
 
     try {
-        // 1. Teams
-        console.log('📦 Creating teams...');
-        await pool.query(`
-            INSERT INTO teams (id, display_name, azure_ad_group_id, type, description, contact_email) VALUES
-            ('team-payments', 'Payments & Billing', 'ad-group-payments', 'producer', 'Handles all payment processing APIs', 'payments@company.com'),
-            ('team-core', 'Core Systems', 'ad-group-core', 'producer', 'Core platform services', 'core@company.com'),
-            ('team-mobile', 'Mobile Team', 'ad-group-mobile', 'consumer', 'Mobile app development', 'mobile@company.com'),
-            ('team-web', 'Web Team', 'ad-group-web', 'consumer', 'Web app development', 'web@company.com')
-            ON CONFLICT (id) DO NOTHING
+        // 1. Clean Slate (Order matters for FKs)
+        console.log('🧹 Cleaning existing data...');
+        await query('DELETE FROM app_registrations');
+        await query('DELETE FROM subscriptions');
+        await query('DELETE FROM operations');
+        await query('DELETE FROM apis');
+        await query('DELETE FROM products');
+        await query('DELETE FROM audit_log');
+        await query('DELETE FROM approval_requests');
+        await query('DELETE FROM user_teams');
+        await query('DELETE FROM users');
+        await query('DELETE FROM teams');
+
+        // RBAC cleanup
+        await query('DELETE FROM permission_matrix');
+        await query('DELETE FROM named_values');
+
+        // 2. Seed Teams
+        console.log('👥 Seeding Teams...');
+        const teams = [
+            {
+                id: 'team-platform',
+                name: 'Platform Engineering',
+                azure_ad_group_id: 'group-platform',
+                type: 'producer',
+                description: 'Core platform services and gateway management.',
+                member_count: 12
+            },
+            {
+                id: 'team-payments',
+                name: 'Payments Squad',
+                azure_ad_group_id: 'group-payments',
+                type: 'both',
+                description: 'Payment processing and financial ledger services.',
+                member_count: 8
+            },
+            {
+                id: 'team-mobile',
+                name: 'Mobile Squad',
+                azure_ad_group_id: 'group-mobile',
+                type: 'consumer',
+                description: 'Mobile app development team.',
+                member_count: 15
+            }
+        ];
+
+        for (const t of teams) {
+            await query(`
+                INSERT INTO teams (id, name, azure_ad_group_id, type, description, member_count, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+            `, [t.id, t.name, t.azure_ad_group_id, t.type, t.description, t.member_count]);
+        }
+
+        // 3. Seed Users (after Teams, so we can set default_team_id)
+        console.log('👤 Seeding Users...');
+        await query(`
+            INSERT INTO users (id, email, name, azure_ad_object_id, default_team_id, role, created_at, updated_at)
+            VALUES 
+            ('user-001', 'admin@example.com', 'Portal Admin', 'oid-admin', 'team-platform', 'admin', NOW(), NOW()),
+            ('user-002', 'dev@example.com', 'Developer', 'oid-dev', 'team-payments', 'user', NOW(), NOW())
         `);
-        console.log('   ✅ Created 4 teams');
 
-        // 2. Users
-        console.log('👥 Creating users...');
-        await pool.query(`
-            INSERT INTO users (id, email, name, azure_ad_object_id, default_team_id, role) VALUES
-            ('user-admin', 'admin@company.com', 'Admin User', 'ad-obj-admin', 'team-core', 'admin'),
-            ('user-alice', 'alice@company.com', 'Alice Producer', 'ad-obj-alice', 'team-payments', 'user'),
-            ('user-bob', 'bob@company.com', 'Bob Consumer', 'ad-obj-bob', 'team-mobile', 'user')
-            ON CONFLICT (id) DO NOTHING
-        `);
-        console.log('   ✅ Created 3 users');
+        // 4. Seed Products
+        console.log('📦 Seeding Products...');
+        const products = [
+            {
+                id: 'prod-001', name: 'payment-gateway', display_name: 'Payment Gateway', version: 'v1.2.0',
+                description: 'Unified payment processing API.',
+                state: 'published', owner_team_id: 'team-payments', environment: 'PROD',
+                quality_score: 92, subscriber_count: 12, type: 'standard'
+            },
+            {
+                id: 'prod-grp-001', name: 'mobile-app-bundle', display_name: 'Mobile App Bundle (GRP)', version: 'v1.0.0',
+                description: 'Consumer-owned GRP product bundling Payment and Identity APIs.',
+                state: 'published', owner_team_id: 'team-mobile', environment: 'DEV',
+                quality_score: 85, subscriber_count: 5, type: 'grp'
+            }
+        ];
 
-        // 3. Products
-        console.log('🎯 Creating products...');
-        await pool.query(`
-            INSERT INTO products (
-                id, name, display_name, version, description, state,
-                owner_team_id, environment, visibility, management_mode,
-                terraform_pipeline_url, github_url,
-                git_repo_url, git_file_path,
-                quality_score,
-                dev_hash, qa_hash, stage_hash, production_hash
-            ) VALUES
-            (
-                'prod-payment-gateway-dev',
-                'payment-gateway',
-                'Payment Gateway API',
-                'v2.1.0',
-                'Core payment processing and transaction management',
-                'published',
-                'team-payments',
-                'DEV',
-                'internal',
-                'TERRAFORM_MANAGED',
-                'https://dev.azure.com/company/payments/_build',
-                'https://github.com/company/payment-gateway',
-                'https://github.com/company/payment-gateway.git',
-                'openapi/payment-gateway.yaml',
-                98.5,
-                'abc123dev', NULL, NULL, NULL
-            ),
-            (
-                'prod-payment-gateway-qa',
-                'payment-gateway',
-                'Payment Gateway API',
-                'v2.1.0',
-                'Core payment processing and transaction management',
-                'published',
-                'team-payments',
-                'QA',
-                'internal',
-                'TERRAFORM_MANAGED',
-                'https://dev.azure.com/company/payments/_build',
-                'https://github.com/company/payment-gateway',
-                'https://github.com/company/payment-gateway.git',
-                'openapi/payment-gateway.yaml',
-                98.5,
-                'abc123dev', 'def456qa', NULL, NULL
-            ),
-            (
-                'prod-payment-gateway-prod',
-                'payment-gateway',
-                'Payment Gateway API',
-                'v2.0.5',
-                'Core payment processing and transaction management',
-                'published',
-                'team-payments',
-                'PROD',
-                'internal',
-                'TERRAFORM_MANAGED',
-                'https://dev.azure.com/company/payments/_build',
-                'https://github.com/company/payment-gateway',
-                'https://github.com/company/payment-gateway-prod.git',
-                'openapi/payment-gateway.yaml',
-                100.0,
-                NULL, NULL, NULL, 'xyz789prod'
-            ),
-            (
-                'prod-user-service-dev',
-                'user-service',
-                'User Management Service',
-                'v1.0.0',
-               'User authentication and profile management',
-                'published',
-                'team-core',
-                'DEV',
-                'private',
-                'TERRAFORM_MANAGED',
-                'https://dev.azure.com/company/core/_build',
-                'https://github.com/company/user-service',
-                'https://github.com/company/user-service.git',
-                'openapi/user-service.yaml',
-                95.0,
-                'user123dev', NULL, NULL, NULL
-            )
-            ON CONFLICT (id) DO NOTHING
-        `);
-        console.log('   ✅ Created 4 products (3 payment gateway across envs, 1 user service)');
+        for (const p of products) {
+            await query(`
+                INSERT INTO products (id, name, display_name, version, description, state, owner_team_id, environment, quality_score, subscriber_count, type, management_mode, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'PORTAL_MANAGED', NOW(), NOW())
+            `, [p.id, p.name, p.display_name, p.version, p.description, p.state, p.owner_team_id, p.environment, p.quality_score, p.subscriber_count, p.type]);
+        }
 
-        // 4. APIs
-        console.log('🔌 Creating APIs...');
-        await pool.query(`
-            INSERT INTO apis (id, product_id, name, display_name, description, path, quality_score) VALUES
-            ('api-payment-process-dev', 'prod-payment-gateway-dev', 'payment-process', 'Payment Processing', 'Process payments and refunds', '/api/v2/payments', 97.0),
-            ('api-payment-process-qa', 'prod-payment-gateway-qa', 'payment-process', 'Payment Processing', 'Process payments and refunds', '/api/v2/payments', 97.0),
-            ('api-payment-process-prod', 'prod-payment-gateway-prod', 'payment-process', 'Payment Processing', 'Process payments and refunds', '/api/v2/payments', 100.0),
-            ('api-user-auth-dev', 'prod-user-service-dev', 'user-auth', 'User Authentication', 'OAuth2 and JWT authentication', '/api/v1/auth', 95.0)
-            ON CONFLICT (id) DO NOTHING
-        `);
-        console.log('   ✅ Created 4 APIs');
+        // 5. Seed APIs
+        console.log('🔌 Seeding APIs...');
+        const apis = [
+            { id: 'api-pay', product_id: 'prod-grp-001', name: 'payments-api', display_name: 'Payments API', description: 'Core payments', path: '/pay', origin_team_id: 'team-payments' },
+            { id: 'api-id', product_id: 'prod-grp-001', name: 'identity-api', display_name: 'Identity API', description: 'User auth', path: '/auth', origin_team_id: 'team-platform' }
+        ];
 
-        // 5. Operations
-        console.log('⚙️  Creating operations...');
-        await pool.query(`
-            INSERT INTO operations (id, api_id, name, display_name, method, url_template, description) VALUES
-            ('op-create-payment', 'api-payment-process-dev', 'createPayment', 'Create Payment', 'POST', '/api/v2/payments', 'Create a new payment transaction'),
-            ('op-get-payment', 'api-payment-process-dev', 'getPayment', 'Get Payment Status', 'GET', '/api/v2/payments/{paymentId}', 'Retrieve payment status'),
-            ('op-login', 'api-user-auth-dev', 'login', 'User Login', 'POST', '/api/v1/auth/login', 'Authenticate user and return JWT')
-            ON CONFLICT (id) DO NOTHING
-        `);
-        console.log('   ✅ Created 3 operations');
+        for (const a of apis) {
+            await query(`
+                INSERT INTO apis (id, product_id, name, display_name, description, path, origin_team_id, quality_score, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, 100, NOW(), NOW())
+            `, [a.id, a.product_id, a.name, a.display_name, a.description, a.path, a.origin_team_id]);
+        }
 
-        // 6. Subscriptions
-        console.log('🔐 Creating subscriptions...');
-        await pool.query(`
-            INSERT INTO subscriptions (
-                id, product_id, subscriber_team_id, state,
-                primary_key_name, primary_key_value,
-                created_at
-            ) VALUES
-            (
-                'sub-mobile-payment-dev',
-                'prod-payment-gateway-dev',
-                'team-mobile',
-                'active',
-                'mobile-payment-key',
-                'encrypted-primary-key-mobile-dev',
-                NOW() - INTERVAL '30 days'
-            ),
-            (
-                'sub-web-payment-dev',
-                'prod-payment-gateway-dev',
-                'team-web',
-                'active',
-                'web-payment-key',
-                'encrypted-primary-key-web-dev',
-                NOW() - INTERVAL '15 days'
-            ),
-            (
-                'sub-mobile-payment-qa',
-                'prod-payment-gateway-qa',
-                'team-mobile',
-                'pending',
-                NULL,
-                NULL,
-                NOW()
-            )
-            ON CONFLICT (id) DO NOTHING
-        `);
-        console.log('   ✅ Created 3 subscriptions (2 active, 1 pending)');
+        // 6. Seed Subscriptions
+        console.log('🔑 Seeding Subscriptions...');
+        const subs = [
+            {
+                id: 'sub-001', product_id: 'prod-001', subscriber_team_id: 'team-payments', state: 'active',
+                primary_key: { name: 'Primary', value: 'a1b2c3d4e5' }, secondary_key: { name: 'Secondary', value: 'f6g7h8i9j0' }
+            },
+            {
+                id: 'sub-grp-001', product_id: 'prod-001', subscriber_team_id: 'team-mobile', state: 'active',
+                primary_key: { name: 'GRP-Key', value: 'grp-12345-bundle' }, secondary_key: { name: 'GRP-Sec', value: 'grp-67890-bundle' }
+            }
+        ];
 
-        // 7. Approval Requests
-        console.log('✔️  Creating approval requests...');
-        await pool.query(`
-            INSERT INTO approval_requests (
-                id, type, status,
-                requester_name, requester_email, requester_team_id,
-                details, submitted_at
-            ) VALUES
-            (
-                'approval-sub-mobile-qa',
-                'SUBSCRIPTION',
-                'PENDING',
-                'Bob Consumer',
-                'bob@company.com',
-                'team-mobile',
-                '{"productId": "prod-payment-gateway-qa", "teamId": "team-mobile", "justification": "Need for QA mobile testing"}',
-                NOW()
-            )
-            ON CONFLICT (id) DO NOTHING
-        `);
-        console.log('   ✅ Created 1 approval request');
+        for (const s of subs) {
+            await query(`
+                INSERT INTO subscriptions (id, product_id, subscriber_team_id, state, primary_key_name, primary_key_value, secondary_key_name, secondary_key_value, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+            `, [s.id, s.product_id, s.subscriber_team_id, s.state, s.primary_key.name, s.primary_key.value, s.secondary_key.name, s.secondary_key.value]);
+        }
 
-        // 8. App Registrations
-        console.log('🔑 Creating app registrations...');
-        await pool.query(`
-            INSERT INTO app_registrations (id, client_id, display_name, environment, product_id, owner_team_id) VALUES
-            ('app-mobile-dev', 'client-mobile-dev-123', 'Mobile App (DEV)', 'DEV', 'prod-payment-gateway-dev', 'team-mobile'),
-            ('app-web-dev', 'client-web-dev-456', 'Web App (DEV)', 'DEV', 'prod-payment-gateway-dev', 'team-web')
-            ON CONFLICT (id) DO NOTHING
-        `);
-        console.log('   ✅ Created 2 app registrations');
+        // 7. Seed App Registrations
+        console.log('📱 Seeding App Registrations...');
+        const apps = [
+            {
+                id: 'app-001',
+                display_name: 'Mobile Checkout App',
+                client_id: 'client-8822-mobile',
+                environment: 'PROD',
+                owner_team_id: 'team-payments',
+                product_id: null
+            },
+            {
+                id: 'app-grp-001',
+                display_name: 'Mobile App Bundle (GRP)',
+                client_id: 'client-grp-mobile',
+                environment: 'PROD',
+                owner_team_id: 'team-mobile',
+                product_id: 'prod-grp-001'
+            }
+        ];
 
-        // 9. Named Values (Access Control Lists)
-        console.log('🗝️  Creating named values...');
-        await pool.query(`
-            INSERT INTO access_control_lists (key, environment, value) VALUES
-            ('backend-payment-url', 'DEV', 'https://dev-payment-backend.company.com'),
-            ('backend-payment-url', 'QA', 'https://qa-payment-backend.company.com'),
-            ('backend-payment-url', 'PROD', 'https://payment-backend.company.com'),
-            ('api-timeout-seconds', 'DEV', '30'),
-            ('api-timeout-seconds', 'PROD', '10')
-            ON CONFLICT (key, environment) DO NOTHING
-        `);
-        console.log('   ✅ Created 5 named values');
+        for (const a of apps) {
+            await query(`
+                INSERT INTO app_registrations (id, display_name, client_id, environment, owner_team_id, product_id, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6, NOW())
+            `, [a.id, a.display_name, a.client_id, a.environment, a.owner_team_id, a.product_id]);
+        }
 
-        // 10. Backends
-        console.log('🔧 Creating backends...');
-        await pool.query(`
-            INSERT INTO governance_backends (id, environment, url, description, title, protocol) VALUES
-            ('payment-processor-backend', 'DEV', 'https://dev-payment-backend.company.com', 'Payment processor service', 'Payment Backend', 'https'),
-            ('payment-processor-backend', 'QA', 'https://qa-payment-backend.company.com', 'Payment processor service', 'Payment Backend', 'https'),
-            ('payment-processor-backend', 'PROD', 'https://payment-backend.company.com', 'Payment processor service', 'Payment Backend', 'https'),
-            ('user-db-backend', 'DEV', 'https://dev-userdb.company.com', 'User database backend', 'User DB', 'https')
-            ON CONFLICT (id, environment) DO NOTHING
-        `);
-        console.log('   ✅ Created 4 backends');
+        // 8. Seed Named Values (Configuration)
+        console.log('⚙️ Seeding Named Values (Configuration)...');
+        // Legacy table for compat
+        await query('DELETE FROM access_control_lists');
 
-        // 11. API Backends (linkage)
-        console.log('🔗 Linking APIs to backends...');
-        await pool.query(`
-            INSERT INTO api_backends (api_id, backend_id, environment) VALUES
-            ('api-payment-process-dev', 'payment-processor-backend', 'DEV'),
-            ('api-payment-process-qa', 'payment-processor-backend', 'QA'),
-            ('api-payment-process-prod', 'payment-processor-backend', 'PROD'),
-            ('api-user-auth-dev', 'user-db-backend', 'DEV')
-            ON CONFLICT (api_id, backend_id, environment) DO NOTHING
-        `);
-        console.log('   ✅ Linked APIs to backends');
+        const namedValues = [
+            // Product Level for 'prod-001'
+            { id: 'nv-001', product_id: 'prod-001', scope_id: null, display_name: 'Backend URL', system_name: 'backend_url', value: 'https://api.payments.com', type: 'literal', is_secret: false },
+            { id: 'nv-002', product_id: 'prod-001', scope_id: null, display_name: 'Max Retries', system_name: 'max_retries', value: '3', type: 'literal', is_secret: false },
+            { id: 'nv-003', product_id: 'prod-001', scope_id: null, display_name: 'DB Connection', system_name: 'db_conn', value: 'https://vault.azure.net/secrets/db-conn', type: 'key_vault', is_secret: true },
 
-        // Verify counts
-        console.log('\n📊 Verification:');
-        const counts = await pool.query(`
-            SELECT 
-                (SELECT COUNT(*) FROM teams) as teams,
-                (SELECT COUNT(*) FROM users) as users,
-                (SELECT COUNT(*) FROM products) as products,
-                (SELECT COUNT(*) FROM apis) as apis,
-                (SELECT COUNT(*) FROM operations) as operations,
-                (SELECT COUNT(*) FROM subscriptions) as subscriptions,
-                (SELECT COUNT(*) FROM approval_requests) as approvals,
-                (SELECT COUNT(*) FROM app_registrations) as app_regs
-        `);
-        const row = counts.rows[0];
-        console.log(`   Teams: ${row.teams}`);
-        console.log(`   Users: ${row.users}`);
-        console.log(`   Products: ${row.products}`);
-        console.log(`   APIs: ${row.apis}`);
-        console.log(`   Operations: ${row.operations}`);
-        console.log(`   Subscriptions: ${row.subscriptions}`);
-        console.log(`   Approvals: ${row.approvals}`);
-        console.log(`   App Registrations: ${row.app_regs}`);
+            // API Level for 'prod-grp-001' -> 'api-pay'
+            { id: 'nv-grp-001', product_id: 'prod-grp-001', scope_id: 'api-pay', display_name: 'Payment Provider Key', system_name: 'stripe_key', value: 'sk_test_12345', type: 'literal', is_secret: true }
+        ];
 
-        console.log('\n✅ Seed data created successfully!');
-        console.log('\n📝 Test Scenario:');
-        console.log('   • Payment Gateway API exists in DEV, QA, PROD with different versions');
-        console.log('   • DEV has 2 active subscriptions (Mobile, Web)');
-        console.log('   • QA has 1 pending subscription (Mobile) with approval request');
-        console.log('   • Subscriber count will show: DEV=2, QA=0, PROD=0');
-        console.log('   • You can test promotion workflow DEV→QA→PROD');
+        for (const nv of namedValues) {
+            await query(`
+                INSERT INTO named_values (id, product_id, scope_id, display_name, system_name, value, type, is_secret)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                ON CONFLICT DO NOTHING
+            `, [nv.id, nv.product_id, nv.scope_id, nv.display_name, nv.system_name, nv.value, nv.type, nv.is_secret]);
+        }
 
-    } catch (err) {
-        console.error('\n❌ Seed data creation failed:', err);
+        // 9. Seed Permission Matrix (RBAC)
+        console.log('🛡️ Seeding Permission Matrix...');
+
+        const permissions = [
+            // Platform Team (Admins) - Owner everywhere
+            { product_id: 'prod-001', ad_group_id: 'group-platform', environment: 'DEV', role: 'Owner' },
+            { product_id: 'prod-001', ad_group_id: 'group-platform', environment: 'PROD', role: 'Owner' },
+
+            // Payments Team - Contributor in DEV, Reader in PROD (Simulating restriction)
+            { product_id: 'prod-001', ad_group_id: 'group-payments', environment: 'DEV', role: 'Contributor' },
+            { product_id: 'prod-001', ad_group_id: 'group-payments', environment: 'PROD', role: 'Reader' },
+
+            // GRP Product - Mobile Team
+            { product_id: 'prod-grp-001', ad_group_id: 'group-mobile', environment: 'DEV', role: 'Contributor' },
+            { product_id: 'prod-grp-001', ad_group_id: 'group-mobile', environment: 'PROD', role: 'Reader' }
+        ];
+
+        for (const p of permissions) {
+            await query(`
+                INSERT INTO permission_matrix (product_id, ad_group_id, environment, role)
+                VALUES ($1, $2, $3, $4)
+            `, [p.product_id, p.ad_group_id, p.environment, p.role]);
+        }
+
+        console.log('✅ Seeding Complete!');
+        process.exit(0);
+    } catch (error) {
+        console.error('❌ Seeding Failed:', error);
         process.exit(1);
     } finally {
         await pool.end();
     }
 }
 
-main().catch(err => console.error('\n💥 Fatal Error:', err));
+seed();
