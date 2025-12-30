@@ -37,19 +37,23 @@ export async function getGlobalInventory() {
  * @todo Implement actual API endpoint
  */
 export async function updateTeam(teamId: string, updates: Partial<Team>): Promise<Team> {
-    // TODO: Replace with actual API call
-    // const updatedTeam = await api.patch(`/admin/teams/${teamId}`, updates);
-
-    console.warn('[adminClient.updateTeam] Not implemented - emitting event with mock data');
-    const mockUpdatedTeam = { id: teamId, ...updates } as Team;
+    const response = await fetch(`/api/v1/teams/${teamId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+    });
+    const updatedTeam = await response.json();
 
     // Emit event to refresh AppDataContext
     eventBus.emit('team:updated', {
         teamId,
-        team: mockUpdatedTeam
+        team: updatedTeam
     });
 
-    return mockUpdatedTeam;
+    // Also emit generic refresh for components listening for dataType
+    eventBus.emit('data:refresh', { dataType: 'teams' });
+
+    return updatedTeam;
 }
 
 /**
@@ -79,17 +83,33 @@ export async function getOrphanProducts(): Promise<Product[]> {
  * @todo Implement actual API endpoint
  */
 export async function updateProduct(productId: string, updates: Partial<Product>): Promise<Product> {
-    // TODO: Replace with actual API call
-    // const updatedProduct = await api.patch(`/admin/products/${productId}`, updates);
+    console.log(`[adminClient] updateProduct called for ${productId}`, updates);
+    try {
+        const response = await fetch(`/api/v1/products/${productId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates)
+        });
+        if (!response.ok) {
+            const errBody = await response.text();
+            console.error(`[adminClient] updateProduct failed with ${response.status}: ${errBody}`);
+            throw new Error(`Failed to update product: ${response.status}`);
+        }
+        const updatedProduct = await response.json();
+        console.log(`[adminClient] updateProduct success for ${productId}`);
 
-    console.warn('[adminClient.updateProduct] Not implemented - emitting event with mock data');
-    const mockUpdatedProduct = { id: productId, ...updates } as Product;
+        // Emit event to refresh relevant data
+        eventBus.emit('product:updated', {
+            productId,
+            product: updatedProduct
+        });
 
-    // Emit event to refresh relevant data
-    eventBus.emit('product:updated', {
-        productId,
-        product: mockUpdatedProduct
-    });
+        // Also emit generic refresh for components listening for dataType (like OrphanManager)
+        eventBus.emit('data:refresh', { dataType: 'products' });
 
-    return mockUpdatedProduct;
+        return updatedProduct;
+    } catch (err) {
+        console.error(`[adminClient] updateProduct error:`, err);
+        throw err;
+    }
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAppData } from '../../../shared/context/AppDataContext';
+import { eventBus } from '../../../shared/events/eventBus';
 import type { Product } from '../../../shared/types/domain';
 import { updateProduct } from '../api/adminClient';
 import toast from 'react-hot-toast';
@@ -14,8 +15,31 @@ export const OrphanProductManager = () => {
     const [products, _setProducts] = useState<Product[]>([]);
 
     useEffect(() => {
-        // TODO: Fetch orphan products from adminClient when implemented
-        // getOrphanProducts().then(setProducts);
+        // Fetch products to identify orphans
+        const controller = new AbortController();
+        const fetchOrphans = async () => {
+            try {
+                // In a real MFE, we would use the adminClient.
+                const res = await fetch('/api/v1/products', { signal: controller.signal });
+                const data = await res.json();
+                _setProducts(data);
+            } catch (err: any) {
+                if (err.name !== 'AbortError') console.error('Failed to fetch products for orphan check', err);
+            }
+        };
+        fetchOrphans();
+
+        // Listen for refresh events
+        const unsubscribe = eventBus.on('data:refresh', (payload) => {
+            if (payload.dataType === 'products' || payload.dataType === 'all') {
+                fetchOrphans();
+            }
+        });
+
+        return () => {
+            controller.abort();
+            unsubscribe();
+        };
     }, []);
     const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
     const [targetTeamId, setTargetTeamId] = useState<string>('');

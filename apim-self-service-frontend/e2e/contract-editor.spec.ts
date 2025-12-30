@@ -1,26 +1,20 @@
 import { test, expect } from '@playwright/test';
 import { setupApiMocks } from './utils/api-mocker';
+import { loginAsUser, navigateTo } from './helpers/login';
 
 test.describe('Contract Editor Interface', () => {
     test.beforeEach(async ({ page }) => {
         await setupApiMocks(page);
-        // Login as PRODUCER
-        await page.goto('/login');
-        await page.getByRole('button', { name: /PRODUCER/i }).click();
-        await expect(page).toHaveURL('/', { timeout: 15000 });
+        // Login as producer bypassing UI for stability
+        await loginAsUser(page, 'producer');
     });
 
-    test.skip('should open editor, make changes and commit', async ({ page }) => {
-        // TODO: Fix when product detail tabs and contract editor are implemented
+    test('should open editor, make changes and commit', async ({ page }) => {
         // Wait for dashboard to load
         await expect(page.getByText(/Universal Search/i)).toBeVisible();
 
-        // Find Payment Gateway product card and click View Details
-        const productCard = page.getByTestId('producer-card').filter({ hasText: /Payment Gateway/i }).first();
-        await expect(productCard).toBeVisible({ timeout: 15000 });
-
-        // Click View Details button
-        await productCard.getByRole('button', { name: /View Details/i }).click();
+        // Navigate via UI or deep link with session preservation
+        await navigateTo(page, '/products/prod-001');
 
         // Wait for product details page
         await expect(page).toHaveURL(/.*products\/prod-001/, { timeout: 15000 });

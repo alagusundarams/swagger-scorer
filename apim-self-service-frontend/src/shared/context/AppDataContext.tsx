@@ -243,9 +243,13 @@ export const useAppData = (): AppData => {
  * This will be replaced with actual API calls
  */
 async function fetchTeamsFromApi(): Promise<Team[]> {
-    // TODO: Replace with actual API call
-    // For now, return empty array as placeholder
-    return [];
+    try {
+        const res = await fetch('/api/v1/teams');
+        if (!res.ok) return [];
+        return await res.json();
+    } catch {
+        return [];
+    }
 }
 
 /**
@@ -253,11 +257,11 @@ async function fetchTeamsFromApi(): Promise<Team[]> {
  * This will be replaced with actual API calls
  */
 async function fetchEnvironmentsFromApi(): Promise<Environment[]> {
-    // TODO: Replace with actual API call
-    // For now, return default environments with proper enum values
-    return [
-        'dev' as Environment,
-        'qa' as Environment,
-        'prod' as Environment,
-    ];
+    try {
+        const res = await fetch('/api/v1/environments');
+        if (!res.ok) return ['dev' as Environment, 'qa' as Environment, 'prod' as Environment];
+        return await res.json();
+    } catch {
+        return ['dev' as Environment, 'qa' as Environment, 'prod' as Environment];
+    }
 }

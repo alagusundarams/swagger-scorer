@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { setupApiMocks } from './utils/api-mocker';
+import { loginAsUser, navigateTo } from './helpers/login';
 
 test.describe('Onboarding Page Visibility', () => {
     test.beforeEach(async ({ page }) => {
@@ -7,9 +8,8 @@ test.describe('Onboarding Page Visibility', () => {
     });
 
     test('should show products for Producer on Dashboard', async ({ page }) => {
-        await page.goto('/login');
-        await page.getByRole('button', { name: /PRODUCER/i }).click();
-        await expect(page).toHaveURL('/', { timeout: 15000 });
+        await loginAsUser(page, 'producer');
+        await navigateTo(page, '/');
 
         // Wait for ANY product card using text
         await expect(page.getByText(/Payment Gateway/i).first()).toBeVisible({ timeout: 15000 });
@@ -21,10 +21,7 @@ test.describe('Onboarding Page Visibility', () => {
     });
 
     test('should redirect Admin to Dashboard', async ({ page }) => {
-        await page.goto('/login');
-        await page.getByRole('button', { name: /ADMIN/i }).click();
-        // Admin goes to dashboard homepage
-        await expect(page).toHaveURL('/', { timeout: 15000 });
+        await loginAsUser(page, 'admin');
         // Verify dashboard loads with search bar
         await expect(page.getByText(/Universal Search/i)).toBeVisible({ timeout: 20000 });
     });

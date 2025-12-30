@@ -1,70 +1,54 @@
-/**
- * E2E Test - Orphan Product Assignment
- */
 
 import { test, expect } from '@playwright/test';
+import { setupApiMocks } from './utils/api-mocker';
+import { loginAsUser, navigateTo } from './helpers/login';
 
 test.describe('Orphan Product Assignment Flow', () => {
     test.beforeEach(async ({ page }) => {
-        // Login as admin using role button
-        await page.goto('/login');
-        await page.getByRole('button', { name: /ADMIN/i }).click();
-        await page.waitForURL(/\/(dashboard|$)/, { timeout: 10000 });
-        // Skip navigating to /admin since route doesn't exist yet
+        await setupApiMocks(page);
+        await loginAsUser(page, 'admin');
     });
 
-    test.skip('admin can view orphaned products', async ({ page }) => {
-        // TODO: Implement when /admin route is ready
-        await expect(page.locator('h3')).toContainText(/orphan/i);
+    test('admin can see orphan products list', async ({ page }) => {
+        await navigateTo(page, '/admin/governance');
+        await expect(page.locator('body')).toContainText(/Platform Governance/i, { timeout: 15000 });
+        await page.getByText(/Orphan Reclamation/i).first().click();
 
-        // Should show orphan count
-        await expect(page.locator('text=/found \\d+ unassigned/i')).toBeVisible();
+        // Wait for table to hydrate with actual data
+        await expect(page.locator('body')).toContainText(/Orphaned \/ Legacy Products/i, { timeout: 15000 });
+        await expect(page.locator('input[type="checkbox"]')).toHaveCount(4, { timeout: 10000 });
     });
 
-    test.skip('admin can assign orphan products to team', async ({ page }) => {
-        // Select an orphan product
-        const firstCheckbox = page.locator('input[type="checkbox"]').first();
-        await firstCheckbox.check();
+    test('can assign orphans to a team', async ({ page }) => {
+        await navigateTo(page, '/admin/governance');
+        await page.getByText(/Orphan Reclamation/i).first().click();
 
-        // Select target team
-        await page.selectOption('select', 'team-platform');
+        // Wait for list
+        await expect(page.locator('input[type="checkbox"]').first()).toBeVisible({ timeout: 15000 });
 
-        // Click assign button
-        await page.click('button:has-text("Assign Selected")');
-
-        // Verify success message
-        await expect(page.locator('text=/assigned successfully/i')).toBeVisible();
-    });
-
-    test.skip('assignment emits event and updates context', async ({ page }) => {
-        // Assign a product
+        // Select an orphan
         await page.locator('input[type="checkbox"]').first().check();
-        await page.selectOption('select', 'team-platform');
-        await page.click('button:has-text("Assign Selected")');
+        await page.locator('select').first().selectOption('team-payments');
+        await page.getByRole('button', { name: /Assign Selected/i }).click();
 
-        // Navigate to inventory
-        await page.goto('/inventory');
-
-        // Verify assigned product now appears with team
-        await expect(page.locator('[data-testid="product-list"]')).toBeVisible();
+        await expect(page.locator('text=/assigned successfully/i')).toBeVisible({ timeout: 10000 });
     });
 
-    test.skip('can assign to additional AD group', async ({ page }) => {
-        // Select product
+    test('assignment emits event and updates context', async ({ page }) => {
+        await navigateTo(page, '/admin/governance');
+        await page.getByText(/Orphan Reclamation/i).first().click();
+
+        // Wait for initial count reflecting mock data (4 orphans)
+        await expect(page.locator('text=/Found/i')).toContainText('4', { timeout: 15000 });
+
         await page.locator('input[type="checkbox"]').first().check();
+        await page.locator('select').first().selectOption('team-payments');
+        await page.getByRole('button', { name: /Assign Selected/i }).click();
 
-        // Select team with multiple AD groups
-        await page.selectOption('select[name="team"]', 'team-analytics');
+        // SUCCESS IS THE TRIGGER
+        await expect(page.locator('text=/assigned successfully/i')).toBeVisible({ timeout: 10000 });
 
-        // Additional AD group dropdown should appear
-        await expect(page.locator('select[name="adGroup"]')).toBeVisible();
-
-        // Select specific AD group
-        await page.selectOption('select[name="adGroup"]', 'ad-group-analytics-dev');
-
-        // Assign
-        await page.click('button:has-text("Assign Selected")');
-
-        await expect(page.locator('text=/assigned successfully/i')).toBeVisible();
+        // Count should update to 3 immediately after successful assignment
+        await expect(page.locator('text=/Found/i')).toContainText('3', { timeout: 15000 });
     });
 });

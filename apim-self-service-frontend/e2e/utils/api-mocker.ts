@@ -1,82 +1,93 @@
 
-import { type Page } from '@playwright/test';
-import { MOCK_PRODUCTS, MOCK_APIS, MOCK_TEAMS, MOCK_SUBSCRIPTIONS, MOCK_APPROVALS } from './mock-data';
+import { Page } from '@playwright/test';
+import { MOCK_PRODUCTS, MOCK_TEAMS, MOCK_APIS, MOCK_SUBSCRIPTIONS, MOCK_APPROVALS, MOCK_ENVIRONMENTS } from './mock-data';
+
+// GLOBAL MOCK STATE
+let statefulProducts: any[] = [];
+let statefulTeams: any[] = [];
+let statefulSubscriptions: any[] = [];
 
 /**
- * Setup API Mocks for Playwright tests
- * Intercepts /api/v1/* calls and returns mock data.
+ * Setup API Mocks with optional state reset.
+ * @param page Playwright Page
+ * @param options { reset: boolean } - Whether to reset mock state. Default true.
  */
-export async function setupApiMocks(page: Page) {
-    // Pipe browser console to test runner console
+export async function setupApiMocks(page: Page, options: { reset: boolean } = { reset: true }) {
+    if (options.reset || statefulProducts.length === 0) {
+        statefulProducts = JSON.parse(JSON.stringify(MOCK_PRODUCTS));
+        statefulTeams = JSON.parse(JSON.stringify(MOCK_TEAMS));
+        statefulSubscriptions = JSON.parse(JSON.stringify(MOCK_SUBSCRIPTIONS));
+        console.log('[E2E INFRA] Mock State RESET');
+    } else {
+        console.log('[E2E INFRA] Mock State PRESERVED');
+    }
+
+    // Pipe console logs
     page.on('console', msg => {
-        if (msg.type() === 'error' || msg.text().includes('[DASH]') || msg.text().includes('[DETAIL]')) {
-            console.log(`[BROWSER ${msg.type().toUpperCase()}] ${msg.text()}`);
+        const t = msg.text();
+        if (msg.type() === 'error' || t.includes('[adminClient]') || t.includes('[DASH]')) {
+            console.log(`[BROWSER]: ${t}`);
         }
     });
 
-    // Log all requests to help debugging
-    await page.route('**/*', async (route) => {
+    await page.route('**/api/v1/**', async (route) => {
         const url = route.request().url();
         const method = route.request().method();
 
-        if (url.includes('/api/v1/')) {
-            console.log(`[E2E MOCK] Intercepting ${method} ${url}`);
+        // 1. PRODUCTS
+        if (url.includes('/products')) {
+            const idMatch = url.match(/\/products\/([^\/\?]+)/);
+            const pid = idMatch ? idMatch[1] : null;
 
-            // 1. Products - Be smart about ID vs Collection
-            if (url.includes('/products')) {
-                // Check if it's a specific product ID (e.g., /products/prod-001)
-                const parts = url.split('/products/');
-                if (parts.length > 1) {
-                    const productId = parts[1].split('?')[0].split('/')[0];
-                    const product = MOCK_PRODUCTS.find(p => p.id === productId) || MOCK_PRODUCTS[0];
-                    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(product) });
+            if (pid) {
+                if (url.includes('/subscriptions')) {
+                    // Return subscriptions for this product
+                    const subs = statefulSubscriptions.filter(s => s.productId === pid);
+                    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(subs) });
+                }
+                if (url.includes('/spec') || url.includes('mock-spec.yaml')) {
+                    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ spec: 'openapi: 3.0.0\ninfo:\n  title: Mock API\n  version: 1.0.0' }) });
                 }
 
-                if (method === 'GET') {
-                    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_PRODUCTS) });
+                // Single Product Operations
+                if (method === 'PATCH' || method === 'POST') {
+                    const updates = JSON.parse(route.request().postData() || '{}');
+                    const idx = statefulProducts.findIndex(p => p.id === pid);
+                    if (idx !== -1) {
+                        statefulProducts[idx] = { ...statefulProducts[idx], ...updates };
+                        console.log(`[E2E MOCK] Updated Product ${pid}`);
+                    }
+                    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(statefulProducts[idx] || {}) });
                 }
-                return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_PRODUCTS[0]) });
+
+                const product = statefulProducts.find(p => p.id === pid) || statefulProducts[0];
+                return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(product) });
             }
 
-            // 2. APIs
-            if (url.includes('/apis')) {
-                return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_APIS) });
-            }
-
-            // 3. Teams
-            if (url.includes('/teams')) {
-                return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_TEAMS) });
-            }
-
-            // 4. Subscriptions
-            if (url.includes('/subscriptions')) {
-                return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_SUBSCRIPTIONS) });
-            }
-
-            // 5. Approvals
-            if (url.includes('/approvals')) {
-                return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_APPROVALS) });
-            }
-
-            // 6. Health
-            if (url.includes('/health')) {
-                return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'UP' }) });
-            }
-
-            // 7. Config
-            if (url.includes('/config')) {
-                return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ version: '1.0.0', env: 'E2E' }) });
-            }
-
-            // Default fallback for other api/v1 calls
-            return route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify(method === 'GET' ? [] : { success: true })
-            });
+            // Collection GET
+            return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(statefulProducts) });
         }
 
-        // Continue all non-api requests
-        await route.continue();
+        // 2. TEAMS
+        if (url.includes('/teams')) {
+            const idMatch = url.match(/\/teams\/([^\/\?]+)/);
+            const tid = idMatch ? idMatch[1] : null;
+
+            if (tid && (method === 'PATCH' || method === 'POST')) {
+                const updates = JSON.parse(route.request().postData() || '{}');
+                const idx = statefulTeams.findIndex(t => t.id === tid);
+                if (idx !== -1) { statefulTeams[idx] = { ...statefulTeams[idx], ...updates }; }
+                return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(statefulTeams[idx] || {}) });
+            }
+            return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(tid ? statefulTeams.find(t => t.id === tid) : statefulTeams) });
+        }
+
+        // 3. OTHERS
+        if (url.includes('/environments')) return route.fulfill({ status: 200, body: JSON.stringify(MOCK_ENVIRONMENTS) });
+        if (url.includes('/subscriptions')) return route.fulfill({ status: 200, body: JSON.stringify(statefulSubscriptions) }); // Global sub list
+        if (url.includes('/apis')) return route.fulfill({ status: 200, body: JSON.stringify(MOCK_APIS) });
+        if (url.includes('/approvals')) return route.fulfill({ status: 200, body: JSON.stringify(MOCK_APPROVALS) });
+
+        return route.fulfill({ status: 200, body: JSON.stringify([]) });
     });
 }
