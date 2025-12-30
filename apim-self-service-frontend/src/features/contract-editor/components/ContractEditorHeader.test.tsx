@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { ContractEditorHeader } from './ContractEditorHeader';
-import { type API, type Product } from '../../../types/entities';
+import { type API, type Product } from '../../inventory/types/inventoryTypes';
 
 const mockProduct: Product = {
     id: 'prod-1',

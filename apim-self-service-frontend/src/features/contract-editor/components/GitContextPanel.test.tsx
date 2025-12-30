@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { GitContextPanel } from './GitContextPanel';
-import { type API, type Product } from '../../../types/entities';
+import { type API, type Product } from '../../inventory/types/inventoryTypes';
 
 const mockProduct: Product = {
     id: 'prod-1',

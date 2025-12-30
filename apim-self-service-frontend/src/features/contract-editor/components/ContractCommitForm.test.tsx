@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ContractCommitForm } from './ContractCommitForm';
-import { type Product } from '../../../types/entities';
+import { type Product } from '../../inventory/types/inventoryTypes';
 
 const mockProduct: Product = {
     id: 'prod-1',

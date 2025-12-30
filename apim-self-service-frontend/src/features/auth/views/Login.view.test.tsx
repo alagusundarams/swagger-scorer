@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
-import { LoginPage } from './Login.view';
+import { LoginPage } from '../../../pages/Login/Login.page';
 import { useAuth } from '../hooks/useAuth';
 
 // Mock the auth hook
