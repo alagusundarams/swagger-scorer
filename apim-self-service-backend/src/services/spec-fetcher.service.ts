@@ -5,42 +5,56 @@
  */
 
 import { query } from './db.js';
-import { readFile } from 'fs/promises';
-import { join } from 'path';
-import { tmpdir } from 'os';
-import simpleGit from 'simple-git';
 import { execSync } from 'child_process';
 
 /**
- * Fetch OpenAPI spec from a product's Git repository
+ * Fetch a single file from ADO/Git using REST API (No cloning)
  */
-export async function fetchSpecFromGit(repoUrl: string, filePath?: string): Promise<string> {
-    const repoPath = join(tmpdir(), `fetch-spec-${Date.now()}`);
-
+export async function fetchFileFromGitApi(repoUrl: string, filePath: string = 'openapi.yaml'): Promise<string> {
     try {
-        // Clone the repo
-        const git = simpleGit();
-        await git.clone(repoUrl, repoPath, ['--depth', '1']);
+        // Parse ADO URL: https://dev.azure.com/{org}/{project}/_git/{repo}
+        const url = new URL(repoUrl);
+        const pathParts = url.pathname.split('/').filter(Boolean);
 
-        // Read OpenAPI spec (default to swagger.yaml or openapi.yaml)
-        const specPath = join(repoPath, filePath || 'openapi.yaml');
-        const specContent = await readFile(specPath, 'utf-8');
+        let org, project, repo;
 
-        // Clean up
-        await cleanupRepo(repoPath);
-
-        return specContent;
-    } catch (err) {
-        // Try alternate filename
-        try {
-            const altPath = join(repoPath, 'swagger.yaml');
-            const specContent = await readFile(altPath, 'utf-8');
-            await cleanupRepo(repoPath);
-            return specContent;
-        } catch {
-            await cleanupRepo(repoPath);
-            throw new Error(`Failed to fetch spec from Git: ${err instanceof Error ? err.message : String(err)}`);
+        if (url.hostname === 'dev.azure.com') {
+            org = pathParts[0];
+            project = pathParts[1];
+            repo = pathParts[3]; // Skip '_git'
+        } else if (url.hostname.includes('.visualstudio.com')) {
+            org = url.hostname.split('.')[0];
+            project = pathParts[0];
+            repo = pathParts[2]; // Skip '_git'
         }
+
+        if (!org || !project || !repo) {
+            throw new Error('Unsupported or invalid Git URL format');
+        }
+
+        const adoPat = process.env.ADO_PAT;
+        if (!adoPat) {
+            throw new Error('ADO_PAT environment variable is missing');
+        }
+
+        const authHeader = `Basic ${Buffer.from(`:${adoPat}`).toString('base64')}`;
+        const apiUrl = `https://dev.azure.com/${org}/${project}/_apis/git/repositories/${repo}/items?path=${encodeURIComponent(filePath)}&api-version=6.0&$format=text`;
+
+        const response = await fetch(apiUrl, {
+            headers: { 'Authorization': authHeader }
+        });
+
+        if (!response.ok) {
+            if (response.status === 404 && filePath === 'openapi.yaml') {
+                // Try fallback to swagger.yaml
+                return fetchFileFromGitApi(repoUrl, 'swagger.yaml');
+            }
+            throw new Error(`Git API error: ${response.status} ${response.statusText}`);
+        }
+
+        return await response.text();
+    } catch (err) {
+        throw new Error(`Failed to fetch file from Git API: ${err instanceof Error ? err.message : String(err)}`);
     }
 }
 
@@ -104,17 +118,6 @@ export async function fetchSpecFromAPIM(productId: string): Promise<string> {
     }
 }
 
-/**
- * Clean up temporary repo directory
- */
-async function cleanupRepo(repoPath: string) {
-    try {
-        const { rm } = await import('fs/promises');
-        await rm(repoPath, { recursive: true, force: true });
-    } catch (err) {
-        // Ignore cleanup errors
-    }
-}
 
 /**
  * Fetch spec for a product (tries Git first, then APIM)
@@ -136,7 +139,7 @@ export async function fetchSpecForProduct(productId: string): Promise<string> {
     // Try Git first if available
     if (product.git_repo_url) {
         try {
-            return await fetchSpecFromGit(product.git_repo_url, product.git_file_path);
+            return await fetchFileFromGitApi(product.git_repo_url, product.git_file_path);
         } catch (gitErr) {
             console.warn(`Failed to fetch from Git, falling back to APIM:`, gitErr);
         }

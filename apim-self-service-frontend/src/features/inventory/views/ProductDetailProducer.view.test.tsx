@@ -8,7 +8,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { renderWithAppData } from '../../../test-utils';
 import { mockTeams, createMockProduct } from '../../../test-utils/mockData';
 import { ProductDetailProducer } from './ProductDetailProducer.view';
-import type { User } from '../../../shared/types/domain';
+import type { User } from '../../../types/commonTypes';
 
 const mockProduct = createMockProduct({
     id: 'prod-test',

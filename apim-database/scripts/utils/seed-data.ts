@@ -119,6 +119,12 @@ async function seed() {
                 description: 'A product with no owner group assigned in AD.',
                 state: 'published', owner_team_id: null, environment: 'PROD',
                 quality_score: 45, subscriber_count: 0, type: 'standard'
+            },
+            {
+                id: 'prod-null-001', name: 'null-product', display_name: 'Null Test Product', version: 'v1.0.0',
+                description: null,
+                state: 'published', owner_team_id: 'team-payments', environment: 'DEV',
+                quality_score: 10, subscriber_count: 0, type: 'standard'
             }
         ];
 
@@ -141,6 +147,20 @@ async function seed() {
                 INSERT INTO apis (id, product_id, name, display_name, description, path, origin_team_id, quality_score, created_at, updated_at)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, 100, NOW(), NOW())
             `, [a.id, a.product_id, a.name, a.display_name, a.description, a.path, a.origin_team_id]);
+        }
+
+        // 5.5 Seed Massive API for B009
+        console.log('📦 Seeding Massive API (60+ operations)...');
+        await query(`
+            INSERT INTO apis (id, product_id, name, display_name, description, path, origin_team_id, quality_score, created_at, updated_at)
+            VALUES ('api-massive', 'prod-001', 'massive-api', 'Massive API', 'API with many operations for UI testing', '/massive', 'team-platform', 100, NOW(), NOW())
+        `);
+
+        for (let i = 1; i <= 65; i++) {
+            await query(`
+                INSERT INTO operations (id, api_id, method, url_template, name, display_name, description, created_at)
+                VALUES ($1, 'api-massive', $2, $3, $4, $4, $5, NOW())
+            `, [`op-massive-${i}`, i % 2 === 0 ? 'GET' : 'POST', `/test/endpoint-${i}`, `Operation ${i}`, `Description for test operation ${i}`]);
         }
 
         // 6. Seed Subscriptions
@@ -210,7 +230,9 @@ async function seed() {
             { id: 'nv-003', product_id: 'prod-001', scope_id: null, display_name: 'DB Connection', system_name: 'db_conn', value: 'https://vault.azure.net/secrets/db-conn', type: 'key_vault', is_secret: true },
 
             // API Level for 'prod-grp-001' -> 'api-pay'
-            { id: 'nv-grp-001', product_id: 'prod-grp-001', scope_id: 'api-pay', display_name: 'Payment Provider Key', system_name: 'stripe_key', value: 'sk_test_12345', type: 'literal', is_secret: true }
+            { id: 'nv-grp-001', product_id: 'prod-grp-001', scope_id: 'api-pay', display_name: 'Payment Provider Key', system_name: 'stripe_key', value: 'sk_test_12345', type: 'literal', is_secret: true },
+            { id: 'nv-004', product_id: 'prod-001', scope_id: null, display_name: 'Environment Flag', system_name: 'env_flag', value: 'production', type: 'literal', is_secret: false },
+            { id: 'nv-005', product_id: 'prod-001', scope_id: null, display_name: 'Cloud Storage Account', system_name: 'storage_account', value: 'https://storage.windows.net', type: 'literal', is_secret: false }
         ];
 
         // Map to legacy access_control_lists format for now (Key, Env, Value)
