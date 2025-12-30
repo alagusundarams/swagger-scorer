@@ -106,10 +106,10 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
     const isInfraLocked = product.managementMode === 'TERRAFORM_MANAGED' || product.managementMode === 'HYBRID';
 
     // === Memoized Computations ===
-    const productSubscriptions = useMemo<Subscription[]>(() =>
-        allSubscriptions.filter(sub =>
-            sub.productId === product.id && sub.state === 'active'
-        ),
+    const productSubscriptions = useMemo<Subscription[]>(() => {
+        const validSubscriptions = allSubscriptions.filter((s: Subscription) => s.productId === product.id);
+        return validSubscriptions.filter(sub => sub.state === 'active');
+    },
         [allSubscriptions, product.id]
     );
 
@@ -495,11 +495,11 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
             {/* Content: Audit Log */}
             {activeTab === 'audit' && (
                 <ProducerAuditLog
-                    onAction={(msg, type) => {
+                    onAction={(msg: string, type: 'success' | 'warning') => {
                         setLocalToast({ message: msg, type });
                         setTimeout(() => setLocalToast(null), 3000);
                     }}
-                    onDecide={async (decision, justification) => {
+                    onDecide={async (decision: string, justification: string) => {
                         console.log(`[ProducerAuditLog] Decision: ${decision}, Justification: ${justification}`);
 
                         // Find the pending request for this product

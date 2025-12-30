@@ -182,15 +182,7 @@ export const ProductDetailPage = () => {
             <RequestAccessModal
                 isOpen={isRequestModalOpen}
                 onClose={() => setIsRequestModalOpen(false)}
-                onSubmit={handleRequestAccess}
-                requestTeamId={requestTeamId}
-                setRequestTeamId={setRequestTeamId}
-                selectedAppId={selectedAppId}
-                setSelectedAppId={setSelectedAppId}
-                businessReason={businessReason}
-                setBusinessReason={setBusinessReason}
-                userTeams={user?.teams || []}
-                appRegistrations={appRegistrations}
+                product={product}
             />
         </MainLayout>
     );
