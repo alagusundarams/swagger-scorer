@@ -50,8 +50,6 @@ export const ProductDetailPage = () => {
     } = useConsumerStore();
 
     const {
-        appRegistrations,
-        fetchAppRegistrations,
         isLoading: appLoading
     } = useConsumerStore();
 
@@ -61,18 +59,11 @@ export const ProductDetailPage = () => {
     // --- State ---
     const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
     const [requestTeamId, setRequestTeamId] = useState(user?.defaultTeamId || (user?.teams ? user.teams[0] : ''));
-    const [selectedAppId, setSelectedAppId] = useState('');
-    const [businessReason, setBusinessReason] = useState('');
+    // Removed unused request access state variables
     const [isPending, setIsPending] = useState(false);
     const [toast, setToast] = useState<{ message: string; show: boolean }>({ message: '', show: false });
 
     // --- Effects ---
-    useEffect(() => {
-        if (user && user.teams.length > 0) {
-            fetchAppRegistrations(user.teams[0]);
-        }
-    }, [user, fetchAppRegistrations]);
-
     // Update requestTeamId when user is loaded
     useEffect(() => {
         if (user && !requestTeamId) {
@@ -94,6 +85,7 @@ export const ProductDetailPage = () => {
     const userRole = getUserRoleForProduct(product || {} as any, user);
 
     // --- Handlers ---
+    // Removed unused handleRequestAccess function
     const handleRequestAccess = () => {
         if (!user || !productId) return;
 

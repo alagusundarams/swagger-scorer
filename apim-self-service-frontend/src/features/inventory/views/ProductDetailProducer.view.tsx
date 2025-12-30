@@ -337,12 +337,13 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                 )}
             </div>
 
-            <ProducerMetrics
+            {/* TODO: Restore ProducerMetrics when implemented */}
+            {/* <ProducerMetrics
                 qualityScore={score}
                 subscriberCount={productSubscriptions.length}
                 apiCount={product.apis.length}
-                getScoreColor={(s) => getScoreTheme(s).split(' ')[0]}
-            />
+                getScoreColor={(s: number) => getScoreTheme(s).split(' ')[0]}
+            /> */}
 
             {/* Tab Navigation */}
             <div className="flex border-b border-gray-100 dark:border-slate-800 mb-8">
@@ -494,32 +495,38 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
 
             {/* Content: Audit Log */}
             {activeTab === 'audit' && (
-                <ProducerAuditLog
-                    onAction={(msg: string, type: 'success' | 'warning') => {
-                        setLocalToast({ message: msg, type });
-                        setTimeout(() => setLocalToast(null), 3000);
-                    }}
-                    onDecide={async (decision: string, justification: string) => {
-                        console.log(`[ProducerAuditLog] Decision: ${decision}, Justification: ${justification}`);
+                <>
+                    {/* TODO: Restore ProducerAuditLog when implemented */}
+                    {/* <ProducerAuditLog
+                        onAction={(msg: string, type: 'success' | 'warning') => {
+                            setLocalToast({ message: msg, type });
+                            setTimeout(() => setLocalToast(null), 3000);
+                        }}
+                        onDecide={async (decision: string, justification: string) => {
+                            console.log(`[ProducerAuditLog] Decision: ${decision}, Justification: ${justification}`);
 
-                        // Find the pending request for this product
-                        const pendingReq = approvalRequests.find(r =>
-                            r.productId === product.id && r.status === 'PENDING'
-                        );
+                            // Find the pending request for this product
+                            const pendingReq = approvalRequests.find(r =>
+                                r.productId === product.id && r.status === 'PENDING'
+                            );
 
-                        if (pendingReq) {
-                            await processApproval(pendingReq.id, decision === 'APPROVE', justification);
+                            if (pendingReq) {
+                                await processApproval(pendingReq.id, decision === 'APPROVE', justification);
 
-                            setLocalToast({
-                                message: `Request ${decision}D successfully.`,
-                                type: decision === 'APPROVE' ? 'success' : 'warning'
-                            });
-                        } else {
-                            console.warn(`[ProducerAuditLog] No PENDING request found for product ${product.id}`);
-                            setLocalToast({ message: 'No pending request found to act on.', type: 'warning' });
-                        }
-                    }}
-                />
+                                setLocalToast({
+                                    message: `Request ${decision}D successfully.`,
+                                    type: decision === 'APPROVE' ? 'success' : 'warning'
+                                });
+                            } else {
+                                console.warn(`[ProducerAuditLog] No PENDING request found for product ${product.id}`);
+                                setLocalToast({ message: 'No pending request found to act on.', type: 'warning' });
+                            }
+                        }}
+                    /> */}
+                    <div className="p-8 text-center text-gray-500">
+                        <p>Audit log coming soon...</p>
+                    </div>
+                </>
             )}
 
             {/* Floating Local Toast */}
