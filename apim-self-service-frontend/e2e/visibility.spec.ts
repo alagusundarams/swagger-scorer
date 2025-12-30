@@ -20,10 +20,12 @@ test.describe('Onboarding Page Visibility', () => {
         expect(count).toBeGreaterThan(0);
     });
 
-    test('should redirect Admin to Global Inventory', async ({ page }) => {
+    test('should redirect Admin to Dashboard', async ({ page }) => {
         await page.goto('/login');
         await page.getByRole('button', { name: /ADMIN/i }).click();
-        await expect(page).toHaveURL(/\/admin\/global-inventory/, { timeout: 15000 });
-        await expect(page.getByRole('heading', { name: /Global Inventory/i })).toBeVisible();
+        // Admin goes to dashboard homepage
+        await expect(page).toHaveURL('/', { timeout: 15000 });
+        // Verify dashboard loads with search bar
+        await expect(page.getByText(/Universal Search/i)).toBeVisible({ timeout: 20000 });
     });
 });
