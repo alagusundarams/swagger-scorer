@@ -1,5 +1,18 @@
 /* Feature-specific styles for the Inventory module */
 
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 1.5rem; /* 24px */
+  margin-bottom: 3rem; /* 48px */
+}
+
+@media (min-width: 768px) {
+  .stats-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 .health-meter-container {
   width: 100%;
   height: 6px;
