@@ -23,7 +23,7 @@ const mockUser: User = {
     azureAdObjectId: 'ad-obj-123',
     teams: ['team-platform'],
     leadsTeams: [],
-    role: 'producer',
+    role: 'user',
     isAdmin: false,
 };
 
