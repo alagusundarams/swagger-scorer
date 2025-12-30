@@ -9,8 +9,8 @@ test.describe('Orphan Product Assignment Flow', () => {
         // Login as admin using role button
         await page.goto('/login');
         await page.getByRole('button', { name: /ADMIN/i }).click();
-        await page.waitForURL(//(dashboard|$)/, { timeout: 10000 });
-            await page.goto('/admin');
+        await page.waitForURL(/\/(dashboard|$)/, { timeout: 10000 });
+        await page.goto('/admin');
     });
 
     test('admin can view orphaned products', async ({ page }) => {
