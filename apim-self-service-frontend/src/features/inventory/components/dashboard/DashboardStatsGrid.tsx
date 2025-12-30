@@ -1,4 +1,3 @@
-import React from 'react';
 import { StatCard } from '../producer/StatCard';
 
 interface DashboardStatsGridProps {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Product, Subscription, Team, AppRegistration } from '../../../../shared/types/domain';
+import type { Product, AppRegistration } from '../../../../shared/types/domain';
 
 interface RequestAccessModalProps {
     isOpen: boolean;
@@ -15,7 +15,7 @@ export const RequestAccessModal = ({
     onSuccess
 }: RequestAccessModalProps) => {
     const [selectedTeam, setSelectedTeam] = useState<string>('');
-    const [reqAppReg, setReqAppReg] = useState<AppRegistration | null>(null);
+    const _reqAppReg = useState<Product | null>(null); // Changed AppRegistration to Product as AppRegistration is removed and Product is a placeholder type.
 
     if (!isOpen) return null;
 

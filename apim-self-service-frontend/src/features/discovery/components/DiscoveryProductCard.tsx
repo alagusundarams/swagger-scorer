@@ -47,7 +47,7 @@ export const DiscoveryProductCard: React.FC<DiscoveryProductCardProps> = ({
                     </div>
                     <div className="text-center">
                         <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-1">Quality</p>
-                        <span className={`text-xs font-black ${getScoreTheme(product.qualityScore || 0).text}`}>{product.qualityScore}%</span>
+                        <span className={`text-xs font-black ${getScoreTheme(product.qualityScore || 0)}`}>{product.qualityScore}%</span>
                     </div>
                 </div>
 

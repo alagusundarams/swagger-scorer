@@ -1,5 +1,5 @@
 /**
- * Mock Data for Tests - Final Version
+ * Mock Data for Tests - Correctly Typed
  */
 
 import type { Team, Product, Subscription, Environment, SubscriptionKey } from '../shared/types/domain';
@@ -58,17 +58,16 @@ const mockSecondaryKey: SubscriptionKey = {
     value: 'mock-secondary-key',
 };
 
-// Mock Subscriptions
+// Mock Subscriptions - properly typed
 export const mockSubscriptions: Subscription[] = [
     {
         id: 'sub-mobile-user-api',
         productId: 'prod-user-api',
-        displayName: 'Mobile Team User API Access',
+        subscriberTeamId: 'team-mobile',
         state: 'active',
-        scope: 'subscription',
         primaryKey: mockPrimaryKey,
         secondaryKey: mockSecondaryKey,
-        createdDate: '2024-06-01T00:00:00Z',
+        createdAt: '2024-06-01T00:00:00Z',
     },
 ];
 
@@ -105,12 +104,11 @@ export function createMockSubscription(overrides: Partial<Subscription> = {}): S
     return {
         id: 'sub-test',
         productId: 'prod-test',
-        displayName: 'Test Subscription',
+        subscriberTeamId: 'team-test',
         state: 'active',
-        scope: 'subscription',
         primaryKey: mockPrimaryKey,
         secondaryKey: mockSecondaryKey,
-        createdDate: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
         ...overrides,
     };
 }

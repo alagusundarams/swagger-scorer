@@ -11,7 +11,7 @@ export const OrphanProductManager = () => {
      * For product operations, we'll use the admin feature's own API client.
      */
     const { teams } = useAppData();
-    const [products, setProducts] = useState<Product[]>([]);
+    const [products, _setProducts] = useState<Product[]>([]);
 
     useEffect(() => {
         // TODO: Fetch orphan products from adminClient when implemented

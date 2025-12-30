@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, Suspense, lazy } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { type Product, type Environment } from '../../features/inventory/types/inventoryTypes';
 import { type Subscription } from '../../features/consumer/types/consumerTypes';
