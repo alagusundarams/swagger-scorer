@@ -17,6 +17,7 @@ export interface InventorySlice {
     updateAPI: (id: string, updates: Partial<API>) => Promise<void>;
     addApiToProduct: (productId: string, apiData: Partial<API>) => Promise<void>;
     removeApiFromProduct: (productId: string, apiId: string) => Promise<void>;
+    fetchOperations: (productId: string, apiId: string) => Promise<void>;
 
     // Named Values
     fetchConfiguration: (productId: string) => Promise<void>;
@@ -146,6 +147,26 @@ export const createInventorySlice: StateCreator<InventorySlice> = (set) => ({
         } catch (error: any) {
             set({ error: error.message || 'Failed to delete configuration value' });
             throw error;
+        }
+    },
+
+    fetchOperations: async (productId: string, apiId: string) => {
+        try {
+            const operations = await inventoryApi.getOperations(productId, apiId);
+            set((state) => ({
+                products: state.products.map(p => {
+                    if (p.id !== productId) return p;
+                    return {
+                        ...p,
+                        apis: p.apis.map(a => {
+                            if (a.id !== apiId) return a;
+                            return { ...a, operations };
+                        })
+                    };
+                })
+            }));
+        } catch (error: any) {
+            console.error("Failed to fetch operations", error);
         }
     }
 });

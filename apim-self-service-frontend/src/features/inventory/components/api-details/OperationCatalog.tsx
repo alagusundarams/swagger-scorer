@@ -30,7 +30,7 @@ export function OperationCatalog({ productId, api }: OperationCatalogProps) {
 
             <div className="max-h-[600px] overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-slate-700">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {api.operations.map((op) => (
+                    {(api.operations || []).map((op) => (
                         <Link
                             key={op.id}
                             to={`/products/${productId}/apis/${api.id}/operations/${op.id}`}

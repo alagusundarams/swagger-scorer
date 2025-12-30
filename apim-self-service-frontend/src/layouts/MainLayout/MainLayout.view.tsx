@@ -22,6 +22,16 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     useEffect(() => {
         if (isAuthenticated && authUser) {
             setUser(authUser);
+            // Sync activeTeamId to ensure correct view context
+            if (authUser.role === 'admin') {
+                // Admin starts with global view by default
+                // No action needed as default is 'all', but existing state logic handles it
+            } else if (authUser.defaultTeamId) {
+                // Producers/Consumers MUST start with their team context
+                // otherwise they see the "all" view which returns nothing for them
+                // or incorrectly shows the "Same Screen" as admin
+                useStore.getState().setActiveTeamId(authUser.defaultTeamId);
+            }
         }
     }, [isAuthenticated, authUser, setUser]);
 

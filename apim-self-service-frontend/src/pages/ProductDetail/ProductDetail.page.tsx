@@ -70,6 +70,15 @@ export const ProductDetailPage = () => {
         }
     }, [user, requestTeamId]);
 
+    // Fetch Configuration if missing
+    // This populates Named Values and KV Backend details
+    const { fetchConfiguration } = useInventoryStore();
+    useEffect(() => {
+        if (productId) {
+            fetchConfiguration(productId);
+        }
+    }, [productId, fetchConfiguration]);
+
     // --- Data Selectors ---
     const product = useMemo(() => allProducts.find(p => p.id === productId), [allProducts, productId]);
 

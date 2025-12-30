@@ -13,7 +13,29 @@ export const MOCK_PRODUCTS = [
         environment: 'DEV',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        apis: [{ id: 'api-001', name: 'payments-v1', displayName: 'Payments API' }],
+        apis: [{
+            id: 'api-001',
+            name: 'payments-v1',
+            displayName: 'Payments API',
+            operations: [
+                {
+                    id: 'op-001',
+                    name: 'get-payments',
+                    displayName: 'List Payments',
+                    method: 'GET',
+                    urlTemplate: '/payments',
+                    description: 'Retrieve a list of processed payments.'
+                },
+                {
+                    id: 'op-002',
+                    name: 'create-payment',
+                    displayName: 'Process Payment',
+                    method: 'POST',
+                    urlTemplate: '/payments',
+                    description: 'Initiate a new payment transaction.'
+                }
+            ]
+        }],
         subscriberCount: 5,
         qualityScore: 95
     },
@@ -30,7 +52,21 @@ export const MOCK_PRODUCTS = [
         environment: 'PROD',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        apis: [{ id: 'api-002', name: 'identity-v1', displayName: 'Identity API' }],
+        apis: [{
+            id: 'api-002',
+            name: 'identity-v1',
+            displayName: 'Identity API',
+            operations: [
+                {
+                    id: 'op-003',
+                    name: 'get-users',
+                    displayName: 'List Users',
+                    method: 'GET',
+                    urlTemplate: '/users',
+                    description: 'Get all registered users.'
+                }
+            ]
+        }],
         subscriberCount: 12,
         qualityScore: 88
     },

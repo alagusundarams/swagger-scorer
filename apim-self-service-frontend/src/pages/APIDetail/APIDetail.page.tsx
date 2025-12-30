@@ -19,11 +19,18 @@ export const APIDetailPage = () => {
     const navigate = useNavigate();
 
     // --- Store Integration ---
-    const { products } = useInventoryStore();
+    const { products, fetchOperations } = useInventoryStore();
 
     // --- Data Selectors ---
     const product = useMemo(() => products.find(p => p.id === productId), [products, productId]);
     const api = useMemo(() => product?.apis.find(a => a.id === apiId), [product, apiId]);
+
+    // Fetch operations if missing
+    useMemo(() => {
+        if (productId && apiId && (!api?.operations || api.operations.length === 0)) {
+            fetchOperations(productId, apiId);
+        }
+    }, [productId, apiId, api?.operations, fetchOperations]);
 
     // Handle missing data gracefully
     if (!product || !api) {

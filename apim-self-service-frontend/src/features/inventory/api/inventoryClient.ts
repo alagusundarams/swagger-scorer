@@ -69,19 +69,24 @@ export const inventoryApi = {
 
     // Named Values
     getNamedValues: async (productId: string) => {
-        const res = await baseClient.get(`/products/${productId}/named-values`);
+        const res = await baseClient.get(`/products/${encodeURIComponent(productId)}/named-values`);
         return res.data;
     },
     addNamedValue: async (productId: string, data: unknown) => {
-        const res = await baseClient.post(`/products/${productId}/named-values`, data);
+        const res = await baseClient.post(`/products/${encodeURIComponent(productId)}/named-values`, data);
         return res.data;
     },
     deleteNamedValue: async (productId: string, valueId: string) => {
-        const res = await baseClient.delete(`/products/${productId}/named-values/${valueId}`);
+        const res = await baseClient.delete(`/products/${encodeURIComponent(productId)}/named-values/${valueId}`);
         return res.data;
     },
     getProductSpec: async (productId: string): Promise<{ spec: string }> => {
-        const res = await baseClient.get(`/products/${productId}/spec`);
+        const res = await baseClient.get(`/products/${encodeURIComponent(productId)}/spec`);
+        return res.data;
+    },
+    // Missing Operations Fetcher
+    getOperations: async (productId: string, apiId: string): Promise<any[]> => {
+        const res = await baseClient.get(`/products/${encodeURIComponent(productId)}/apis/${encodeURIComponent(apiId)}/operations`);
         return res.data;
     }
 };
