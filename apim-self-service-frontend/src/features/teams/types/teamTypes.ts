@@ -2,20 +2,7 @@
  * Team Specific Types
  * 
  * Decentralized from global entities.ts
+ * NOW LINKED TO SHARED DOMAIN.
  */
 
-export interface Team {
-    id: string;
-    name: string;
-    azureAdGroupId: string;
-    type: 'producer' | 'consumer' | 'both';
-    description: string;
-    memberCount: number;
-    additionalAdGroups?: string[];
-    adGroupMapping?: {
-        DEV?: string;
-        QA?: string;
-        STAGE?: string;
-        PROD?: string;
-    };
-}
+export * from '../../../shared/types/domain';

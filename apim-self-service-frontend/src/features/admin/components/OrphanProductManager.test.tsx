@@ -2,10 +2,10 @@
  * OrphanProductManager Tests
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { screen, fireEvent } from '@testing-library/react';
 import { renderWithAppData, createEventBusSpy } from '../../../test-utils';
-import { mockTeams, mockOrphanProduct } from '../../../test-utils/mockData';
+import { mockTeams } from '../../../test-utils/mockData';
 import { OrphanProductManager } from './OrphanProductManager';
 
 describe('OrphanProductManager', () => {

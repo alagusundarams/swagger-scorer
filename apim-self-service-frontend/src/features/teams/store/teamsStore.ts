@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Team } from '../types/teamTypes';
+import type { Team } from '../../../shared/types/domain';
 import { teamsApi } from '../api/teamsClient';
 
 interface TeamsState {

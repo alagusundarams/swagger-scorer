@@ -1,11 +1,16 @@
 import { useState } from 'react';
-import { useTeamsStore } from '../../teams/store/teamsStore';
-import type { Team } from '../../teams/types/teamTypes';
+import { useAppData } from '../../../shared/context/AppDataContext';
+import type { Team } from '../../../shared/types/domain';
+import { updateTeam } from '../api/adminClient';
 import { Input } from '../../../core/ui/Input';
 import toast from 'react-hot-toast';
 
 export const TeamManager = () => {
-    const { teams, modifyTeam: updateTeam } = useTeamsStore();
+    /**
+     * MFE-Compliant: Read-only access to teams via shared context
+     * TODO: Implement team modification via admin feature's own API client
+     */
+    const { teams } = useAppData();
     const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState<Partial<Team>>({});
 

@@ -1,12 +1,13 @@
 import { useMemo, useState, lazy, Suspense } from 'react';
-import type { Product, User, API } from '../../../types/entities';
-import type { Subscription } from '../../consumer/types/consumerTypes';
-import { useTeamsStore } from '../../teams/store/teamsStore';
-import { ProductConsumerHeader } from '../components/ProductConsumerHeader';
-import { ProductGettingStarted } from '../components/ProductGettingStarted';
-import { ConfigurationTab } from '../components/ConfigurationTab';
-import { ApiInterfaceCatalog } from '../components/ApiInterfaceCatalog';
-import { ProductComplianceInfo } from '../components/ProductComplianceInfo';
+import { type Product, type API, type Subscription } from '../../../shared/types/domain';
+import { type User } from '../../../core/types/commonTypes';
+import { useAppData } from '../../../shared/context/AppDataContext';
+import { ProductConsumerHeader } from '../components/product/ProductConsumerHeader';
+import { ProductGettingStarted } from '../components/product/ProductGettingStarted';
+import { ProductComplianceInfo } from '../components/product/ProductComplianceInfo';
+import { ApiInterfaceCatalog } from '../components/api-details/ApiInterfaceCatalog';
+import { ConfigurationTab } from '../components/api-details/ConfigurationTab';
+import { inventoryApi } from '../../inventory/api/inventoryClient';
 
 // Lazy load Contract Editor
 const ContractEditorModal = lazy(() =>
@@ -16,9 +17,21 @@ const ContractEditorModal = lazy(() =>
 );
 
 /**
- * ProductDetailConsumer Component
+ * ProductDetailConsumer View (Feature)
  * 
- * **Purpose**: Consumer-specific view for discovering and using API products.
+ * ------------------------------------------------------------------
+ * 📍 Purpose:
+ * Renders the "Consumer" experience for a product (Read-only + Subscribe).
+ * 
+ * 🔄 Data Flow:
+ * - [PROPS] `product`: Passed from Orchestrator (Page).
+ * - [PROPS] `subscription`: Passed from Orchestrator (Page).
+ * - [CONTEXT] `useAppData`: Read-only access to teams (MFE-compliant)
+ * 
+ * 🔒 Security:
+ * - This view assumes the user is ALREADY authorized to see this product.
+ * - It manages `readOnly` state for the Contract Editor.
+ * ------------------------------------------------------------------
  */
 export const ProductDetailConsumer = ({
     product,
@@ -26,7 +39,15 @@ export const ProductDetailConsumer = ({
     hasPendingRequest,
     onRequestAccess
 }: ProductDetailConsumerProps) => {
-    const { teams: allTeams } = useTeamsStore();
+    /**
+     * MFE-Compliant Data Access:
+     * Instead of importing useTeamsStore from the teams feature (which violates MFE boundaries),
+     * we use the shared AppDataContext for read-only access to team data.
+     * 
+     * The teams data is centrally loaded at the app root level and automatically refreshed
+     * when team:created, team:updated, or team:deleted events are emitted.
+     */
+    const { teams: allTeams } = useAppData();
     const [activeTab, setActiveTab] = useState<'overview' | 'config'>('overview');
 
     // Contract Editor State
@@ -139,6 +160,7 @@ export const ProductDetailConsumer = ({
                         api={selectedApi}
                         isOpen={isEditorOpen}
                         readOnly={true}
+                        fetchSpec={inventoryApi.getProductSpec}
                         onClose={() => {
                             setIsEditorOpen(false);
                             setSelectedApi(null);

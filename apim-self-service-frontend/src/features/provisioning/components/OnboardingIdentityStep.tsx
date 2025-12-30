@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Team } from '../../teams/types/teamTypes';
+import type { Team } from '../../../shared/types/domain';
 
 export interface OnboardingIdentityStepProps {
     formData: {

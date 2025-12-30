@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { MonacoEditor } from './MonacoEditor';
 import { saveDraftFile, getDraftFile, clearDraftSession, getStorageUsageMB } from '../storage/draftStorage';
-import type { API, Product } from '../../../types/entities';
+import type { API, Product } from '../../../shared/types/domain';
 
 interface ContractEditorModalProps {
     product: Product;
@@ -10,6 +10,7 @@ interface ContractEditorModalProps {
     onClose: () => void;
     onCommit?: (message: string, description: string) => Promise<void>;
     readOnly?: boolean;
+    fetchSpec?: (productId: string) => Promise<{ spec: string }>;
 }
 
 /**
@@ -32,7 +33,8 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
     isOpen,
     onClose,
     onCommit,
-    readOnly = false
+    readOnly = false,
+    fetchSpec
 }) => {
     const [content, setContent] = useState('');
     const [commitMessage, setCommitMessage] = useState('');
@@ -44,15 +46,29 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
     const filename = 'contract.yaml';
     const language = 'yaml';
 
+    const [isLoadingSpec, setIsLoadingSpec] = useState(false);
+
     useEffect(() => {
         if (!isOpen) return;
 
-        const draft = getDraftFile(product.id, filename);
-        if (draft) {
-            setContent(draft.content);
-            setIsModified(true);
-        } else {
-            const mockContract = `openapi: 3.0.0
+        const loadContent = async () => {
+            const draft = getDraftFile(product.id, filename);
+            if (draft) {
+                setContent(draft.content);
+                setIsModified(true);
+            } else {
+                setIsLoadingSpec(true);
+                try {
+                    if (fetchSpec) {
+                        const { spec } = await fetchSpec(product.id);
+                        setContent(spec);
+                    } else {
+                        throw new Error('No fetchSpec provider found');
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch real spec:', error);
+                    // Fallback to generated mock spec if fetch fails
+                    const mockContract = `openapi: 3.0.0
 info:
   title: ${api.displayName}
   description: ${api.description}
@@ -67,10 +83,15 @@ ${api.operations.map(op => `  ${op.urlTemplate}:
         '200':
           description: Successful response`).join('\n')}
 `;
-            setContent(mockContract);
-        }
+                    setContent(mockContract);
+                } finally {
+                    setIsLoadingSpec(false);
+                }
+            }
+            setStorageUsage(getStorageUsageMB(product.id));
+        };
 
-        setStorageUsage(getStorageUsageMB(product.id));
+        loadContent();
     }, [isOpen, product.id, api, filename]);
 
     useEffect(() => {
@@ -155,6 +176,14 @@ ${api.operations.map(op => `  ${op.urlTemplate}:
                 />
 
                 <div className="flex-1 min-h-0 bg-[#1e1e1e] relative">
+                    {isLoadingSpec && (
+                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity duration-300">
+                            <div className="flex flex-col items-center gap-4">
+                                <div className="w-10 h-10 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin"></div>
+                                <p className="text-emerald-500 font-bold text-xs uppercase tracking-widest">Fetching Spec...</p>
+                            </div>
+                        </div>
+                    )}
                     <MonacoEditor
                         value={content}
                         language={language}

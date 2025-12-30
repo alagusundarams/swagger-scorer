@@ -79,5 +79,9 @@ export const inventoryApi = {
     deleteNamedValue: async (productId: string, valueId: string) => {
         const res = await baseClient.delete(`/products/${productId}/named-values/${valueId}`);
         return res.data;
+    },
+    getProductSpec: async (productId: string): Promise<{ spec: string }> => {
+        const res = await baseClient.get(`/products/${productId}/spec`);
+        return res.data;
     }
 };

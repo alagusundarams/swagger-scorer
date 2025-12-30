@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Product, API } from '../../../types/entities';
+import type { Product, API } from '../../../shared/types/domain';
 
 interface GitContextPanelProps {
     product: Product;

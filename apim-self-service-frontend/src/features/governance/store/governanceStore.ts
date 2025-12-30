@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ApprovalRequest, AuditLog } from '../types/governanceTypes';
+import type { ApprovalRequest, AuditLog } from '../../../shared/types/domain';
 import { governanceApi } from '../api/governanceClient';
 
 interface GovernanceState {

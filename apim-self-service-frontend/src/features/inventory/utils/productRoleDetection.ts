@@ -1,13 +1,5 @@
-/**
- * Product Role Detection Utility
- * 
- * **Purpose**: Determine user's role and permissions for a specific product.
- * 
- * @module productRoleDetection
- */
-
-import type { Product, User, Environment } from '../../../types/entities';
-import type { Team } from '../../teams/types/teamTypes';
+import { type User, type Environment } from '../../../core/types/commonTypes';
+import { type Product, type Team } from '../../../shared/types/domain';
 
 /**
  * User's role in relation to a specific product

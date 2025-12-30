@@ -3,20 +3,20 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 
 // Lazy imports for MFE chunks
-const LoginPage = lazy(() => import('./features/auth/views/Login.view').then(module => ({ default: module.LoginPage })));
-const DashboardPage = lazy(() => import('./features/inventory/views/Dashboard.view').then(module => ({ default: module.DashboardPage })));
-const ProductDetailPage = lazy(() => import('./features/inventory/views/ProductDetail.view').then(module => ({ default: module.ProductDetailPage })));
-const APIDetailPage = lazy(() => import('./features/inventory/views/APIDetail.view').then(module => ({ default: module.APIDetailPage })));
-const EndpointDetailPage = lazy(() => import('./features/inventory/views/EndpointDetail.view').then(module => ({ default: module.EndpointDetailPage })));
-const OnboardingWizard = lazy(() => import('./features/provisioning/views/Onboarding.view').then(module => ({ default: module.OnboardingWizard })));
-const BrowsePage = lazy(() => import('./features/discovery/views/Browse.view').then(module => ({ default: module.BrowsePage })));
-const MarketplacePage = lazy(() => import('./features/discovery/views/Marketplace.view').then(module => ({ default: module.MarketplacePage })));
-const AnalyzerPage = lazy(() => import('./features/analyzer/views/Analyzer.view').then(module => ({ default: module.AnalyzerPage })));
-const AdminGovernancePage = lazy(() => import('./features/admin/views/AdminGovernance.view').then(module => ({ default: module.AdminGovernancePage })));
-const AdminMappingView = lazy(() => import('./features/inventory/views/AdminMapping.view').then(module => ({ default: module.AdminMappingView })));
+const LoginPage = lazy(() => import('./pages/Login/Login.page').then(module => ({ default: module.LoginPage })));
+const DashboardPage = lazy(() => import('./pages/Dashboard/Dashboard.page').then(module => ({ default: module.DashboardPage })));
+const ProductDetailPage = lazy(() => import('./pages/ProductDetail/ProductDetail.page').then(module => ({ default: module.ProductDetailPage })));
+const APIDetailPage = lazy(() => import('./pages/APIDetail/APIDetail.page').then(module => ({ default: module.APIDetailPage })));
+const EndpointDetailPage = lazy(() => import('./pages/EndpointDetail/EndpointDetail.page').then(module => ({ default: module.EndpointDetailPage })));
+const OnboardingWizard = lazy(() => import('./pages/Onboarding/Onboarding.page').then(module => ({ default: module.OnboardingWizard })));
+const BrowsePage = lazy(() => import('./pages/Browse/Browse.page').then(module => ({ default: module.BrowsePage })));
+const MarketplacePage = lazy(() => import('./pages/Marketplace/Marketplace.page').then(module => ({ default: module.MarketplacePage })));
+const AnalyzerPage = lazy(() => import('./pages/Analyzer/Analyzer.page').then(module => ({ default: module.AnalyzerPage })));
+const AdminGovernancePage = lazy(() => import('./pages/AdminGovernance/AdminGovernance.page').then(module => ({ default: module.AdminGovernancePage })));
+const AdminMappingView = lazy(() => import('./pages/AdminMapping/AdminMapping.page').then(module => ({ default: module.AdminMappingView })));
 const PolicyStudioContainer = lazy(() => import('./features/policy-studio/PolicyStudio.container').then(module => ({ default: module.PolicyStudioContainer })));
-const GlobalInventoryPage = lazy(() => import('./features/admin/views/GlobalInventory.view').then(module => ({ default: module.GlobalInventory })));
-const AppsPage = lazy(() => import('./features/consumer/views/Apps.view').then(module => ({ default: module.AppsPage })));
+const GlobalInventoryPage = lazy(() => import('./pages/GlobalInventory/GlobalInventory.page').then(module => ({ default: module.GlobalInventory })));
+const AppsPage = lazy(() => import('./pages/Apps/Apps.page').then(module => ({ default: module.AppsPage })));
 
 import { ProtectedRoute } from './core/routing/ProtectedRoute';
 
@@ -28,6 +28,16 @@ const LoadingFallback = () => (
     </div>
   </div>
 );
+
+import { useInventoryStore } from './features/inventory/hooks/useInventoryStore';
+
+function OnboardingWrapper() {
+  const { products } = useInventoryStore();
+  const validateName = (name: string) =>
+    products.some(p => p.name.toLowerCase() === name.toLowerCase() || p.displayName.toLowerCase() === name.toLowerCase());
+
+  return <OnboardingWizard validateProductName={validateName} />;
+}
 
 function App() {
   return (
@@ -80,7 +90,7 @@ function App() {
             path="/onboard"
             element={
               <ProtectedRoute>
-                <OnboardingWizard />
+                <OnboardingWrapper />
               </ProtectedRoute>
             }
           />

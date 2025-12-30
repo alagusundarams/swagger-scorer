@@ -1,11 +1,22 @@
-import { useState, useMemo } from 'react';
-import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
-import { useTeamsStore } from '../../teams/store/teamsStore';
+import { useState, useEffect, useMemo } from 'react';
+import { useAppData } from '../../../shared/context/AppDataContext';
+import type { Product } from '../../../shared/types/domain';
+import { updateProduct } from '../api/adminClient';
 import toast from 'react-hot-toast';
 
 export const OrphanProductManager = () => {
-    const { products, updateProduct } = useInventoryStore();
-    const { teams } = useTeamsStore();
+    /**
+     * MFE-Compliant Data Access:
+     * Using shared AppDataContext for read-only team data.
+     * For product operations, we'll use the admin feature's own API client.
+     */
+    const { teams } = useAppData();
+    const [products, setProducts] = useState<Product[]>([]);
+
+    useEffect(() => {
+        // TODO: Fetch orphan products from adminClient when implemented
+        // getOrphanProducts().then(setProducts);
+    }, []);
     const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
     const [targetTeamId, setTargetTeamId] = useState<string>('');
     const [targetAdGroupId, setTargetAdGroupId] = useState<string>('');

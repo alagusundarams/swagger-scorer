@@ -1,5 +1,5 @@
 import { api as baseClient } from '../../../api/baseClient';
-import type { ApprovalRequest, AuditLog } from '../types/governanceTypes';
+import type { ApprovalRequest, AuditLog } from '../../../shared/types/domain';
 
 /**
  * Governance API Client

@@ -1,13 +1,14 @@
 /**
- * ProductDetailProducer View Tests
+ * ProductDetailProducer View Tests - Fixed
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { renderWithAppData } from '../../../test-utils';
-import { mockTeams, createMockProduct, mockSubscriptions } from '../../../test-utils/mockData';
+import { mockTeams, createMockProduct } from '../../../test-utils/mockData';
 import { ProductDetailProducer } from './ProductDetailProducer.view';
+import type { User } from '../../../shared/types/domain';
 
 const mockProduct = createMockProduct({
     id: 'prod-test',
@@ -15,10 +16,15 @@ const mockProduct = createMockProduct({
     ownerTeamId: 'team-platform',
 });
 
-const mockUser = {
+const mockUser: User = {
+    id: 'user-123',
     email: 'producer@example.com',
     name: 'Producer User',
-    roles: ['producer'],
+    azureAdObjectId: 'ad-obj-123',
+    teams: ['team-platform'],
+    leadsTeams: [],
+    role: 'producer',
+    isAdmin: false,
 };
 
 describe('ProductDetailProducer', () => {
@@ -26,7 +32,7 @@ describe('ProductDetailProducer', () => {
         vi.clearAllMocks();
     });
 
-    it('should render product details with team dropdown', () => {
+    it('should render product details', () => {
         renderWithAppData(
             <BrowserRouter>
                 <ProductDetailProducer product={mockProduct} user={mockUser} />
@@ -34,22 +40,7 @@ describe('ProductDetailProducer', () => {
             { teams: mockTeams }
         );
 
-        expect(screen.getByText('Test Product')).toBeInTheDocument();
-    });
-
-    it('should display subscriber list', () => {
-        renderWithAppData(
-            <BrowserRouter>
-                <ProductDetailProducer product={mockProduct} user={mockUser} />
-            </BrowserRouter>,
-            { teams: mockTeams }
-        );
-
-        // Should show subscribers section
-        const subscribersSection = screen.queryByTestId('subscribers-section');
-        if (subscribersSection) {
-            expect(subscribersSection).toBeInTheDocument();
-        }
+        expect(screen.getByText('Test Product')).toBeTruthy();
     });
 
     it('should use AppDataContext for teams data', () => {

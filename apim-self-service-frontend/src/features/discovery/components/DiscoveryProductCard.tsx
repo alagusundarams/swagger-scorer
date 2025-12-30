@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import type { Product } from '../../../types/entities';
-import type { Team } from '../../teams/types/teamTypes';
+import { type Product, type Team } from '../../../shared/types/domain';
+import { getScoreTheme } from '../../../utils/statusUtils';
 
 interface DiscoveryProductCardProps {
     product: Product;
@@ -47,7 +47,7 @@ export const DiscoveryProductCard: React.FC<DiscoveryProductCardProps> = ({
                     </div>
                     <div className="text-center">
                         <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-1">Quality</p>
-                        <span className="text-xs font-black text-emerald-500">{product.qualityScore}%</span>
+                        <span className={`text-xs font-black ${getScoreTheme(product.qualityScore || 0).text}`}>{product.qualityScore}%</span>
                     </div>
                 </div>
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { type API, type Product } from '../../../types/entities';
+import { type API, type Product } from '../../../shared/types/domain';
+import { maskKey } from '../../../utils/securityUtils';
 
 interface ApiConsoleProps {
     product: Product;
@@ -81,8 +82,8 @@ export const ApiConsole = ({ product, subscriptionKey }: ApiConsoleProps) => {
                         <div className="w-32">
                             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Method</label>
                             <span className={`block w-full text-center py-3 rounded-xl text-xs font-black ring-1 ${method === 'GET' ? 'bg-blue-500/10 text-blue-400 ring-blue-500/30' :
-                                    method === 'POST' ? 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/30' :
-                                        'bg-amber-500/10 text-amber-400 ring-amber-500/30'
+                                method === 'POST' ? 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/30' :
+                                    'bg-amber-500/10 text-amber-400 ring-amber-500/30'
                                 }`}>
                                 {method}
                             </span>
@@ -103,7 +104,7 @@ export const ApiConsole = ({ product, subscriptionKey }: ApiConsoleProps) => {
                         <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 flex items-center justify-between">
                             <span className="text-slate-400 text-xs font-mono">Ocp-Apim-Subscription-Key</span>
                             <span className="text-blue-400 text-xs font-mono font-bold tracking-tighter">
-                                {subscriptionKey ? `${subscriptionKey.slice(0, 4)}••••••••${subscriptionKey.slice(-4)}` : 'MISSING_KEY'}
+                                {subscriptionKey ? maskKey(subscriptionKey) : 'MISSING_KEY'}
                             </span>
                         </div>
                         {!subscriptionKey && (

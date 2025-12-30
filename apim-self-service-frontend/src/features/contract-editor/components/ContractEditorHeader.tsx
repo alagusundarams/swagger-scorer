@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { API, Product } from '../../../types/entities';
+import type { API, Product } from '../../../shared/types/domain';
+import { getEnvironmentTheme } from '../../../utils/statusUtils';
 import { ContractBreadcrumb } from './ContractBreadcrumb';
 
 interface ContractEditorHeaderProps {
@@ -31,10 +32,7 @@ export const ContractEditorHeader: React.FC<ContractEditorHeaderProps> = ({
                     >
                         Edit Contract: {api.displayName}
                     </h1>
-                    <span className={`px-3 py-1 text-xs font-black rounded-lg ${product.environment === 'PROD'
-                        ? 'bg-emerald-500/10 text-emerald-500'
-                        : 'bg-blue-500/10 text-blue-500'
-                        }`}>
+                    <span className={`px-3 py-1 text-xs font-black rounded-lg ${getEnvironmentTheme(product.environment || '').bg} ${getEnvironmentTheme(product.environment || '').text}`}>
                         {product.environment}
                     </span>
                     {isModified && (

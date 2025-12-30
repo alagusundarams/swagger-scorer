@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Product } from '../../../types/entities';
+import type { Product } from '../../../shared/types/domain';
 
 interface ContractCommitFormProps {
     product: Product;

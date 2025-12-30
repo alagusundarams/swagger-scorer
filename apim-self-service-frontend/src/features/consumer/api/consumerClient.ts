@@ -1,5 +1,5 @@
 import { api as baseClient } from '../../../api/baseClient';
-import type { Subscription, AppRegistration } from '../types/consumerTypes';
+import type { Subscription, AppRegistration } from '../../../shared/types/domain';
 
 /**
  * Consumer API Client
