@@ -23,10 +23,10 @@ test.describe('Dashboard End-to-End', () => {
         await page.getByText(/ACTIVE SUBSCRIPTIONS/i).click();
         await expect(page.getByText(/Identity Service/i).first()).toBeVisible();
 
-        // 3. Approvals
-        await page.getByText(/APPROVALS/i).click();
-        await expect(page.getByText(/Audit Decisions/i)).toBeVisible();
-        await expect(page.getByText(/Decision Queue/i)).toBeVisible();
+        // 3. Approvals - increase timeout for slow rendering
+        await page.getByText(/APPROVALS/i).click({ timeout: 20000 });
+        await expect(page.getByText(/Audit Decisions/i)).toBeVisible({ timeout: 20000 });
+        await expect(page.getByText(/Decision Queue/i)).toBeVisible({ timeout: 20000 });
 
         // 4. Global Inventory (Admin only - skip in this Producer-focused test as it's covered in visibility.spec.ts)
     });

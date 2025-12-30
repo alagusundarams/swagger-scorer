@@ -4,11 +4,10 @@ import { setupApiMocks } from './utils/api-mocker';
 test.describe('Onboarding Wizard Flow', () => {
     test.beforeEach(async ({ page }) => {
         await setupApiMocks(page);
-        // Login first
+        // Login as PRODUCER to register APIs
         await page.goto('/login');
-        await page.getByPlaceholder('Enter your email').fill('user@company.com');
-        await page.getByRole('button', { name: 'Next' }).click();
-        await expect(page).toHaveURL('/', { timeout: 10000 });
+        await page.getByRole('button', { name: /PRODUCER/i }).click();
+        await expect(page).toHaveURL('/', { timeout: 15000 });
     });
 
     test('should complete the onboarding wizard successfully', async ({ page }) => {

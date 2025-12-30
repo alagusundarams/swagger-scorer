@@ -17,8 +17,11 @@ test.describe('Consumer RBAC & Visibility', () => {
         // 2. Navigate to "Active Subscriptions" tab
         await page.getByText(/ACTIVE SUBSCRIPTIONS/i).click();
 
-        // 3. Click one to view details - target the text directly for robustness
-        await page.getByText(/Identity Service/i).first().click();
+        // 3. Wait for products to fully load, then click
+        const productLink = page.getByText(/Identity Service/i).first();
+        await productLink.waitFor({ state: 'visible', timeout: 20000 });
+        await page.waitForTimeout(1000); // Small wait for DOM stabilization
+        await productLink.click();
 
         // 4. Verify we are on Product Detail Page
         await expect(page).toHaveURL(/\/products\//, { timeout: 15000 });

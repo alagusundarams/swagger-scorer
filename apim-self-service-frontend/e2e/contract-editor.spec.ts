@@ -24,8 +24,8 @@ test.describe('Contract Editor Interface', () => {
         // Wait for product details page
         await expect(page).toHaveURL(/.*products\/prod-001/, { timeout: 15000 });
 
-        // Switch to APIS tab
-        await page.getByRole('button', { name: /API Inventory/i }).click();
+        // Switch to APIS tab - increase timeout for page transition
+        await page.getByRole('button', { name: /API Inventory/i }).click({ timeout: 20000 });
 
         // Find Charges & Voids API and click Edit Contract
         const editBtn = page.getByTestId('edit-contract-btn').first();
