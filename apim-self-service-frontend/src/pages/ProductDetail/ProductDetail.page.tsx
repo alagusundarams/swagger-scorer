@@ -84,9 +84,7 @@ export const ProductDetailPage = () => {
     const userRole = getUserRoleForProduct(product || {} as any, user);
 
     // --- Handlers ---
-    const _handleRequestAccessClick = () => {
-        setIsRequestModalOpen(true);
-    };
+    // TODO: Implement handleRequestAccessClick when modal functionality is ready
 
     // --- Render Logic ---
 
