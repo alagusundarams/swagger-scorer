@@ -6,11 +6,10 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Team Management Flow', () => {
     test('admin can update team name', async ({ page }) => {
-        // Login as admin
+        // Login as admin using role button
         await page.goto('/login');
-        await page.fill('[name="email"]', 'admin@example.com');
-        await page.fill('[name="password"]', 'password');
-        await page.click('button[type="submit"]');
+        await page.getByRole('button', { name: /ADMIN/i }).click();
+        await page.waitForURL(/\/(dashboard|$)/, { timeout: 10000 });
 
         // Navigate to admin panel
         await page.goto('/admin');
@@ -29,11 +28,10 @@ test.describe('Team Management Flow', () => {
     });
 
     test('team update triggers refresh in inventory views', async ({ page }) => {
-        // Login
+        // Login as producer using role button
         await page.goto('/login');
-        await page.fill('[name="email"]', 'producer@example.com');
-        await page.fill('[name="password"]', 'password');
-        await page.click('button[type="submit"]');
+        await page.getByRole('button', { name: /PRODUCER/i }).click();
+        await page.waitForURL(/\/(dashboard|$)/, { timeout: 10000 });
 
         // Navigate to product
         await page.goto('/products/prod-user-api');

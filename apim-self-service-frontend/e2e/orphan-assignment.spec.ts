@@ -6,12 +6,11 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Orphan Product Assignment Flow', () => {
     test.beforeEach(async ({ page }) => {
-        // Login as admin
+        // Login as admin using role button
         await page.goto('/login');
-        await page.fill('[name="email"]', 'admin@example.com');
-        await page.fill('[name="password"]', 'password');
-        await page.click('button[type="submit"]');
-        await page.goto('/admin');
+        await page.getByRole('button', { name: /ADMIN/i }).click();
+        await page.waitForURL(//(dashboard|$)/, { timeout: 10000 });
+            await page.goto('/admin');
     });
 
     test('admin can view orphaned products', async ({ page }) => {

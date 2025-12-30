@@ -1,0 +1,80 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e7]:
+        - img "Everest Re" [ref=e9]
+        - generic [ref=e10] [cursor=pointer]:
+          - img [ref=e12]:
+            - generic [ref=e14]: A
+          - generic [ref=e15]: APIM Self Service
+      - generic [ref=e16]:
+        - generic [ref=e17]: 🌐 Live Database
+        - generic [ref=e18]: Dashboard
+      - button "S" [ref=e21] [cursor=pointer]:
+        - generic [ref=e22]: S
+  - navigation "Breadcrumb" [ref=e23]:
+    - list [ref=e24]:
+      - listitem [ref=e25]:
+        - link "Home" [ref=e26] [cursor=pointer]:
+          - /url: /
+          - img [ref=e27]
+          - text: Home
+      - listitem [ref=e29]:
+        - img [ref=e30]
+      - listitem [ref=e32]:
+        - generic [ref=e33]: payment-gateway
+  - generic [ref=e35]:
+    - generic [ref=e36]:
+      - generic [ref=e37]:
+        - generic [ref=e38]:
+          - generic [ref=e39]: 🔍
+          - generic [ref=e40]:
+            - generic [ref=e41]:
+              - heading "Payment Gateway" [level=1] [ref=e42]
+              - generic [ref=e43]: Vv1.0.0
+            - paragraph [ref=e44]: Core payment processing API
+        - button "🚀 Request Integration Access" [ref=e46]
+      - generic [ref=e47]:
+        - generic [ref=e48]:
+          - paragraph [ref=e49]: API Documentation
+          - generic [ref=e50]:
+            - generic [ref=e51]: ✓
+            - text: OpenAPI 3.0 Verified
+        - generic [ref=e52]:
+          - paragraph [ref=e53]: Environment
+          - text: DEV
+    - generic [ref=e54]:
+      - button "Overview" [ref=e55]
+      - button "Configuration" [ref=e56]
+    - generic [ref=e58]:
+      - heading "Interface Catalog" [level=2] [ref=e61]
+      - generic [ref=e64] [cursor=pointer]:
+        - generic [ref=e65]:
+          - generic [ref=e66]: 📡
+          - generic [ref=e67]:
+            - heading "Payments API" [level=3] [ref=e68]
+            - paragraph [ref=e69]:
+              - text: "Base Path:"
+              - code [ref=e70]: /payments/v1
+        - generic [ref=e71]:
+          - button "View Source ⚡" [ref=e72]
+          - generic [ref=e73]:
+            - paragraph [ref=e74]: Endpoints
+            - generic [ref=e75]: 2 Managed
+          - generic [ref=e76]: ↓
+  - contentinfo [ref=e77]:
+    - generic [ref=e78]:
+      - generic [ref=e79]:
+        - img [ref=e81]:
+          - generic [ref=e83]: A
+        - paragraph [ref=e84]: © 2024 APIM Self Service. All rights reserved.
+      - generic [ref=e85]:
+        - img [ref=e87]
+        - generic [ref=e89]:
+          - paragraph [ref=e90]: Contact
+          - link "apim-admin@company.com" [ref=e91] [cursor=pointer]:
+            - /url: mailto:apim-admin@company.com
+```

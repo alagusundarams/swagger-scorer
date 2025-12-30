@@ -6,12 +6,10 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Product Management Flow', () => {
     test.beforeEach(async ({ page }) => {
-        // Login as producer
+        // Login as producer using role button
         await page.goto('/login');
-        await page.fill('[name="email"]', 'producer@example.com');
-        await page.fill('[name="password"]', 'password');
-        await page.click('button[type="submit"]');
-        await expect(page).toHaveURL('/dashboard');
+        await page.getByRole('button', { name: /PRODUCER/i }).click();
+        await page.waitForURL(/\/(dashboard|$)/, { timeout: 10000 });
     });
 
     test('producer can view product details', async ({ page }) => {

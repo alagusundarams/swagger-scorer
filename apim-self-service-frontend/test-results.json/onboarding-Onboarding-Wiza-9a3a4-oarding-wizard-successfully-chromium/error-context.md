@@ -1,0 +1,69 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e7]:
+        - img "Everest Re" [ref=e9]
+        - generic [ref=e10] [cursor=pointer]:
+          - img [ref=e12]:
+            - generic [ref=e14]: A
+          - generic [ref=e15]: APIM Self Service
+      - generic [ref=e16]:
+        - generic [ref=e17]: 🌐 Live Database
+        - generic [ref=e18]: Onboard Product
+      - button "S" [ref=e21] [cursor=pointer]:
+        - generic [ref=e22]: S
+  - navigation "Breadcrumb" [ref=e23]:
+    - list [ref=e24]:
+      - listitem [ref=e25]:
+        - link "Home" [ref=e26] [cursor=pointer]:
+          - /url: /
+          - img [ref=e27]
+          - text: Home
+      - listitem [ref=e29]:
+        - img [ref=e30]
+      - listitem [ref=e32]:
+        - generic [ref=e33]: Onboard Product
+  - generic [ref=e36]:
+    - paragraph [ref=e42]:
+      - text: STEP 1
+      - generic [ref=e43]: /
+      - text: "03"
+    - generic [ref=e45]:
+      - generic [ref=e46]:
+        - paragraph [ref=e47]: "Step 1: Identity"
+        - heading "Establish Identity" [level=2] [ref=e48]
+        - paragraph [ref=e49]: Define the core attributes of your new API Product.
+      - generic [ref=e50]:
+        - generic [ref=e51]:
+          - generic [ref=e52]:
+            - generic [ref=e53]: Product Name
+            - textbox "e.g. Payments Gateway" [ref=e54]: My New API
+          - generic [ref=e55]:
+            - generic [ref=e56]: Initial Version
+            - textbox "v1.0.0" [ref=e57]
+        - generic [ref=e58]:
+          - generic [ref=e59]: Product Description
+          - textbox "Describe your product..." [active] [ref=e60]: This is a test description for the new API.
+        - generic [ref=e61]:
+          - generic [ref=e62]: Owner Team
+          - combobox [ref=e63]:
+            - option "Select Ownership Group" [selected]
+      - generic [ref=e64]:
+        - generic [ref=e65]: Baseline Validation Active
+        - button "Establish Identity" [ref=e66]
+  - contentinfo [ref=e67]:
+    - generic [ref=e68]:
+      - generic [ref=e69]:
+        - img [ref=e71]:
+          - generic [ref=e73]: A
+        - paragraph [ref=e74]: © 2024 APIM Self Service. All rights reserved.
+      - generic [ref=e75]:
+        - img [ref=e77]
+        - generic [ref=e79]:
+          - paragraph [ref=e80]: Contact
+          - link "apim-admin@company.com" [ref=e81] [cursor=pointer]:
+            - /url: mailto:apim-admin@company.com
+```
