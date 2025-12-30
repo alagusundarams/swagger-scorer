@@ -1,15 +1,10 @@
 /**
- * Mock Data for Tests
- * 
- * Provides realistic mock data for all domain entities.
- * Use these mocks in tests to ensure consistency.
+ * Mock Data for Tests - FIXED
  */
 
-import type { Team, Product, Subscription, API, ApprovalRequest, Environment } from '../shared/types/domain';
+import type { Team, Product, Subscription, ApprovalRequest, Environment } from '../shared/types/domain';
 
-/**
- * Mock Teams
- */
+// Mock Teams
 export const mockTeams: Team[] = [
     {
         id: 'team-platform',
@@ -39,14 +34,10 @@ export const mockTeams: Team[] = [
     },
 ];
 
-/**
- * Mock Environments
- */
-export const mockEnvironments: Environment[] = ['dev', 'qa', 'prod'];
+// Mock Environments
+export const mockEnvironments: Environment[] = ['DEV', 'QA', 'PROD'];
 
-/**
- * Mock Products
- */
+// Mock Products
 export const mockProducts: Product[] = [
     {
         id: 'prod-user-api',
@@ -56,7 +47,7 @@ export const mockProducts: Product[] = [
         version: '2.1.0',
         ownerTeamId: 'team-platform',
         ownerAdGroupId: 'ad-group-platform',
-        environment: 'prod',
+        environment: 'PROD',
         qualityScore: 85,
         adoptionMetrics: {
             totalSubscribers: 24,
@@ -69,7 +60,7 @@ export const mockProducts: Product[] = [
             hasMonitoring: true,
             securityScore: 90,
         },
-        apis: ['api-user-v2'],
+        apis: [],
         createdAt: '2024-01-15T10:00:00Z',
         updatedAt: '2024-12-15T14:30:00Z',
     },
@@ -81,7 +72,7 @@ export const mockProducts: Product[] = [
         version: '1.5.2',
         ownerTeamId: 'team-analytics',
         ownerAdGroupId: 'ad-group-analytics',
-        environment: 'qa',
+        environment: 'QA',
         qualityScore: 92,
         adoptionMetrics: {
             totalSubscribers: 12,
@@ -94,103 +85,28 @@ export const mockProducts: Product[] = [
             hasMonitoring: true,
             securityScore: 95,
         },
-        apis: ['api-payment-v1'],
+        apis: [],
         createdAt: '2024-03-20T08:00:00Z',
         updatedAt: '2024-12-28T16:45:00Z',
     },
 ];
 
-/**
- * Mock orphan product (no valid owner team)
- */
-export const mockOrphanProduct: Product = {
-    id: 'prod-legacy',
-    name: 'Legacy API',
-    displayName: 'Legacy System API',
-    description: 'Deprecated legacy system integration',
-    version: '0.9.0',
-    ownerTeamId: 'legacy-pool',
-    ownerAdGroupId: 'ad-group-legacy',
-    environment: 'dev',
-    qualityScore: 45,
-    adoptionMetrics: {
-        totalSubscribers: 3,
-        activeConsumers: 2,
-        monthlyRequests: 15000,
-    },
-    compliance: {
-        hasDocumentation: false,
-        hasTests: false,
-        hasMonitoring: false,
-        securityScore: 60,
-    },
-    apis: ['api-legacy-v0'],
-    createdAt: '2020-01-01T00:00:00Z',
-    updatedAt: '2024-06-15T10:00:00Z',
-};
-
-/**
- * Mock APIsexport const mockAPIs: API[] = [
-  {
-    id: 'api-user-v2',
-    name: 'User API v2',
-    productId: 'prod-user-api',
-    version: '2.0',
-    endpoints: 12,
-    operations: [
-      {
-        id: 'op-get-user',
-        name: 'Get User',
-        method: 'GET',
-        path: '/users/{userId}',
-        description: 'Retrieve user by ID',
-      },
-      {
-        id: 'op-create-user',
-        name: 'Create User',
-        method: 'POST',
-        path: '/users',
-        description: 'Create new user',
-      },
-    ],
-  },
-];
-
-/**
- * Mock Subscriptions
- */
+// Mock Subscriptions  
 export const mockSubscriptions: Subscription[] = [
     {
         id: 'sub-mobile-user-api',
         productId: 'prod-user-api',
-        teamId: 'team-mobile',
-        environment: 'prod',
+        environment: 'PROD',
         status: 'active',
         createdAt: '2024-06-01T00:00:00Z',
         expiresAt: '2025-06-01T00:00:00Z',
     },
 ];
 
-/**
- * Mock Approval Requests
- */
-export const mockApprovalRequests: ApprovalRequest[] = [
-    {
-        id: 'approval-prod-payment-qa-to-prod',
-        productId: 'prod-payment',
-        requestedBy: 'user@example.com',
-        fromEnvironment: 'qa',
-        toEnvironment: 'prod',
-        status: 'PENDING',
-        createdAt: '2024-12-29T10:00:00Z',
-        approvalType: 'product_promotion',
-    },
-];
+// Mock Approval Requests
+export const mockApprovalRequests: ApprovalRequest[] = [];
 
-/**
- * Factory functions for creating custom mocks
- */
-
+// Factory functions
 export function createMockTeam(overrides: Partial<Team> = {}): Team {
     return {
         id: 'team-test',
@@ -212,7 +128,7 @@ export function createMockProduct(overrides: Partial<Product> = {}): Product {
         version: '1.0.0',
         ownerTeamId: 'team-test',
         ownerAdGroupId: 'ad-group-test',
-        environment: 'dev',
+        environment: 'DEV',
         qualityScore: 75,
         adoptionMetrics: {
             totalSubscribers: 5,
@@ -236,8 +152,7 @@ export function createMockSubscription(overrides: Partial<Subscription> = {}): S
     return {
         id: 'sub-test',
         productId: 'prod-test',
-        teamId: 'team-test',
-        environment: 'dev',
+        environment: 'DEV',
         status: 'active',
         createdAt: new Date().toISOString(),
         ...overrides,

@@ -119,7 +119,7 @@ describe('AppDataContext', () => {
             });
 
             // Emit team:created event
-            const { eventBus } = await import('./eventBus');
+            const { eventBus } = await import('../events/eventBus');
             eventBus.emit('team:created', {
                 team: mockTeams[2],
             });
@@ -151,7 +151,7 @@ describe('AppDataContext', () => {
                 expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
             });
 
-            const { eventBus } = await import('./eventBus');
+            const { eventBus } = await import('../events/eventBus');
             eventBus.emit('team:updated', {
                 teamId: mockTeams[0].id,
                 team: { ...mockTeams[0], name: 'Updated Team' },
@@ -181,7 +181,7 @@ describe('AppDataContext', () => {
                 expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
             });
 
-            const { eventBus } = await import('./eventBus');
+            const { eventBus } = await import('../events/eventBus');
             eventBus.emit('team:deleted', {
                 teamId: mockTeams[0].id,
             });
@@ -210,7 +210,7 @@ describe('AppDataContext', () => {
                 expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
             });
 
-            const { eventBus } = await import('./eventBus');
+            const { eventBus } = await import('../events/eventBus');
             eventBus.emit('data:refresh', {
                 dataType: 'teams',
             });

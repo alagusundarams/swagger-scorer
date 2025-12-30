@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import type { ApprovalRequest } from '../../../shared/types/domain';
+import type { ApprovalRequest } from '../../../../shared/types/domain';
 
 interface ApprovalRequestCardProps {
     request: ApprovalRequest;
