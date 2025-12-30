@@ -44,7 +44,6 @@ export const ProductDetailPage = () => {
 
     const {
         subscriptions: allSubscriptions,
-        requestAccess,
         isLoading: subLoading,
         error: subError
     } = useConsumerStore();
@@ -60,8 +59,8 @@ export const ProductDetailPage = () => {
     const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
     const [requestTeamId, setRequestTeamId] = useState(user?.defaultTeamId || (user?.teams ? user.teams[0] : ''));
     // Removed unused request access state variables
-    const [isPending, setIsPending] = useState(false);
-    const [toast, setToast] = useState<{ message: string; show: boolean }>({ message: '', show: false });
+    const [isPending, _setIsPending] = useState(false);
+    const [toast, _setToast] = useState<{ message: string; show: boolean }>({ message: '', show: false });
 
     // --- Effects ---
     // Update requestTeamId when user is loaded
@@ -85,10 +84,8 @@ export const ProductDetailPage = () => {
     const userRole = getUserRoleForProduct(product || {} as any, user);
 
     // --- Handlers ---
-    // Removed unused handleRequestAccess function - to be implemented when modal is ready
-
     const handleRequestAccessClick = () => {
-        setToast({ message: '', show: false }), 4000);
+        setIsRequestModalOpen(true);
     };
 
     // --- Render Logic ---

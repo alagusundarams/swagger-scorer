@@ -68,10 +68,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
         console.warn('[MFE] requestProductPromotion placeholder called');
     };
 
-    const _processApproval = async (_id: string, _approved: boolean, _justification: string) => {
-        // TODO: Implement via inventoryApi.processApproval()
-        console.warn('[MFE] processApproval placeholder called');
-    };
+    // TODO: Implement processApproval via inventoryApi when ready
     const navigate = useNavigate();
 
     // === Modal State ===
@@ -113,7 +110,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
     );
 
 
-    const _score = product.qualityScore || 0;
+    // Removed unused score variable
 
     // === Event Handlers ===
     const handleRevokeAccess = useCallback((subscriptionId: string) => {
