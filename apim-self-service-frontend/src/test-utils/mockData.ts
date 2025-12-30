@@ -1,8 +1,8 @@
 /**
- * Mock Data for Tests - FIXED
+ * Mock Data for Tests - Matching Real Interfaces
  */
 
-import type { Team, Product, Subscription, ApprovalRequest, Environment } from '../shared/types/domain';
+import type { Team, Product, Subscription, Environment } from '../shared/types/domain';
 
 // Mock Teams
 export const mockTeams: Team[] = [
@@ -23,21 +23,12 @@ export const mockTeams: Team[] = [
         description: 'Mobile app development team',
         memberCount: 8,
     },
-    {
-        id: 'team-analytics',
-        name: 'Analytics Team',
-        azureAdGroupId: 'ad-group-analytics',
-        type: 'both',
-        description: 'Data analytics and reporting',
-        memberCount: 15,
-        additionalAdGroups: ['ad-group-analytics-dev', 'ad-group-analytics-qa'],
-    },
 ];
 
 // Mock Environments
 export const mockEnvironments: Environment[] = ['DEV', 'QA', 'PROD'];
 
-// Mock Products
+// Mock Products (matching actual Product interface)
 export const mockProducts: Product[] = [
     {
         id: 'prod-user-api',
@@ -45,21 +36,12 @@ export const mockProducts: Product[] = [
         displayName: 'User Management API',
         description: 'Core user management and authentication API',
         version: '2.1.0',
+        state: 'published',
         ownerTeamId: 'team-platform',
         ownerAdGroupId: 'ad-group-platform',
         environment: 'PROD',
         qualityScore: 85,
-        adoptionMetrics: {
-            totalSubscribers: 24,
-            activeConsumers: 18,
-            monthlyRequests: 1250000,
-        },
-        compliance: {
-            hasDocumentation: true,
-            hasTests: true,
-            hasMonitoring: true,
-            securityScore: 90,
-        },
+        subscriberCount: 24,
         apis: [],
         createdAt: '2024-01-15T10:00:00Z',
         updatedAt: '2024-12-15T14:30:00Z',
@@ -70,41 +52,33 @@ export const mockProducts: Product[] = [
         displayName: 'Payment Processing API',
         description: 'Secure payment processing and billing',
         version: '1.5.2',
-        ownerTeamId: 'team-analytics',
-        ownerAdGroupId: 'ad-group-analytics',
+        state: 'published',
+        ownerTeamId: 'team-mobile',
+        ownerAdGroupId: 'ad-group-mobile',
         environment: 'QA',
         qualityScore: 92,
-        adoptionMetrics: {
-            totalSubscribers: 12,
-            activeConsumers: 10,
-            monthlyRequests: 450000,
-        },
-        compliance: {
-            hasDocumentation: true,
-            hasTests: true,
-            hasMonitoring: true,
-            securityScore: 95,
-        },
         apis: [],
         createdAt: '2024-03-20T08:00:00Z',
         updatedAt: '2024-12-28T16:45:00Z',
     },
 ];
 
-// Mock Subscriptions  
+// Mock Subscriptions (matching actual Subscription interface)
 export const mockSubscriptions: Subscription[] = [
     {
         id: 'sub-mobile-user-api',
         productId: 'prod-user-api',
-        environment: 'PROD',
-        status: 'active',
-        createdAt: '2024-06-01T00:00:00Z',
-        expiresAt: '2025-06-01T00:00:00Z',
+        displayName: 'Mobile Team User API Access',
+        state: 'active',
+        scope: 'subscription',
+        primaryKey: 'primary-key-123',
+        secondaryKey: 'secondary-key-456',
+        createdDate: '2024-06-01T00:00:00Z',
+        callCount: 125000,
+        dataTransferred: 5242880,
+        apiQuotaResetDate: new Date().toISOString(),
     },
 ];
-
-// Mock Approval Requests
-export const mockApprovalRequests: ApprovalRequest[] = [];
 
 // Factory functions
 export function createMockTeam(overrides: Partial<Team> = {}): Team {
@@ -126,21 +100,11 @@ export function createMockProduct(overrides: Partial<Product> = {}): Product {
         displayName: 'Test Product',
         description: 'Test product for unit tests',
         version: '1.0.0',
+        state: 'published',
         ownerTeamId: 'team-test',
         ownerAdGroupId: 'ad-group-test',
         environment: 'DEV',
         qualityScore: 75,
-        adoptionMetrics: {
-            totalSubscribers: 5,
-            activeConsumers: 3,
-            monthlyRequests: 10000,
-        },
-        compliance: {
-            hasDocumentation: true,
-            hasTests: true,
-            hasMonitoring: true,
-            securityScore: 80,
-        },
         apis: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -152,9 +116,12 @@ export function createMockSubscription(overrides: Partial<Subscription> = {}): S
     return {
         id: 'sub-test',
         productId: 'prod-test',
-        environment: 'DEV',
-        status: 'active',
-        createdAt: new Date().toISOString(),
+        displayName: 'Test Subscription',
+        state: 'active',
+        scope: 'subscription',
+        primaryKey: 'test-key-123',
+        secondaryKey: 'test-key-456',
+        createdDate: new Date().toISOString(),
         ...overrides,
     };
 }
