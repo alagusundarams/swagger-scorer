@@ -85,18 +85,10 @@ export const ProductDetailPage = () => {
     const userRole = getUserRoleForProduct(product || {} as any, user);
 
     // --- Handlers ---
-    // Removed unused handleRequestAccess function
-    const handleRequestAccess = () => {
-        if (!user || !productId) return;
+    // Removed unused handleRequestAccess function - to be implemented when modal is ready
 
-        setIsPending(true);
-        setIsRequestModalOpen(false);
-
-        // --- Store Update ---
-        requestAccess(productId, requestTeamId);
-
-        setToast({ message: 'Access request submitted for review.', show: true });
-        setTimeout(() => setToast({ message: '', show: false }), 4000);
+    const handleRequestAccessClick = () => {
+        setToast({ message: '', show: false }), 4000);
     };
 
     // --- Render Logic ---

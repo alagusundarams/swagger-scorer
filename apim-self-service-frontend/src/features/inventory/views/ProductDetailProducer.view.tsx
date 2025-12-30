@@ -9,8 +9,7 @@ import { useAppData } from '../../../shared/context/AppDataContext';
 import { ManageProductModal } from '../components/product/ManageProductModal';
 import { SubscriberCard } from '../components/producer/SubscriberCard';
 import { ProducerHeader } from '../components/product/ProducerHeader';
-import { ProducerMetrics } from '../components/producer/ProducerMetrics';
-import { ProducerAuditLog } from '../components/producer/ProducerAuditLog';
+// Removed unused ProducerMetrics and ProducerAuditLog imports
 import { RevokeAccessModal } from '../components/modals/RevokeAccessModal';
 import { ConfigurationTab } from '../components/api-details/ConfigurationTab';
 import { AddApiModal } from '../components/api-details/AddApiModal';
@@ -69,7 +68,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
         console.warn('[MFE] requestProductPromotion placeholder called');
     };
 
-    const processApproval = async (_requestId: string, _approved: boolean, _reason?: string) => {
+    const _processApproval = async (_id: string, _approved: boolean, _justification: string) => {
         // TODO: Implement via inventoryApi.processApproval()
         console.warn('[MFE] processApproval placeholder called');
     };
@@ -114,7 +113,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
     );
 
 
-    const score = product.qualityScore || 0;
+    const _score = product.qualityScore || 0;
 
     // === Event Handlers ===
     const handleRevokeAccess = useCallback((subscriptionId: string) => {
