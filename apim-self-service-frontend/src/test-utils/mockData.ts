@@ -1,8 +1,8 @@
 /**
- * Mock Data for Tests - Matching Real Interfaces
+ * Mock Data for Tests - Final Version
  */
 
-import type { Team, Product, Subscription, Environment } from '../shared/types/domain';
+import type { Team, Product, Subscription, Environment, SubscriptionKey } from '../shared/types/domain';
 
 // Mock Teams
 export const mockTeams: Team[] = [
@@ -13,7 +13,6 @@ export const mockTeams: Team[] = [
         type: 'producer',
         description: 'Core platform and infrastructure APIs',
         memberCount: 12,
-        additionalAdGroups: ['ad-group-platform-readonly'],
     },
     {
         id: 'team-mobile',
@@ -28,7 +27,7 @@ export const mockTeams: Team[] = [
 // Mock Environments
 export const mockEnvironments: Environment[] = ['DEV', 'QA', 'PROD'];
 
-// Mock Products (matching actual Product interface)
+// Mock Products
 export const mockProducts: Product[] = [
     {
         id: 'prod-user-api',
@@ -46,24 +45,20 @@ export const mockProducts: Product[] = [
         createdAt: '2024-01-15T10:00:00Z',
         updatedAt: '2024-12-15T14:30:00Z',
     },
-    {
-        id: 'prod-payment',
-        name: 'Payment API',
-        displayName: 'Payment Processing API',
-        description: 'Secure payment processing and billing',
-        version: '1.5.2',
-        state: 'published',
-        ownerTeamId: 'team-mobile',
-        ownerAdGroupId: 'ad-group-mobile',
-        environment: 'QA',
-        qualityScore: 92,
-        apis: [],
-        createdAt: '2024-03-20T08:00:00Z',
-        updatedAt: '2024-12-28T16:45:00Z',
-    },
 ];
 
-// Mock Subscriptions (matching actual Subscription interface)
+// Mock subscription keys
+const mockPrimaryKey: SubscriptionKey = {
+    name: 'primary',
+    value: 'mock-primary-key',
+};
+
+const mockSecondaryKey: SubscriptionKey = {
+    name: 'secondary',
+    value: 'mock-secondary-key',
+};
+
+// Mock Subscriptions
 export const mockSubscriptions: Subscription[] = [
     {
         id: 'sub-mobile-user-api',
@@ -71,12 +66,9 @@ export const mockSubscriptions: Subscription[] = [
         displayName: 'Mobile Team User API Access',
         state: 'active',
         scope: 'subscription',
-        primaryKey: 'primary-key-123',
-        secondaryKey: 'secondary-key-456',
+        primaryKey: mockPrimaryKey,
+        secondaryKey: mockSecondaryKey,
         createdDate: '2024-06-01T00:00:00Z',
-        callCount: 125000,
-        dataTransferred: 5242880,
-        apiQuotaResetDate: new Date().toISOString(),
     },
 ];
 
@@ -102,9 +94,6 @@ export function createMockProduct(overrides: Partial<Product> = {}): Product {
         version: '1.0.0',
         state: 'published',
         ownerTeamId: 'team-test',
-        ownerAdGroupId: 'ad-group-test',
-        environment: 'DEV',
-        qualityScore: 75,
         apis: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -119,8 +108,8 @@ export function createMockSubscription(overrides: Partial<Subscription> = {}): S
         displayName: 'Test Subscription',
         state: 'active',
         scope: 'subscription',
-        primaryKey: 'test-key-123',
-        secondaryKey: 'test-key-456',
+        primaryKey: mockPrimaryKey,
+        secondaryKey: mockSecondaryKey,
         createdDate: new Date().toISOString(),
         ...overrides,
     };

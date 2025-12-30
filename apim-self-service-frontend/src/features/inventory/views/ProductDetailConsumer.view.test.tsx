@@ -1,5 +1,5 @@
 /**
- * ProductDetailConsumer View Tests - Fixed
+ * ProductDetailConsumer View Tests
  */
 
 import { describe, it, expect } from 'vitest';
@@ -30,7 +30,13 @@ describe('ProductDetailConsumer', () => {
     it('should render product details', () => {
         renderWithAppData(
             <BrowserRouter>
-                <ProductDetailConsumer product={mockProduct} user={mockUser} />
+                <ProductDetailConsumer
+                    product={mockProduct}
+                    user={mockUser}
+                    subscription={null}
+                    hasPendingRequest={false}
+                    onRequestAccess={() => { }}
+                />
             </BrowserRouter>,
             { teams: mockTeams }
         );
@@ -41,12 +47,17 @@ describe('ProductDetailConsumer', () => {
     it('should use AppDataContext for teams data', () => {
         const { container } = renderWithAppData(
             <BrowserRouter>
-                <ProductDetailConsumer product={mockProduct} user={mockUser} />
+                <ProductDetailConsumer
+                    product={mockProduct}
+                    user={mockUser}
+                    subscription={null}
+                    hasPendingRequest={false}
+                    onRequestAccess={() => { }}
+                />
             </BrowserRouter>,
             { teams: mockTeams }
         );
 
-        // Teams from context should be available
         expect(container).toBeTruthy();
     });
 });
