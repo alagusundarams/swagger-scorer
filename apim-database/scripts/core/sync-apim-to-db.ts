@@ -100,6 +100,7 @@ interface ApimProduct {
     state: string;
     subscriptionRequired: boolean;
     subscriptionCount: number;
+    policyXml?: string;
 }
 
 interface ApimApi {
@@ -216,18 +217,66 @@ function extractClientIdsFromPolicy(xml: string): string[] {
     return Array.from(ids);
 }
 
+function extractNamedValuesFromPolicy(xml: string): string[] {
+    if (!xml) return [];
+    const nvs = new Set<string>();
+    const matches = xml.match(/{{([^}]+)}}/g);
+    if (matches) {
+        matches.forEach(m => {
+            nvs.add(m.replace(/[{}]/g, '').trim());
+        });
+    }
+    return Array.from(nvs);
+}
+
 async function fetchApimProducts(token: string, azConfig: AzureConfig): Promise<ApimProduct[]> {
     const apiConfig = getApimConfig(token, azConfig);
     const response = await AzureService.fetchAPIM<any>(apiConfig, '/products');
-    return response.value.map((p: any) => ({
-        id: p.name,
-        armId: p.id,
-        name: p.properties.displayName,
-        description: p.properties.description,
-        state: p.properties.state,
-        subscriptionRequired: p.properties.subscriptionRequired,
-        subscriptionCount: 0
-    }));
+    const products = response.value;
+
+    console.log(`⏳ [${azConfig.environment}] Fetching Policies for ${products.length} Products...`);
+    const results: ApimProduct[] = [];
+    const BATCH_SIZE = 10;
+
+    for (let i = 0; i < products.length; i += BATCH_SIZE) {
+        const batch = products.slice(i, i + BATCH_SIZE);
+        // console.log(`  ⏳ [${azConfig.environment}] Product Batch ${i + 1}...`);
+
+        const batchResults = await Promise.all(batch.map(async (p: any) => {
+            let policyXml = '';
+            try {
+                const polRes = await fetch(`https://management.azure.com${p.id}/policies/policy?api-version=2022-08-01&format=rawxml`, {
+                    headers: { 'Authorization': `Bearer ${apiConfig.accessToken}` }
+                });
+                if (polRes.ok) {
+                    const text = await polRes.text();
+                    if (text.trim().startsWith('<')) {
+                        policyXml = text;
+                    } else {
+                        try {
+                            const json = JSON.parse(text);
+                            policyXml = json.properties?.value || '';
+                        } catch (e) {
+                            policyXml = text;
+                        }
+                    }
+                }
+            } catch (e) { /* ignore */ }
+
+            return {
+                id: p.name,
+                armId: p.id,
+                name: p.properties.displayName,
+                description: p.properties.description,
+                state: p.properties.state,
+                subscriptionRequired: p.properties.subscriptionRequired,
+                subscriptionCount: 0,
+                policyXml
+            };
+        }));
+        results.push(...batchResults);
+    }
+    return results;
 }
 
 async function fetchApimSubscriptions(token: string, azConfig: AzureConfig): Promise<any[]> {
@@ -736,25 +785,81 @@ async function runWorker(envName: string) {
             )
         `);
 
+        // --- 4. DATA ANALYSIS: Build Named Value Usage Map ---
+        const nvUsageMap = new Map<string, Array<{ uniqueProductId: string, scopeId?: string }>>();
+
+        // Scan Product Policies
+        for (const p of apimProducts) {
+            const uniqueProductId = `${p.id}:${AZURE_CONFIG.environment}:${region}`;
+            const nvs = extractNamedValuesFromPolicy(p.policyXml || '');
+            for (const nvName of nvs) {
+                if (!nvUsageMap.has(nvName)) nvUsageMap.set(nvName, []);
+                nvUsageMap.get(nvName)!.push({ uniqueProductId, scopeId: undefined });
+            }
+        }
+
+        // Scan API Policies
+        // Note: API loop above computes uniqueApiId but doesn't expose it easily here.
+        // We'll re-scan or we could have built this map inside the API loop.
+        // For clarity, we'll iterate apimApis again (in memory, fast).
+        for (const a of apimApis) {
+            const uniqueApiId = `${a.id}:${AZURE_CONFIG.environment}:${region}`;
+            // We need the LINKED Product ID for this API. 
+            // Simplified: We assume we can find it via the p.id or 'unknown-product' logic.
+            // Ideally we'd have a map of apiId -> productId from the loop above.
+            // For now, let's look up parent product from APIM structure if possible.
+            // But we don't have that link cached well. 
+            // Fallback: If API uses NV, we link it to 'unknown-product' but Scope = uniqueApiId.
+            // BETTER: We should rely on the DB having the API->Product link? No, sync is running now.
+            // Let's use 'unknown-product' for API-scoped NVs unless we know the parent.
+            // Actually, the API loop inserted APIs with linkedProductId. 
+            // Let's rely on the user manually fixing API-scoped ownership if we miss it, 
+            // OR we can make a best effort to find the product name from the API loop.
+
+            const nvs = extractNamedValuesFromPolicy(a.policyXml);
+            for (const nvName of nvs) {
+                if (!nvUsageMap.has(nvName)) nvUsageMap.set(nvName, []);
+                // We link to 'unknown-product' (global placeholder) BUT scoped to this API.
+                // This ensures it shows up in the API config.
+                nvUsageMap.get(nvName)!.push({ uniqueProductId: 'unknown-product', scopeId: uniqueApiId });
+            }
+        }
+
         for (const nv of namedValues) {
             const isKv = !!nv.keyVaultUrl;
             const val = isKv ? nv.keyVaultUrl : nv.value;
             const type = isKv ? 'key_vault' : 'literal';
-            const id = `nv-${AZURE_CONFIG.environment}-${nv.name}`; // Deterministic ID
 
-            // Note: Sync script usually pulls Service-Level named values.
-            // We map these to GLOBAL (product_id='unknown-product', scope_id=NULL) 
-            // unless we can infer strict ownership later.
-            await pool.query(`
-                INSERT INTO named_values(id, product_id, scope_id, display_name, system_name, value, type, is_secret, updated_at)
-                VALUES($1, 'unknown-product', NULL, $2, $3, $4, $5, $6, NOW())
-                ON CONFLICT(product_id, system_name, scope_id) DO UPDATE SET
-                    display_name = EXCLUDED.display_name,
-                    value = EXCLUDED.value,
-                    type = EXCLUDED.type,
-                    is_secret = EXCLUDED.is_secret,
-                    updated_at = NOW();
-            `, [id, nv.name, nv.name, val, type, nv.isSecret]);
+            const usages = nvUsageMap.get(nv.name) || [];
+
+            if (usages.length === 0) {
+                // Orphan / Unused -> Assign to Global/Unknown
+                // This ensures we don't lose data, but it won't be visible in a specific product.
+                await pool.query(`
+                    INSERT INTO named_values(product_id, scope_id, display_name, system_name, value, type, is_secret, updated_at)
+                    VALUES('unknown-product', NULL, $1, $2, $3, $4, $5, NOW())
+                    ON CONFLICT(product_id, system_name, scope_id) DO UPDATE SET
+                        display_name = EXCLUDED.display_name,
+                        value = EXCLUDED.value,
+                        type = EXCLUDED.type,
+                        is_secret = EXCLUDED.is_secret,
+                        updated_at = NOW();
+                `, [nv.name, nv.name, val, type, nv.isSecret]);
+            } else {
+                // Insert for EACH usage
+                for (const usage of usages) {
+                    await pool.query(`
+                        INSERT INTO named_values(product_id, scope_id, display_name, system_name, value, type, is_secret, updated_at)
+                        VALUES($1, $2, $3, $4, $5, $6, $7, NOW())
+                        ON CONFLICT(product_id, system_name, scope_id) DO UPDATE SET
+                            display_name = EXCLUDED.display_name,
+                            value = EXCLUDED.value,
+                            type = EXCLUDED.type,
+                            is_secret = EXCLUDED.is_secret,
+                            updated_at = NOW();
+                    `, [usage.uniqueProductId, usage.scopeId || null, nv.name, nv.name, val, type, nv.isSecret]);
+                }
+            }
         }
 
         console.log(`🔗 Resolving ${capturedAppIds.size} potential App Identities...`);

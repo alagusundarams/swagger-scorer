@@ -126,7 +126,10 @@ CREATE TABLE IF NOT EXISTS products (
     production_hash TEXT,
     
     -- Governance Intelligence
-    detected_anomalies JSONB -- e.g. ["MANUAL_CREATION", "ENV_SKIP", "UNOWNED"]
+    detected_anomalies JSONB, -- e.g. ["MANUAL_CREATION", "ENV_SKIP", "UNOWNED"]
+    
+    -- Policy Content (Self-Service)
+    policy_xml TEXT
 );
 
 CREATE INDEX idx_products_owner ON products(owner_team_id);
@@ -319,7 +322,7 @@ CREATE TABLE IF NOT EXISTS access_control_lists (
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS named_values (
-    id TEXT PRIMARY KEY,
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
     product_id TEXT REFERENCES products(id) ON DELETE CASCADE,
     scope_id TEXT, -- Null for Product Level, API ID for API Scope
     display_name TEXT NOT NULL,

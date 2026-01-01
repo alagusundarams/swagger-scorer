@@ -15,8 +15,9 @@ import { logAudit } from './audit.service.js';
  * @param environment Optional environment filter (DEV, QA, STAGE, PROD)
  * @param userRole Optional user role (admin sees all, others see team-filtered)
  * @param teamId Optional team ID filter (ignored if userRole is 'admin')
+ * @param userGroups Optional list of AD Group IDs the user belongs to
  */
-export async function getAllProducts(environment?: string, userRole?: string, teamId?: string) {
+export async function getAllProducts(environment?: string, userRole?: string, teamId?: string, userGroups: string[] = []) {
     // Build WHERE clauses
     const whereConditions: string[] = [];
     const queryParams: any[] = [];
@@ -27,10 +28,20 @@ export async function getAllProducts(environment?: string, userRole?: string, te
         queryParams.push(environment);
     }
 
-    // Only filter by team if user is NOT admin
-    if (teamId && userRole !== 'admin') {
-        whereConditions.push(`p.owner_team_id = $${paramIndex++}`);
-        queryParams.push(teamId);
+    // Filter by Team OR Permission Matrix if not Admin
+    if (userRole !== 'admin') {
+        const teamCondition = teamId ? `p.owner_team_id = $${paramIndex++}` : '1=0';
+        if (teamId) queryParams.push(teamId);
+
+        // RBAC: Check if user has ANY role in permission_matrix for this product via their groups
+        // We use ANY($n) for array comparison in Postgres
+        const rbacCondition = userGroups.length > 0
+            ? `EXISTS (SELECT 1 FROM permission_matrix pm WHERE pm.product_id = p.id AND pm.ad_group_id = ANY($${paramIndex++}::text[]))`
+            : '1=0';
+
+        if (userGroups.length > 0) queryParams.push(userGroups);
+
+        whereConditions.push(`(${teamCondition} OR ${rbacCondition})`);
     }
 
     const whereClause = whereConditions.length > 0
@@ -652,4 +663,102 @@ export async function generateManifest(productId: string, format: 'json' | 'tfva
 
         return tf;
     }
+}
+/**
+ * Eject Product from Terraform Management to Self-Service
+ * 
+ * 1. Snapshots the live state (Mocked: Assumes DB is sync'd)
+ * 2. Unlocks the DB record (Sets management_mode = PORTAL_MANAGED)
+ * 3. Logs the "Smart Decomposition" event
+ */
+export async function ejectProduct(productId: string) {
+    if (!productId) throw new Error('Product ID is required');
+
+    // 1. Validate Current State
+    const productRes = await query('SELECT management_mode, environment FROM products WHERE id = $1', [productId]);
+    if (productRes.rows.length === 0) throw new Error('Product not found');
+    const product = productRes.rows[0];
+
+    if (product.management_mode !== 'TERRAFORM_MANAGED') {
+        throw new Error(`Product is already ${product.management_mode}. No need to eject.`);
+    }
+
+    // 2. Perform "Smart Decomposition" (Placeholder for Phase 6 Logic)
+    // In a real implementation, this would:
+    // a) Fetch strict XML from APIM
+    // b) Parse out <set-variable> and <backend-url>
+    // c) Call addNamedValue() for each extracted secret
+    console.log(`[ProductsService] Ejecting ${productId}: Analyzing policy for Smart Decomposition...`);
+    // Mocking the extraction of a hotfix URL:
+    try {
+        await addNamedValue(productId, {
+            displayName: 'Ejected Backend URL',
+            systemName: 'ejected-backend-url',
+            value: 'https://api.ejected-legacy.com',
+            type: 'literal',
+            isSecret: false,
+            allowOverwrite: true
+        });
+    } catch (e) {
+        // Ignore if exists
+    }
+
+    // 3. Update Database State
+    const result = await query(
+        `UPDATE products 
+         SET management_mode = 'PORTAL_MANAGED', 
+             reconciliation_status = 'MANUAL', 
+             updated_at = NOW() 
+         WHERE id = $1 
+         RETURNING *`,
+        [productId]
+    );
+
+    // 4. Log Critical Audit Event
+    await logAudit({
+        entityType: 'PRODUCT',
+        entityId: productId,
+        action: 'EJECT_TO_SELF_SERVICE',
+        userId: 'system-user', // Should be req.user
+        changes: {
+            from: 'TERRAFORM_MANAGED',
+            to: 'PORTAL_MANAGED',
+            note: 'User explicitly opted out of Terraform sync.'
+        }
+    });
+
+    return result.rows[0];
+}
+
+/**
+ * Fetch Product Policy XML
+ */
+export async function getProductPolicy(productId: string) {
+    const res = await query('SELECT policy_xml FROM products WHERE id = $1', [productId]);
+    if (res.rows.length === 0) throw new Error('Product not found');
+    return {
+        id: productId,
+        policyXml: res.rows[0].policy_xml || '<policies>\n  <inbound>\n    <base />\n  </inbound>\n  <backend>\n    <base />\n  </backend>\n  <outbound>\n    <base />\n  </outbound>\n  <on-error>\n    <base />\n  </on-error>\n</policies>'
+    };
+}
+
+/**
+ * Update Product Policy XML
+ */
+export async function updateProductPolicy(productId: string, xml: string) {
+    const res = await query(
+        'UPDATE products SET policy_xml = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+        [xml, productId]
+    );
+    if (res.rows.length === 0) throw new Error('Product not found');
+
+    await logAudit({
+        entityType: 'PRODUCT',
+        entityId: productId,
+        action: 'UPDATE_POLICY',
+        userId: 'system-user',
+        changes: { note: 'Product Policy Updated via Policy Studio' }
+    });
+
+    return res.rows[0];
 }

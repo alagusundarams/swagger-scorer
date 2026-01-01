@@ -29,8 +29,9 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     // GET /api/v1/products?environment=DEV&role=admin&teamId=xxx (with role-based filtering)
     fastify.get('/products', async (request, reply) => {
         try {
-            const { environment, role, teamId } = request.query as any;
-            const products = await getAllProducts(environment, role, teamId);
+            const { environment, role, teamId, groups } = request.query as any;
+            const userGroups = groups ? groups.split(',') : [];
+            const products = await getAllProducts(environment, role, teamId, userGroups);
             return products;
         } catch (error) {
             fastify.log.error({ err: error }, 'Error fetching products');
@@ -59,6 +60,47 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         } catch (error) {
             fastify.log.error({ err: error }, 'Error updating product');
             return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to update product' });
+        }
+    });
+
+    // GET /api/v1/products/:id/policy (Product Policy)
+    fastify.get('/products/:id/policy', async (request, reply) => {
+        const { id } = request.params as any;
+        try {
+            const { getProductPolicy } = await import('../services/products.service.js');
+            const policy = await getProductPolicy(id);
+            return policy;
+        } catch (error: any) {
+            fastify.log.error({ err: error }, 'Error fetching product policy');
+            return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
+        }
+    });
+
+    // PUT /api/v1/products/:id/policy (Update Product Policy)
+    fastify.put('/products/:id/policy', async (request, reply) => {
+        const { id } = request.params as any;
+        const { xml } = request.body as any;
+        try {
+            const { updateProductPolicy } = await import('../services/products.service.js');
+            const result = await updateProductPolicy(id, xml);
+            return result;
+        } catch (error: any) {
+            fastify.log.error({ err: error }, 'Error updating product policy');
+            return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
+        }
+    });
+
+    // POST /api/v1/products/:id/eject (Eject to Self-Service)
+    fastify.post('/products/:id/eject', async (request, reply) => {
+        const { id } = request.params as any;
+        try {
+            const { ejectProduct } = await import('../services/products.service.js');
+            const product = await ejectProduct(id);
+
+            return product;
+        } catch (error: any) {
+            fastify.log.error({ err: error }, 'Error ejecting product');
+            return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
         }
     });
 
