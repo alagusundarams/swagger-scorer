@@ -14,6 +14,7 @@ import { RevokeAccessModal } from '../components/modals/RevokeAccessModal';
 import { ConfigurationTab } from '../components/api-details/ConfigurationTab';
 import { AddApiModal } from '../components/api-details/AddApiModal';
 import { inventoryApi } from '../../inventory/api/inventoryClient';
+import { PromotionWizard } from '../components/product/PromotionWizard';
 
 // Lazy load Contract Editor (only loads Monaco when needed)
 const ContractEditorModal = lazy(() =>
@@ -63,10 +64,6 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
      */
     const [approvalRequests, _setApprovalRequests] = useState<ApprovalRequest[]>([]);
 
-    const requestProductPromotion = async (_productId: string, _targetEnv: string) => {
-        // TODO: Implement via inventoryApi.requestPromotion()
-        console.warn('[MFE] requestProductPromotion placeholder called');
-    };
 
     // TODO: Implement processApproval via inventoryApi when ready
     const navigate = useNavigate();
@@ -75,6 +72,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
     const [isManageModalOpen, setIsManageModalOpen] = useState(false);
     const [isEditorOpen, setIsEditorOpen] = useState(false);
     const [isPolicyStudioOpen, setIsPolicyStudioOpen] = useState(false);
+    const [isPromotionWizardOpen, setIsPromotionWizardOpen] = useState(false);
     const [isAddApiOpen, setIsAddApiOpen] = useState(false);
     const [selectedApi, setSelectedApi] = useState<API | null>(null);
 
@@ -166,36 +164,8 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
             return;
         }
 
-        // 1. Check for Pending Request
-        const hasPending = approvalRequests.some(r =>
-            r.productId === product.id &&
-            r.type === 'PROMOTION_REQUEST' &&
-            r.status === 'PENDING'
-        );
-
-        if (hasPending) {
-            setLocalToast({ message: `Promotion to ${nextStage} is already pending approval.`, type: 'warning' });
-            return;
-        }
-
-        try {
-            // 2. Submit Request
-            await requestProductPromotion(product.id, nextStage);
-
-            addNotification({
-                type: 'info',
-                title: 'Promotion Requested',
-                message: `Request to promote ${product.displayName} to ${nextStage} submitted for approval.`,
-                navigateTo: `/products/${product.id}`
-            });
-
-            setLocalToast({ message: `Promotion Request Submitted: ${nextStage}`, type: 'success' });
-            setTimeout(() => setLocalToast(null), 3000);
-
-        } catch (error: any) {
-            setLocalToast({ message: error.message || 'Failed to request promotion', type: 'warning' });
-        }
-    }, [product.id, product.displayName, product.environment, requestProductPromotion, addNotification, approvalRequests]);
+        setIsPromotionWizardOpen(true);
+    }, [product.environment]);
 
     const handleDeprecate = useCallback(() => {
         if (confirm(`Are you sure you want to deprecate ${product.displayName}? This will prevent new subscriptions.`)) {
@@ -643,6 +613,16 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                     />
                 </Suspense>
             )}
+
+            <PromotionWizard
+                isOpen={isPromotionWizardOpen}
+                onClose={() => setIsPromotionWizardOpen(false)}
+                product={product}
+                onComplete={() => {
+                    // Refresh or trigger state update
+                    setIsOutOfSync(false);
+                }}
+            />
         </div>
     );
 };

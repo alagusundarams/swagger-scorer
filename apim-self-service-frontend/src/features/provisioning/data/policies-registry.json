@@ -1,0 +1,244 @@
+[
+    {
+        "id": "rate-limit",
+        "name": "Rate Limit",
+        "category": "Traffic",
+        "intent": "I want to limit the release rate of calls",
+        "description": "Throttles the number of calls from a specific key (IP, User) within a time period.",
+        "inputs": [
+            {
+                "name": "calls",
+                "label": "Number of Calls",
+                "type": "number",
+                "placeholder": "10"
+            },
+            {
+                "name": "period",
+                "label": "Time Period (Sec)",
+                "type": "number",
+                "placeholder": "60"
+            }
+        ],
+        "xmlTemplate": "<rate-limit calls=\"{{calls}}\" renewal-period=\"{{period}}\" />",
+        "defaultSection": "inbound"
+    },
+    {
+        "id": "mock-response",
+        "name": "Mock Response",
+        "category": "Mocking",
+        "intent": "I want to return a static response",
+        "description": "Aborts pipeline and returns a mocked response to the caller.",
+        "inputs": [
+            {
+                "name": "code",
+                "label": "Status Code",
+                "type": "number",
+                "default": "200"
+            },
+            {
+                "name": "contentType",
+                "label": "Content Type",
+                "type": "text",
+                "default": "application/json"
+            }
+        ],
+        "xmlTemplate": "<mock-response status-code=\"{{code}}\" content-type=\"{{contentType}}\" />",
+        "defaultSection": "inbound"
+    },
+    {
+        "id": "rewrite-uri",
+        "name": "Rewrite URL",
+        "category": "Transformation",
+        "intent": "I want to change the backend target path",
+        "description": "Modifies the request path before sending to the backend.",
+        "inputs": [
+            {
+                "name": "template",
+                "label": "New Path Template",
+                "type": "text",
+                "placeholder": "/v2/api"
+            }
+        ],
+        "xmlTemplate": "<rewrite-uri template=\"{{template}}\" copy-unmatched-params=\"true\" />",
+        "defaultSection": "inbound"
+    },
+    {
+        "id": "set-header",
+        "name": "Set Header",
+        "category": "Transformation",
+        "intent": "I want to add or modify a header",
+        "description": "Sets a request or response header.",
+        "inputs": [
+            {
+                "name": "name",
+                "label": "Header Name",
+                "type": "text",
+                "placeholder": "X-Correlation-ID"
+            },
+            {
+                "name": "value",
+                "label": "Value",
+                "type": "text",
+                "placeholder": "@(context.RequestId)"
+            },
+            {
+                "name": "action",
+                "label": "Action",
+                "type": "select",
+                "options": [
+                    "override",
+                    "skip",
+                    "append",
+                    "delete"
+                ],
+                "default": "override"
+            }
+        ],
+        "xmlTemplate": "<set-header name=\"{{name}}\" exists-action=\"{{action}}\">\n  <value>{{value}}</value>\n</set-header>",
+        "defaultSection": "inbound"
+    },
+    {
+        "id": "quota",
+        "name": "Usage Quota",
+        "category": "Restriction",
+        "intent": "I want to limit the total call volume over a long period",
+        "description": "Enforces a renewable or lifetime call volume/bandwidth quota.",
+        "inputs": [
+            {
+                "name": "calls",
+                "label": "Max Calls",
+                "type": "number",
+                "placeholder": "1000"
+            },
+            {
+                "name": "period",
+                "label": "Period (Sec)",
+                "type": "number",
+                "placeholder": "3600"
+            },
+            {
+                "name": "key",
+                "label": "Counter Key",
+                "type": "text",
+                "default": "@(context.Subscription.Id)"
+            }
+        ],
+        "xmlTemplate": "<quota-by-key calls=\"{{calls}}\" renewal-period=\"{{period}}\" counter-key=\"{{key}}\" />",
+        "tagName": "quota-by-key",
+        "defaultSection": "inbound"
+    },
+    {
+        "id": "set-variable",
+        "name": "Set Variable",
+        "category": "Transformation",
+        "intent": "I want to store a value in a variable",
+        "defaultSection": "inbound",
+        "description": "Create or update a context variable.",
+        "xmlTemplate": "<set-variable name=\"{{name}}\" value=\"{{value}}\" />",
+        "inputs": [
+            {
+                "name": "name",
+                "label": "Variable Name",
+                "type": "text",
+                "placeholder": "e.g. myVar",
+                "required": true
+            },
+            {
+                "name": "value",
+                "label": "Value",
+                "type": "text",
+                "placeholder": "e.g. @(context...)",
+                "required": true
+            }
+        ]
+    },
+    {
+        "id": "set-body",
+        "name": "Set Body",
+        "category": "Transformation",
+        "intent": "I want to change the message body",
+        "defaultSection": "inbound",
+        "description": "Overrides the message body with a new value.",
+        "xmlTemplate": "<set-body>{{body}}</set-body>",
+        "inputs": [
+            {
+                "name": "body",
+                "label": "Body Content",
+                "type": "textarea",
+                "placeholder": "e.g. { \"status\": \"ok\" }",
+                "required": true
+            }
+        ]
+    },
+    {
+        "id": "cors",
+        "name": "CORS",
+        "category": "Security",
+        "intent": "I want to enable Cross-Origin Resource Sharing",
+        "description": "Allows browser-based clients to access the API.",
+        "inputs": [
+            {
+                "name": "origins",
+                "label": "Allowed Origins",
+                "type": "text",
+                "placeholder": "*",
+                "default": "*"
+            },
+            {
+                "name": "methods",
+                "label": "Allowed Methods",
+                "type": "text",
+                "placeholder": "GET, POST",
+                "default": "GET, POST"
+            }
+        ],
+        "xmlTemplate": "<cors allow-credentials=\"true\">\n  <allowed-origins>\n    <origin>{{origins}}</origin>\n  </allowed-origins>\n  <allowed-methods>\n    <method>{{methods}}</method>\n  </allowed-methods>\n</cors>",
+        "defaultSection": "inbound"
+    },
+    {
+        "id": "validate-jwt",
+        "name": "Validate JWT",
+        "category": "Security",
+        "intent": "I want to validate OAuth2/OIDC tokens",
+        "description": "Enforces existence and validity of a JWT in the Authorization header.",
+        "inputs": [
+            {
+                "name": "header",
+                "label": "Header Name",
+                "type": "text",
+                "default": "Authorization"
+            },
+            {
+                "name": "audience",
+                "label": "Audience (aud)",
+                "type": "text",
+                "placeholder": "api://client-id"
+            },
+            {
+                "name": "issuer",
+                "label": "Issuer (iss)",
+                "type": "text",
+                "placeholder": "https://login.microsoftonline.com/..."
+            }
+        ],
+        "xmlTemplate": "<validate-jwt header-name=\"{{header}}\" failed-validation-httpcode=\"401\" failed-validation-error-message=\"Unauthorized\">\n  <openid-config url=\"{{issuer}}/.well-known/openid-configuration\" />\n  <required-claims>\n    <claim name=\"aud\">\n      <value>{{audience}}</value>\n    </claim>\n  </required-claims>\n</validate-jwt>",
+        "defaultSection": "inbound"
+    },
+    {
+        "id": "custom-xml",
+        "name": "Custom Logic",
+        "category": "Transformation",
+        "intent": "I want to write custom policy XML",
+        "description": "Raw XML block for advanced logic (choose, set-variable, etc).",
+        "inputs": [
+            {
+                "name": "xml",
+                "label": "XML Content",
+                "type": "textarea",
+                "placeholder": "<my-policy />"
+            }
+        ],
+        "xmlTemplate": "{{xml}}",
+        "defaultSection": "inbound"
+    }
+]

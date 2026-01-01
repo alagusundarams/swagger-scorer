@@ -13,6 +13,7 @@ export interface InventorySlice {
 
     // Actions
     fetchInventory: () => Promise<void>;
+    loadProducts: () => Promise<void>;
     updateProduct: (id: string, updates: Partial<Product>) => Promise<void>;
     updateAPI: (id: string, updates: Partial<API>) => Promise<void>;
     addApiToProduct: (productId: string, apiData: Partial<API>) => Promise<void>;
@@ -33,7 +34,7 @@ export interface InventorySlice {
  * Manages only Product and API inventory.
  * Teams, Subscriptions, and Governance state relocated to their respective domains.
  */
-export const createInventorySlice: StateCreator<InventorySlice> = (set) => ({
+export const createInventorySlice: StateCreator<InventorySlice> = (set, get) => ({
     products: [],
     apis: [],
     error: null,
@@ -58,6 +59,13 @@ export const createInventorySlice: StateCreator<InventorySlice> = (set) => ({
             set({ error: error.message || "Failed to load inventory data.", isLoading: false });
         }
     },
+
+    loadProducts: async () => {
+        const { fetchInventory } = get();
+        await fetchInventory();
+    },
+
+
 
     updateProduct: async (id, updates) => {
         set((state) => ({

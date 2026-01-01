@@ -83,7 +83,7 @@ class EventBus {
     ): () => void {
         // Initialize the Set if this is the first subscriber for this event
         if (!this.subscribers[eventType]) {
-            this.subscribers[eventType] = new Set();
+            this.subscribers[eventType] = new Set<EventHandler<T>>() as any;
         }
 
         // Add the handler to the subscribers

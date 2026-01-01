@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { MonacoEditor } from './MonacoEditor';
+import React, { useState, useEffect } from 'react';
+import { SpecStudio } from '../../spec-studio';
 import { saveDraftFile, getDraftFile, clearDraftSession, getStorageUsageMB } from '../storage/draftStorage';
 import type { API, Product } from '../../../shared/types/domain';
+import { ContractEditorHeader } from './ContractEditorHeader';
+import { GitContextPanel } from './GitContextPanel';
+import { ContractCommitForm } from './ContractCommitForm';
 
 interface ContractEditorModalProps {
     product: Product;
@@ -23,9 +26,6 @@ interface ContractEditorModalProps {
  * - Git commit form
  * - Memory-efficient (disposes on close)
  */
-import { ContractEditorHeader } from './ContractEditorHeader';
-import { GitContextPanel } from './GitContextPanel';
-import { ContractCommitForm } from './ContractCommitForm';
 
 export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
     product,
@@ -92,7 +92,7 @@ ${api.operations.map(op => `  ${op.urlTemplate}:
         };
 
         loadContent();
-    }, [isOpen, product.id, api, filename]);
+    }, [isOpen, product.id, api, filename, fetchSpec]);
 
     useEffect(() => {
         if (!isOpen || !isModified) return;
@@ -110,12 +110,10 @@ ${api.operations.map(op => `  ${op.urlTemplate}:
         return () => clearInterval(autoSaveInterval);
     }, [isOpen, isModified, content, product.id, filename, language]);
 
-    const handleContentChange = useCallback((value: string | undefined) => {
-        if (value !== undefined) {
-            setContent(value);
-            setIsModified(true);
-        }
-    }, []);
+    const handleContentChange = (value: string) => {
+        setContent(value);
+        setIsModified(true);
+    };
 
     const handleCommit = async () => {
         if (!commitMessage.trim()) {
@@ -159,7 +157,7 @@ ${api.operations.map(op => `  ${op.urlTemplate}:
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-            <div className="w-full h-full max-w-[95vw] max-h-[95vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl flex flex-col">
+            <div className="w-full h-full max-w-[95vw] max-h-[95vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl flex flex-col overflow-hidden">
                 <ContractEditorHeader
                     api={api}
                     product={product}
@@ -175,21 +173,19 @@ ${api.operations.map(op => `  ${op.urlTemplate}:
                     isModified={isModified}
                 />
 
-                <div className="flex-1 min-h-0 bg-[#1e1e1e] relative">
+                <div className="flex-1 min-h-0 bg-slate-950 relative flex flex-col">
                     {isLoadingSpec && (
-                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity duration-300">
+                        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity duration-300">
                             <div className="flex flex-col items-center gap-4">
                                 <div className="w-10 h-10 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin"></div>
                                 <p className="text-emerald-500 font-bold text-xs uppercase tracking-widest">Fetching Spec...</p>
                             </div>
                         </div>
                     )}
-                    <MonacoEditor
-                        value={content}
-                        language={language}
-                        onChange={handleContentChange}
+                    <SpecStudio
+                        initialContent={content}
+                        onContentChange={handleContentChange}
                         readOnly={readOnly}
-                        height="100%"
                     />
                 </div>
 

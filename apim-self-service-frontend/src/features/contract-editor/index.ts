@@ -6,5 +6,4 @@
  */
 
 export { ContractEditorModal } from './components/ContractEditorModal';
-export { MonacoEditor } from './components/MonacoEditor';
 export * from './storage/draftStorage';

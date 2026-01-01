@@ -43,9 +43,14 @@ export const OnboardingIdentityStep: React.FC<OnboardingIdentityStepProps> = ({
                             value={formData.name}
                             onChange={(e) => onChange({ ...formData, name: e.target.value })}
                             className={`w-full px-8 py-5 bg-gray-50 dark:bg-slate-900 border-2 rounded-2xl font-bold text-lg focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${isNameDuplicate ? 'border-red-500 text-red-500' : 'border-transparent'}`}
-                            placeholder="e.g. Payments Gateway"
+                            placeholder="e.g. Payments_Gateway"
                         />
                         {isNameDuplicate && <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest ml-1">Error: This name is already taken in {environment}</p>}
+                        {formData.name && !/^[a-zA-Z0-9-_]+$/.test(formData.name) && (
+                            <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest ml-1">
+                                Invalid Name: Use only alphanumeric, dashes, or underscores.
+                            </p>
+                        )}
                     </div>
 
                     <div className="space-y-3">
@@ -91,7 +96,7 @@ export const OnboardingIdentityStep: React.FC<OnboardingIdentityStepProps> = ({
                 </div>
                 <button
                     onClick={onNext}
-                    disabled={!formData.name || !formData.ownerTeamId}
+                    disabled={!formData.name || !formData.ownerTeamId || !/^[a-zA-Z0-9-_]+$/.test(formData.name)}
                     className="px-12 py-5 bg-gray-900 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl hover:bg-black transition-all shadow-premium disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                     Establish Identity

@@ -15,7 +15,7 @@ import { getAccessibleEnvironments } from '../../features/inventory/utils/produc
 import { DashboardStatsGrid } from '../../features/inventory/components/dashboard/DashboardStatsGrid';
 import { DashboardTabs } from '../../features/inventory/components/dashboard/DashboardTabs';
 import { DashboardContent } from '../../features/inventory/components/dashboard/DashboardContent';
-// const GlobalInventory = lazy(() => import('../../features/admin/views/GlobalInventory.view').then(module => ({ default: module.GlobalInventory })));
+import { GlobalInventory } from '../../features/admin/views/GlobalInventory.view';
 import '../../features/inventory/inventory.css';
 import { filterProducts, matchesSearchQuery } from '../../utils/filterUtils';
 
@@ -246,10 +246,8 @@ export const DashboardPage = () => {
                                     <span>Manage Orphans</span>
                                 </button>
                             </div>
-                            {/* TODO: Restore GlobalInventory when component is ready */}
-                            {/* <Suspense fallback={<div className="p-20 text-center animate-pulse text-[10px] font-black uppercase tracking-widest text-slate-400">Loading Global Inventory...</div>}>
-                                <GlobalInventory embedded />
-                            </Suspense> */}
+                            {/* Global Inventory Table */}
+                            <GlobalInventory products={allProducts} embedded />
                         </div>
                     ) : (
                         <>
@@ -287,6 +285,6 @@ export const DashboardPage = () => {
                     )}
                 </div>
             </div>
-        </MainLayout>
+        </MainLayout >
     );
 };

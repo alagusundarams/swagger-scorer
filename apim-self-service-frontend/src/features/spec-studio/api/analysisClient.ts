@@ -1,5 +1,5 @@
 /**
- * @fileoverview Analyzer API Client
+ * Spec Studio Analysis API Client
  * 
  * Logic for interacting with the Analysis and Draft services.
  */
@@ -33,7 +33,9 @@ export interface AnalysisResult {
     }>;
 }
 
-// === ANALYZER ENDPOINTS ===
+/**
+ * Post a specification for analysis
+ */
 export const postAnalyze = (spec: string) =>
     api.post<AnalysisResult>('/analyze', { content: spec, format: 'yaml' });
 

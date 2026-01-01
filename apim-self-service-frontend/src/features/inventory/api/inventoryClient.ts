@@ -47,8 +47,12 @@ export const removeApi = async (productId: string, apiId: string): Promise<boole
     return res.data.success;
 };
 
-export const requestPromotion = async (productId: string, targetEnv: string): Promise<unknown> => {
-    const res = await baseClient.post(`/products/${productId}/promote`, { targetEnv });
+export const requestPromotion = async (productId: string, targetEnv: string, policyXml?: string, variables?: { name: string; value: string }[]): Promise<unknown> => {
+    const res = await baseClient.post(`/products/${productId}/promote`, {
+        targetEnv,
+        policyXml,
+        variables
+    });
     return res.data;
 };
 
@@ -84,9 +88,23 @@ export const inventoryApi = {
         const res = await baseClient.get(`/products/${encodeURIComponent(productId)}/spec`);
         return res.data;
     },
+    // Product Policy
+    getProductPolicy: async (productId: string): Promise<{ policyXml: string }> => {
+        const res = await baseClient.get(`/products/${encodeURIComponent(productId)}/policy`);
+        return res.data;
+    },
+    updateProductPolicy: async (productId: string, xml: string): Promise<any> => {
+        const res = await baseClient.put(`/products/${encodeURIComponent(productId)}/policy`, { xml });
+        return res.data;
+    },
     // Missing Operations Fetcher
     getOperations: async (productId: string, apiId: string): Promise<any[]> => {
         const res = await baseClient.get(`/products/${encodeURIComponent(productId)}/apis/${encodeURIComponent(apiId)}/operations`);
+        return res.data;
+    },
+    // Eject to Self-Service
+    ejectProduct: async (productId: string): Promise<Product> => {
+        const res = await baseClient.post(`/products/${encodeURIComponent(productId)}/eject`);
         return res.data;
     }
 };
