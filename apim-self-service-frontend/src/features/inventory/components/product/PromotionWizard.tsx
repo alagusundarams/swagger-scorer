@@ -6,6 +6,27 @@ import { OnboardingResolutionStep } from '../../../provisioning/components/Onboa
 import { inventoryApi } from '../../api/inventoryClient';
 import { useStore } from '../../../../store/useStore';
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: PromotionWizard
+ * ------------------------------------------------------------------
+ * 🔄 LIFECYCLE:
+ * - Triggered from ProductDetailProducer.view.tsx when a user clicks "Promote".
+ * - Orchestrates the multi-step journey from Dev -> QA -> Stage -> Prod.
+ * 
+ * 📥 DATA INFLOW:
+ * - `product`: The source product entity containing current environment and policies.
+ * - `inventoryApi.getProductPolicy`: Hydrates the baseline XML from Git/DB on mount.
+ * 
+ * 📤 DATA OUTFLOW (PR Creation):
+ * - `inventoryApi.requestPromotion`: Final payload sent to backend to trigger 
+ *   an ADO/GitHub Pull Request with environment-specific variables.
+ * 
+ * 🧩 MFE / EVENT BUS:
+ * - Uses `useStore` (Zustand) for toast notifications (`addNotification`).
+ * - Emits `onComplete` to parent to trigger a view refresh after PR creation.
+ * ------------------------------------------------------------------
+ */
 interface PromotionWizardProps {
     isOpen: boolean;
     onClose: () => void;

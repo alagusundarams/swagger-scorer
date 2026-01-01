@@ -5,6 +5,25 @@ import { ViolationsTable } from '../components/ViolationsTable';
 import { MonacoEditorContainer } from '../components/MonacoEditorContainer';
 import '../spec-studio.css';
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: SpecStudio (The Unified Spec Engine)
+ * ------------------------------------------------------------------
+ * 🔄 LIFECYCLE:
+ * - Mounted during Onboarding (Step 2) to sketch new APIs.
+ * - Mounted in ContractEditorModal for "Day 2" maintenance.
+ * - Mounted in standalone /analyzer for ad-hoc compliance checks.
+ * 
+ * 📥 DATA INFLOW:
+ * - `initialContent`: Hydrated from either Onboarding state OR a Remote Git fetch (maintenance).
+ * - `onContentChange`: External callback to sync changes back to the parent (e.g., Onboarding Wizard state).
+ * 
+ * 📤 DATA OUTFLOW (Internal State / Event Bus):
+ * - Uses `useSpecStudio` (Zustand) for global-to-feature state.
+ * - `runAnalysis()`: Triggers external API calls via `analysisClient.ts`.
+ * - `onAnalysisComplete`: Custom event hook to notify parent wizards of quality gate status.
+ * ------------------------------------------------------------------
+ */
 interface SpecStudioProps {
     initialContent?: string;
     onContentChange?: (content: string) => void;

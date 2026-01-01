@@ -6,6 +6,28 @@ import { ContractEditorHeader } from './ContractEditorHeader';
 import { GitContextPanel } from './GitContextPanel';
 import { ContractCommitForm } from './ContractCommitForm';
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: ContractEditorModal
+ * ------------------------------------------------------------------
+ * 🔄 LIFECYCLE:
+ * - Triggered by the "Edit Contract" button in APIDetailPage.
+ * - Represents the "Maintenance" (Day 2) phase of the API lifecycle.
+ * - Wraps the `SpecStudio` engine with production commit workflows.
+ * 
+ * 📥 DATA INFLOW:
+ * - `api` & `product`: Contextual identities for the API being edited.
+ * - `fetchSpec`: Remote handler that retrieves the current specification from Git.
+ * - `draftStorage`: Hydrates local browser drafts (failsafe) on mount.
+ * 
+ * 📤 DATA OUTFLOW (PR Event Bus):
+ * - `onCommit`: High-level callback emitted to trigger the creation 
+ *   of a Pull Request in the backend repository.
+ * 
+ * 🧩 ENGINE INTEGRATION:
+ * - Plugs `SpecStudio` into its center for real-time analysis and Monaco support.
+ * ------------------------------------------------------------------
+ */
 interface ContractEditorModalProps {
     product: Product;
     api: API;

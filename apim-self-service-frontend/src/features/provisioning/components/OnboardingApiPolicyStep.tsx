@@ -8,6 +8,29 @@ import { PolicyPalette } from './PolicyPalette';
 import { PolicyVisualEditor } from './PolicyVisualEditor';
 import { usePolicyStudio } from './usePolicyStudio';
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: OnboardingApiPolicyStep (The Unified Policy Studio)
+ * ------------------------------------------------------------------
+ * 🔄 LIFECYCLE:
+ * - Mounted during Onboarding (Step 4) to define initial policies.
+ * - Reused in the PromotionWizard for environment-specific policy overrides.
+ * - Serves as the primary workspace for API operation & product scope definitions.
+ * 
+ * 📥 DATA INFLOW:
+ * - `specContent`: Raw OpenAPI spec used by `swaggerParser` to build the Operation Explorer.
+ * - `initialApiPolicies`: Existing operational policies (from DB/Drafts) to hydrate the editors.
+ * - `productPolicyXml`: The high-level product policy baseline.
+ * 
+ * 📤 DATA OUTFLOW (Event Bus / State):
+ * - `onNext(policies, productXml)`: Callback emitted when "Save Configuration" is clicked.
+ * - Emits a key-value map of `operationId` -> `policyXml` and the final product-level XML.
+ * 
+ * 🧩 ENGINE:
+ * - Powered by `usePolicyStudio` custom hook for complex state orchestration.
+ * - Integrates with `PolicyPalette` (Input) and `PolicyExplorer` (Navigation).
+ * ------------------------------------------------------------------
+ */
 // Lazy load the heavy XML editor
 const PolicyXmlEditor = lazy(() => import('./PolicyXmlEditor').then(m => ({ default: m.PolicyXmlEditor })));
 
