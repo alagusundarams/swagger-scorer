@@ -6,6 +6,16 @@
  * @module features/provisioning/api
  */
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 API Client: Provisioning (Project Creation)
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Direct communication with the APIM Provisioning service.
+ * - Triggers the creation of Git repositories and AD resource groups.
+ * - Handles the final submission of the onboarding payload.
+ * ------------------------------------------------------------------
+ */
 import { api } from '../../../api/baseClient';
 
 /**

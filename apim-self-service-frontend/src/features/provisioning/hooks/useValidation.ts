@@ -1,4 +1,14 @@
 import { useMemo, useCallback } from 'react';
+/**
+ * ------------------------------------------------------------------
+ * 📍 Custom Hook: useValidation
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Provides reactive validation logic for form fields.
+ * - Bridges the UI with the `validationStore` and `validationClient`.
+ * - Handles the debounce and lifecycle of remote availability checks.
+ * ------------------------------------------------------------------
+ */
 import { useValidationStore } from '../store/validationStore';
 import { validateProductName } from '../api/validationClient';
 

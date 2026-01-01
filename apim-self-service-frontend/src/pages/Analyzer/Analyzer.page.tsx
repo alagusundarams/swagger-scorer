@@ -4,9 +4,17 @@ import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { SpecStudio, useSpecStudio } from '../../features/spec-studio';
 
 /**
- * AnalyzerPage Controller
+ * ------------------------------------------------------------------
+ * 📍 Page: Analyzer (Ad-hoc Analysis)
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Provides a dedicated route (/analyzer) for one-off spec linting.
+ * - Orchestrates the SpecStudio engine in a standalone workstation layout.
  * 
- * Now uses the unified SpecStudio engine.
+ * 📥 DATA FLOW:
+ * - Purely volatile state managed within the SpecStudio feature store.
+ * - Does not persist to drafts or products (used for "Sanity Checks").
+ * ------------------------------------------------------------------
  */
 export function AnalyzerPage() {
     const { setPageTitle } = useStore();

@@ -290,6 +290,14 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
                                 onSubmit={handleSubmit}
                                 productName={formData.name}
                                 productVersion={formData.version}
+                                apiName={formData.apiName}
+                                apiSuffix={formData.apiSuffix}
+                                teamId={formData.ownerTeamId}
+                                setTeamId={(id) => setFormData({ ...formData, ownerTeamId: id })}
+                                isPublic={formData.visibility === 'public'}
+                                setIsPublic={(pub) => setFormData({ ...formData, visibility: pub ? 'public' : 'private' })}
+                                projectKey=""
+                                setProjectKey={() => { }}
                             />
                         )}
 

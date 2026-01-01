@@ -1,6 +1,16 @@
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: DeploymentConfirmationModal
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Final validation gate before pushing policies to APIM.
+ * - Visualizes the "Diff" between current and new policy XML.
+ * - Collects the optional "Commit Message" for Git-backed products.
+ * ------------------------------------------------------------------
+ */
 import { useState } from 'react';
 
-interface Props {
+interface DeploymentConfirmationModalProps {
     isOpen: boolean;
     onClose: () => void;
     onConfirm: (justification: string) => void;
@@ -8,7 +18,7 @@ interface Props {
     resourceName: string;
 }
 
-export const DeploymentConfirmationModal = ({ isOpen, onClose, onConfirm, isDeploying, resourceName }: Props) => {
+export const DeploymentConfirmationModal = ({ isOpen, onClose, onConfirm, isDeploying, resourceName }: DeploymentConfirmationModalProps) => {
     const [justification, setJustification] = useState('');
 
     if (!isOpen) return null;

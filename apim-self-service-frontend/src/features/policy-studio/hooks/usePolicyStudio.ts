@@ -7,6 +7,17 @@
  * @module features/policy-studio/hooks
  */
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Custom Hook: usePolicyStudio (Functional Logic)
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Managed state for the Visual Policy Builder DAG.
+ * - Handles the "Drag and Drop" logic and swimlane sorting.
+ * - Bridges the Visual DAG to the XML Generator/Parser utilities.
+ * - Controls the "Section-Specific" (Inbound/Outbound) editing context.
+ * ------------------------------------------------------------------
+ */
 import { useState, useEffect } from 'react';
 import {
     getPolicyDisplay,

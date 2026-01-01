@@ -1,3 +1,13 @@
+/**
+ * ------------------------------------------------------------------
+ * 📍 Feature Types: Policy Studio
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Domain model for APIM policies and the Visual Editor DAG.
+ * - Defines the schema for Policy Templates (JSON) and Steps.
+ * - Specifies the orchestration sections (Inbound, Outbound, etc.).
+ * ------------------------------------------------------------------
+ */
 export type PolicyScope = 'global' | 'product' | 'api' | 'operation';
 
 export type PolicySection = 'inbound' | 'backend' | 'outbound' | 'onError';

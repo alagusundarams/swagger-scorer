@@ -2,6 +2,16 @@ import { useState, useMemo, useEffect } from 'react';
 import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
 import { type Product } from '../../inventory/types/inventoryTypes';
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: OnboardingIntentModal
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Entry point selector for the onboarding wizard.
+ * - Allows users to choose between "New API" and "Existing API" workflows.
+ * - Sets the initial context for the wizard state machine.
+ * ------------------------------------------------------------------
+ */
 interface OnboardingIntentModalProps {
     onSelectIntent: (mode: 'new' | 'existing', existingProduct?: Product) => void;
     userTeams: { id: string, name: string }[];

@@ -1,6 +1,19 @@
 import React, { useState } from 'react';
 import { type AnalysisResult } from '../api/analysisClient';
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: ViolationsTable
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Detailed list of linter violations found in the API specification.
+ * - Allows searching, filtering by severity, and deep-linking to lines.
+ * - Bridges the "Abstract Score" with actionable developer tasks.
+ * 
+ * 📥 DATA INFLOW:
+ * - `analysis`: The raw linting result containing the violations array.
+ * ------------------------------------------------------------------
+ */
 interface ViolationsTableProps {
     result: AnalysisResult | null;
     onSelectLine: (line: number) => void;

@@ -1,11 +1,21 @@
 import { type PolicyStep } from '../../types/policyTypes';
 
-interface Props {
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: RateLimitProperties
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Specialized property editor for the `rate-limit` policy.
+ * - Handles specific validation for "Calls", "Renewal Period", and "Counter Keys".
+ * - Ensures the user provides valid numeric constraints for API protection.
+ * ------------------------------------------------------------------
+ */
+interface RateLimitPropertiesProps {
     step: PolicyStep;
     onChange: (updatedProperties: Record<string, any>) => void;
 }
 
-export const RateLimitProperties = ({ step, onChange }: Props) => {
+export const RateLimitProperties = ({ step, onChange }: RateLimitPropertiesProps) => {
     const { calls = 10, renewalPeriod = 60, counterKey = '@(context.Subscription.Id)' } = step.properties;
 
     const handleChange = (field: string, value: any) => {

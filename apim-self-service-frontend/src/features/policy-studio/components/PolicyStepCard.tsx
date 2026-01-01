@@ -1,6 +1,16 @@
 import React from 'react';
 import type { PolicyStep } from '../types/policyTypes';
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: PolicyStepCard
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Visual representation of a single policy step in the builder.
+ * - Displays the policy name, category-based styling, and action buttons.
+ * - Handles the "Edit Properties" and "Remove" triggers.
+ * ------------------------------------------------------------------
+ */
 export interface PolicyStepCardProps {
     step: PolicyStep;
     onRemove?: () => void;

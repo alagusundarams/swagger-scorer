@@ -1,6 +1,20 @@
 import { ReactNode, useState } from 'react';
 import { PolicyTemplate } from './policyTemplates';
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: PolicyCard
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - The visual wrapper for a single policy instance in the editor.
+ * - Handles the "Expanded/Collapsed" state and visibility toggles.
+ * - Provides the generic "Delete" and "Section Change" actions.
+ * 
+ * 📥 DATA INFLOW:
+ * - `name`: Display name of the policy.
+ * - `category`: Color-coded category for visual grouping.
+ * ------------------------------------------------------------------
+ */
 interface PolicyCardProps {
     template: PolicyTemplate;
     onRemove?: () => void;

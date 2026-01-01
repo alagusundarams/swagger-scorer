@@ -1,12 +1,22 @@
 import { useState, useEffect } from 'react';
 import { type PolicyStep } from '../../types/policyTypes';
 
-interface Props {
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: GenericPolicyProperties
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Dynamic form builder for standard APIM policies.
+ * - Maps policy JSON schemas to standard form controls (Inputs, Selects).
+ * - Implements the "Simple Mode" property editor for most policies.
+ * ------------------------------------------------------------------
+ */
+interface GenericPolicyPropertiesProps {
     step: PolicyStep;
     onChange: (updatedProperties: Record<string, any>) => void;
 }
 
-export const GenericPolicyProperties = ({ step, onChange }: Props) => {
+export const GenericPolicyProperties = ({ step, onChange }: GenericPolicyPropertiesProps) => {
     // Local state for immediate feedback, syncs to parent on blur/change
     const [properties, setProperties] = useState(step.properties || {});
     const [customXml, setCustomXml] = useState(step.customXmlContent || step.xmlSnippet || '');

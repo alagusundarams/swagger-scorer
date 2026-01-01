@@ -3,7 +3,16 @@
  * 
  * Logic for interacting with the Analysis and Draft services.
  */
-
+/**
+ * ------------------------------------------------------------------
+ * 📍 API Client: Spec Analysis
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Communication gateway for the API Quality Gate analyzer.
+ * - Sends OpenAPI (YAML/JSON) specifications to the linter service.
+ * - Maps backend violation models to the frontend 'AnalysisResult' type.
+ * ------------------------------------------------------------------
+ */
 import { api, workflowApi } from '../../../api/baseClient';
 
 /**

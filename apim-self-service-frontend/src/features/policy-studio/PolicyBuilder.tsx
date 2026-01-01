@@ -7,6 +7,18 @@
  */
 
 import React, { useState } from 'react';
+
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: PolicyBuilder
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - The primary workspace for the Visual Policy Editor.
+ * - Orchestrates the drag-and-drop experience for policy blocks.
+ * - Manages the "Inbound", "Outbound", and "Backend" swimlanes.
+ * - Synchronizes with the backend via the `usePolicyStudio` hook.
+ * ------------------------------------------------------------------
+ */
 import { usePolicyTemplates, useGeneratePolicyXml } from './hooks/usePolicyStudio';
 import type { PolicyTemplate } from './api/policyClient';
 import './PolicyBuilder.css';

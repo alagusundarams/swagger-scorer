@@ -2,6 +2,19 @@ import { PolicyTemplate, PolicyInput } from './policyTemplates';
 import { PolicyCard } from './PolicyCard';
 
 /**
+ * ------------------------------------------------------------------
+ * 📍 Component: GenericPolicyRenderer
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Factory component that renders a specific policy widget based on its template.
+ * - Maps the `inputs` defined in `POLICY_TEMPLATES` to form controls (Text, Select, etc).
+ * - Implements the "Simple Mode" UI for each policy instance.
+ * 
+ * 📥 DATA INFLOW:
+ * - `policy`: The specific instance data (ID, Type, Values).
+ * ------------------------------------------------------------------
+ */
+/**
  * Props for GenericPolicyRenderer
  * Strictly typed to ensure the form matches the JSON schema.
  */

@@ -1,6 +1,19 @@
 import React from 'react';
 import { type AnalysisResult } from '../api/analysisClient';
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: ScoreCard
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - High-level visualization of the API Quality Score.
+ * - Categorizes violations into security, reliability, documentation, etc.
+ * - Provides immediate visual feedback (Red/Yellow/Green) for contract quality.
+ * 
+ * 📥 DATA INFLOW:
+ * - `analysis`: The raw linting result from the Quality Gate backend.
+ * ------------------------------------------------------------------
+ */
 interface ScoreCardProps {
     result: AnalysisResult | null;
 }

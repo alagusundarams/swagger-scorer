@@ -1,5 +1,19 @@
 import React from 'react';
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: OnboardingProgressBar
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Visual indicator of the user's progress through the onboarding wizard.
+ * - Maps the current `step` index to a percentage and breadcrumb list.
+ * - Provides non-linear navigation hints (completed vs. active steps).
+ * 
+ * 📥 DATA INFLOW:
+ * - `step`: The current active index.
+ * - `steps`: The list of all step labels/definitions.
+ * ------------------------------------------------------------------
+ */
 interface OnboardingProgressBarProps {
     currentStep: number;
     totalSteps: number;

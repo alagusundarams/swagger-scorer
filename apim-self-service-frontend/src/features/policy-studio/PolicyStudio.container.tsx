@@ -1,3 +1,14 @@
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: PolicyStudio (Container)
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Smart container for the standalone Policy Studio feature.
+ * - Handles data fetching for policy templates and existing configurations.
+ * - Provides the context providers required by the `PolicyBuilder`.
+ * - Acts as the entry point for the "Policy Editor" page.
+ * ------------------------------------------------------------------
+ */
 import { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import { type PolicyScope, type PolicyFlow, type PolicyStep, type PolicySection, type PolicyStepType } from './types/policyTypes';

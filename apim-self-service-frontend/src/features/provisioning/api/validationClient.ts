@@ -4,6 +4,16 @@
  * API calls for provisioning-specific validation
  */
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 API Client: Validation (Quality Assurance)
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Communicates with the pre-deployment validation service.
+ * - Checks for naming collisions, region availability, and quota limits.
+ * - Used by the wizard to gate the final "Submit" action.
+ * ------------------------------------------------------------------
+ */
 import { api } from '../../../api/baseClient';
 
 export interface ValidationResult {

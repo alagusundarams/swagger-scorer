@@ -1,13 +1,13 @@
 /**
- * xmlParser.ts
- * 
- * Utility to parse Azure API Management (APIM) Policy XML into a structured JSON format
- * suitable for visualization in the Policy Studio.
- * 
- * Features:
- * - Extracts Inbound, Backend, Outbound, On-Error sections.
+ * ------------------------------------------------------------------
+ * 📍 Utility: XML Policy Parser
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Deconstructs complex APIM XML policy files into a structured DAG.
+ * - Extracts "Inbound", "Outbound", "Backend", and "On-Error" sections.
  * - Identifies key policies: rate-limit, validate-jwt, set-header, mock-response.
- * - Robust against malformed XML using widespread regex patterns (for client-side lightness).
+ * - Robust against malformed XML using widespread regex patterns.
+ * ------------------------------------------------------------------
  */
 
 export interface PolicyNode {

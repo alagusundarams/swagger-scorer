@@ -1,3 +1,13 @@
+/**
+ * ------------------------------------------------------------------
+ * 📍 Custom Hook: useProvisioning
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Orchestrates the master state of the Onboarding Wizard.
+ * - Handles the transition between steps and data persistence.
+ * - Synchronizes local form state with the Blob Storage draft service.
+ * ------------------------------------------------------------------
+ */
 import { useCallback, useMemo } from 'react';
 
 /**

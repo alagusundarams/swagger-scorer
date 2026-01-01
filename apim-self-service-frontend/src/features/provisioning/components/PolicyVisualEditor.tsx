@@ -1,6 +1,24 @@
 import { ConfiguredPolicy, POLICY_TEMPLATES } from './policyTemplates';
 import { GenericPolicyRenderer } from './GenericPolicyRenderer';
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: PolicyVisualEditor
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Renders the visual representation of active policies for a scope.
+ * - Bridges the logic between raw `ConfiguredPolicy` data and widget rendering.
+ * - Handles the reordering and section-based grouping (Inbound/Outbound etc).
+ * 
+ * 📥 DATA INFLOW:
+ * - `activePolicies`: The list of policy instances currently applied.
+ * 
+ * 📤 ACTIONS:
+ * - `handleUpdatePolicyValue`: Propagates field-level changes back to the 
+ *   orchestration store (`usePolicyStudio`).
+ * - `handleRemovePolicy`: Triggers deletion of a policy instance.
+ * ------------------------------------------------------------------
+ */
 interface PolicyVisualEditorProps {
     activePolicies: ConfiguredPolicy[];
     handleUpdatePolicyValue: (id: string, newValues: Record<string, unknown>) => void;

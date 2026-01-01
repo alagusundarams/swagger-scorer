@@ -12,6 +12,20 @@
  * ------------------------------------------------------------------
  */
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Feature Module: Policy Templates & XML Engine
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Defines the JSON schema for "Configurable Policies".
+ * - Provides the logic for parsing existing XML into active UI state.
+ * - Handles the 'Compilation' step that turns Visual state back into valid APIM XML.
+ * 
+ * 🧩 DATA STRUCTURES:
+ * - `ConfiguredPolicy`: The runtime instance of a policy in the visual editor.
+ * - `POLICY_TEMPLATES`: Registry of all available policy types (Rate Limit, CORS, etc.).
+ * ------------------------------------------------------------------
+ */
 export interface PolicyInput {
     name: string;
     label: string;

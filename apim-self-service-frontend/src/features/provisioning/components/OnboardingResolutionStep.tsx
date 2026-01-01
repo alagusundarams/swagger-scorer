@@ -1,5 +1,23 @@
 import { useState, useEffect } from 'react';
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: OnboardingResolutionStep (Variable Resolution)
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Scans the finalized API/Product policies for `{{variable}}` placeholders.
+ * - Provides a JIT (Just-In-Time) UI for resolving these into environment-specific 
+ *   Named Values (Managed via GitLab/ADO pipelines).
+ * 
+ * 📥 DATA INFLOW:
+ * - `productPolicyXml` & `apiPolicies`: The full set of XML content to scan.
+ * - `existingNamedValues`: Registry of already known variables for pre-hydration.
+ * 
+ * 📤 DATA OUTFLOW:
+ * - `onNext(resolvedValues)`: Emits the final key-value pairs to be injected 
+ *   during the environment-specific deployment pipeline.
+ * ------------------------------------------------------------------
+ */
 interface OnboardingResolutionStepProps {
     productPolicyXml: string;
     apiPolicies: Record<string, string>;
@@ -92,7 +110,7 @@ export const OnboardingResolutionStep = ({
                                 {variables.map((v: DetectedVariable) => (
                                     <tr key={v.name} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
                                         <td className="p-6 font-mono text-purple-400 font-bold">
-                                            {`{{${v.name}}}`}
+                                            {`{ {${v.name} } } `}
                                         </td>
                                         <td className="p-6">
                                             {v.isExisting ? (

@@ -7,6 +7,16 @@
  * @module features/policy-studio/api
  */
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 API Client: Policy Studio (Persistence)
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Communication gateway for fetching and saving APIM policies.
+ * - Handles the ingestion of Policy Templates (JSON) from the server.
+ * - Manages the "Live Sync" of policy changes during the editing session.
+ * ------------------------------------------------------------------
+ */
 import { api } from '../../../api/baseClient';
 
 /**

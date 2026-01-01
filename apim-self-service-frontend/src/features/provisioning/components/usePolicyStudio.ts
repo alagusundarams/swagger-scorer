@@ -1,3 +1,23 @@
+/**
+ * ------------------------------------------------------------------
+ * 📍 Custom Hook: usePolicyStudio
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Orchestrates the complex bi-directional state of the Policy Studio.
+ * - Manages the lifecycle of PolicyState (JSON) <-> XML syncing.
+ * - Handles the 'Hybrid' mode transitions between Visual and XML views.
+ * 
+ * 📥 INPUTS:
+ * - `specContent`: The raw OpenAPI spec to parse for operations.
+ * - `initialApiPolicies`: Hydration data for operation-level policies.
+ * - `productPolicyXml`: Hydration data for the product-level baseline.
+ * 
+ * 📤 ACTIONS:
+ * - `handleToggleMode`: Switches between Visual/XML mode for a specific scope.
+ * - `handleUpdatePolicyValue`: Mutations in the Visual editor reflect in the XML state.
+ * - `handleStepNext`: Consolidates all volatile state for the parent wizard.
+ * ------------------------------------------------------------------
+ */
 import { useState, useEffect, useMemo } from 'react';
 import jsyaml from 'js-yaml';
 import { ApiOperation, parseSwaggerOperations } from '../../../utils/swaggerParser';
@@ -92,7 +112,7 @@ export function usePolicyStudio({
                 if (spec?.paths) {
                     Object.entries(spec.paths).forEach(([path, methods]) => {
                         Object.keys(methods).forEach((method) => {
-                            const opId = `${method.toUpperCase()} ${path}`;
+                            const opId = `${method.toUpperCase()} ${path} `;
                             if (!opMap[opId]) {
                                 opMap[opId] = { enabled: false, mode: 'simple', activePolicies: [], isOverridden: false };
                             }
@@ -117,13 +137,13 @@ export function usePolicyStudio({
         const sections = ['inbound', 'backend', 'outbound', 'on-error'] as const;
 
         sections.forEach(section => {
-            xml += `  <${section}>\n    <base />\n`;
+            xml += `  < ${section}>\n < base />\n`;
             const sectionPolicies = activePolicies.filter(p => p.section === section);
             sectionPolicies.forEach(p => {
                 const match = POLICY_TEMPLATES.find(t => t.id === p.templateId);
                 if (match) {
                     const fragment = generatePolicyXml(match, p.values || {});
-                    xml += `    ${fragment.replace(/\n/g, '\n    ')}\n`;
+                    xml += `    ${fragment.replace(/\n/g, '\n    ')} \n`;
                 }
             });
             xml += `  </${section}>\n`;

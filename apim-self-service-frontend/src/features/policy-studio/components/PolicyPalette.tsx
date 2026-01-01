@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { type PolicyStepType } from '../types/policyTypes';
@@ -83,7 +83,7 @@ const DraggablePaletteItem = ({ item, isCollapsed }: { item: PaletteItem; isColl
 };
 
 export const PolicyPalette = () => {
-    const [isCollapsed, setIsCollapsed] = React.useState(false);
+    const [isCollapsed, setIsCollapsed] = useState(false);
 
     return (
         <div className={`flex flex-col h-full transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-64'}`}>

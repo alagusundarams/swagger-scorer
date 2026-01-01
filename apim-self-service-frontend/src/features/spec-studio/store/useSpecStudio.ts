@@ -1,7 +1,18 @@
 /**
- * Zustand Store for Spec Studio Analysis State
+ * ------------------------------------------------------------------
+ * 📍 Feature Store: Spec Studio (Zustand)
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Manages the reactive state for the unified OpenAPI editor.
+ * - Handles the async lifecycle of API contract analysis.
+ * - Synchronizes UI navigation (line selection) between the editor and violations table.
+ * 
+ * 📤 ACTIONS / STATE:
+ * - `spec`: The current raw content of the editor.
+ * - `runAnalysis`: Triggers the high-level quality gate analysis.
+ * - `selectedLine`: Global tracker for cross-component highlighting (Editor <-> Table).
+ * ------------------------------------------------------------------
  */
-
 import { create } from 'zustand';
 import { postAnalyze, type AnalysisResult } from '../api/analysisClient';
 

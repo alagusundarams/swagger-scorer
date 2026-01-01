@@ -1,3 +1,16 @@
+/**
+ * ------------------------------------------------------------------
+ * 📍 Utility: OpenAPI/Swagger Parser
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Structural analysis of OpenAPI (3.0+) and Swagger (2.0) documents.
+ * - Map operations to a flat array for the 'Operation Explorer' UI.
+ * - Normalize complex paths/methods for policy targeting.
+ * 
+ * 🧩 DATA STRUCTURES:
+ * - `ApiOperation`: The normalized internal model for an API endpoint.
+ * ------------------------------------------------------------------
+ */
 import yaml from 'js-yaml';
 
 export interface ApiOperation {

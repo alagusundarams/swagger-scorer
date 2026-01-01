@@ -1,6 +1,19 @@
 import React from 'react';
 import type { Team } from '../../../shared/types/domain';
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: OnboardingIdentityStep
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - First step in the onboarding wizard focusing on API Identity.
+ * - Collects the API Display Name, Technical Name, and URL Suffix.
+ * - Enforces technical naming conventions (slugification).
+ * 
+ * 📥 DATA INFLOW:
+ * - `formData`: Initial state from the master wizard store.
+ * ------------------------------------------------------------------
+ */
 export interface OnboardingIdentityStepProps {
     formData: {
         name: string;

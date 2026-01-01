@@ -1,6 +1,22 @@
 import { useState, useEffect } from 'react';
 import { SpecStudio, useSpecStudio } from '../../spec-studio';
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: OnboardingSpecStep
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Second step in the onboarding wizard focusing on the API Contract.
+ * - Integrates the SpecStudio engine for ad-hoc editing/analysis.
+ * - Handles the ingestion of OpenAPI files (Upload, URL, Paste).
+ * 
+ * 📥 DATA INFLOW:
+ * - `formData.spec`: Hydrated from previous draft if available.
+ * 
+ * 📤 ACTIONS:
+ * - `onNext`: Persists the validated spec to the shared wizard store.
+ * ------------------------------------------------------------------
+ */
 interface OnboardingSpecStepProps {
     onBack: () => void;
     onNext: (specContent: string, apiName: string, apiSuffix: string) => void;
@@ -48,8 +64,8 @@ export const OnboardingSpecStep = ({ onBack, onNext, initialApiName = '', initia
                             value={apiName}
                             onChange={e => setApiName(e.target.value)}
                             placeholder="e.g. Orders-API"
-                            className={`w-full bg-slate-50 dark:bg-slate-800/50 border p-3 rounded-xl text-sm font-bold outline-none ring-2 ring-transparent focus:ring-blue-500/20 transition-all ${apiName && !/^[a-zA-Z0-9-_]+$/.test(apiName) ? 'border-red-500 text-red-500' : 'border-slate-200 dark:border-slate-700'
-                                }`}
+                            className={`w - full bg - slate - 50 dark: bg - slate - 800 / 50 border p - 3 rounded - xl text - sm font - bold outline - none ring - 2 ring - transparent focus: ring - blue - 500 / 20 transition - all ${apiName && !/^[a-zA-Z0-9-_]+$/.test(apiName) ? 'border-red-500 text-red-500' : 'border-slate-200 dark:border-slate-700'
+                                } `}
                         />
                         {apiName && !/^[a-zA-Z0-9-_]+$/.test(apiName) && (
                             <p className="text-[10px] text-red-500 font-bold mt-1">Alphanumeric, dashes, underscores only.</p>
@@ -64,8 +80,8 @@ export const OnboardingSpecStep = ({ onBack, onNext, initialApiName = '', initia
                                 value={apiSuffix}
                                 onChange={e => setApiSuffix(e.target.value)}
                                 placeholder="orders"
-                                className={`flex-1 bg-slate-50 dark:bg-slate-800/50 border p-3 rounded-r-xl text-sm font-bold outline-none ring-2 ring-transparent focus:ring-blue-500/20 transition-all ${apiSuffix && !/^[a-zA-Z0-9-_\/]+$/.test(apiSuffix) ? 'border-red-500 text-red-500' : 'border-slate-200 dark:border-slate-700'
-                                    }`}
+                                className={`flex - 1 bg - slate - 50 dark: bg - slate - 800 / 50 border p - 3 rounded - r - xl text - sm font - bold outline - none ring - 2 ring - transparent focus: ring - blue - 500 / 20 transition - all ${apiSuffix && !/^[a-zA-Z0-9-_\/]+$/.test(apiSuffix) ? 'border-red-500 text-red-500' : 'border-slate-200 dark:border-slate-700'
+                                    } `}
                             />
                         </div>
                     </div>
@@ -90,7 +106,7 @@ export const OnboardingSpecStep = ({ onBack, onNext, initialApiName = '', initia
                         {result && (
                             <div className="text-right">
                                 <span className="block text-[10px] font-black uppercase text-slate-400">Analysis Result</span>
-                                <span className={`text-sm font-black tracking-tight ${isValid ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                <span className={`text - sm font - black tracking - tight ${isValid ? 'text-emerald-500' : 'text-amber-500'} `}>
                                     {isValid ? 'VALIDATED' : 'IMPROVEMENTS RECOMMENDED'}
                                 </span>
                             </div>

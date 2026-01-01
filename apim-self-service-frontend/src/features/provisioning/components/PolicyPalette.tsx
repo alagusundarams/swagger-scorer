@@ -1,6 +1,19 @@
 import { PolicyAssistant } from './PolicyAssistant';
-import { PolicyTemplate } from './policyTemplates';
+import { type PolicyTemplate } from './policyTemplates';
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: PolicyPalette
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Serves as the library of available policies.
+ * - Provides search/filter capabilities to find specific policy types.
+ * - Draggable/Clickable interface for adding a new policy to the current scope.
+ * 
+ * 📤 ACTIONS:
+ * - `handleAddPolicy`: Emitted when a user selects a policy from the palette.
+ * ------------------------------------------------------------------
+ */
 interface PolicyPaletteProps {
     readOnly: boolean;
     handleAddPolicy: (template: PolicyTemplate) => void;

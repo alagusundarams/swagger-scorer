@@ -2,6 +2,19 @@ import { useState, useMemo } from 'react';
 import { POLICY_TEMPLATES, PolicyTemplate } from './policyTemplates';
 
 /**
+ * ------------------------------------------------------------------
+ * 📍 Component: PolicyAssistant
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Provides JIT (Just-In-Time) documentation for the selected policy template.
+ * - Displays the XML signature and usage guidelines for developers.
+ * - Helps users understand the "Intent" of a policy before applying it.
+ * 
+ * 📥 DATA INFLOW:
+ * - `template`: The active template being viewed or configured.
+ * ------------------------------------------------------------------
+ */
+/**
  * Props for the PolicyAssistant Component.
  * Follows Strict MFE Pattern: No internal store dependencies.
  */
@@ -73,9 +86,9 @@ export const PolicyAssistant = ({ onSelectTemplate, className = '' }: PolicyAssi
                         >
                             <div className="flex justify-between items-start mb-1">
                                 <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${template.category === 'Traffic' ? 'bg-amber-100 text-amber-700' :
-                                        template.category === 'Security' ? 'bg-red-100 text-red-700' :
-                                            template.category === 'Mocking' ? 'bg-green-100 text-green-700' :
-                                                'bg-blue-100 text-blue-700'
+                                    template.category === 'Security' ? 'bg-red-100 text-red-700' :
+                                        template.category === 'Mocking' ? 'bg-green-100 text-green-700' :
+                                            'bg-blue-100 text-blue-700'
                                     }`}>
                                     {template.category}
                                 </span>

@@ -1,5 +1,15 @@
 import type { PolicyStep } from '../../types/policyTypes';
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: CustomXmlProperties
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Expert-mode override for a single policy step.
+ * - Provides a Monaco editor instance for editing raw XML snippets.
+ * - Used for policies that don't have a structured JSON template.
+ * ------------------------------------------------------------------
+ */
 interface CustomXmlPropertiesProps {
     step: PolicyStep;
     onChange: (updates: Partial<PolicyStep>) => void;

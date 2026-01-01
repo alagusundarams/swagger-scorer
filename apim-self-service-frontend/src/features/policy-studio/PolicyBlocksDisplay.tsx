@@ -6,10 +6,19 @@
  * NO parsing logic in frontend
  */
 
-import React from 'react';
 import { usePolicyDisplay } from './hooks/usePolicyStudio';
 import './PolicyBlocksDisplay.css';
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: PolicyBlocksDisplay
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Read-only visualization of applied policy blocks.
+ * - Used in high-level summaries or audit logs where editing is not required.
+ * - Renders a compact, "LEGO-like" stack of XML-backed policies.
+ * ------------------------------------------------------------------
+ */
 interface PolicyBlocksDisplayProps {
     productId: string;
 }

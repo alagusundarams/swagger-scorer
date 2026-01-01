@@ -1,6 +1,20 @@
 import React from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: MonacoEditorContainer
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Enterprise-grade code editor for YAML/JSON OpenAPI specs.
+ * - Handles syntax highlighting, line decorations (Violations), and diffing.
+ * - Isolated from the main UI thread to ensure high performance on large specs.
+ * 
+ * 📥 DATA INFLOW:
+ * - `value`: The raw specification content.
+ * - `markers`: Diagnostic markers mapped from linter violations.
+ * ------------------------------------------------------------------
+ */
 interface MonacoEditorContainerProps {
     spec: string;
     onSpecChange: (value: string) => void;

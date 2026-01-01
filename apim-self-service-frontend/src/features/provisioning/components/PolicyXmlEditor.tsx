@@ -1,5 +1,18 @@
 import Editor from '@monaco-editor/react';
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: PolicyXmlEditor
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Expert-mode editor for raw APIM XML policy definitions.
+ * - Provides bit-level control over the policy configuration.
+ * - Syncs back to the Visual editor via the `usePolicyStudio` hook.
+ * 
+ * 📥 DATA INFLOW:
+ * - `xml`: The raw XML string representing the active scope.
+ * ------------------------------------------------------------------
+ */
 interface PolicyXmlEditorProps {
     xmlContent: string;
     onChange: (newXml: string | undefined) => void;

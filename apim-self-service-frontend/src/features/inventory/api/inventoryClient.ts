@@ -1,5 +1,15 @@
+/**
+ * ------------------------------------------------------------------
+ * 📍 API Client: Inventory & Promotion
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Domain gateway for Products, APIs, and Environment Promotions.
+ * - Handles the "Source of Truth" for Git-synced contracts and policies.
+ * - Triggers the cross-environment promotion workflow (Creation of PRs).
+ * ------------------------------------------------------------------
+ */
 import { api as baseClient } from '../../../api/baseClient';
-import type { Product, API } from '../types/inventoryTypes';
+import type { Product, API } from '../../../shared/types/domain';
 
 /**
  * Inventory API Client - CORE ONLY

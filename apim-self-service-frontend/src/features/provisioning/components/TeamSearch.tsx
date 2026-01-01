@@ -1,6 +1,15 @@
-import React from 'react';
 import type { Team } from '../../../shared/types/domain';
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: TeamSearch
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Autocomplete search for Team ownership during onboarding.
+ * - Fetches teams from the shared domain registry.
+ * - Ensures a valid AD team is selected for resource tagging.
+ * ------------------------------------------------------------------
+ */
 interface TeamSearchProps {
     onToggleTeam: (teamId: string) => void;
     selectedTeams: string[];

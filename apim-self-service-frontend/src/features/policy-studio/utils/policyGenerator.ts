@@ -1,4 +1,14 @@
-import type { PolicyFlow } from '../types/policyTypes';
+/**
+ * ------------------------------------------------------------------
+ * 📍 Utility: XML Policy Generator
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Reconstructs valid APIM XML policy strings from the frontend DAG.
+ * - Handles the serialization of policy properties into XML attributes/nodes.
+ * - Ensures the generated XML adheres to Azure APIM schema constraints.
+ * ------------------------------------------------------------------
+ */
+import { type PolicyFlow } from '../types/policyTypes';
 
 /**
  * Policy Generator Utility

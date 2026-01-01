@@ -1,13 +1,31 @@
 import { useState } from 'react';
 
-interface Props {
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: OnboardingFulfillmentStep
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Final step in the onboarding wizard focusing on deployment settings.
+ * - Collects Team ownership, Visibility settings, and Project keys.
+ * - Triggers the final "Submit" action that initiates the backend provisioning.
+ * ------------------------------------------------------------------
+ */
+interface OnboardingFulfillmentStepProps {
     onBack: () => void;
     onSubmit: () => void;
     productName?: string;
     productVersion?: string;
+    apiName: string;
+    apiSuffix: string;
+    teamId: string;
+    setTeamId: (teamId: string) => void;
+    isPublic: boolean;
+    setIsPublic: (isPublic: boolean) => void;
+    projectKey: string;
+    setProjectKey: (projectKey: string) => void;
 }
 
-export const OnboardingFulfillmentStep = ({ onBack, onSubmit, productName, productVersion }: Props) => {
+export function OnboardingFulfillmentStep({ onBack, onSubmit, productName, productVersion }: OnboardingFulfillmentStepProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSubmit = () => {

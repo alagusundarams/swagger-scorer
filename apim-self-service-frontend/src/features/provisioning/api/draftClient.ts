@@ -6,6 +6,16 @@
  * until the product is officially approved and committed to Git.
  */
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 API Client: Onboarding Drafts (Blob Persistence)
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Manages the persistent lifecycle of multi-step onboarding drafts.
+ * - Bridges the frontend wizard state with backend Blob Storage.
+ * - Ensures recovery of in-flight API sketches across sessions.
+ * ------------------------------------------------------------------
+ */
 import { api } from '../../../api/baseClient';
 
 export interface OnboardingDraft {

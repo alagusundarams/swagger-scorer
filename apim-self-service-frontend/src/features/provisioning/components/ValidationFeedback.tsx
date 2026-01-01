@@ -8,6 +8,16 @@
 import { memo } from 'react';
 import '../provisioning.css';
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Component: ValidationFeedback
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Visual indicator for form-level or logic-level validation states.
+ * - Displays success/error messages with appropriate iconography.
+ * - Used across the onboarding wizard for consistent UX.
+ * ------------------------------------------------------------------
+ */
 interface ValidationFeedbackProps {
     fieldName: string;
     error: {

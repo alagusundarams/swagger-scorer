@@ -5,6 +5,16 @@
  * Follows the slice pattern - NO GOD OBJECTS
  */
 
+/**
+ * ------------------------------------------------------------------
+ * 📍 Feature Slice: Validation Logic
+ * ------------------------------------------------------------------
+ * 🔄 RESPONSIBILITY:
+ * - Atomic state and actions for the validation domain.
+ * - Handles the asynchronous lifecycle of product/API availability checks.
+ * - Implements the "Optimistic UI" updates for validation feedback.
+ * ------------------------------------------------------------------
+ */
 import { type StateCreator } from 'zustand';
 
 export interface ValidationError {
