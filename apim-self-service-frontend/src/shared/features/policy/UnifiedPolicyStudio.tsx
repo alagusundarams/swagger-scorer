@@ -1,11 +1,10 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import { ApiOperation } from '../../../utils/swaggerParser';
 import { usePolicyStudio } from './usePolicyStudio';
-import { type PolicyStep, type PolicyTemplate } from './types';
+import { type PolicyStep } from './types';
 import { PolicyExplorer } from './components/PolicyExplorer';
 import { PolicyPalette } from './components/PolicyPalette';
 import { PolicyFlowList } from './components/PolicyFlowList';
-import { POLICY_TEMPLATES } from './templates';
 
 const PolicyXmlEditor = lazy(() => import('./components/PolicyXmlEditor').then(m => ({ default: m.PolicyXmlEditor })));
 
@@ -55,6 +54,8 @@ export const UnifiedPolicyStudio: React.FC<UnifiedPolicyStudioProps> = ({
         initialApiPolicies
     });
 
+    const [activeSection, setActiveSection] = useState<string>('inbound');
+
     if (!scanned) {
         return (
             <div className="h-full flex items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-400 font-mono text-sm animate-pulse">
@@ -92,24 +93,18 @@ export const UnifiedPolicyStudio: React.FC<UnifiedPolicyStudioProps> = ({
                 </div>
                 <div className="flex gap-4">
                     <div className="flex items-center gap-2 mr-4 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-1 border border-slate-200 dark:border-slate-700">
-                        <span className="text-[9px] font-black uppercase text-slate-400 mr-2">Quick Add:</span>
+                        <span className="text-[9px] font-black uppercase text-slate-400 mr-2">Jump To:</span>
                         {(['inbound', 'backend', 'outbound', 'on-error'] as const).map(sec => (
-                            <select
+                            <button
                                 key={sec}
-                                disabled={readOnly}
-                                onChange={(e) => {
-                                    if (e.target.value) {
-                                        handleAddStep(e.target.value, sec);
-                                        e.target.value = '';
-                                    }
-                                }}
-                                className="text-[9px] font-black uppercase bg-white dark:bg-slate-700 border-none rounded-md px-2 py-1 cursor-pointer hover:ring-1 hover:ring-purple-500 transition-all"
+                                onClick={() => setActiveSection(sec)}
+                                className={`text-[9px] font-black uppercase px-2 py-1 rounded-md transition-all ${activeSection === sec
+                                    ? 'bg-purple-600 text-white shadow-sm'
+                                    : 'text-slate-500 hover:bg-white dark:hover:bg-slate-700'
+                                    }`}
                             >
-                                <option value="">{sec.split('-').join(' ')}</option>
-                                {POLICY_TEMPLATES.map(t => (
-                                    <option key={t.id} value={t.id}>{t.name}</option>
-                                ))}
-                            </select>
+                                {sec.split('-').join(' ')}
+                            </button>
                         ))}
                     </div>
                     <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 border border-slate-200 dark:border-slate-700">
@@ -149,6 +144,8 @@ export const UnifiedPolicyStudio: React.FC<UnifiedPolicyStudioProps> = ({
                             <PolicyFlowList
                                 section="inbound"
                                 steps={activeSteps.filter((s: PolicyStep) => s.section === 'inbound')}
+                                isActive={activeSection === 'inbound'}
+                                onActivate={() => setActiveSection('inbound')}
                                 onAdd={(tid: string) => handleAddStep(tid, 'inbound')}
                                 onUpdate={handleUpdateStep}
                                 onRemove={handleRemoveStep}
@@ -160,6 +157,8 @@ export const UnifiedPolicyStudio: React.FC<UnifiedPolicyStudioProps> = ({
                             <PolicyFlowList
                                 section="backend"
                                 steps={activeSteps.filter((s: PolicyStep) => s.section === 'backend')}
+                                isActive={activeSection === 'backend'}
+                                onActivate={() => setActiveSection('backend')}
                                 onAdd={(tid: string) => handleAddStep(tid, 'backend')}
                                 onUpdate={handleUpdateStep}
                                 onRemove={handleRemoveStep}
@@ -175,6 +174,8 @@ export const UnifiedPolicyStudio: React.FC<UnifiedPolicyStudioProps> = ({
                             <PolicyFlowList
                                 section="outbound"
                                 steps={activeSteps.filter((s: PolicyStep) => s.section === 'outbound')}
+                                isActive={activeSection === 'outbound'}
+                                onActivate={() => setActiveSection('outbound')}
                                 onAdd={(tid: string) => handleAddStep(tid, 'outbound')}
                                 onUpdate={handleUpdateStep}
                                 onRemove={handleRemoveStep}
@@ -187,6 +188,8 @@ export const UnifiedPolicyStudio: React.FC<UnifiedPolicyStudioProps> = ({
                                 <PolicyFlowList
                                     section="on-error"
                                     steps={activeSteps.filter((s: PolicyStep) => s.section === 'on-error')}
+                                    isActive={activeSection === 'on-error'}
+                                    onActivate={() => setActiveSection('on-error')}
                                     onAdd={(tid: string) => handleAddStep(tid, 'on-error')}
                                     onUpdate={handleUpdateStep}
                                     onRemove={handleRemoveStep}
@@ -207,7 +210,12 @@ export const UnifiedPolicyStudio: React.FC<UnifiedPolicyStudioProps> = ({
                     )}
                 </div>
 
-                <PolicyPalette onSelect={(template: PolicyTemplate) => handleAddStep(template.id)} readOnly={readOnly} />
+                <PolicyPalette
+                    activeSection={activeSection}
+                    onSectionChange={setActiveSection}
+                    onSelect={(tid: string) => handleAddStep(tid, activeSection as any)}
+                    readOnly={readOnly}
+                />
             </div>
 
             {/* Footer */}

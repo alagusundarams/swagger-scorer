@@ -1,21 +1,50 @@
 
 import React from 'react';
-import { type PolicyTemplate } from '../types';
+
 import { POLICY_TEMPLATES } from '../templates';
 
 interface PolicyPaletteProps {
-    onSelect: (template: PolicyTemplate) => void;
+    activeSection: string;
+    onSectionChange: (section: string) => void;
+    onSelect: (templateId: string) => void;
     readOnly?: boolean;
 }
 
-export const PolicyPalette: React.FC<PolicyPaletteProps> = ({ onSelect, readOnly }) => {
+export const PolicyPalette: React.FC<PolicyPaletteProps> = ({
+    activeSection,
+    onSectionChange,
+    onSelect,
+    readOnly
+}) => {
     const categories = Array.from(new Set(POLICY_TEMPLATES.map(t => t.category)));
+    const sections = [
+        { id: 'inbound', label: 'Inbound', color: 'indigo' },
+        { id: 'backend', label: 'Backend', color: 'amber' },
+        { id: 'outbound', label: 'Outbound', color: 'pink' },
+        { id: 'on-error', label: 'Error', color: 'red' }
+    ];
 
     return (
         <div className="w-80 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shadow-2xl z-20">
             <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50">
                 <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 dark:text-slate-200">Policy Palette</h3>
                 <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold">Add logic to your API</p>
+            </div>
+
+            {/* Section Selector */}
+            <div className="p-4 grid grid-cols-2 gap-2 border-b border-slate-100 dark:border-slate-800">
+                {sections.map(s => (
+                    <button
+                        key={s.id}
+                        onClick={() => onSectionChange(s.id)}
+                        className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all flex flex-col items-center justify-center gap-1 border ${activeSection === s.id
+                            ? `bg-${s.color}-500 text-white border-${s.color}-600 shadow-lg shadow-${s.color}-500/20`
+                            : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                            }`}
+                    >
+                        <span>{s.label}</span>
+                    </button>
+                ))}
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-8">
@@ -27,7 +56,7 @@ export const PolicyPalette: React.FC<PolicyPaletteProps> = ({ onSelect, readOnly
                                 <button
                                     key={template.id}
                                     disabled={readOnly}
-                                    onClick={() => onSelect(template)}
+                                    onClick={() => onSelect(template.id)}
                                     className="w-full text-left p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/20 hover:border-purple-200 dark:hover:border-purple-900/40 hover:bg-white dark:hover:bg-slate-800 transition-all group"
                                 >
                                     <div className="flex justify-between items-start mb-1">
