@@ -106,6 +106,7 @@ export async function fetchSpecFromAPIM(productId: string): Promise<string> {
             throw new Error(`Azure configuration missing for ${product.environment} (subscriptionId, resourceGroup, instance)`);
         }
 
+        console.log(`[SpecFetcher] Exporting API spec for ${apiName} (${product.environment})...`);
         const url = `https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${resourceGroup}/providers/Microsoft.ApiManagement/service/${apimInstance}/apis/${apiName}?export=true&format=openapi&api-version=2022-08-01`;
 
         const response = await fetch(url, {
@@ -116,12 +117,17 @@ export async function fetchSpecFromAPIM(productId: string): Promise<string> {
         });
 
         if (!response.ok) {
+            const errorText = await response.text().catch(() => 'No body');
+            console.error(`[SpecFetcher] APIM Error: ${response.status}`, errorText);
             throw new Error(`APIM API error: ${response.status} ${response.statusText}`);
         }
 
-        const spec = await response.json();
-        return JSON.stringify(spec, null, 2);
-    } catch (err) {
+        const specText = await response.text();
+        console.log(`[SpecFetcher] Received spec (length: ${specText.length}, starts with: ${specText.substring(0, 20).replace(/\n/g, '\\n')})`);
+
+        return specText; // Return as-is (JSON or YAML)
+    } catch (err: any) {
+        console.error(`[SpecFetcher] Failed to fetch from APIM:`, err.message);
         throw new Error(`Failed to fetch spec from APIM: ${err instanceof Error ? err.message : String(err)}`);
     }
 }
@@ -131,6 +137,7 @@ export async function fetchSpecFromAPIM(productId: string): Promise<string> {
  * Fetch spec for a product (tries Git first, then APIM)
  */
 export async function fetchSpecForProduct(productId: string): Promise<string> {
+    console.log(`[SpecFetcher] Fetching spec for ${productId}...`);
     // Get product from database
     const result = await query(`
         SELECT id, name, git_repo_url, git_file_path, environment
@@ -146,11 +153,16 @@ export async function fetchSpecForProduct(productId: string): Promise<string> {
 
     // Try Git first if available
     if (product.git_repo_url) {
+        console.log(`[SpecFetcher] Attempting Git fetch from ${product.git_repo_url} / ${product.git_file_path || 'openapi.yaml'}`);
         try {
-            return await fetchFileFromGitApi(product.git_repo_url, product.git_file_path);
+            const spec = await fetchFileFromGitApi(product.git_repo_url, product.git_file_path);
+            console.log(`[SpecFetcher] ✅ Successfully fetched from Git`);
+            return spec;
         } catch (gitErr) {
-            console.warn(`Failed to fetch from Git, falling back to APIM:`, gitErr);
+            console.warn(`[SpecFetcher] ⚠️ Failed to fetch from Git, falling back to APIM:`, gitErr instanceof Error ? gitErr.message : gitErr);
         }
+    } else {
+        console.log(`[SpecFetcher] No Git repo linked, proceeding direct to APIM`);
     }
 
     // Fallback to APIM

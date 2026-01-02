@@ -36,6 +36,7 @@ export const PolicyEditorPage = () => {
     useEffect(() => {
         const load = async () => {
             if (productId) {
+                console.log(`[PolicyEditor] Loading data for ${productId}...`);
                 try {
                     // Parallel Fetch
                     const [specData, productPolicyData] = await Promise.all([
@@ -43,11 +44,12 @@ export const PolicyEditorPage = () => {
                         inventoryApi.getProductPolicy(productId).catch(() => ({ policyXml: '' })) // Graceful fail for new/legacy
                     ]);
 
+                    console.log(`[PolicyEditor] Data loaded successfully for ${productId}`);
                     setSpecContent(specData.spec);
                     setProductPolicyXml(productPolicyData.policyXml);
 
                 } catch (e) {
-                    console.error("Failed to load editor data", e);
+                    console.error("[PolicyEditor] Failed to load editor data", e);
                     toast.error("Failed to load product data");
                 }
             }

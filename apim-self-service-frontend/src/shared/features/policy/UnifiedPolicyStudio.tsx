@@ -18,6 +18,7 @@ interface UnifiedPolicyStudioProps {
     onBack?: () => void;
     readOnly?: boolean;
     environment?: string;
+    onEnvironmentChange?: (env: any) => void;
 }
 
 export const UnifiedPolicyStudio: React.FC<UnifiedPolicyStudioProps> = ({
@@ -29,7 +30,8 @@ export const UnifiedPolicyStudio: React.FC<UnifiedPolicyStudioProps> = ({
     onSave,
     onBack,
     readOnly = false,
-    environment
+    environment,
+    onEnvironmentChange
 }) => {
     const {
         operations,

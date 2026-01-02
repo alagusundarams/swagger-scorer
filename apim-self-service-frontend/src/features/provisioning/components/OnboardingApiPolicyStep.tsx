@@ -11,6 +11,7 @@ interface OnboardingApiPolicyStepProps {
     initialApiPolicies?: Record<string, string>;
     readOnly?: boolean;
     environment?: string;
+    onEnvironmentChange?: (env: any) => void;
 }
 
 export const OnboardingApiPolicyStep = ({
@@ -22,7 +23,8 @@ export const OnboardingApiPolicyStep = ({
     productName = "New Product",
     initialApiPolicies,
     readOnly = false,
-    environment
+    environment,
+    onEnvironmentChange
 }: OnboardingApiPolicyStepProps) => {
 
     const handleSave = (apiPolicies: Record<string, string>, productXml: string) => {
@@ -41,6 +43,7 @@ export const OnboardingApiPolicyStep = ({
                 onBack={onBack}
                 readOnly={readOnly}
                 environment={environment}
+                onEnvironmentChange={onEnvironmentChange}
             />
         </div>
     );

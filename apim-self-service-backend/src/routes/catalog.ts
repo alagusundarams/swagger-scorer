@@ -5,6 +5,7 @@
  */
 
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
+import { getAppConfig } from '../config/loader.js';
 import { getAllProducts, getAllApis, updateProduct, getGlobalInventory, getPermissionMatrix, updatePermissionMatrix, addProduct, addApi, getOperations, searchApis } from '../services/products.service.js';
 import { getAllTeams } from '../services/teams.service.js';
 import { getAllSubscriptions, addSubscription, updateSubscriptionState } from '../services/subscriptions.service.js';
@@ -126,7 +127,8 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     fastify.get('/products/:id/spec', async (request, reply) => {
         const { id } = request.params as any;
         try {
-            const isMock = process.env.USE_BACKEND_MOCKS === 'true';
+            const config = getAppConfig();
+            const isMock = config.useBackendMocks;
             const { fetchSpecForProduct } = isMock
                 ? await import('../services/spec-fetcher.mock.js')
                 : await import('../services/spec-fetcher.service.js');
@@ -327,7 +329,8 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     // POST /api/v1/admin/score-products (Trigger background scoring job)
     fastify.post('/admin/score-products', async (_request, reply) => {
         try {
-            const isMock = process.env.USE_BACKEND_MOCKS === 'true';
+            const config = getAppConfig();
+            const isMock = config.useBackendMocks;
             const { scoreAllProducts } = isMock
                 ? await import('../services/scoring.service.mock.js')
                 : await import('../services/scoring.service.js');
@@ -352,7 +355,8 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     fastify.post('/admin/score-product/:id', async (request, reply) => {
         const { id } = request.params as any;
         try {
-            const isMock = process.env.USE_BACKEND_MOCKS === 'true';
+            const config = getAppConfig();
+            const isMock = config.useBackendMocks;
             const { scoreProductById } = isMock
                 ? await import('../services/scoring.service.mock.js')
                 : await import('../services/scoring.service.js');
