@@ -166,10 +166,10 @@
     top: 100%;
     margin-top: 8px;
     width: 240px;
-    background-color: #ffffff;
-    border: 1px solid #e2e8f0;
+    background-color: #1e293b;
+    border: 1px solid #334155;
     border-radius: 1.5rem;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
     z-index: 50;
 }
 
