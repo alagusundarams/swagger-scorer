@@ -9,9 +9,9 @@
 import { api } from '../../../api/baseClient';
 
 /**
- * Login API call (placeholder)
+ * Login API call
  */
-export async function login(credentials: { email: string; password: string }) {
+export async function login(credentials: { email?: string; password?: string; role?: string }) {
     return api.post('/auth/login', credentials);
 }
 

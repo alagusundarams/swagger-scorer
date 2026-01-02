@@ -4,22 +4,38 @@
         "name": "Rate Limit",
         "category": "Traffic",
         "intent": "I want to limit the release rate of calls",
-        "description": "Throttles the number of calls from a specific key (IP, User) within a time period.",
+        "description": "Throttles calls based on a key (e.g. IP address, User ID).",
+        "tagName": "rate-limit-by-key",
         "inputs": [
             {
                 "name": "calls",
                 "label": "Number of Calls",
                 "type": "number",
-                "placeholder": "10"
+                "placeholder": "10",
+                "required": true
             },
             {
                 "name": "period",
                 "label": "Time Period (Sec)",
                 "type": "number",
-                "placeholder": "60"
+                "placeholder": "60",
+                "required": true
+            },
+            {
+                "name": "key",
+                "label": "Counter Key",
+                "type": "text",
+                "default": "@(context.Request.IpAddress)",
+                "placeholder": "@(context.Request.IpAddress)"
+            },
+            {
+                "name": "remainingCallsHeaderName",
+                "label": "Header: Remaining Calls",
+                "type": "text",
+                "placeholder": "X-RateLimit-Remaining"
             }
         ],
-        "xmlTemplate": "<rate-limit calls=\"{{calls}}\" renewal-period=\"{{period}}\" />",
+        "xmlTemplate": "<rate-limit-by-key calls=\"{{calls}}\" renewal-period=\"{{period}}\" counter-key=\"{{key}}\" remaining-calls-header-name=\"{{remainingCallsHeaderName}}\" />",
         "defaultSection": "inbound"
     },
     {
@@ -57,9 +73,15 @@
                 "label": "New Path Template",
                 "type": "text",
                 "placeholder": "/v2/api"
+            },
+            {
+                "name": "copyUnmatchedParams",
+                "label": "Copy Unmatched Query Params",
+                "type": "boolean",
+                "default": "true"
             }
         ],
-        "xmlTemplate": "<rewrite-uri template=\"{{template}}\" copy-unmatched-params=\"true\" />",
+        "xmlTemplate": "<rewrite-uri template=\"{{template}}\" copy-unmatched-params=\"{{copyUnmatchedParams}}\" />",
         "defaultSection": "inbound"
     },
     {
@@ -102,13 +124,19 @@
         "name": "Usage Quota",
         "category": "Restriction",
         "intent": "I want to limit the total call volume over a long period",
-        "description": "Enforces a renewable or lifetime call volume/bandwidth quota.",
+        "description": "Enforces a renewable call volume/bandwidth quota.",
         "inputs": [
             {
                 "name": "calls",
                 "label": "Max Calls",
                 "type": "number",
                 "placeholder": "1000"
+            },
+            {
+                "name": "bandwidth",
+                "label": "Max Bandwidth (KB)",
+                "type": "number",
+                "placeholder": "10000"
             },
             {
                 "name": "period",
@@ -123,7 +151,7 @@
                 "default": "@(context.Subscription.Id)"
             }
         ],
-        "xmlTemplate": "<quota-by-key calls=\"{{calls}}\" renewal-period=\"{{period}}\" counter-key=\"{{key}}\" />",
+        "xmlTemplate": "<quota-by-key calls=\"{{calls}}\" bandwidth=\"{{bandwidth}}\" renewal-period=\"{{period}}\" counter-key=\"{{key}}\" />",
         "tagName": "quota-by-key",
         "defaultSection": "inbound"
     },
@@ -179,20 +207,44 @@
         "inputs": [
             {
                 "name": "origins",
-                "label": "Allowed Origins",
+                "label": "Allowed Origins (CSV)",
                 "type": "text",
                 "placeholder": "*",
                 "default": "*"
             },
             {
                 "name": "methods",
-                "label": "Allowed Methods",
+                "label": "Allowed Methods (CSV)",
                 "type": "text",
                 "placeholder": "GET, POST",
                 "default": "GET, POST"
+            },
+            {
+                "name": "allowheaders",
+                "label": "Allowed Headers (CSV)",
+                "type": "text",
+                "placeholder": "Content-Type, Authorization"
+            },
+            {
+                "name": "exposeheaders",
+                "label": "Expose Headers (CSV)",
+                "type": "text",
+                "placeholder": "*"
+            },
+            {
+                "name": "maxage",
+                "label": "Max Age (Sec)",
+                "type": "number",
+                "default": "300"
+            },
+            {
+                "name": "allowcredentials",
+                "label": "Allow Credentials",
+                "type": "boolean",
+                "default": "true"
             }
         ],
-        "xmlTemplate": "<cors allow-credentials=\"true\">\n  <allowed-origins>\n    <origin>{{origins}}</origin>\n  </allowed-origins>\n  <allowed-methods>\n    <method>{{methods}}</method>\n  </allowed-methods>\n</cors>",
+        "xmlTemplate": "<cors allow-credentials=\"{{allowcredentials}}\">\n  <allowed-origins>\n    {{origins_block}}\n  </allowed-origins>\n  <allowed-methods>\n    {{methods_block}}\n  </allowed-methods>\n  <allowed-headers>\n    {{headers_block}}\n  </allowed-headers>\n  <expose-headers>\n    {{expose_headers_block}}\n  </expose-headers>\n</cors>",
         "defaultSection": "inbound"
     },
     {
@@ -209,19 +261,33 @@
                 "default": "Authorization"
             },
             {
-                "name": "audience",
-                "label": "Audience (aud)",
+                "name": "audiences",
+                "label": "Audiences (CSV)",
                 "type": "text",
-                "placeholder": "api://client-id"
+                "placeholder": "api://a, api://b"
+            },
+            {
+                "name": "azp",
+                "label": "Authorized Parties (azp) (CSV)",
+                "type": "text",
+                "placeholder": "client-id-1, client-id-2",
+                "required": false
+            },
+            {
+                "name": "roles",
+                "label": "Required Roles (CSV)",
+                "type": "text",
+                "placeholder": "admin, writer",
+                "required": false
             },
             {
                 "name": "issuer",
-                "label": "Issuer (iss)",
+                "label": "Issuer (OpenID Config URL)",
                 "type": "text",
-                "placeholder": "https://login.microsoftonline.com/..."
+                "placeholder": "https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration"
             }
         ],
-        "xmlTemplate": "<validate-jwt header-name=\"{{header}}\" failed-validation-httpcode=\"401\" failed-validation-error-message=\"Unauthorized\">\n  <openid-config url=\"{{issuer}}/.well-known/openid-configuration\" />\n  <required-claims>\n    <claim name=\"aud\">\n      <value>{{audience}}</value>\n    </claim>\n  </required-claims>\n</validate-jwt>",
+        "xmlTemplate": "<validate-jwt header-name=\"{{header}}\" failed-validation-httpcode=\"401\" failed-validation-error-message=\"Unauthorized\">\n  <openid-config url=\"{{issuer}}\" />\n  <required-claims>\n    {{claims_block}}\n  </required-claims>\n</validate-jwt>",
         "defaultSection": "inbound"
     },
     {

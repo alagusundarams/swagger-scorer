@@ -16,7 +16,10 @@ export const DashboardStatsGrid = ({ heroStats }: DashboardStatsGridProps) => {
     return (
         <div className="stats-grid">
             {heroStats.map((stat, idx) => (
-                <StatCard key={idx} {...stat} />
+                <StatCard
+                    key={idx}
+                    {...stat}
+                />
             ))}
         </div>
     );

@@ -17,8 +17,23 @@ import {
     upsertBackend,
     deleteBackend
 } from '../services/backends.service.js';
+import { getAppConfig } from '../config/loader.js';
 
 const configRoutes: FastifyPluginAsync = async (fastify) => {
+    // ==========================================
+    // ENVIRONMENTS ROUTES
+    // ==========================================
+
+    /**
+     * GET /api/v1/environments
+     * Get list of available environment names
+     */
+    fastify.get('/environments', async (_request, _reply) => {
+        const config = getAppConfig();
+        // Return lowercase names to match frontend expectations
+        return config.azure.environments.map(e => e.name.toLowerCase());
+    });
+
     // ==========================================
     // NAMED VALUES ROUTES
     // ==========================================

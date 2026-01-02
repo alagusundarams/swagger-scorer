@@ -158,8 +158,11 @@ export async function analyzeRoutes(
             const { productId } = request.params;
 
             try {
-                // Import spec fetcher service
-                const { fetchSpecForProduct } = await import('../services/spec-fetcher.service.js');
+                // Import spec fetcher service (Mocked if requested)
+                const isMock = process.env.USE_BACKEND_MOCKS === 'true';
+                const { fetchSpecForProduct } = isMock
+                    ? await import('../services/spec-fetcher.mock.js')
+                    : await import('../services/spec-fetcher.service.js');
 
                 // Fetch spec from Git or APIM
                 fastify.log.info({ productId }, 'Fetching OpenAPI spec for product');

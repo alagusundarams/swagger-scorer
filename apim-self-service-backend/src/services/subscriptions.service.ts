@@ -12,7 +12,7 @@ import { logAudit } from './audit.service.js';
  * @param userRole Optional user role (admin sees all)
  * @param teamId Optional team ID filter (ignored if userRole is 'admin')
  */
-export async function getAllSubscriptions(userRole?: string, teamId?: string) {
+export async function getAllSubscriptions(userRole: string = 'admin', teamId?: string) {
     // Build WHERE clause - admin sees all, regular users see only their team's subscriptions
     const whereConditions: string[] = [];
     const queryParams: any[] = [];

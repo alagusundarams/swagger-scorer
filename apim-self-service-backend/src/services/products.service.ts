@@ -5,10 +5,22 @@
  */
 
 import { query } from './db.js';
-import { updateProductMetadata } from './apim.service.js';
+// import { updateProductMetadata } from './apim.service.js'; // Removed for dynamic mock support
 import { logAudit } from './audit.service.js';
 
 
+
+
+/**
+ * Helper to get the APIM service (Mocked if requested)
+ */
+async function getApimService() {
+    const isMock = process.env.USE_BACKEND_MOCKS === 'true';
+    if (isMock) {
+        return await import('./apim.service.mock.js');
+    }
+    return await import('./apim.service.js');
+}
 
 /**
  * Fetch all products with their associated APIs and calculated subscriber counts
@@ -17,13 +29,13 @@ import { logAudit } from './audit.service.js';
  * @param teamId Optional team ID filter (ignored if userRole is 'admin')
  * @param userGroups Optional list of AD Group IDs the user belongs to
  */
-export async function getAllProducts(environment?: string, userRole?: string, teamId?: string, userGroups: string[] = []) {
+export async function getAllProducts(environment?: string, userRole: string = 'admin', teamId?: string, userGroups: string[] = []) {
     // Build WHERE clauses
     const whereConditions: string[] = [];
     const queryParams: any[] = [];
     let paramIndex = 1;
 
-    if (environment) {
+    if (environment && environment !== 'ALL') {
         whereConditions.push(`p.environment = $${paramIndex++}`);
         queryParams.push(environment);
     }
@@ -316,8 +328,11 @@ export async function updateProduct(id: string, data: { ownerTeamId?: string }) 
             // And we'd loop through environments if the product exists in multiple.
             // For this POC, we'll use the record's environment.
             const env = result.rows[0].environment || 'DEV';
-            updateProductMetadata(result.rows[0].name, team.azure_ad_group_id, env)
-                .catch(err => console.error('[ProductsService] ARM Sync Failed Background:', err));
+
+            // Trigger ARM Metadata Sync
+            const apim = await getApimService();
+            apim.updateProductMetadata(result.rows[0].name, team.azure_ad_group_id, env)
+                .catch((err: any) => console.error('[ProductsService] ARM Sync Failed Background:', err));
         }
     }
 
@@ -435,9 +450,10 @@ export async function updatePermissionMatrix(productId: string, entries: { adGro
 
     // 3. Trigger ARM Sync for each entry if needed
     // (In a real app, you might only sync 'Admin' or 'Contributor' groups)
+    const apim = await getApimService();
     for (const entry of entries) {
-        updateProductMetadata(productId, entry.adGroupId, entry.environment)
-            .catch(err => console.error('[ProductsService] Matrix ARM Sync Failed Background:', err));
+        apim.updateProductMetadata(productId, entry.adGroupId, entry.environment)
+            .catch((err: any) => console.error('[ProductsService] Matrix ARM Sync Failed Background:', err));
     }
 
     // 4. Log Audit

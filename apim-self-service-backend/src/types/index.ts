@@ -104,6 +104,16 @@ export interface AnalyzeRequest {
 }
 
 /**
+ * Azure Environment metadata
+ */
+export interface AzureEnvironment {
+    name: string;
+    instance: string;
+    resourceGroup: string;
+    subscriptionId: string;
+}
+
+/**
  * Error response structure
  * Consistent error format for all API errors
  */
@@ -118,6 +128,9 @@ export interface ErrorResponse {
  * Loaded from config.json
  */
 export interface AppConfig {
+    azure: {
+        environments: AzureEnvironment[];
+    };
     database: {
         url: string;
     };

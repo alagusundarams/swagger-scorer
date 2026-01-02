@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../features/auth/hooks/useAuth';
 import { useStore } from '../../store/useStore';
-import { USE_MOCKS } from '../../config/env';
 import './Header.css';
 
 export const Header = () => {
@@ -60,8 +59,8 @@ export const Header = () => {
 
                 {/* CENTER - Status & Page Name */}
                 <div className="header-center">
-                    <div className={`status-badge ${USE_MOCKS ? 'mock' : 'live'}`}>
-                        {USE_MOCKS ? '⚡️ Mock Dashboard' : '🌐 Live Database'}
+                    <div className="status-badge live">
+                        🌐 Live Database
                     </div>
                     <span className="page-title">{pageTitle}</span>
                 </div>

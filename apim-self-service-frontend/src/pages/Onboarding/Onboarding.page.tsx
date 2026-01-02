@@ -209,7 +209,7 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
                         <OnboardingProgressBar currentStep={getVisualStep()} totalSteps={stepsConf.length} />
                     )}
 
-                    <div className="bg-white dark:bg-slate-800 rounded-[3rem] shadow-premium border border-gray-100 dark:border-slate-700/40 relative overflow-hidden min-h-[600px] flex flex-col">
+                    <div className="bg-white dark:bg-slate-800 rounded-[3rem] shadow-premium border border-gray-100 dark:border-slate-700/40 relative overflow-hidden min-h-[850px] flex flex-col">
 
                         {/* Step 0: Intent (Modal embedded) */}
                         {step === 0 && (
@@ -239,6 +239,7 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
                                     setFormData({ ...formData, specContent: spec, apiName, apiSuffix });
                                     handleNext();
                                 }}
+                                initialSpec={formData.specContent}
                                 initialApiName={formData.apiName}
                                 initialApiSuffix={formData.apiSuffix}
                             />

@@ -138,8 +138,8 @@ async function seed() {
         // 5. Seed APIs
         console.log('🔌 Seeding APIs...');
         const apis = [
-            { id: 'api-pay', product_id: 'prod-grp-001', name: 'payments-api', display_name: 'Payments API', description: 'Core payments', path: '/pay', origin_team_id: 'team-payments' },
-            { id: 'api-id', product_id: 'prod-grp-001', name: 'identity-api', display_name: 'Identity API', description: 'User auth', path: '/auth', origin_team_id: 'team-platform' }
+            { id: 'api-pay', product_id: 'prod-grp-001', name: 'payments-api', display_name: 'Payments API', description: 'Core payments', path: '/v1/pay', origin_team_id: 'team-payments' },
+            { id: 'api-id', product_id: 'prod-grp-001', name: 'identity-api', display_name: 'Identity API', description: 'User auth', path: '/v1/auth', origin_team_id: 'team-platform' }
         ];
 
         for (const a of apis) {
@@ -153,7 +153,7 @@ async function seed() {
         console.log('📦 Seeding Massive API (60+ operations)...');
         await query(`
             INSERT INTO apis (id, product_id, name, display_name, description, path, origin_team_id, quality_score, created_at, updated_at)
-            VALUES ('api-massive', 'prod-001', 'massive-api', 'Massive API', 'API with many operations for UI testing', '/massive', 'team-platform', 100, NOW(), NOW())
+            VALUES ('api-massive', 'prod-001', 'massive-api', 'Massive API', 'API with many operations for UI testing', '/v1/massive', 'team-platform', 100, NOW(), NOW())
         `);
 
         for (let i = 1; i <= 65; i++) {

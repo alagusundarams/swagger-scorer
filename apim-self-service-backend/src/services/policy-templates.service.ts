@@ -111,22 +111,39 @@ export async function getPolicyTemplate(id: string): Promise<PolicyTemplate | nu
 export function generateXmlFromTemplate(template: PolicyTemplate, values: Record<string, any>): string {
     let xml = template.templateSchema.xmlTemplate;
 
-    // Replace {{fieldName}} with values
+    // 1. Handle {{#each ...}} blocks first
+    // Pattern: {{#each fieldName}}...{{this}}...{{/each}}
+    const eachRegex = /\{\{#each\s+([a-zA-Z0-9_]+)\}\}([\s\S]*?)\{\{\/each\}\}/g;
+    xml = xml.replace(eachRegex, (_, fieldName, innerTemplate) => {
+        const value = values[fieldName];
+        if (!Array.isArray(value)) {
+            // Handle comma-separated strings as arrays if needed (for legacy/simple inputs)
+            if (typeof value === 'string' && value.includes(',')) {
+                const parts = value.split(',').map(v => v.trim()).filter(Boolean);
+                return parts.map(p => innerTemplate.replace(/\{\{this\}\}/g, p)).join('\n        ');
+            }
+            return '';
+        }
+        return value.map(item => innerTemplate.replace(/\{\{this\}\}/g, String(item).trim())).join('\n        ');
+    });
+
+    // 2. Replace regular {{fieldName}} with values
     Object.entries(values).forEach(([key, value]) => {
         const placeholder = `{{${key}}}`;
 
         if (Array.isArray(value)) {
-            // For arrays, join with newlines
-            xml = xml.replace(placeholder, value.join('\n        '));
-        } else if (typeof value === 'string' && value.includes(',')) {
-            // Handle comma-separated values (like methods)
-            const parts = value.split(',').map(v => v.trim());
-            const methodsXml = parts.map(p => `<method>${p}</method>`).join('\n        ');
-            xml = xml.replace('{{#each allowedMethods}}<method>{{this}}</method>{{/each}}', methodsXml);
+            // If it's an array but not used in an #each block, just join it
+            xml = xml.replace(new RegExp(placeholder, 'g'), value.map(v => String(v).trim()).join(', '));
         } else {
-            xml = xml.replace(placeholder, String(value));
+            // Trim string values to avoid invalid XML spacing
+            const sanitizedValue = typeof value === 'string' ? value.trim() : String(value);
+            xml = xml.replace(new RegExp(placeholder, 'g'), sanitizedValue);
         }
     });
+
+    // 3. Clean up any remaining Handlebars-style helpers (like #if) if present but unhandled
+    // This is a minimal implementation; in production, use a real parser
+    xml = xml.replace(/\{\{#if.*?\}\}([\s\S]*?)\{\{\/if\}\}/g, '$1');
 
     return xml;
 }

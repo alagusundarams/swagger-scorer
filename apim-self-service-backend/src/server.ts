@@ -30,6 +30,7 @@ import configManagementRoutes from './routes/config.routes.js';
 import policyTemplatesRoutes from './routes/policy-templates.routes.js';
 import policyDisplayRoutes from './routes/policy-display.routes.js';
 import inventoryRoutes from './routes/inventory.routes.js';
+import { authRoutes } from './routes/auth.routes.js';
 import multipart from '@fastify/multipart';
 import { AppConfig } from './types/index.js';
 
@@ -149,6 +150,7 @@ export async function build() {
     await fastify.register(policyTemplatesRoutes, { prefix: '/api/v1' });
     await fastify.register(policyDisplayRoutes, { prefix: '/api/v1' });
     await fastify.register(inventoryRoutes, { prefix: '/api/v1' });
+    await fastify.register(authRoutes, { prefix: '/api/v1/auth' });
 
     // Error handler for uncaught errors
     fastify.setErrorHandler((error, _request, reply) => {

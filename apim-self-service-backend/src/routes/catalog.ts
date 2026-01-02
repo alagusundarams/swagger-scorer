@@ -10,7 +10,7 @@ import { getAllTeams } from '../services/teams.service.js';
 import { getAllSubscriptions, addSubscription, updateSubscriptionState } from '../services/subscriptions.service.js';
 import { getAllApprovals, updateApproval } from '../services/approvals.service.js';
 import { getAuditLogs } from '../services/audit.service.js';
-import { scoreAllProducts, scoreProductById } from '../services/scoring.service.js';
+// import { scoreAllProducts, scoreProductById } from '../services/scoring.service.js'; // Removed for dynamic mock support
 import { getAppRegistrations, addAppRegistration } from '../services/apps.service.js';
 
 export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {
@@ -235,12 +235,17 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     // POST /api/v1/admin/score-products (Trigger background scoring job)
     fastify.post('/admin/score-products', async (_request, reply) => {
         try {
+            const isMock = process.env.USE_BACKEND_MOCKS === 'true';
+            const { scoreAllProducts } = isMock
+                ? await import('../services/scoring.service.mock.js')
+                : await import('../services/scoring.service.js');
+
             // Trigger background job (don't await - return immediately)
             scoreAllProducts()
-                .then(result => {
+                .then((result: any) => {
                     fastify.log.info({ result }, 'Background scoring completed');
                 })
-                .catch(err => {
+                .catch((err: any) => {
                     fastify.log.error({ err }, 'Background scoring failed');
                 });
 
@@ -255,6 +260,11 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     fastify.post('/admin/score-product/:id', async (request, reply) => {
         const { id } = request.params as any;
         try {
+            const isMock = process.env.USE_BACKEND_MOCKS === 'true';
+            const { scoreProductById } = isMock
+                ? await import('../services/scoring.service.mock.js')
+                : await import('../services/scoring.service.js');
+
             const score = await scoreProductById(id);
             if (score === null) {
                 return reply.status(404).send({ error: 'Not Found', message: 'Product has no OpenAPI spec to score' });

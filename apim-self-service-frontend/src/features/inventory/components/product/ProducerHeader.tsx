@@ -1,6 +1,7 @@
 import { type Product } from '../../types/inventoryTypes';
 import { getEnvironmentTheme } from '../../../../utils/statusUtils';
 import { getStatusTheme, getNextEnvironment } from '../../../../utils/statusUtils';
+import { inventoryApi } from '../../api/inventoryClient';
 
 interface ProducerHeaderProps {
     product: Product;
@@ -65,14 +66,31 @@ export function ProducerHeader({
 
             {/* Terraform Management Mode Banner (Only if NO Anomalies) */}
             {product.managementMode === 'TERRAFORM_MANAGED' && (!product.detectedAnomalies || product.detectedAnomalies.length === 0) && (
-                <div className="mb-6 p-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-3xl flex items-center gap-4 animate-slide-up">
-                    <span className="text-3xl">🔧</span>
-                    <div className="flex-1">
-                        <p className="text-sm font-black text-blue-700 dark:text-blue-500 uppercase tracking-widest">Terraform Managed</p>
-                        <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                            This product is currently managed via Terraform. Changes must be made through the Azure DevOps pipeline.
-                        </p>
+                <div className="mb-6 p-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-3xl flex items-center justify-between gap-4 animate-slide-up">
+                    <div className="flex items-center gap-4">
+                        <span className="text-3xl">🔧</span>
+                        <div className="flex-1">
+                            <p className="text-sm font-black text-blue-700 dark:text-blue-500 uppercase tracking-widest">Terraform Managed</p>
+                            <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                                This product is currently managed via Terraform. Changes must be made through the Azure DevOps pipeline.
+                            </p>
+                        </div>
                     </div>
+                    {/* Eject Button for Admin/Leads */}
+                    <button
+                        onClick={() => {
+                            if (confirm('Are you sure you want to Eject this product from Terraform? This will switch it to Portal-Managed mode and enable local overrides via the Policy Studio.')) {
+                                inventoryApi.ejectProduct(product.id)
+                                    .then(() => {
+                                        window.location.reload();
+                                    })
+                                    .catch(err => alert('Failed to eject: ' + err.message));
+                            }
+                        }}
+                        className="px-5 py-2.5 bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-50 transition-all border border-blue-200 shadow-sm whitespace-nowrap"
+                    >
+                        🚀 Eject to Self-Service
+                    </button>
                 </div>
             )}
 

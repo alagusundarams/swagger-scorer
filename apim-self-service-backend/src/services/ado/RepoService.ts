@@ -38,22 +38,6 @@ export class RepoService {
     async syncRepo(productId: string, repoUrl: string): Promise<{ path: string, commitHash: string }> {
         const localPath = path.join(this.workspacePath, productId);
 
-        if (process.env.USE_BACKEND_MOCKS === 'true') {
-            console.log(`☁️ [MOCK_MODE] Simulating Git Sync for ${productId}...`);
-            this.ensureWorkspace();
-
-            // Create a fake folder if it doesn't exist
-            if (!fs.existsSync(localPath)) {
-                fs.mkdirSync(localPath, { recursive: true });
-            }
-
-            // Return fake hash for Modern product, fake 'init' for others
-            if (productId.includes('payment-v2')) {
-                return { path: localPath, commitHash: 'a1b2c3d' };
-            }
-            return { path: localPath, commitHash: '0000000' };
-        }
-
         let git: SimpleGit;
 
         try {

@@ -9,7 +9,7 @@ import { useAppData } from '../../../shared/context/AppDataContext';
 import { ManageProductModal } from '../components/product/ManageProductModal';
 import { SubscriberCard } from '../components/producer/SubscriberCard';
 import { ProducerHeader } from '../components/product/ProducerHeader';
-// Removed unused ProducerMetrics and ProducerAuditLog imports
+import { ProductAuditLog } from '../../governance/components/ProductAuditLog';
 import { RevokeAccessModal } from '../components/modals/RevokeAccessModal';
 import { ConfigurationTab } from '../components/api-details/ConfigurationTab';
 import { AddApiModal } from '../components/api-details/AddApiModal';
@@ -461,38 +461,15 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
 
             {/* Content: Audit Log */}
             {activeTab === 'audit' && (
-                <>
-                    {/* TODO: Restore ProducerAuditLog when implemented */}
-                    {/* <ProducerAuditLog
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-lg border border-gray-100 dark:border-slate-700 animate-fade-in mb-8">
+                    <ProductAuditLog
+                        productId={product.id}
                         onAction={(msg: string, type: 'success' | 'warning') => {
                             setLocalToast({ message: msg, type });
                             setTimeout(() => setLocalToast(null), 3000);
                         }}
-                        onDecide={async (decision: string, justification: string) => {
-                            console.log(`[ProducerAuditLog] Decision: ${decision}, Justification: ${justification}`);
-
-                            // Find the pending request for this product
-                            const pendingReq = approvalRequests.find(r =>
-                                r.productId === product.id && r.status === 'PENDING'
-                            );
-
-                            if (pendingReq) {
-                                await processApproval(pendingReq.id, decision === 'APPROVE', justification);
-
-                                setLocalToast({
-                                    message: `Request ${decision}D successfully.`,
-                                    type: decision === 'APPROVE' ? 'success' : 'warning'
-                                });
-                            } else {
-                                console.warn(`[ProducerAuditLog] No PENDING request found for product ${product.id}`);
-                                setLocalToast({ message: 'No pending request found to act on.', type: 'warning' });
-                            }
-                        }}
-                    /> */}
-                    <div className="p-8 text-center text-gray-500">
-                        <p>Audit log coming soon...</p>
-                    </div>
-                </>
+                    />
+                </div>
             )}
 
             {/* Floating Local Toast */}

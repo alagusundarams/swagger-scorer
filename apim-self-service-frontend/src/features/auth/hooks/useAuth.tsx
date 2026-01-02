@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { User } from '../../../types/commonTypes';
 
+import { login as apiLogin, logout as apiLogout } from '../api/authClient';
+
 interface AuthContextType {
     user: User | null;
     isAuthenticated: boolean;
-    login: (provider?: string) => Promise<void>;
+    login: (role?: string) => Promise<void>;
     logout: () => void;
     isLoading: boolean;
     getToken: () => Promise<string>;
@@ -23,32 +25,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setIsLoading(false);
-        }, 1000);
+        // Initial check (could call /me if backend supported it, for now just load)
+        const timer = setTimeout(() => setIsLoading(false), 500);
         return () => clearTimeout(timer);
     }, []);
 
-    const login = async (provider?: string) => {
+    const login = async (role?: string) => {
         setIsLoading(true);
-        return new Promise<void>((resolve) => {
-            setTimeout(() => {
-                const role = provider === 'admin' ? 'admin' : 'user';
-                const isConsumer = provider === 'consumer';
-                setUser({
-                    id: 'u1',
-                    name: role === 'admin' ? 'Portal Admin' : (isConsumer ? 'Mike Consumer' : 'Sarah Producer'),
-                    email: role === 'admin' ? 'admin@company.com' : (isConsumer ? 'mike@core.sys' : 'sarah@payments.dev'),
-                    role: role,
-                    teams: isConsumer ? ['team-mobile'] : ['team-payments', 'team-core'],
-                    azureAdObjectId: 'mock-oid-123',
-                    leadsTeams: isConsumer ? [] : ['team-payments', 'team-core'],
-                    defaultTeamId: isConsumer ? 'team-mobile' : 'team-payments'
-                });
-                setIsLoading(false);
-                resolve();
-            }, 100);
-        });
+        try {
+            // Determine email based on role (simple mapping for demo buttons)
+            let email = 'user@company.com';
+            if (role === 'admin') email = 'admin@apim.portal';
+            if (role === 'consumer') email = 'mike@core.sys';
+            if (role === 'producer') email = 'sarah@payments.dev';
+
+            const res = await apiLogin({ email, role });
+            setUser(res.data);
+        } catch (error) {
+            console.error("Login failed", error);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const logout = () => {

@@ -63,6 +63,9 @@ export async function loadAppConfig(configPath: string): Promise<AppConfig> {
 
     // 2. Build the final config with Environment Variable Precedence
     const config: AppConfig = {
+        azure: {
+            environments: fileConfig.azure?.environments || [],
+        },
         database: {
             url: process.env.DATABASE_URL || fileConfig.database?.url || '',
         },

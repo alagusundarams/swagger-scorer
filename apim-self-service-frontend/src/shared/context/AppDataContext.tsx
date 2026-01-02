@@ -259,9 +259,13 @@ async function fetchTeamsFromApi(): Promise<Team[]> {
 async function fetchEnvironmentsFromApi(): Promise<Environment[]> {
     try {
         const res = await fetch('/api/v1/environments');
-        if (!res.ok) return ['dev' as Environment, 'qa' as Environment, 'prod' as Environment];
+        if (!res.ok) {
+            // Fallback for dev/missing endpoint
+            return ['dev' as Environment, 'qa' as Environment, 'prod' as Environment];
+        }
         return await res.json();
     } catch {
+        // Silent fallback
         return ['dev' as Environment, 'qa' as Environment, 'prod' as Environment];
     }
 }

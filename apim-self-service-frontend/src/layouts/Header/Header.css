@@ -2,9 +2,11 @@
     position: sticky;
     top: 0;
     z-index: 40;
-    background-color: #1e293b;
-    border-bottom: 2px solid #64748b;
-    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.4);
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 2px solid #e2e8f0;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 }
 
 .header-container {
@@ -164,10 +166,10 @@
     top: 100%;
     margin-top: 8px;
     width: 240px;
-    background-color: #1e293b;
-    border: 1px solid #334155;
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
     border-radius: 1.5rem;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
     z-index: 50;
 }
 
@@ -238,7 +240,7 @@
 }
 
 .sign-out-button:hover {
-    background-color: #7f1d1d;
+    background-color: rgba(127, 29, 29, 0.4);
 }
 
 .header-menu-icon {

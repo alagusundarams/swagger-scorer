@@ -7,6 +7,7 @@ import { ProductGettingStarted } from '../components/product/ProductGettingStart
 import { ProductComplianceInfo } from '../components/product/ProductComplianceInfo';
 import { ApiInterfaceCatalog } from '../components/api-details/ApiInterfaceCatalog';
 import { ConfigurationTab } from '../components/api-details/ConfigurationTab';
+import { ProductAuditLog } from '../../governance/components/ProductAuditLog';
 import { inventoryApi } from '../../inventory/api/inventoryClient';
 
 // Lazy load Contract Editor
@@ -48,7 +49,7 @@ export const ProductDetailConsumer = ({
      * when team:created, team:updated, or team:deleted events are emitted.
      */
     const { teams: allTeams } = useAppData();
-    const [activeTab, setActiveTab] = useState<'overview' | 'config'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'config' | 'audit'>('overview');
 
     // Contract Editor State
     const [selectedApi, setSelectedApi] = useState<API | null>(null);
@@ -90,6 +91,15 @@ export const ProductDetailConsumer = ({
                         }`}
                 >
                     Configuration
+                </button>
+                <button
+                    onClick={() => setActiveTab('audit')}
+                    className={`pb-4 px-2 text-sm font-bold uppercase tracking-widest transition-colors ${activeTab === 'audit'
+                        ? 'border-b-2 border-emerald-500 text-emerald-600 dark:text-emerald-400'
+                        : 'text-gray-400 hover:text-gray-600 dark:hover:text-slate-300'
+                        }`}
+                >
+                    Audit Log
                 </button>
             </div>
 
@@ -150,6 +160,12 @@ export const ProductDetailConsumer = ({
 
             {activeTab === 'config' && (
                 <ConfigurationTab product={product} />
+            )}
+
+            {activeTab === 'audit' && (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-lg border border-gray-100 dark:border-slate-700 animate-fade-in mb-8">
+                    <ProductAuditLog productId={product.id} />
+                </div>
             )}
 
             {/* Contract Viewer Modal (Read-only for consumers) */}
