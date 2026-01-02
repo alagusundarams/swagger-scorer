@@ -19,28 +19,40 @@ const logger = pino({
  * by a CSI driver (Azure Blob CSI) for persistence and cross-replica access.
  */
 export class OnboardingStorageService {
-    private stagingDir: string;
+    private stagingDir: string | null = null;
+    private initialized: boolean = false;
 
     constructor() {
+        // No longer calls getAppConfig() here to avoid module-load initialization errors
+    }
+
+    private async initialize() {
+        if (this.initialized) return;
+
         const config = getAppConfig();
         // Default to a folder in the app root, or use storagePath from config
         this.stagingDir = config.storagePath || join(process.cwd(), 'staging');
-        this.ensureDir(this.stagingDir);
+
+        if (!existsSync(this.stagingDir)) {
+            await mkdir(this.stagingDir, { recursive: true });
+            logger.info(`Created staging directory: ${this.stagingDir}`);
+        }
+
+        this.initialized = true;
     }
 
-    private async ensureDir(path: string) {
-        if (!existsSync(path)) {
-            await mkdir(path, { recursive: true });
-            logger.info(`Created staging directory: ${path}`);
-        }
+    private async getStagingPath(): Promise<string> {
+        await this.initialize();
+        return this.stagingDir!;
     }
 
     /**
      * Store an API spec for onboarding
      */
     async storeSpec(userId: string, sessionId: string, apiName: string, content: string | Buffer): Promise<string> {
+        const stagingDir = await this.getStagingPath();
         const relativePath = join(userId, sessionId, `${apiName}.json`);
-        const fullPath = join(this.stagingDir, relativePath);
+        const fullPath = join(stagingDir, relativePath);
 
         await mkdir(dirname(fullPath), { recursive: true });
         await writeFile(fullPath, content);
@@ -53,7 +65,8 @@ export class OnboardingStorageService {
      * Retrieve a stored API spec
      */
     async retrieveSpec(relativePath: string): Promise<string> {
-        const fullPath = join(this.stagingDir, relativePath);
+        const stagingDir = await this.getStagingPath();
+        const fullPath = join(stagingDir, relativePath);
         if (!existsSync(fullPath)) {
             throw new Error(`Spec not found at path: ${relativePath}`);
         }
@@ -66,7 +79,8 @@ export class OnboardingStorageService {
      * Delete a stored API spec
      */
     async deleteSpec(relativePath: string): Promise<void> {
-        const fullPath = join(this.stagingDir, relativePath);
+        const stagingDir = await this.getStagingPath();
+        const fullPath = join(stagingDir, relativePath);
         if (existsSync(fullPath)) {
             await rm(fullPath);
             logger.info(`Deleted staged spec: ${relativePath}`);
@@ -76,8 +90,8 @@ export class OnboardingStorageService {
     /**
      * Get the base staging directory
      */
-    getStagingDir(): string {
-        return this.stagingDir;
+    async getStagingDir(): Promise<string> {
+        return await this.getStagingPath();
     }
 }
 
