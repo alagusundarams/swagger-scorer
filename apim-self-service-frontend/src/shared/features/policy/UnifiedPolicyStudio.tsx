@@ -83,9 +83,16 @@ export const UnifiedPolicyStudio: React.FC<UnifiedPolicyStudioProps> = ({
                         <div className="flex items-center gap-2 mb-1">
                             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-purple-500">Unified Policy Studio</p>
                             {environment && (
-                                <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded text-[9px] font-black uppercase tracking-widest border border-blue-200 dark:border-blue-800">
+                                <button
+                                    onClick={() => {
+                                        const nextEnv = environment === 'DEV' ? 'QA' : (environment === 'QA' ? 'PROD' : 'DEV');
+                                        onEnvironmentChange?.(nextEnv);
+                                    }}
+                                    className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded text-[9px] font-black uppercase tracking-widest border border-blue-200 dark:border-blue-800 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors cursor-pointer"
+                                    title="Click to cycle environment"
+                                >
                                     {environment}
-                                </span>
+                                </button>
                             )}
                         </div>
                         <h2 className="text-2xl font-black tracking-tighter">

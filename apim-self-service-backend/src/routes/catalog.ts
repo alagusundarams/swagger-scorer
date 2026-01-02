@@ -18,7 +18,6 @@ import { getAllSubscriptions, addSubscription, updateSubscriptionState } from '.
 import { getAllApprovals, updateApproval } from '../services/approvals.service.js';
 import { getAuditLogs } from '../services/audit.service.js';
 import { getAppRegistrations, addAppRegistration } from '../services/apps.service.js';
-import { fetchSpecForProduct } from '../services/spec-fetcher.service.js';
 import { promoteProduct } from '../services/promotion.service.js';
 
 // Mocks (Conditionally used or effectively swapped at runtime if needed, 
