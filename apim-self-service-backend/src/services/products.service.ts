@@ -192,6 +192,41 @@ export async function getAllApis() {
 }
 
 /**
+ * Fetch operations for a specific API
+ */
+export async function getOperations(apiId: string) {
+    const res = await query(`
+        SELECT * FROM operations
+        WHERE api_id = $1
+        ORDER BY path ASC, method ASC
+    `, [apiId]);
+    return res.rows;
+}
+
+/**
+ * Search APIs across all products
+ */
+export async function searchApis(queryTerm: string) {
+    const res = await query(`
+        SELECT a.*, p.display_name as product_display_name
+        FROM apis a
+        JOIN products p ON a.product_id = p.id
+        WHERE a.display_name ILIKE $1 
+           OR a.path ILIKE $1
+           OR a.description ILIKE $1
+        ORDER BY a.display_name ASC
+        LIMIT 50
+    `, [`%${queryTerm}%`]);
+
+    return res.rows.map(a => ({
+        ...a,
+        productId: a.product_id,
+        displayName: a.display_name,
+        productDisplayName: a.product_display_name
+    }));
+}
+
+/**
  * Add a new product to the catalog
  */
 export async function addProduct(product: {

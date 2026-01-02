@@ -91,6 +91,30 @@ const draftsRoute: FastifyPluginAsync = async (fastify) => {
     });
 
     /**
+     * POST /api/v1/drafts
+     * Alias for upload
+     */
+    fastify.post('/drafts', async (request, _reply) => {
+        return fastify.inject({
+            method: 'POST',
+            url: '/api/v1/drafts/upload',
+            payload: request.body as any
+        }).then(res => JSON.parse(res.payload));
+    });
+
+    /**
+     * POST /api/v1/provisioning/drafts
+     * Another alias for upload (used by provisioning wizard)
+     */
+    fastify.post('/provisioning/drafts', async (request, _reply) => {
+        return fastify.inject({
+            method: 'POST',
+            url: '/api/v1/drafts/upload',
+            payload: request.body as any
+        }).then(res => JSON.parse(res.payload));
+    });
+
+    /**
      * GET /api/v1/drafts
      * Get all drafts for current user
      */

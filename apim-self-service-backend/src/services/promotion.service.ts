@@ -149,6 +149,88 @@ export async function autoPromoteProduct(
 }
 
 /**
+ * Direct promotion of product (bypassing approval flow if needed)
+ */
+export async function promoteProduct(
+    productId: string,
+    targetEnvironment: string,
+    requesterId: string,
+    _policyXml?: string,
+    _variables?: any
+): Promise<PromotionResult> {
+    console.log(`[Promotion] Manual promotion of ${productId} to ${targetEnvironment} by ${requesterId}`);
+
+    try {
+        // 1. Get product details for deployment
+        const productRes = await query(`
+            SELECT display_name, description, api_path, policy_xml, dev_hash
+            FROM products
+            WHERE id = $1
+        `, [productId]);
+
+        if (productRes.rows.length === 0) {
+            throw new Error(`Product ${productId} not found`);
+        }
+
+        const product = productRes.rows[0];
+
+        // 2. Deploy to ARM/APIM
+        console.log(`[Promotion] Deploying to ARM...`);
+        const deployment = await deployProductToEnvironment(
+            productId,
+            targetEnvironment,
+            {
+                displayName: product.display_name,
+                description: product.description,
+                apiPath: product.api_path,
+                policyXml: product.policy_xml
+            }
+        );
+
+        if (!deployment.success) {
+            throw new Error(deployment.error || 'ARM deployment failed');
+        }
+
+        // 3. Update hash in DB
+        const hashColumn = `${targetEnvironment.toLowerCase()}_hash`;
+        await query(`
+            UPDATE products
+            SET ${hashColumn} = $1,
+                updated_at = NOW()
+            WHERE id = $2
+        `, [product.dev_hash || 'manual-hash', productId]);
+
+        // 4. Log to audit trail
+        await query(`
+            INSERT INTO audit_log (
+                entity_type, entity_id, action, user_id,
+                changes, timestamp
+            ) VALUES ($1, $2, $3, $4, $5, NOW())
+        `, [
+            'product',
+            productId,
+            'manual_promotion',
+            requesterId,
+            JSON.stringify({
+                targetEnvironment,
+                deploymentId: deployment.deploymentId
+            })
+        ]);
+
+        return {
+            success: true,
+            deploymentId: deployment.deploymentId
+        };
+    } catch (error: any) {
+        console.error(`[Promotion] Manual promotion failed:`, error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
+/**
  * Get promotion history for a product
  */
 export async function getPromotionHistory(productId: string) {

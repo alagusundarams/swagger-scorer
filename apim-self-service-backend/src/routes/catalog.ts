@@ -5,7 +5,7 @@
  */
 
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
-import { getAllProducts, getAllApis, updateProduct, getGlobalInventory, getPermissionMatrix, updatePermissionMatrix } from '../services/products.service.js';
+import { getAllProducts, getAllApis, updateProduct, getGlobalInventory, getPermissionMatrix, updatePermissionMatrix, addProduct, addApi, getOperations, searchApis } from '../services/products.service.js';
 import { getAllTeams } from '../services/teams.service.js';
 import { getAllSubscriptions, addSubscription, updateSubscriptionState } from '../services/subscriptions.service.js';
 import { getAllApprovals, updateApproval } from '../services/approvals.service.js';
@@ -26,7 +26,6 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         }
     });
 
-    // GET /api/v1/products?environment=DEV&role=admin&teamId=xxx (with role-based filtering)
     fastify.get('/products', async (request, reply) => {
         try {
             const { environment, role, teamId, groups } = request.query as any;
@@ -60,6 +59,25 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         } catch (error) {
             fastify.log.error({ err: error }, 'Error updating product');
             return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to update product' });
+        }
+    });
+
+    fastify.put('/products/:id', async (request, _reply) => {
+        return fastify.inject({
+            method: 'PATCH',
+            url: `/api/v1/products/${(request.params as any).id}`,
+            payload: request.body as any
+        }).then(res => JSON.parse(res.payload));
+    });
+
+    // POST /api/v1/products (Direct onboarding)
+    fastify.post('/products', async (request, reply) => {
+        try {
+            const product = await addProduct(request.body as any);
+            return product;
+        } catch (error: any) {
+            fastify.log.error({ err: error }, 'Error adding product');
+            return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
         }
     });
 
@@ -104,6 +122,45 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         }
     });
 
+    // GET /api/v1/products/:id/spec (Product Spec)
+    fastify.get('/products/:id/spec', async (request, reply) => {
+        const { id } = request.params as any;
+        try {
+            const isMock = process.env.USE_BACKEND_MOCKS === 'true';
+            const { fetchSpecForProduct } = isMock
+                ? await import('../services/spec-fetcher.mock.js')
+                : await import('../services/spec-fetcher.service.js');
+
+            const spec = await fetchSpecForProduct(id);
+            return { spec };
+        } catch (error: any) {
+            fastify.log.error({ err: error }, 'Error fetching product spec');
+            return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
+        }
+    });
+
+    // Alias for /Spec (Uppercase compatibility)
+    fastify.get('/products/:id/Spec', async (request, _reply) => {
+        return fastify.inject({
+            method: 'GET',
+            url: `/api/v1/products/${(request.params as any).id}/spec`
+        }).then(res => JSON.parse(res.payload));
+    });
+
+    // POST /api/v1/products/:id/promote
+    fastify.post('/products/:id/promote', async (request, reply) => {
+        const { id } = request.params as any;
+        const { targetEnv, policyXml, variables } = request.body as any;
+        try {
+            const { promoteProduct } = await import('../services/promotion.service.js');
+            const result = await promoteProduct(id, targetEnv, 'system-user', policyXml, variables);
+            return result;
+        } catch (error: any) {
+            fastify.log.error({ err: error }, 'Error promoting product');
+            return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
+        }
+    });
+
     // POST /api/v1/products/:id/apis (Add API)
     fastify.post('/products/:id/apis', async (request, reply) => {
         const { id } = request.params as any;
@@ -128,6 +185,41 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
             return { success: true };
         } catch (error: any) {
             fastify.log.error({ err: error }, 'Error removing API');
+            return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
+        }
+    });
+
+    // GET /api/v1/products/:id/apis/:apiId/operations
+    fastify.get('/products/:id/apis/:apiId/operations', async (request, reply) => {
+        const { apiId } = request.params as any;
+        try {
+            const operations = await getOperations(apiId);
+            return operations;
+        } catch (error: any) {
+            fastify.log.error({ err: error }, 'Error fetching operations');
+            return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
+        }
+    });
+
+    // POST /api/v1/apis (Direct onboarding)
+    fastify.post('/apis', async (request, reply) => {
+        try {
+            const api = await addApi(request.body as any);
+            return api;
+        } catch (error: any) {
+            fastify.log.error({ err: error }, 'Error adding API');
+            return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
+        }
+    });
+
+    // GET /api/v1/apis/search
+    fastify.get('/apis/search', async (request, reply) => {
+        const { q } = request.query as any;
+        try {
+            const apis = await searchApis(q || '');
+            return apis;
+        } catch (error: any) {
+            fastify.log.error({ err: error }, 'Error searching APIs');
             return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
         }
     });
@@ -300,6 +392,23 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
             fastify.log.error({ err: error }, 'Error updating permission matrix');
             return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to update permissions' });
         }
+    });
+
+    // Alias for GET /admin/permissions/:productId
+    fastify.get('/admin/permissions/:productId', async (request, _reply) => {
+        return fastify.inject({
+            method: 'GET',
+            url: `/api/v1/permissions/${(request.params as any).productId}`
+        }).then(res => JSON.parse(res.payload));
+    });
+
+    // Alias for PUT /admin/permissions/:id
+    fastify.put('/admin/permissions/:id', async (request, _reply) => {
+        return fastify.inject({
+            method: 'POST',
+            url: `/api/v1/permissions/${(request.params as any).id}`,
+            payload: request.body as any
+        }).then(res => JSON.parse(res.payload));
     });
 
     // GET /api/v1/apps
