@@ -197,7 +197,7 @@ export async function getOperations(apiId: string) {
     const res = await query(`
         SELECT * FROM operations
         WHERE api_id = $1
-        ORDER BY path ASC, method ASC
+        ORDER BY url_template ASC, method ASC
     `, [apiId]);
     return res.rows;
 }

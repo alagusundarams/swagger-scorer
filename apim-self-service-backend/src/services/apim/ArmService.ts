@@ -87,4 +87,19 @@ export class ArmService {
         const initial = await axios.get(url, { headers: this.headers });
         return initial.data.value;
     }
+
+    /**
+     * Fetches Operations for an API.
+     */
+    async getApiOperations(apiId: string): Promise<any[]> {
+        try {
+            // endpoint: /apis/{apiId}/operations
+            const url = `${this.baseUrl}/apis/${apiId}/operations?api-version=2022-08-01`;
+            const response = await axios.get(url, { headers: this.headers });
+            return response.data.value;
+        } catch (e) {
+            console.error(`Failed to fetch operations for API ${apiId}`, e);
+            return [];
+        }
+    }
 }

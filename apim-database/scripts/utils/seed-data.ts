@@ -149,6 +149,23 @@ async function seed() {
             `, [a.id, a.product_id, a.name, a.display_name, a.description, a.path, a.origin_team_id]);
         }
 
+        // 5.1 Seed Operations for api-pay
+        await query(`
+            INSERT INTO operations (id, api_id, method, url_template, name, display_name, description, created_at)
+            VALUES 
+            ('op-pay-charge', 'api-pay', 'POST', '/charge', 'charge-card', 'Charge Card', 'Process a credit card charge', NOW()),
+            ('op-pay-refund', 'api-pay', 'POST', '/refund', 'refund-txn', 'Refund Transaction', 'Refund a previous transaction', NOW()),
+            ('op-pay-history', 'api-pay', 'GET', '/history/{customerId}', 'get-history', 'Get History', 'Retrieve transaction history', NOW())
+        `);
+
+        // 5.2 Seed Operations for api-id
+        await query(`
+            INSERT INTO operations (id, api_id, method, url_template, name, display_name, description, created_at)
+            VALUES 
+            ('op-id-login', 'api-id', 'POST', '/login', 'login', 'User Login', 'Authenticate user', NOW()),
+            ('op-id-profile', 'api-id', 'GET', '/profile', 'get-profile', 'Get Profile', 'Get user profile', NOW())
+        `);
+
         // 5.5 Seed Massive API for B009
         console.log('📦 Seeding Massive API (60+ operations)...');
         await query(`

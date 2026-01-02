@@ -110,6 +110,15 @@ interface ApimApi {
     protocols: string[];
     serviceUrl: string;
     policyXml: string;
+    operations: ApimOperation[];
+}
+
+interface ApimOperation {
+    id: string;
+    name: string; // display name
+    method: string;
+    urlTemplate: string;
+    description: string;
 }
 
 interface AzureConfig {
@@ -494,14 +503,36 @@ async function fetchApimApis(token: string, azConfig: AzureConfig): Promise<Apim
                 }
             } catch (e) { /* ignore */ }
 
-            return {
+            const resultItem: ApimApi = {
                 id: a.name,
                 name: a.properties.displayName,
                 path: a.properties.path,
                 protocols: a.properties.protocols,
                 serviceUrl: a.properties.serviceUrl,
-                policyXml: policyXml
+                policyXml: policyXml,
+                operations: []
             };
+
+            // Fetch Operations
+            try {
+                const opsRes = await fetch(`https://management.azure.com${a.id}/operations?api-version=2022-08-01`, {
+                    headers: { 'Authorization': `Bearer ${apiConfig.accessToken}` }
+                });
+                if (opsRes.ok) {
+                    const opsJson = await opsRes.json();
+                    resultItem.operations = opsJson.value.map((o: any) => ({
+                        id: o.name,
+                        name: o.properties.displayName,
+                        method: o.properties.method,
+                        urlTemplate: o.properties.urlTemplate,
+                        description: o.properties.description || ''
+                    }));
+                }
+            } catch (e) {
+                console.warn(`  ⚠️ Failed to fetch operations for ${a.name}`);
+            }
+
+            return resultItem;
         }));
 
         results.push(...batchResults);
@@ -731,6 +762,21 @@ async function runWorker(envName: string) {
             `, [uniqueApiId, a.id, a.name, a.path, linkedProductId, rawData]);
 
             extractClientIdsFromPolicy(a.policyXml).forEach(cid => capturedAppIds.add(cid));
+
+            // Sync Operations
+            for (const op of a.operations) {
+                const uniqueOpId = `${op.id}:${AZURE_CONFIG.environment}:${region}`;
+                await pool.query(`
+                    INSERT INTO operations (id, api_id, name, display_name, method, url_template, description, created_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+                    ON CONFLICT (id) DO UPDATE SET
+                        name = EXCLUDED.name,
+                        display_name = EXCLUDED.display_name,
+                        method = EXCLUDED.method,
+                        url_template = EXCLUDED.url_template,
+                        description = EXCLUDED.description;
+                `, [uniqueOpId, uniqueApiId, op.id, op.name, op.method, op.urlTemplate, op.description]);
+            }
         }
 
         for (const s of apimSubs) {
