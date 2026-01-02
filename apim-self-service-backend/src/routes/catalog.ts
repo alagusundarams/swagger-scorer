@@ -6,13 +6,32 @@
 
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
 import { getAppConfig } from '../config/loader.js';
-import { getAllProducts, getAllApis, updateProduct, getGlobalInventory, getPermissionMatrix, updatePermissionMatrix, addProduct, addApi, getOperations, searchApis } from '../services/products.service.js';
+import {
+    getAllProducts, getAllApis, updateProduct, getGlobalInventory,
+    getPermissionMatrix, updatePermissionMatrix, addProduct, addApi,
+    getOperations, searchApis, removeApi, getProductPolicy,
+    updateProductPolicy, ejectProduct, getNamedValues, addNamedValue,
+    deleteNamedValue
+} from '../services/products.service.js';
 import { getAllTeams } from '../services/teams.service.js';
 import { getAllSubscriptions, addSubscription, updateSubscriptionState } from '../services/subscriptions.service.js';
 import { getAllApprovals, updateApproval } from '../services/approvals.service.js';
 import { getAuditLogs } from '../services/audit.service.js';
-// import { scoreAllProducts, scoreProductById } from '../services/scoring.service.js'; // Removed for dynamic mock support
 import { getAppRegistrations, addAppRegistration } from '../services/apps.service.js';
+import { fetchSpecForProduct } from '../services/spec-fetcher.service.js';
+import { promoteProduct } from '../services/promotion.service.js';
+
+// Mocks (Conditionally used or effectively swapped at runtime if needed, 
+// but for static imports we rely on the main service having fallback or logic)
+// To fully support "dynamic mocks" with static imports, services usually internally check config.
+// Since spec-fetcher and scoring services were dynamically imported based on config,
+// we might need to keep them dynamic OR standardizing them to handle mocks internally.
+// "products.service.ts" already handles APIM mocks internally.
+// "spec-fetcher.service.ts" does NOT appear to handle mocks internally in the previous code (it imported .mock.js).
+// So for spec-fetcher and scoring, I will KEEP logic to resolve the implementation, but maybe move it to a helper or keep dynamic import for THAT specific case if internal mock handling isn't ready.
+// However, the prompt asked to "separate controller from service".
+// I will keep the dynamic resolution for Mocks *where strictly necessary* (like spec fetcher if it swaps files completely) 
+// but standardizing is better. For now, I'll stick to dynamic for Spec/Scoring to avoid breakage, but static for Products.
 
 export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {
 
@@ -86,7 +105,6 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     fastify.get('/products/:id/policy', async (request, reply) => {
         const { id } = request.params as any;
         try {
-            const { getProductPolicy } = await import('../services/products.service.js');
             const policy = await getProductPolicy(id);
             return policy;
         } catch (error: any) {
@@ -100,7 +118,6 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         const { id } = request.params as any;
         const { xml } = request.body as any;
         try {
-            const { updateProductPolicy } = await import('../services/products.service.js');
             const result = await updateProductPolicy(id, xml);
             return result;
         } catch (error: any) {
@@ -113,9 +130,7 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     fastify.post('/products/:id/eject', async (request, reply) => {
         const { id } = request.params as any;
         try {
-            const { ejectProduct } = await import('../services/products.service.js');
             const product = await ejectProduct(id);
-
             return product;
         } catch (error: any) {
             fastify.log.error({ err: error }, 'Error ejecting product');
@@ -129,6 +144,7 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         try {
             const config = getAppConfig();
             const isMock = config.useBackendMocks;
+            // Keeping dynamic import for mocks as spec-fetcher structure implies separation
             const { fetchSpecForProduct } = isMock
                 ? await import('../services/spec-fetcher.mock.js')
                 : await import('../services/spec-fetcher.service.js');
@@ -154,7 +170,6 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         const { id } = request.params as any;
         const { targetEnv, policyXml, variables } = request.body as any;
         try {
-            const { promoteProduct } = await import('../services/promotion.service.js');
             const result = await promoteProduct(id, targetEnv, 'system-user', policyXml, variables);
             return result;
         } catch (error: any) {
@@ -169,7 +184,6 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         const body = request.body as any;
         try {
             // Ensure productId matches path param
-            const { addApi } = await import('../services/products.service.js');
             const api = await addApi({ ...body, productId: id });
             return api;
         } catch (error: any) {
@@ -182,7 +196,6 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     fastify.delete('/products/:id/apis/:apiId', async (request, reply) => {
         const { id, apiId } = request.params as any;
         try {
-            const { removeApi } = await import('../services/products.service.js');
             await removeApi(apiId, id);
             return { success: true };
         } catch (error: any) {
@@ -447,7 +460,6 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     fastify.get('/products/:id/named-values', async (request, reply) => {
         const { id } = request.params as any;
         try {
-            const { getNamedValues } = await import('../services/products.service.js');
             const values = await getNamedValues(id);
             return values;
         } catch (error) {
@@ -461,7 +473,6 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         const { id } = request.params as any;
         const body = request.body as any;
         try {
-            const { addNamedValue } = await import('../services/products.service.js');
             const value = await addNamedValue(id, body);
             return value;
         } catch (error: any) {
@@ -474,7 +485,6 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     fastify.delete('/products/:id/named-values/:valueId', async (request, reply) => {
         const { id, valueId } = request.params as any;
         try {
-            const { deleteNamedValue } = await import('../services/products.service.js');
             await deleteNamedValue(id, valueId);
             return { success: true };
         } catch (error: any) {
