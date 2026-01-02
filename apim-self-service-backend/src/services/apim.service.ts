@@ -1,9 +1,4 @@
-/**
- * @fileoverview APIM Service
- * 
- * Handles interactions with Azure API Management.
- * Currently simulates these operations for demo purposes.
- */
+import { ArmService } from './apim/ArmService.js';
 
 export interface APIMSyncResult {
     success: boolean;
@@ -98,4 +93,21 @@ async function getAzureAccessToken(): Promise<string> {
     } catch {
         return 'mock-token';
     }
+}
+
+/**
+ * Returns an instance of ArmService for a given environment
+ */
+export async function getArmService(environment: string): Promise<ArmService> {
+    const token = await getAzureAccessToken();
+    const subId = process.env.AZURE_SUBSCRIPTION_ID || '00000000-0000-0000-0000-000000000000';
+    const rg = process.env.AZURE_RESOURCE_GROUP || 'rg-apim-poc';
+    const serviceName = process.env.AZURE_APIM_NAME || `apim-${environment.toLowerCase()}-001`;
+
+    return new ArmService({
+        subscriptionId: subId,
+        resourceGroup: rg,
+        serviceName: serviceName,
+        accessToken: token
+    });
 }

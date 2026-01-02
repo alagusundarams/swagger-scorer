@@ -87,5 +87,38 @@ export async function analyzeXmlToFlow(xml: string): Promise<PolicyFlow> {
         });
     }
 
+
     return flow;
+}
+
+/**
+ * Smart Decomposition: Extracts hardcoded values and replaces them with tokens
+ */
+export function decomposePolicyXml(xml: string): { cleanedXml: string, variables: { name: string, value: string }[] } {
+    const variables: { name: string, value: string }[] = [];
+    let cleanedXml = xml;
+
+    // 1. Detect Backend URLs
+    const backendRegex = /<set-backend-service\s+base-url="([^"{}]+)"\s*\/>/g;
+    let match;
+    while ((match = backendRegex.exec(xml)) !== null) {
+        const val = match[1];
+        const varName = `ejected-backend-${val.replace(/[^a-z0-9]/gi, '-').toLowerCase().slice(-10)}`;
+        variables.push({ name: varName, value: val });
+        cleanedXml = cleanedXml.replace(val, `{{${varName}}}`);
+    }
+
+    // 2. Detect hardcoded URLs in set-variable or headers (Simplified)
+    const urlRegex = /https?:\/\/[a-z0-9.-]+\.[a-z]{2,5}[^\s"<]*/gi;
+    const urls = Array.from(new Set(xml.match(urlRegex) || []));
+    urls.forEach((url, i) => {
+        // Skip if already tokenized
+        if (xml.includes(`{{`)) return;
+
+        const varName = `ejected-url-${i}`;
+        variables.push({ name: varName, value: url });
+        cleanedXml = cleanedXml.replace(new RegExp(url, 'g'), `{{${varName}}}`);
+    });
+
+    return { cleanedXml, variables };
 }

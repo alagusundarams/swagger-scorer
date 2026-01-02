@@ -62,8 +62,29 @@ export class ArmService {
             const response = await axios.get(url, { headers: this.headers });
             return response.data.value; // The raw XML string
         } catch (e) {
-            // Policy might not exist
             return null;
         }
+    }
+
+    /**
+     * Fetches Policy for a Product.
+     */
+    async getProductPolicy(productId: string): Promise<string | null> {
+        try {
+            const url = `${this.baseUrl}/products/${productId}/policies/policy?api-version=2022-08-01`;
+            const response = await axios.get(url, { headers: this.headers });
+            return response.data.value;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /**
+     * Fetches all Named Values from APIM.
+     */
+    async getNamedValues(): Promise<any[]> {
+        const url = `${this.baseUrl}/namedValues?api-version=2022-08-01`;
+        const initial = await axios.get(url, { headers: this.headers });
+        return initial.data.value;
     }
 }

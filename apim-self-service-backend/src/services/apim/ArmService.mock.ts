@@ -66,4 +66,24 @@ export class ArmServiceMock {
         }
         return `<policies><inbound><base /></inbound><backend><base /></backend><outbound><base /></outbound><on-error><base /></on-error></policies>`;
     }
+
+    async getProductPolicy(productId: string): Promise<string | null> {
+        console.log(`☁️ [MOCK_MODE] Fetching Policy for Product ${productId}...`);
+        return `
+<policies>
+    <inbound>
+        <base />
+        <set-backend-service base-url="https://legacy-backend-internal.com/v1" />
+        <set-header name="X-Ejected" exists-action="override"><value>true</value></set-header>
+    </inbound>
+    <backend><base /></backend>
+    <outbound><base /></outbound>
+    <on-error><base /></on-error>
+</policies>`;
+    }
+
+    async getNamedValues(): Promise<any[]> {
+        console.log('☁️ [MOCK_MODE] Fetching Named Values from Fake Azure...');
+        return [];
+    }
 }

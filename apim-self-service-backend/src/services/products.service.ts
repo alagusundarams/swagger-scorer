@@ -7,6 +7,8 @@
 import { query } from './db.js';
 // import { updateProductMetadata } from './apim.service.js'; // Removed for dynamic mock support
 import { logAudit } from './audit.service.js';
+import { decomposePolicyXml } from './policy-builder.service.js';
+import { RepoService } from './ado/RepoService.js';
 
 
 
@@ -699,24 +701,60 @@ export async function ejectProduct(productId: string) {
         throw new Error(`Product is already ${product.management_mode}. No need to eject.`);
     }
 
-    // 2. Perform "Smart Decomposition" (Placeholder for Phase 6 Logic)
-    // In a real implementation, this would:
-    // a) Fetch strict XML from APIM
-    // b) Parse out <set-variable> and <backend-url>
-    // c) Call addNamedValue() for each extracted secret
-    console.log(`[ProductsService] Ejecting ${productId}: Analyzing policy for Smart Decomposition...`);
-    // Mocking the extraction of a hotfix URL:
-    try {
-        await addNamedValue(productId, {
-            displayName: 'Ejected Backend URL',
-            systemName: 'ejected-backend-url',
-            value: 'https://api.ejected-legacy.com',
-            type: 'literal',
-            isSecret: false,
-            allowOverwrite: true
-        });
-    } catch (e) {
-        // Ignore if exists
+    // 2. Perform "Smart Decomposition"
+    console.log(`[ProductsService] Ejecting ${productId}: Fetching live state from APIM...`);
+
+    const apimService = await getApimService();
+    const arm = await apimService.getArmService(product.environment);
+
+    // a) Fetch Live XML
+    const liveXml = await arm.getProductPolicy(productId);
+
+    let finalXml = liveXml || '<policies><inbound><base /></inbound><backend><base /></backend><outbound><base /></outbound></policies>';
+    let extractedVars: { name: string, value: string }[] = [];
+
+    if (liveXml) {
+        // b) Decompose
+        const decomposition = decomposePolicyXml(liveXml);
+        finalXml = decomposition.cleanedXml;
+        extractedVars = decomposition.variables;
+
+        // c) Save Ejected Named Values
+        for (const v of extractedVars) {
+            try {
+                await addNamedValue(productId, {
+                    displayName: `Ejected: ${v.name}`,
+                    systemName: v.name,
+                    value: v.value,
+                    type: 'literal',
+                    isSecret: v.value.includes('secret') || v.value.includes('key'), // Basic secret heuristic
+                    allowOverwrite: true
+                });
+            } catch (e) {
+                // Ignore if exists
+            }
+        }
+    }
+
+    // d) Setup Git Repository (TF Layout)
+    const repoUrl = product.repository_url || `https://dev.azure.com/org/proj/_git/${productId}-portal`;
+    if (repoUrl && !process.env.USE_BACKEND_MOCKS) {
+        const repoLoader = new RepoService();
+        const files = [
+            { path: 'policies/product-policy.xml', content: finalXml },
+            {
+                path: `config/${product.environment.toLowerCase()}.json`,
+                content: JSON.stringify({
+                    variables: extractedVars.reduce((acc, v) => ({ ...acc, [v.name]: v.value }), {})
+                }, null, 2)
+            }
+        ];
+
+        try {
+            await repoLoader.commitFiles(productId, repoUrl, files, 'chore: Initialize portal-managed product via Smart Decomposition');
+        } catch (err) {
+            console.warn(`[ProductsService] Git initialization failed during eject (ignoring):`, err);
+        }
     }
 
     // 3. Update Database State

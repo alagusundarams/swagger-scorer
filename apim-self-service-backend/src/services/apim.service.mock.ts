@@ -16,3 +16,9 @@ export async function syncToAPIM(productId: string, environment: string) {
         details: `Successfully synchronized to mock instance`
     };
 }
+
+import { ArmServiceMock } from './apim/ArmService.mock.js';
+
+export async function getArmService(_environment: string): Promise<any> {
+    return new ArmServiceMock();
+}

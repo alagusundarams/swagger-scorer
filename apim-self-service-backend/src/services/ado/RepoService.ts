@@ -37,24 +37,35 @@ export class RepoService {
      */
     async syncRepo(productId: string, repoUrl: string): Promise<{ path: string, commitHash: string }> {
         const localPath = path.join(this.workspacePath, productId);
+        const isLocalOnly = !repoUrl || repoUrl.includes('local') || process.env.GIT_LOCAL_ONLY === 'true';
 
         let git: SimpleGit;
 
         try {
             if (fs.existsSync(localPath) && fs.existsSync(path.join(localPath, '.git'))) {
-                // Repo exists: PULL
-                // console.log(`[ADO] Pulling existing repo for ${productId}...`);
                 git = simpleGit(localPath);
-                await git.pull();
+                if (!isLocalOnly) {
+                    try {
+                        await git.pull();
+                    } catch (e) {
+                        console.warn(`[ADO] Pull failed for ${productId}, continuing with local state:`, e);
+                    }
+                }
             } else {
-                // Repo missing: CLONE
-                // console.log(`[ADO] Cloning repo for ${productId}...`);
-                await simpleGit().clone(repoUrl, localPath);
+                if (!fs.existsSync(localPath)) {
+                    fs.mkdirSync(localPath, { recursive: true });
+                }
                 git = simpleGit(localPath);
+
+                if (isLocalOnly) {
+                    await git.init();
+                } else {
+                    await simpleGit().clone(repoUrl, localPath);
+                }
             }
 
-            const log = await git.log({ maxCount: 1 });
-            const latestHash = log.latest?.hash || 'unknown';
+            const log = await git.log({ maxCount: 1 }).catch(() => null);
+            const latestHash = log?.latest?.hash || 'initial';
 
             return { path: localPath, commitHash: latestHash };
 
@@ -62,5 +73,40 @@ export class RepoService {
             console.error(`[ADO] Failed to sync repo for ${productId}:`, error);
             throw new Error(`Git Sync Failed: ${error instanceof Error ? error.message : String(error)}`);
         }
+    }
+
+    /**
+     * Commits and pushes a set of files to the repository.
+     */
+    async commitFiles(productId: string, repoUrl: string, files: { path: string, content: string }[], message: string): Promise<string> {
+        const { path: localPath } = await this.syncRepo(productId, repoUrl);
+        const isLocalOnly = !repoUrl || repoUrl.includes('local') || process.env.GIT_LOCAL_ONLY === 'true';
+        const git = simpleGit(localPath);
+
+        for (const file of files) {
+            const fullPath = path.join(localPath, file.path);
+            const dir = path.dirname(fullPath);
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+            fs.writeFileSync(fullPath, file.content);
+        }
+
+        await git.add('.');
+        const commit = await git.commit(message);
+
+        if (commit.commit) {
+            if (!isLocalOnly) {
+                try {
+                    await git.push();
+                } catch (e) {
+                    console.warn(`[ADO] Push failed for ${productId}, but local commit successful.`, e);
+                }
+            }
+            const log = await git.log({ maxCount: 1 });
+            return log.latest?.hash || 'unknown';
+        }
+
+        return 'no-changes';
     }
 }
