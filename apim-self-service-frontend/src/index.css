@@ -120,6 +120,7 @@ body {
 .dashboard-input-select {
   appearance: none;
   background-image: none;
+  cursor: pointer;
   /* removed default chevron to use custom one */
 }
 

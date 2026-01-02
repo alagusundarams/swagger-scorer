@@ -26,16 +26,16 @@ export const Select: React.FC<SelectProps> = ({
             )}
             <div className="relative">
                 <select
-                    className={`dashboard-input dashboard-input-select ${error ? 'dashboard-input-error' : ''} ${className}`}
+                    className={`dashboard-input dashboard-input-select cursor-pointer hover:border-blue-500/50 transition-all ${error ? 'dashboard-input-error' : ''} ${className}`}
                     {...props}
                 >
                     {options.map(opt => (
-                        <option key={opt.value} value={opt.value} className="bg-slate-800">
+                        <option key={opt.value} value={opt.value}>
                             {opt.label}
                         </option>
                     ))}
                 </select>
-                <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none z-50">
+                <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none z-10">
                     <svg className="h-6 w-6 text-slate-100" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                     </svg>
