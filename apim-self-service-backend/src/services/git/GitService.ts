@@ -19,7 +19,7 @@ export class GitService {
     constructor() {
         const config = getAppConfig();
         // Points to the local clone path defined in config or defaults to a folder sibling to backend
-        this.repoPath = process.env.GIT_LOCAL_PATH || path.resolve(process.cwd(), '../git-repo');
+        this.repoPath = config.gitLocalPath || path.resolve(process.cwd(), '../git-repo');
 
         // Explicit initialization: Ensure the directory exists before simple-git uses it
         // This prevents "Cannot use simple-git on a directory that does not exist" errors

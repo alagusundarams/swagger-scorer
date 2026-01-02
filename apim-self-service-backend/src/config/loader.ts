@@ -61,23 +61,27 @@ export async function loadAppConfig(configPath: string): Promise<AppConfig> {
         // console.log(`ℹ️ No config.json found at ${configPath}, relying on Environment Variables.`);
     }
 
-    // 2. Build the final config with Environment Variable Precedence
+    // 2. Build the final config with JSON Priority (Primary: config.json, Secondary: Env)
     const config: AppConfig = {
         azure: {
             environments: fileConfig.azure?.environments || [],
         },
         database: {
-            url: process.env.DATABASE_URL || fileConfig.database?.url || '',
+            url: fileConfig.database?.url || process.env.DATABASE_URL || '',
         },
         devops: {
-            pat: process.env.ADO_PAT || fileConfig.devops?.pat || 'your-read-only-pat',
-            organization: process.env.ADO_ORG || fileConfig.devops?.organization || 'your-org',
+            pat: fileConfig.devops?.pat || process.env.ADO_PAT || 'your-read-only-pat',
+            organization: fileConfig.devops?.organization || process.env.ADO_ORG || 'your-org',
         },
         server: {
-            port: parseInt(process.env.PORT || String(fileConfig.server?.port || 3001), 10),
-            logLevel: process.env.LOG_LEVEL || fileConfig.server?.logLevel || 'info',
-            host: process.env.HOST || fileConfig.server?.host || '0.0.0.0',
-        }
+            port: parseInt(String(fileConfig.server?.port || process.env.PORT || 3001), 10),
+            logLevel: fileConfig.server?.logLevel || process.env.LOG_LEVEL || 'info',
+            host: fileConfig.server?.host || process.env.HOST || '0.0.0.0',
+        },
+        storagePath: fileConfig.storagePath || process.env.STORAGE_PATH || '',
+        gitLocalOnly: fileConfig.gitLocalOnly !== undefined ? fileConfig.gitLocalOnly : (process.env.GIT_LOCAL_ONLY === 'true'),
+        gitLocalPath: fileConfig.gitLocalPath || process.env.GIT_LOCAL_PATH || '',
+        useBackendMocks: fileConfig.useBackendMocks !== undefined ? fileConfig.useBackendMocks : (process.env.USE_BACKEND_MOCKS === 'true')
     };
 
     // 3. FAIL-FAST: Validate critical configuration

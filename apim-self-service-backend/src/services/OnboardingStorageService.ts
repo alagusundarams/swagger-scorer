@@ -2,6 +2,7 @@ import { mkdir, writeFile, readFile, rm } from 'fs/promises';
 import { join, dirname } from 'path';
 import { existsSync } from 'fs';
 import pino from 'pino';
+import { getAppConfig } from '../config/loader.js';
 
 const logger = pino({
     transport: {
@@ -21,8 +22,9 @@ export class OnboardingStorageService {
     private stagingDir: string;
 
     constructor() {
-        // Default to a folder in the app root, or use STORAGE_PATH env var
-        this.stagingDir = process.env.STORAGE_PATH || join(process.cwd(), 'staging');
+        const config = getAppConfig();
+        // Default to a folder in the app root, or use storagePath from config
+        this.stagingDir = config.storagePath || join(process.cwd(), 'staging');
         this.ensureDir(this.stagingDir);
     }
 

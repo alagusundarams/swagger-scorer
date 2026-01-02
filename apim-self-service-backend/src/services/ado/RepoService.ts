@@ -14,6 +14,7 @@ import simpleGit, { SimpleGit } from 'simple-git';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { getAppConfig } from '../../config/loader.js';
 
 const WORKSPACE_DIR = 'apim-portal-workspace';
 
@@ -36,8 +37,9 @@ export class RepoService {
      * Returns the local path and the latest commit hash.
      */
     async syncRepo(productId: string, repoUrl: string): Promise<{ path: string, commitHash: string }> {
+        const config = getAppConfig();
         const localPath = path.join(this.workspacePath, productId);
-        const isLocalOnly = !repoUrl || repoUrl.includes('local') || process.env.GIT_LOCAL_ONLY === 'true';
+        const isLocalOnly = !repoUrl || repoUrl.includes('local') || config.gitLocalOnly;
 
         let git: SimpleGit;
 
@@ -79,8 +81,9 @@ export class RepoService {
      * Commits and pushes a set of files to the repository.
      */
     async commitFiles(productId: string, repoUrl: string, files: { path: string, content: string }[], message: string): Promise<string> {
+        const config = getAppConfig();
         const { path: localPath } = await this.syncRepo(productId, repoUrl);
-        const isLocalOnly = !repoUrl || repoUrl.includes('local') || process.env.GIT_LOCAL_ONLY === 'true';
+        const isLocalOnly = !repoUrl || repoUrl.includes('local') || config.gitLocalOnly;
         const git = simpleGit(localPath);
 
         for (const file of files) {

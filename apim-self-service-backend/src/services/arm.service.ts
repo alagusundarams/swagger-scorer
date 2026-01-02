@@ -9,24 +9,26 @@
 
 import { DefaultAzureCredential } from '@azure/identity';
 import { ApiManagementClient } from '@azure/arm-apimanagement';
-
-// Configuration from environment
-const SUBSCRIPTION_ID = process.env.AZURE_SUBSCRIPTION_ID || '';
-const RESOURCE_GROUP = process.env.AZURE_RESOURCE_GROUP || '';
-const APIM_SERVICE_NAME = process.env.AZURE_APIM_SERVICE_NAME || '';
-
-// Lazy-initialized client
-let apimClient: ApiManagementClient | null = null;
+import { getAppConfig } from '../config/loader.js';
 
 /**
- * Get or create APIM client with MI authentication
+ * Get APIM configuration for a specific environment
  */
-function getApimClient(): ApiManagementClient {
-    if (!apimClient) {
-        const credential = new DefaultAzureCredential();
-        apimClient = new ApiManagementClient(credential, SUBSCRIPTION_ID);
+function getApimConfigForEnv(environment: string) {
+    const config = getAppConfig();
+    const env = config.azure.environments.find(e => e.name.toUpperCase() === environment.toUpperCase());
+    if (!env) {
+        throw new Error(`Azure environment configuration not found for: ${environment}`);
     }
-    return apimClient;
+    return env;
+}
+
+/**
+ * Create APIM client for a specific subscription
+ */
+function createApimClient(subscriptionId: string): ApiManagementClient {
+    const credential = new DefaultAzureCredential();
+    return new ApiManagementClient(credential, subscriptionId);
 }
 
 /**
@@ -40,7 +42,7 @@ function getApimClient(): ApiManagementClient {
 export async function deployProductToEnvironment(
     productId: string,
     environment: string,
-    config: {
+    deploymentConfig: {
         displayName: string;
         description: string;
         apiPath: string;
@@ -52,21 +54,24 @@ export async function deployProductToEnvironment(
     error?: string;
 }> {
     try {
-        const client = getApimClient();
+        const envConfig = getApimConfigForEnv(environment);
+        const { subscriptionId, resourceGroup, instance: apimServiceName } = envConfig;
+
+        const client = createApimClient(subscriptionId);
 
         // Generate environment-specific product ID
         const envProductId = `${productId}-${environment.toLowerCase()}`;
 
-        console.log(`[ARM] Deploying ${productId} to ${environment}...`);
+        console.log(`[ARM] Deploying ${productId} to ${environment} (using ${apimServiceName})...`);
 
         // 1. Create/Update Product in APIM
         const productResult = await client.product.createOrUpdate(
-            RESOURCE_GROUP,
-            APIM_SERVICE_NAME,
+            resourceGroup,
+            apimServiceName,
             envProductId,
             {
-                displayName: config.displayName,
-                description: config.description,
+                displayName: deploymentConfig.displayName,
+                description: deploymentConfig.description,
                 approvalRequired: false,
                 subscriptionRequired: true,
                 state: 'published'
@@ -76,16 +81,16 @@ export async function deployProductToEnvironment(
         console.log(`[ARM] Product deployed: ${productResult.id}`);
 
         // 2. Create/Update API if path provided
-        if (config.apiPath) {
+        if (deploymentConfig.apiPath) {
             const apiId = `${productId}-api-${environment.toLowerCase()}`;
 
             await (client as any).api.createOrUpdate(
-                RESOURCE_GROUP,
-                APIM_SERVICE_NAME,
+                resourceGroup,
+                apimServiceName,
                 apiId,
                 {
-                    displayName: config.displayName,
-                    path: config.apiPath,
+                    displayName: deploymentConfig.displayName,
+                    path: deploymentConfig.apiPath,
                     protocols: ['https'],
                     subscriptionRequired: true,
                     // Link to product
@@ -96,15 +101,15 @@ export async function deployProductToEnvironment(
             console.log(`[ARM] API deployed: ${apiId}`);
 
             // 3. Apply policy if provided
-            if (config.policyXml) {
+            if (deploymentConfig.policyXml) {
                 await client.apiPolicy.createOrUpdate(
-                    RESOURCE_GROUP,
-                    APIM_SERVICE_NAME,
+                    resourceGroup,
+                    apimServiceName,
                     apiId,
                     'policy',
                     {
                         format: 'xml',
-                        value: config.policyXml
+                        value: deploymentConfig.policyXml
                     }
                 );
 
@@ -139,12 +144,15 @@ export async function getDeploymentStatus(
     lastUpdated?: Date;
 }> {
     try {
-        const client = getApimClient();
+        const envConfig = getApimConfigForEnv(environment);
+        const { subscriptionId, resourceGroup, instance: apimServiceName } = envConfig;
+
+        const client = createApimClient(subscriptionId);
         const envProductId = `${productId}-${environment.toLowerCase()}`;
 
         const product = await client.product.get(
-            RESOURCE_GROUP,
-            APIM_SERVICE_NAME,
+            resourceGroup,
+            apimServiceName,
             envProductId
         );
 
@@ -162,17 +170,21 @@ export async function getDeploymentStatus(
 }
 
 /**
- * Validate ARM configuration
+ * Validate ARM configuration for a given environment
  */
-export function validateArmConfig(): {
+export function validateArmConfig(environment: string): {
     valid: boolean;
     missing: string[];
 } {
     const missing: string[] = [];
-
-    if (!SUBSCRIPTION_ID) missing.push('AZURE_SUBSCRIPTION_ID');
-    if (!RESOURCE_GROUP) missing.push('AZURE_RESOURCE_GROUP');
-    if (!APIM_SERVICE_NAME) missing.push('AZURE_APIM_SERVICE_NAME');
+    try {
+        const env = getApimConfigForEnv(environment);
+        if (!env.subscriptionId) missing.push('subscriptionId');
+        if (!env.resourceGroup) missing.push('resourceGroup');
+        if (!env.instance) missing.push('instance');
+    } catch (e) {
+        missing.push('environment-not-found');
+    }
 
     return {
         valid: missing.length === 0,

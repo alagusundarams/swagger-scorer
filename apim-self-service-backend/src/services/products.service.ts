@@ -9,15 +9,14 @@ import { query } from './db.js';
 import { logAudit } from './audit.service.js';
 import { decomposePolicyXml } from './policy-builder.service.js';
 import { RepoService } from './ado/RepoService.js';
-
-
-
+import { getAppConfig } from '../config/loader.js';
 
 /**
  * Helper to get the APIM service (Mocked if requested)
  */
 async function getApimService() {
-    const isMock = process.env.USE_BACKEND_MOCKS === 'true';
+    const config = getAppConfig();
+    const isMock = config.useBackendMocks;
     if (isMock) {
         return await import('./apim.service.mock.js');
     }
@@ -725,6 +724,7 @@ export async function generateManifest(productId: string, format: 'json' | 'tfva
  * 3. Logs the "Smart Decomposition" event
  */
 export async function ejectProduct(productId: string) {
+    const config = getAppConfig();
     if (!productId) throw new Error('Product ID is required');
 
     // 1. Validate Current State
@@ -773,7 +773,7 @@ export async function ejectProduct(productId: string) {
 
     // d) Setup Git Repository (TF Layout)
     const repoUrl = product.repository_url || `https://dev.azure.com/org/proj/_git/${productId}-portal`;
-    if (repoUrl && !process.env.USE_BACKEND_MOCKS) {
+    if (repoUrl && !config.useBackendMocks) {
         const repoLoader = new RepoService();
         const files = [
             { path: 'policies/product-policy.xml', content: finalXml },

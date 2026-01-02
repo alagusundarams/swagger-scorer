@@ -6,12 +6,14 @@
 
 import { query } from './db.js';
 import { execSync } from 'child_process';
+import { getAppConfig } from '../config/loader.js';
 
 /**
  * Fetch a single file from ADO/Git using REST API (No cloning)
  */
 export async function fetchFileFromGitApi(repoUrl: string, filePath: string = 'openapi.yaml'): Promise<string> {
     try {
+        const config = getAppConfig();
         // Parse ADO URL: https://dev.azure.com/{org}/{project}/_git/{repo}
         const url = new URL(repoUrl);
         const pathParts = url.pathname.split('/').filter(Boolean);
@@ -32,9 +34,9 @@ export async function fetchFileFromGitApi(repoUrl: string, filePath: string = 'o
             throw new Error('Unsupported or invalid Git URL format');
         }
 
-        const adoPat = process.env.ADO_PAT;
-        if (!adoPat) {
-            throw new Error('ADO_PAT environment variable is missing');
+        const adoPat = config.devops.pat;
+        if (!adoPat || adoPat === 'your-read-only-pat') {
+            throw new Error('ADO_PAT is missing or using default placeholder in config');
         }
 
         const authHeader = `Basic ${Buffer.from(`:${adoPat}`).toString('base64')}`;
@@ -63,19 +65,31 @@ export async function fetchFileFromGitApi(repoUrl: string, filePath: string = 'o
  */
 export async function fetchSpecFromAPIM(productId: string): Promise<string> {
     try {
+        const config = getAppConfig();
         // Get Azure access token
         const token = execSync('az account get-access-token --resource https://management.azure.com --query accessToken -o tsv', {
             encoding: 'utf-8'
         }).trim();
 
-        // Get product from DB to find associated API
+        // Get product from DB to find associated API and environment
         const productResult = await query(`
-            SELECT id, name FROM products WHERE id = $1
+            SELECT id, name, environment FROM products WHERE id = $1
         `, [productId]);
 
         if (productResult.rows.length === 0) {
             throw new Error(`Product ${productId} not found`);
         }
+
+        const product = productResult.rows[0];
+
+        // Find matching Azure environment in config
+        const envConfig = config.azure.environments.find(e => e.name.toUpperCase() === product.environment?.toUpperCase());
+
+        if (!envConfig) {
+            throw new Error(`Azure environment configuration not found for: ${product.environment}`);
+        }
+
+        const { subscriptionId, resourceGroup, instance: apimInstance } = envConfig;
 
         // Get first API for this product
         const apiResult = await query(`
@@ -88,14 +102,8 @@ export async function fetchSpecFromAPIM(productId: string): Promise<string> {
 
         const apiName = apiResult.rows[0].name;
 
-        // Fetch from environment config (would need to be passed or stored)
-        // For now, using hardcoded pattern - should be improved
-        const subscriptionId = process.env.AZURE_SUBSCRIPTION_ID || '';
-        const resourceGroup = process.env.AZURE_RESOURCE_GROUP || '';
-        const apimInstance = process.env.APIM_INSTANCE || '';
-
         if (!subscriptionId || !resourceGroup || !apimInstance) {
-            throw new Error('Azure configuration missing (AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP, APIM_INSTANCE)');
+            throw new Error(`Azure configuration missing for ${product.environment} (subscriptionId, resourceGroup, instance)`);
         }
 
         const url = `https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${resourceGroup}/providers/Microsoft.ApiManagement/service/${apimInstance}/apis/${apiName}?export=true&format=openapi&api-version=2022-08-01`;

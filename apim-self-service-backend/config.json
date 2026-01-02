@@ -3,9 +3,27 @@
     "environments": [
       {
         "name": "DEV",
-        "instance": "your-dev-apim",
-        "resourceGroup": "your-dev-rg",
-        "subscriptionId": "your-dev-sub"
+        "instance": "apim-dev-service",
+        "resourceGroup": "rg-apim-dev",
+        "subscriptionId": "00000000-0000-0000-0000-000000000000"
+      },
+      {
+        "name": "QA",
+        "instance": "apim-qa-service",
+        "resourceGroup": "rg-apim-qa",
+        "subscriptionId": "00000000-0000-0000-0000-000000000000"
+      },
+      {
+        "name": "STAGE",
+        "instance": "apim-stage-service",
+        "resourceGroup": "rg-apim-stage",
+        "subscriptionId": "00000000-0000-0000-0000-000000000000"
+      },
+      {
+        "name": "PRD",
+        "instance": "apim-prd-service",
+        "resourceGroup": "rg-apim-prd",
+        "subscriptionId": "00000000-0000-0000-0000-000000000000"
       }
     ]
   },
@@ -20,5 +38,6 @@
     "port": 3001,
     "logLevel": "info",
     "host": "0.0.0.0"
-  }
+  },
+  "useBackendMocks": true
 }

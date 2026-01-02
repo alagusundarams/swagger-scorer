@@ -143,6 +143,10 @@ export interface AppConfig {
         logLevel: string;
         host?: string;
     };
+    storagePath?: string;
+    gitLocalOnly?: boolean;
+    gitLocalPath?: string;
+    useBackendMocks?: boolean;
 }
 
 // === Policy Studio Types ===
