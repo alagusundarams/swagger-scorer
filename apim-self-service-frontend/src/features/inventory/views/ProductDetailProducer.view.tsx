@@ -6,12 +6,14 @@ import { getScoreTheme, getNextEnvironment } from '../../../utils/statusUtils';
 import { useStore } from '../../../store/useStore';
 import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
 import { useAppData } from '../../../shared/context/AppDataContext';
-import { ManageProductModal } from '../components/product/ManageProductModal';
+import { ManageProductModal }
+    from '../components/product/ManageProductModal';
 import { SubscriberCard } from '../components/producer/SubscriberCard';
 import { ProducerHeader } from '../components/product/ProducerHeader';
 import { ProductAuditLog } from '../../governance/components/ProductAuditLog';
 import { RevokeAccessModal } from '../components/modals/RevokeAccessModal';
 import { ConfigurationTab } from '../components/api-details/ConfigurationTab';
+import { ApiInterfaceCatalog } from '../components/api-details/ApiInterfaceCatalog';
 import { AddApiModal } from '../components/api-details/AddApiModal';
 import { inventoryApi } from '../../inventory/api/inventoryClient';
 import { PromotionWizard } from '../components/product/PromotionWizard';
@@ -450,6 +452,16 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                                 </div>
                             </div>
                         ))}
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-slate-700 animate-fade-in">
+                        <ApiInterfaceCatalog
+                            product={product}
+                            onManage={(api) => navigateToAPI(api.id)}
+                            onViewContract={(api) => {
+                                setSelectedApi(api);
+                                setIsEditorOpen(true);
+                            }}
+                        />
                     </div>
                 </div>
             )}

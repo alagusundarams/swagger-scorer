@@ -10,6 +10,7 @@ import { type Product, type API } from '../../types/inventoryTypes';
 interface ApiInterfaceCatalogProps {
     product: Product;
     onViewContract?: (api: API) => void;
+    onManage?: (api: API) => void;
 }
 
 /**
@@ -19,7 +20,7 @@ interface ApiInterfaceCatalogProps {
  * **Permission**: READ-ONLY.
  * **Features**: Drill-down to operations, view documentation, and VIEW CONTRACT.
  */
-export function ApiInterfaceCatalog({ product, onViewContract }: ApiInterfaceCatalogProps) {
+export function ApiInterfaceCatalog({ product, onViewContract, onManage }: ApiInterfaceCatalogProps) {
     const [expandedApi, setExpandedApi] = useState<string | null>(null);
 
     return (
@@ -47,7 +48,15 @@ export function ApiInterfaceCatalog({ product, onViewContract }: ApiInterfaceCat
                                         📡
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-black text-gray-900 dark:text-white mb-1">
+                                        <h3
+                                            className={`text-lg font-black text-gray-900 dark:text-white mb-1 ${onManage ? 'hover:text-emerald-600 cursor-pointer transition-colors' : ''}`}
+                                            onClick={(e) => {
+                                                if (onManage) {
+                                                    e.stopPropagation();
+                                                    onManage(api);
+                                                }
+                                            }}
+                                        >
                                             {api.displayName}
                                         </h3>
                                         <p className="text-sm text-gray-400 font-medium">
@@ -56,6 +65,18 @@ export function ApiInterfaceCatalog({ product, onViewContract }: ApiInterfaceCat
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-8">
+                                    {onManage && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onManage(api);
+                                            }}
+                                            className="hidden md:block px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-widest rounded-xl border border-blue-100 dark:border-blue-800/50 hover:bg-blue-100 transition-colors"
+                                        >
+                                            Manage
+                                        </button>
+                                    )}
+
                                     {onViewContract && (
                                         <button
                                             onClick={(e) => {

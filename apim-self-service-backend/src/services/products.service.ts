@@ -16,6 +16,9 @@ import { decomposePolicyXml } from './policy-builder.service.js';
 import { RepoService } from './ado/RepoService.js';
 import { getAppConfig } from '../config/loader.js';
 import { ProductsRepository } from '../repositories/products.repo.js';
+// @ts-ignore
+import SwaggerParser from '@apidevtools/swagger-parser';
+import { fetchSpecForProduct } from './spec-fetcher.service.js';
 
 const productsRepo = new ProductsRepository();
 
@@ -670,6 +673,60 @@ export async function updateProductPolicy(productId: string, xml: string) {
         userId: 'system-user',
         changes: { note: 'Product Policy Updated via Policy Studio' }
     });
-
     return res.rows[0];
 }
+
+/**
+ * Sync Operations from Spec to DB
+ * This parses the current spec and populates the 'operations' table.
+ */
+export async function syncProductOperations(productId: string) {
+    try {
+        // 1. Fetch Spec
+        const specContent = await fetchSpecForProduct(productId);
+        if (!specContent) return;
+
+        // 2. Parse Spec
+        const api = await SwaggerParser.parse(specContent);
+        if (!api.paths) return;
+
+        // 3. Get API ID for this product (Assuming 1:1 for MVP, or first API)
+        // In full model, we need to know WHICH API this spec belongs to.
+        // For now, we look up the API linked to this product.
+        const apisRes = await productsRepo.getAllApisByProductId(productId);
+        if (apisRes.rows.length === 0) return;
+
+        const apiId = apisRes.rows[0].id; // Target first API
+
+        // 4. Extract and Upsert Operations
+        const operations = [];
+        for (const [path, methods] of Object.entries(api.paths)) {
+            for (const [method, details] of Object.entries(methods as any)) {
+                if (['get', 'post', 'put', 'delete', 'patch', 'head', 'options'].includes(method.toLowerCase())) {
+                    operations.push({
+                        apiId,
+                        method: method.toUpperCase(),
+                        path: path, // Raw path
+                        urlTemplate: path, // For now same as path
+                        displayName: (details as any).summary || (details as any).operationId || `${method.toUpperCase()} ${path}`,
+                        description: (details as any).description || ''
+                    });
+                }
+            }
+        }
+
+        console.log(`[Sync] Found ${operations.length} operations for product ${productId}. Syncing to DB...`);
+
+        for (const op of operations) {
+            await productsRepo.upsertOperation(op);
+        }
+
+        return { count: operations.length };
+
+    } catch (error) {
+        console.error("Failed to sync operations from spec:", error);
+        // Do not throw, best effort
+        return undefined;
+    }
+}
+

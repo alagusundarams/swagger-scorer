@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import jsyaml from 'js-yaml';
 import { ApiOperation, parseSwaggerOperations } from '../../../utils/swaggerParser';
 import { type PolicyStep, type PolicySection } from './types';
@@ -47,8 +47,21 @@ export function usePolicyStudio({
 
     const activeSteps = useMemo(() => currentPolicy?.steps || [], [currentPolicy]);
 
+    // Refs for stable comparison to prevent loops
+    const initialLoadDone = useRef(false);
+    const prevSpecContent = useRef(specContent);
+    const prevOpsLen = useRef(preParsedOperations?.length || 0);
+
     // 1. Loader Effect
     useEffect(() => {
+        const hasSpecChanged = specContent !== prevSpecContent.current;
+        const hasOpsChanged = (preParsedOperations?.length || 0) !== prevOpsLen.current;
+
+        // Skip if already loaded and nothing material changed
+        if (initialLoadDone.current && !hasSpecChanged && !hasOpsChanged) {
+            return;
+        }
+
         const loadOps = async () => {
             const globalOp: ApiOperation = {
                 id: 'global',
@@ -65,50 +78,69 @@ export function usePolicyStudio({
             }
 
             setOperations([globalOp, ...ops]);
-            const opMap: Record<string, OperationPolicyState> = {};
 
-            // Hydrate initial policies
-            if (initialApiPolicies) {
-                Object.entries(initialApiPolicies).forEach(([id, xml]) => {
-                    opMap[id] = {
-                        enabled: true,
-                        mode: 'xml',
-                        steps: parsePolicyXml(xml),
-                        xmlContent: xml,
-                        isOverridden: true
-                    };
-                });
-            }
+            // Only hydrate policies on FIRST load to avoid overwriting user changes in-memory
+            if (!initialLoadDone.current) {
+                const opMap: Record<string, OperationPolicyState> = {};
 
-            // Hydrate product policy
-            if (!opMap['product']) {
-                opMap['product'] = {
-                    enabled: true,
-                    mode: 'simple',
-                    steps: productPolicyXml ? parsePolicyXml(productPolicyXml) : [],
-                    xmlContent: productPolicyXml || '',
-                    isOverridden: !!productPolicyXml
-                };
-            }
-
-            // Fill empty slots from spec
-            try {
-                const spec = jsyaml.load(specContent || '') as any;
-                if (spec?.paths) {
-                    Object.entries(spec.paths).forEach(([path, methods]: [string, any]) => {
-                        Object.keys(methods).forEach((method) => {
-                            const opId = `${method.toUpperCase()} ${path} `;
-                            if (!opMap[opId]) {
-                                opMap[opId] = { enabled: false, mode: 'simple', steps: [], isOverridden: false };
-                            }
-                        });
+                // Hydrate initial policies
+                if (initialApiPolicies) {
+                    Object.entries(initialApiPolicies).forEach(([id, xml]) => {
+                        opMap[id] = {
+                            enabled: true,
+                            mode: 'xml',
+                            steps: parsePolicyXml(xml),
+                            xmlContent: xml,
+                            isOverridden: true
+                        };
                     });
                 }
-            } catch { /* silent fail on spec parsing */ }
 
-            setPolicies(opMap);
-            setSelectedOpId('product');
-            setScanned(true);
+                // Hydrate product policy
+                if (!opMap['product']) {
+                    opMap['product'] = {
+                        enabled: true,
+                        mode: 'simple',
+                        steps: productPolicyXml ? parsePolicyXml(productPolicyXml) : [],
+                        xmlContent: productPolicyXml || '',
+                        isOverridden: !!productPolicyXml
+                    };
+                }
+
+                // Fill empty slots from spec
+                try {
+                    // Determine source for paths: either from parsed ops or raw spec
+                    // If we have ops, use them to seed the map keys
+                    if (ops.length > 0) {
+                        ops.forEach(op => {
+                            if (!opMap[op.id] && op.id !== 'global') {
+                                opMap[op.id] = { enabled: false, mode: 'simple', steps: [], isOverridden: false };
+                            }
+                        });
+                    } else if (specContent) {
+                        const spec = jsyaml.load(specContent || '') as any;
+                        if (spec?.paths) {
+                            Object.entries(spec.paths).forEach(([path, methods]: [string, any]) => {
+                                Object.keys(methods).forEach((method) => {
+                                    const opId = `${method.toUpperCase()} ${path} `; // Note: Check space/trim consistency with parser
+                                    if (!opMap[opId]) {
+                                        opMap[opId] = { enabled: false, mode: 'simple', steps: [], isOverridden: false };
+                                    }
+                                });
+                            });
+                        }
+                    }
+                } catch { /* silent fail on spec parsing */ }
+
+                setPolicies(opMap);
+                setSelectedOpId('product');
+                setScanned(true);
+            }
+
+            // Update refs
+            initialLoadDone.current = true;
+            prevSpecContent.current = specContent;
+            prevOpsLen.current = preParsedOperations?.length || 0;
         };
         loadOps();
     }, [specContent, preParsedOperations, productPolicyXml, initialApiPolicies]);

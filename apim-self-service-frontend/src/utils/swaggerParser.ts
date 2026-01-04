@@ -24,7 +24,7 @@ export interface ApiOperation {
 }
 
 export const parseSwaggerOperations = async (specContent: string): Promise<ApiOperation[]> => {
-    console.log("SwaggerParser: Received content type:", typeof specContent);
+    // console.log("SwaggerParser: Received content type:", typeof specContent);
     if (!specContent) {
         console.warn("SwaggerParser: Empty content");
         return [];

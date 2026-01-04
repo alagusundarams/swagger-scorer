@@ -11,9 +11,9 @@ import {
     getPermissionMatrix, updatePermissionMatrix, addProduct, addApi,
     getOperations, searchApis, removeApi, getProductPolicy,
     updateProductPolicy, ejectProduct, getNamedValues, addNamedValue,
-    deleteNamedValue
+    deleteNamedValue, syncProductOperations
 } from '../services/products.service.js';
-import { getAllTeams } from '../services/teams.service.js';
+import { getAllTeams, createTeam, updateTeam } from '../services/teams.service.js';
 import { getAllSubscriptions, addSubscription, updateSubscriptionState } from '../services/subscriptions.service.js';
 import { getAllApprovals, updateApproval } from '../services/approvals.service.js';
 import { getAuditLogs } from '../services/audit.service.js';
@@ -149,6 +149,13 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
                 : await import('../services/spec-fetcher.service.js');
 
             const spec = await fetchSpecForProduct(id);
+
+            // Trigger background sync of operations
+            // This ensures the "Interface Catalog" is populated with endpoints found in this spec
+            syncProductOperations(id).catch(err =>
+                fastify.log.error({ err }, 'Background sync of operations failed')
+            );
+
             return { spec };
         } catch (error: any) {
             fastify.log.error({ err: error }, 'Error fetching product spec');
@@ -246,6 +253,29 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         } catch (error) {
             fastify.log.error({ err: error }, 'Error fetching teams');
             return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to fetch teams' });
+        }
+    });
+
+    // POST /api/v1/teams
+    fastify.post('/teams', async (request, reply) => {
+        try {
+            const team = await createTeam(request.body);
+            return team;
+        } catch (error: any) {
+            fastify.log.error({ err: error }, 'Error creating team');
+            return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
+        }
+    });
+
+    // PATCH /api/v1/teams/:id
+    fastify.patch('/teams/:id', async (request, reply) => {
+        const { id } = request.params as any;
+        try {
+            const team = await updateTeam(id, request.body);
+            return team;
+        } catch (error: any) {
+            fastify.log.error({ err: error }, 'Error updating team');
+            return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
         }
     });
 

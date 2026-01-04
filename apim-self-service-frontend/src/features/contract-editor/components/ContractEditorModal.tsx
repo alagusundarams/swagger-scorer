@@ -83,6 +83,9 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
                 try {
                     if (fetchSpec) {
                         const { spec } = await fetchSpec(product.id);
+                        if (!spec || !spec.trim()) {
+                            throw new Error('Fetched specification is empty');
+                        }
                         setContent(spec);
                     } else {
                         throw new Error('No fetchSpec provider found');

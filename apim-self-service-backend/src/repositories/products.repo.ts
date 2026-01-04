@@ -128,6 +128,20 @@ export class ProductsRepository {
         ]);
     }
 
+    async upsertOperation(op: any) {
+        return await query(`
+            INSERT INTO operations (
+                api_id, method, path, display_name, description, url_template
+            ) VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (api_id, method, path) 
+            DO UPDATE SET 
+                display_name = EXCLUDED.display_name,
+                description = EXCLUDED.description,
+                url_template = EXCLUDED.url_template
+            RETURNING *
+        `, [op.apiId, op.method, op.path, op.displayName, op.description, op.urlTemplate]);
+    }
+
     async removeApi(apiId: string, productId: string) {
         return await query(`
             DELETE FROM apis 

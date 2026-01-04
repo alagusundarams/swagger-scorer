@@ -17,7 +17,7 @@ export const requestProductAccess = async (productId: string, teamId: string): P
 };
 
 export const updateSubscription = async (subId: string, updates: Partial<Subscription>): Promise<Subscription> => {
-    const res = await baseClient.put(`/subscriptions/${subId}`, updates);
+    const res = await baseClient.patch(`/subscriptions/${subId}`, updates);
     return res.data;
 };
 

@@ -70,8 +70,14 @@ export const ProductDetailPage = () => {
         }
     }, [user, requestTeamId]);
 
-    // Fetch Configuration if missing
-    // This populates Named Values and KV Backend details
+    // Ensure inventory is loaded (critical for direct page loads)
+    useEffect(() => {
+        if (allProducts.length === 0) {
+            useInventoryStore.getState().fetchInventory();
+        }
+    }, [allProducts.length]);
+
+    // Fetch Configuration if missing (populates Named Values)
     const { fetchConfiguration } = useInventoryStore();
     useEffect(() => {
         if (productId) {

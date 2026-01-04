@@ -22,7 +22,7 @@ export async function getAdminDashboard() {
  * Get global inventory
  */
 export async function getGlobalInventory() {
-    return api.get('/admin/inventory');
+    return api.get('/admin/global-inventory');
 }
 
 /**
