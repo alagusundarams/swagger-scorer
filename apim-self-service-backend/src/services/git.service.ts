@@ -12,19 +12,30 @@ export interface GitCommitResponse {
 }
 
 /**
- * Simulate creating a deployment branch and committing changes
+ * Simulates a Git Commit & Push
+ * Now supports author attribution for auditing.
  */
-export async function simulateDeployCommit(entityId: string, environment: string): Promise<GitCommitResponse> {
-    const hash = Math.random().toString(16).substring(2, 9);
-    const branch = `deploy/${entityId.toLowerCase()}-${environment.toLowerCase()}`;
+export async function simulateDeployCommit(
+    productId: string,
+    environment: string,
+    options?: { authorName?: string; authorEmail?: string; message?: string }
+) {
+    // 1. Generate Deterministic Branch Name (Feature Request 12)
+    // Structure: onboard/{productId}-init or feature/{env}-deploy
+    const branchName = `feature/${productId}-${environment.toLowerCase()}-deploy`;
 
-    // In a real implementation, you would use simple-git or similar here
-    console.log(`[GIT] 🌿 Creating branch: ${branch}`);
-    console.log(`[GIT] 📝 Committed spec changes: ${hash}`);
+    // 2. Mock Commit Hash
+    const hash = Math.random().toString(36).substring(2, 9);
+
+    // 3. Log Attribution (Simulating git commit --author)
+    const author = options?.authorName ? `${options.authorName} <${options.authorEmail}>` : 'Service Account';
+    console.log(`[Git] Committing to ${branchName} by ${author}`);
 
     return {
-        hash,
-        branch,
-        timestamp: new Date().toISOString()
+        success: true,
+        hash: hash,
+        branch: branchName,
+        repoUrl: `https://dev.azure.com/myorg/apim/_git/${productId}`,
+        timestamp: new Date()
     };
 }

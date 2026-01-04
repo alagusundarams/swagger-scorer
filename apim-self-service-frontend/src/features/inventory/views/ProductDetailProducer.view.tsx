@@ -388,6 +388,11 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                                     <div className="text-xs text-gray-500 dark:text-slate-500">{api.description}</div>
                                     <div className="text-xs text-gray-400 dark:text-slate-600 mt-1">
                                         {api.operations.length} operations
+                                        {api.computedStatus && (
+                                            <span className="ml-2 font-bold text-amber-600 dark:text-amber-400">
+                                                • {api.computedStatus}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
 

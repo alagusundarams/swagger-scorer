@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { useAuth } from '../../features/auth/hooks/useAuth';
 import { useInventoryStore } from '../../features/inventory/hooks/useInventoryStore';
@@ -32,14 +32,20 @@ import { RequestAccessModal } from '../../features/inventory/components/modals/R
  */
 export const ProductDetailPage = () => {
     const { productId } = useParams<{ productId: string }>();
+    const [searchParams] = useSearchParams();
+    const environmentParam = searchParams.get('environment');
 
     // --- Store Integration ---
     const { user } = useAuth();
 
     const {
         products: allProducts,
+        currentProduct,
         isLoading: invLoading,
-        error: invError
+        error: invError,
+        fetchInventory,
+        fetchProduct,
+        fetchConfiguration
     } = useInventoryStore();
 
     const {
@@ -73,20 +79,30 @@ export const ProductDetailPage = () => {
     // Ensure inventory is loaded (critical for direct page loads)
     useEffect(() => {
         if (allProducts.length === 0) {
-            useInventoryStore.getState().fetchInventory();
+            fetchInventory();
         }
-    }, [allProducts.length]);
+    }, [allProducts.length, fetchInventory]);
 
     // Fetch Configuration if missing (populates Named Values)
-    const { fetchConfiguration } = useInventoryStore();
     useEffect(() => {
         if (productId) {
             fetchConfiguration(productId);
         }
     }, [productId, fetchConfiguration]);
 
+    // Fetch specific product based on productId and environment
+    useEffect(() => {
+        if (productId) {
+            // If environment param is present, fetch that specific version
+            // Otherwise default to store logic (usually DEV or last viewed)
+            fetchProduct(productId, environmentParam || undefined);
+        }
+    }, [productId, environmentParam, fetchProduct]);
+
     // --- Data Selectors ---
-    const product = useMemo(() => allProducts.find(p => p.id === productId), [allProducts, productId]);
+    // Use currentProduct directly, as fetchProduct now populates it
+    // Fallback to allProducts look up if currentProduct is not yet set (or for initial load)
+    const product = currentProduct || allProducts.find(p => p.id === productId);
 
     const subscription = useMemo(() => {
         if (!user || !product) return null;

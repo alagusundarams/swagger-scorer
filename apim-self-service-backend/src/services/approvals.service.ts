@@ -106,15 +106,38 @@ export async function updateApproval(id: string, status: 'APPROVED' | 'REJECTED'
     // 4. Deployment Flow (Demo / Simulation) - Legacy DEV flow
     if (status === 'APPROVED' && approval.details?.environment === 'DEV') {
         const targetId = approval.details.targetId || approval.details.productId;
+
+        // --- VALIDATION GATE START --- (User Req 8, 9, 11)
+        // Ensure "User is liable" -> Validate the Repo URL they provided exists
+        if (process.env.ENABLE_STRICT_VALIDATION === 'true') {
+            const repoUrl = approval.details.repoUrl;
+            if (!repoUrl) {
+                throw new Error('VALIDATION GATE FAILURE: Repository URL is required before approval.');
+            }
+            // Lazy load to avoid circular deps if any
+            const { RepoService } = await import('./ado/RepoService.js');
+            const repoService = new RepoService();
+            const validation = await repoService.validateRepoUrl(repoUrl);
+
+            if (!validation.isValid) {
+                throw new Error(`VALIDATION GATE FAILURE: Repository validation failed. ${validation.error}`);
+            }
+        }
+        // --- VALIDATION GATE END ---
+
         if (targetId) {
-            // 4a. GitOps Simulation
-            const gitInfo = await simulateDeployCommit(targetId, 'DEV');
+            // 4a. GitOps Simulation with Attribution (User Req 13)
+            const gitInfo = await simulateDeployCommit(targetId, 'DEV', {
+                authorName: resolvedBy, // "Who pushed the button"
+                authorEmail: `${resolvedBy.replace(/\s+/g, '.')}@example.com`, // Simulated email
+                message: `Approved and Deployed by ${resolvedBy}`
+            });
 
             // 4b. APIM Synchronization
             await syncToAPIM(targetId, 'DEV');
 
             // 4c. SNOW Ticket (ServiceNow)
-            await createSNOWTicket('deployment', `Auto-deploy for ${targetId} to DEV as part of approval ${id}`);
+            await createSNOWTicket('deployment', `Auto-deploy for ${targetId} to DEV as part of approval ${id}. Repo: ${approval?.details?.repoUrl || 'N/A'}`);
 
             // 4d. Update product state
             await query(`
@@ -128,13 +151,14 @@ export async function updateApproval(id: string, status: 'APPROVED' | 'REJECTED'
                 entityType: 'product',
                 entityId: targetId,
                 action: 'deployed',
-                userId: 'admin-001',
+                userId: resolvedBy,
                 changes: {
                     commitHash: gitInfo.hash,
                     branch: gitInfo.branch,
                     environment: 'DEV',
                     triggeredBy: resolvedBy,
-                    status: 'SUCCESS'
+                    status: 'SUCCESS',
+                    repoUrl: approval.details.repoUrl
                 }
             });
         }

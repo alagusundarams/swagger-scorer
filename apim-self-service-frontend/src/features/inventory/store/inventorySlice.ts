@@ -7,12 +7,14 @@ import type { Product, API } from '../types/inventoryTypes';
  */
 export interface InventorySlice {
     products: Product[];
+    currentProduct: Product | null;
     apis: API[];
     error: string | null;
     isLoading: boolean;
 
     // Actions
     fetchInventory: () => Promise<void>;
+    fetchProduct: (id: string, environment?: string) => Promise<void>;
     loadProducts: () => Promise<void>;
     updateProduct: (id: string, updates: Partial<Product>) => Promise<void>;
     updateAPI: (id: string, updates: Partial<API>) => Promise<void>;
@@ -36,6 +38,7 @@ export interface InventorySlice {
  */
 export const createInventorySlice: StateCreator<InventorySlice> = (set, get) => ({
     products: [],
+    currentProduct: null,
     apis: [],
     error: null,
     isLoading: false,
@@ -57,6 +60,25 @@ export const createInventorySlice: StateCreator<InventorySlice> = (set, get) => 
             });
         } catch (error: any) {
             set({ error: error.message || "Failed to load inventory data.", isLoading: false });
+        }
+    },
+
+    fetchProduct: async (id: string, environment?: string) => {
+        set({ error: null, isLoading: true });
+        try {
+            const product = await inventoryApi.getProduct(id, environment);
+            const { products } = get();
+
+            // Update current product AND update it in the list if it exists
+            set({
+                currentProduct: product,
+                products: products.some(p => p.id === id)
+                    ? products.map(p => p.id === id ? product : p)
+                    : [...products, product],
+                isLoading: false
+            });
+        } catch (error: any) {
+            set({ error: error.message || "Failed to load product.", isLoading: false });
         }
     },
 

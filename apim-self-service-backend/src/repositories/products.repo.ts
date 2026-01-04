@@ -35,6 +35,7 @@ export class ProductsRepository {
         return await query(`
             SELECT p.*, 
                    t.name as owner_team_name,
+                   p.dev_hash, p.qa_hash, p.stage_hash, p.prod_hash,
                    COALESCE(sub_counts.active_subscribers, 0) as calculated_subscriber_count
             FROM products p
             LEFT JOIN teams t ON p.owner_team_id = t.id
@@ -106,13 +107,17 @@ export class ProductsRepository {
 
     async addProduct(product: any) {
         return await query(`
-            INSERT INTO products (
-                id, name, display_name, description, state, owner_team_id, environment, management_mode, git_repo_url, git_file_path, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+                id, name, display_name, description, state, owner_team_id, environment, management_mode, git_repo_url, git_file_path, 
+                dev_hash, qa_hash, stage_hash, prod_hash,
+                created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
+                $11, $12, $13, $14,
+                NOW(), NOW())
             RETURNING *
         `, [
             product.id, product.name, product.displayName, product.description, product.state, product.ownerTeamId, product.environment,
-            product.managementMode || 'PORTAL_MANAGED', product.gitRepoUrl, product.gitFilePath
+            product.managementMode || 'PORTAL_MANAGED', product.gitRepoUrl, product.gitFilePath,
+            product.devHash || null, product.qaHash || null, product.stageHash || null, product.prodHash || null
         ]);
     }
 
@@ -152,6 +157,15 @@ export class ProductsRepository {
 
     async getProductById(id: string) {
         return await query('SELECT * FROM products WHERE id = $1', [id]);
+    }
+
+    async getApiById(id: string) {
+        return await query(`
+            SELECT a.*, p.display_name as product_display_name
+            FROM apis a
+            JOIN products p ON a.product_id = p.id
+            WHERE a.id = $1
+        `, [id]);
     }
 
     async updateProductOwner(id: string, ownerTeamId: string) {
@@ -324,4 +338,17 @@ export class ProductsRepository {
             [xml, productId]
         );
     }
+}
+
+export interface NamedValue {
+    id: string;
+    product_id: string;
+    scope_id?: string;
+    display_name: string;
+    system_name: string;
+    value: string;
+    type: 'literal' | 'keyvault';
+    is_secret: boolean;
+    created_at: Date;
+    updated_at: Date;
 }

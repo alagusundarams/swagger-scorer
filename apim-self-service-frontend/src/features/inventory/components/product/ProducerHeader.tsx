@@ -1,3 +1,4 @@
+import { useSearchParams } from 'react-router-dom';
 import { type Product } from '../../types/inventoryTypes';
 import { getEnvironmentTheme } from '../../../../utils/statusUtils';
 import { getStatusTheme, getNextEnvironment } from '../../../../utils/statusUtils';
@@ -23,6 +24,17 @@ export function ProducerHeader({
     onDeprecateClick,
     isPromotionPending = false
 }: ProducerHeaderProps) {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const currentEnv = searchParams.get('environment') || product.environment || 'DEV';
+
+    const handleEnvChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const newEnv = e.target.value;
+        setSearchParams(prev => {
+            prev.set('environment', newEnv);
+            return prev;
+        });
+    };
+
     return (
         <div className="mb-8">
             {/* Governance Anomaly Banner */}
@@ -152,9 +164,24 @@ export function ProducerHeader({
                     )}
 
                     <div className="h-8 w-px bg-gray-200 dark:bg-slate-700 mx-2"></div>
-                    <span className={`px-3 py-1 text-xs font-black rounded-lg border uppercase ${getEnvironmentTheme(product.environment || '').bg} ${getEnvironmentTheme(product.environment || '').text} ${getEnvironmentTheme(product.environment || '').border}`}>
-                        {product.environment}
-                    </span>
+
+                    {/* Region Selector (formerly static badge) */}
+                    <div className="relative group">
+                        <select
+                            value={currentEnv}
+                            onChange={handleEnvChange}
+                            className={`appearance-none cursor-pointer pl-3 pr-8 py-1 text-xs font-black rounded-lg border uppercase outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 transition-all ${getEnvironmentTheme(currentEnv).bg} ${getEnvironmentTheme(currentEnv).text} ${getEnvironmentTheme(currentEnv).border}`}
+                        >
+                            <option value="DEV">DEV (Draft)</option>
+                            <option value="QA">QA</option>
+                            <option value="STAGE">STAGE</option>
+                            <option value="PROD">PROD</option>
+                        </select>
+                        <div className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[8px] ${getEnvironmentTheme(currentEnv).text}`}>
+                            ▼
+                        </div>
+                    </div>
+
                     {product.lastDeployedCommitHash && (
                         <a
                             href={product.terraformPipelineUrl || '#'}

@@ -15,6 +15,16 @@ async function seedDemoData() {
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS detected_anomalies JSONB;`);
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS last_deployed_commit_hash TEXT;`);
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS terraform_pipeline_url TEXT;`);
+        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS dev_hash TEXT;`);
+        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS qa_hash TEXT;`);
+        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS stage_hash TEXT;`);
+        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS prod_hash TEXT;`);
+
+        // Approval Request Schema Patch
+        await client.query(`ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS approver_team_id TEXT;`);
+        await client.query(`ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS requester_name TEXT;`);
+        await client.query(`ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS requester_email TEXT;`);
+
         console.log('🛠️ Schema Patched.');
 
         // 1. Seed Teams
@@ -22,7 +32,8 @@ async function seedDemoData() {
             INSERT INTO teams (id, name, type, description, member_count)
             VALUES 
                 ('team-platform', 'Platform Engineering', 'producer', 'Core platform services.', 12),
-                ('team-payments', 'Payments Squad', 'both', 'Payment processing and ledger.', 8)
+                ('team-payments', 'Payments Squad', 'both', 'Payment processing and ledger.', 8),
+                ('team-analytics', 'Data Analytics', 'consumer', 'Business intelligence consumption.', 5)
             ON CONFLICT (id) DO NOTHING;
         `);
         console.log('✅ Teams Seeded.');
@@ -111,13 +122,15 @@ async function seedDemoData() {
 
         // 4. Insert "Payment Gateway v2" (The Golden Path) ✨
         // - Terraform Managed (Blue Banner)
-        // - Git Hash
-        // - Clean Config
+        // - Git Hash populated for Multi-Env Demo
+        // - Divergence to show "Changed in DEV"
         await client.query(`
             INSERT INTO products (
                 id, name, display_name, version, state, environment,
                 owner_team_id, management_mode, authorized_teams,
-                detected_anomalies, quality_score, last_deployed_commit_hash, terraform_pipeline_url
+                detected_anomalies, quality_score, 
+                last_deployed_commit_hash, terraform_pipeline_url,
+                dev_hash, qa_hash, prod_hash
             ) VALUES (
                 'prod-payment-v2',
                 'payment-gateway-v2',
@@ -130,8 +143,11 @@ async function seedDemoData() {
                 '{"DEV": ["team-payments"]}',
                 '[]'::jsonb, -- Clean!
                 98.50,
-                'a1b2c3d', -- Git Hash
-                'https://dev.azure.com/contoso/project/_build?definitionId=123'
+                'a1b2c3d', -- Git Hash (Base)
+                'https://dev.azure.com/contoso/project/_build?definitionId=123',
+                'new-feature-hash-xyz', -- DEV hash differs (Simulates "Changed in DEV")
+                'a1b2c3d', -- QA matched Base
+                'a1b2c3d'  -- PROD matches Base
             );
         `);
 
@@ -148,6 +164,27 @@ async function seedDemoData() {
             );
         `);
         console.log('✅ Modern Product Seeded.');
+
+        // 5. Insert Approval Request for "Validation Gate" Demo 🛡️
+        // - Type: PRODUCT_ONBOARDING
+        // - Missing Repo URL (to be filled in UI)
+        await client.query(`
+            INSERT INTO approval_requests (
+                id, type, status, requester_team_id, submitted_at, details, 
+                approver_team_id, requester_name, requester_email
+            ) VALUES (
+                'req-onboarding-01',
+                'PRODUCT_ONBOARDING',
+                'PENDING',
+                'team-analytics',
+                NOW(),
+                '{"targetName": "Data Analytics Hub", "targetVersion": "v1.0-alpha", "environment": "DEV", "reason": "New platform for BI dashboards."}'::jsonb,
+                'team-platform',
+                'Alice Data',
+                'alice@contoso.com'
+            );
+        `);
+        console.log('✅ Approval Request Seeded (Validation Gate).');
 
     } catch (err) {
         console.error('❌ Seeding Failed:', err);

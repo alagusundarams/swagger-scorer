@@ -11,7 +11,7 @@ import {
     getPermissionMatrix, updatePermissionMatrix, addProduct, addApi,
     getOperations, searchApis, removeApi, getProductPolicy,
     updateProductPolicy, ejectProduct, getNamedValues, addNamedValue,
-    deleteNamedValue, syncProductOperations
+    deleteNamedValue, syncProductOperations, getProductById, getApiById
 } from '../services/products.service.js';
 import { getAllTeams, createTeam, updateTeam } from '../services/teams.service.js';
 import { getAllSubscriptions, addSubscription, updateSubscriptionState } from '../services/subscriptions.service.js';
@@ -69,6 +69,22 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         }
     });
 
+    // GET /api/v1/products/:id (Single Product + Env Context)
+    fastify.get('/products/:id', async (request, reply) => {
+        const { id } = request.params as any;
+        const { environment } = request.query as any;
+        try {
+            const product = await getProductById(id, environment);
+            if (!product) {
+                return reply.status(404).send({ error: 'Not Found', message: 'Product not found' });
+            }
+            return product;
+        } catch (error) {
+            fastify.log.error({ err: error }, 'Error fetching product');
+            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to fetch product' });
+        }
+    });
+
     fastify.patch('/products/:id', async (request, reply) => {
         const { id } = request.params as any;
         const body = request.body as any;
@@ -122,6 +138,28 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         } catch (error: any) {
             fastify.log.error({ err: error }, 'Error updating product policy');
             return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
+        }
+    });
+
+    // GET /api/v1/api-inventory/:id (Helper for Policy Studio to get specs)
+    fastify.get('/api-inventory/:id', async (request, reply) => {
+        const { id } = request.params as any;
+        try {
+            const api = await getApiById(id);
+            if (!api) {
+                return reply.status(404).send({ error: 'Not Found', message: 'API not found' });
+            }
+
+            return {
+                id: api.id,
+                name: api.name,
+                // Return git_repo_url as swagger_url for now, or null if strictly needed.
+                // In a real app we might proxy or return a blob url.
+                swagger_url: api.git_repo_url // Simplification for POC
+            };
+        } catch (error) {
+            fastify.log.error({ err: error }, 'Error fetching API inventory');
+            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to fetch API inventory' });
         }
     });
 

@@ -45,8 +45,129 @@ export async function getAllProducts(environment?: string, userRole: string = 'a
     const productRes = await productsRepo.getAllProducts(environment, userRole, teamId, userGroups);
     const apiRes = await productsRepo.getAllApis();
 
+    // Instantiate Repo Service for metadata checks
+    const repoService = new RepoService();
+
     // 3. Assemble with complete field mapping
-    const products = productRes.rows.map((p: any) => ({
+    const products = await Promise.all(productRes.rows.map(async (p: any) => {
+        // Map Hashes
+        const envHashes = {
+            DEV: p.dev_hash,
+            QA: p.qa_hash,
+            STAGE: p.stage_hash,
+            PROD: p.prod_hash
+        };
+
+        const currentEnvHash = envHashes[p.environment as keyof typeof envHashes] || null;
+
+        return {
+            // Core fields
+            id: p.id,
+            name: p.name,
+            displayName: p.display_name,
+            version: p.version,
+            description: p.description,
+            state: p.state,
+            type: p.type || 'standard',
+            environment: p.environment,
+            region: p.region,
+
+            // Team ownership
+            ownerTeamId: p.owner_team_id,
+            ownerTeamName: p.owner_team_name,
+            authorizedTeams: p.authorized_teams || [],
+
+            // Metrics
+            subscriberCount: p.calculated_subscriber_count,
+            qualityScore: p.quality_score,
+
+            // Management
+            managementMode: p.management_mode,
+            terraformPipelineUrl: p.terraform_pipeline_url,
+            gitRepoUrl: p.git_repo_url,
+            gitFilePath: p.git_file_path,
+            lastDeployedCommitHash: p.last_deployed_commit_hash,
+
+            // Environment Hashes (Version Matrix)
+            envHashes,
+
+            // Identity (App Registration)
+            identity: p.identity_client_id ? {
+                clientId: p.identity_client_id,
+                displayName: p.identity_display_name,
+                appIdUri: p.identity_app_id_uri
+            } : undefined,
+
+            // Timestamps
+            createdAt: p.created_at,
+            updatedAt: p.updated_at,
+
+            // APIs
+            apis: await Promise.all(apiRes.rows
+                .filter((a: any) => a.product_id === p.id)
+                .map(async (a: any) => {
+                    // Computed Status Calculation
+                    // 1. Get latest commit for this API file
+                    let statusDetails = 'Synced';
+                    if (process.env.ENABLE_GIT_CHECKS === 'true' && a.git_repo_url && a.git_file_path) {
+                        try {
+                            const metadata = await repoService.getCommitMetadata(a.git_repo_url, a.git_file_path);
+                            if (metadata && metadata.hash !== currentEnvHash) {
+                                statusDetails = `Changed in ${p.environment} (Draft)`;
+                            }
+                        } catch (e) {
+                            // Fallback/Ignore git errors to prevent listing failure
+                        }
+                    }
+
+                    return {
+                        id: a.id,
+                        name: a.name,
+                        displayName: a.display_name,
+                        description: a.description,
+                        path: a.path,
+                        qualityScore: a.quality_score,
+                        originTeamId: a.origin_team_id,
+                        gitRepoUrl: a.git_repo_url,
+                        gitFilePath: a.git_file_path,
+                        operations: a.operations_json || [],
+                        computedStatus: statusDetails
+                    };
+                }))
+        };
+    }));
+
+    return products;
+}
+
+/**
+ * Fetch a single product by ID with environment context
+ */
+export async function getProductById(id: string, environment?: string) {
+    const productRes = await productsRepo.getProductById(id);
+    if (productRes.rows.length === 0) return null;
+    const p = productRes.rows[0];
+
+    // Instantiate Repo Service
+    const repoService = new RepoService();
+
+    // Fetch APIs for this product
+    const apiRes = await productsRepo.getAllApisByProductId(id);
+
+    // Map Hashes
+    const envHashes = {
+        DEV: p.dev_hash,
+        QA: p.qa_hash,
+        STAGE: p.stage_hash,
+        PROD: p.prod_hash
+    };
+
+    // Determine effective environment for the view
+    // If environment param is passed, we view it from that perspective
+    const effectiveEnv = environment || p.environment;
+    const currentEnvHash = envHashes[effectiveEnv as keyof typeof envHashes] || null;
+
+    return {
         // Core fields
         id: p.id,
         name: p.name,
@@ -55,7 +176,7 @@ export async function getAllProducts(environment?: string, userRole: string = 'a
         description: p.description,
         state: p.state,
         type: p.type || 'standard',
-        environment: p.environment,
+        environment: effectiveEnv, // Return the requested environment
         region: p.region,
 
         // Team ownership
@@ -74,7 +195,10 @@ export async function getAllProducts(environment?: string, userRole: string = 'a
         gitFilePath: p.git_file_path,
         lastDeployedCommitHash: p.last_deployed_commit_hash,
 
-        // Identity (App Registration)
+        // Environment Hashes
+        envHashes,
+
+        // Identity
         identity: p.identity_client_id ? {
             clientId: p.identity_client_id,
             displayName: p.identity_display_name,
@@ -86,9 +210,21 @@ export async function getAllProducts(environment?: string, userRole: string = 'a
         updatedAt: p.updated_at,
 
         // APIs
-        apis: apiRes.rows
-            .filter((a: any) => a.product_id === p.id)
-            .map((a: any) => ({
+        apis: await Promise.all(apiRes.rows.map(async (a: any) => {
+            // Computed Status Calculation
+            let statusDetails = 'Synced';
+            if (process.env.ENABLE_GIT_CHECKS === 'true' && a.git_repo_url && a.git_file_path) {
+                try {
+                    const metadata = await repoService.getCommitMetadata(a.git_repo_url, a.git_file_path);
+                    if (metadata && metadata.hash !== currentEnvHash) {
+                        statusDetails = `Changed in ${effectiveEnv}`; // Dynamic status
+                    }
+                } catch (e) {
+                    // Ignore git errors
+                }
+            }
+
+            return {
                 id: a.id,
                 name: a.name,
                 displayName: a.display_name,
@@ -98,11 +234,11 @@ export async function getAllProducts(environment?: string, userRole: string = 'a
                 originTeamId: a.origin_team_id,
                 gitRepoUrl: a.git_repo_url,
                 gitFilePath: a.git_file_path,
-                operations: a.operations_json || []
-            }))
-    }));
-
-    return products;
+                operations: a.operations_json || [],
+                computedStatus: statusDetails
+            };
+        }))
+    };
 }
 
 /**
@@ -135,6 +271,12 @@ export async function getAllApis() {
         productDisplayName: a.product_display_name,
         qualityScore: a.quality_score
     }));
+}
+
+export async function getApiById(id: string) {
+    const res = await productsRepo.getApiById(id);
+    if (res.rows.length === 0) return null;
+    return res.rows[0];
 }
 
 /**
@@ -573,59 +715,93 @@ export async function ejectProduct(productId: string) {
         throw new Error(`Product is already ${product.management_mode}. No need to eject.`);
     }
 
-    // 2. Perform "Smart Decomposition"
-    console.log(`[ProductsService] Ejecting ${productId}: Fetching live state from APIM...`);
+    // 2. Perform "Smart Decomposition" - Multi-Environment Extraction (User req: "Eject based on all regions")
+    console.log(`[ProductsService] Ejecting ${productId}: Fetching live state from Multi-Region APIM...`);
 
     const apimService = await getApimService();
-    const arm = await apimService.getArmService(product.environment);
+    const environments = ['DEV', 'QA', 'STAGE', 'PROD'];
 
-    // a) Fetch Live XML
-    const liveXml = await arm.getProductPolicy(productId);
+    // Store extracted variables per environment [env -> { key: value }]
+    const envConfigs: Record<string, Record<string, string>> = {};
+    let baseXml = '<policies><inbound><base /></inbound><backend><base /></backend><outbound><base /></outbound></policies>';
 
-    let finalXml = liveXml || '<policies><inbound><base /></inbound><backend><base /></backend><outbound><base /></outbound></policies>';
-    let extractedVars: { name: string, value: string }[] = [];
+    // 2a. Scrape all environments
+    for (const env of environments) {
+        try {
+            const arm = await apimService.getArmService(env);
+            const liveXml = await arm.getProductPolicy(productId);
 
-    if (liveXml) {
-        // b) Decompose
-        const decomposition = decomposePolicyXml(liveXml);
-        finalXml = decomposition.cleanedXml;
-        extractedVars = decomposition.variables;
+            if (liveXml) {
+                const decomposition = decomposePolicyXml(liveXml);
 
-        // c) Save Ejected Named Values
-        for (const v of extractedVars) {
-            try {
-                await addNamedValue(productId, {
-                    displayName: `Ejected: ${v.name}`,
-                    systemName: v.name,
-                    value: v.value,
-                    type: 'literal',
-                    isSecret: v.value.includes('secret') || v.value.includes('key'), // Basic secret heuristic
-                    allowOverwrite: true
-                });
-            } catch (e) {
-                // Ignore if exists
+                // We take DEV as the "Base XML" structure
+                if (env === 'DEV') {
+                    baseXml = decomposition.cleanedXml;
+                }
+
+                // Store variables for this env
+                envConfigs[env] = decomposition.variables.reduce((acc, v) => ({ ...acc, [v.name]: v.value }), {});
             }
+        } catch (e) {
+            console.warn(`[Eject] Could not scrape ${env} (might not exist):`, e);
+            envConfigs[env] = {};
         }
     }
 
-    // d) Setup Git Repository (TF Layout)
+    // 2b. Calculate Diffs & Base
+    // Base = DEV config
+    const baseConfig = envConfigs['DEV'] || {};
+    const extractedVars: { name: string, value: string }[] = Object.entries(baseConfig).map(([k, v]) => ({ name: k, value: v as string }));
+
+    // 2c. Save Base Named Values to DB (Source of Truth for Portal)
+    for (const v of extractedVars) {
+        try {
+            await addNamedValue(productId, {
+                displayName: `Ejected: ${v.name}`,
+                systemName: v.name,
+                value: v.value,
+                type: 'literal',
+                isSecret: v.value.includes('secret') || v.value.includes('key'),
+                allowOverwrite: true
+            });
+        } catch (e) { /* Ignore */ }
+    }
+
+    // 2d. Prepare Repo Files (Base + Env Overlays)
+    const repoFiles = [
+        { path: 'policies/product-policy.xml', content: baseXml },
+        // Base Config (Dev)
+        {
+            path: `config/base.json`,
+            content: JSON.stringify({ variables: baseConfig }, null, 2)
+        }
+    ];
+
+    // Add Env-Specific Configs (only if they differ from Base/Dev, or just dump all for completeness?)
+    // User asked for "extracting values for dev qa stage prod".
+    // Best practice: Write specific config files for each env.
+    for (const env of environments) {
+        if (env === 'DEV') continue; // Handled as base
+
+        const currentConfig = envConfigs[env];
+        if (Object.keys(currentConfig).length > 0) {
+            // Calculate diff if we wanted to be sparse, but for "Eject" explicit is safer.
+            // We write the FULL config for that env to ensure it works immediately.
+            repoFiles.push({
+                path: `config/${env.toLowerCase()}.json`,
+                content: JSON.stringify({ variables: currentConfig }, null, 2)
+            });
+        }
+    }
+
+    // 2e. Setup Git Repository
     const repoUrl = product.repository_url || `https://dev.azure.com/org/proj/_git/${productId}-portal`;
     if (repoUrl && !config.useBackendMocks) {
         const repoLoader = new RepoService();
-        const files = [
-            { path: 'policies/product-policy.xml', content: finalXml },
-            {
-                path: `config/${product.environment.toLowerCase()}.json`,
-                content: JSON.stringify({
-                    variables: extractedVars.reduce((acc, v) => ({ ...acc, [v.name]: v.value }), {})
-                }, null, 2)
-            }
-        ];
-
         try {
-            await repoLoader.commitFiles(productId, repoUrl, files, 'chore: Initialize portal-managed product via Smart Decomposition');
+            await repoLoader.commitFiles(productId, repoUrl, repoFiles, 'chore: Initialize portal-managed product (Multi-Env Eject)');
         } catch (err) {
-            console.warn(`[ProductsService] Git initialization failed during eject (ignoring):`, err);
+            console.warn(`[ProductsService] Git initialization failed during eject:`, err);
         }
     }
 
@@ -641,7 +817,7 @@ export async function ejectProduct(productId: string) {
         changes: {
             fromMode: 'TERRAFORM_MANAGED',
             toMode: 'PORTAL_MANAGED',
-            extractedVariables: extractedVars.length
+            extractedEnvs: Object.keys(envConfigs).filter(k => Object.keys(envConfigs[k]).length > 0)
         }
     });
 

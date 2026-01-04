@@ -46,6 +46,7 @@ export interface API {
     originTeamId?: string;
     gitRepoUrl?: string;
     gitFilePath?: string;
+    computedStatus?: string;
     gitInfo?: {
         managedByTfvars?: boolean;
         contractPath?: string;

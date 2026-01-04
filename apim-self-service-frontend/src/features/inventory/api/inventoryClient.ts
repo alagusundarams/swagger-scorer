@@ -22,6 +22,11 @@ export const getProducts = async (): Promise<Product[]> => {
     return res.data;
 };
 
+export const getProduct = async (id: string, environment?: string): Promise<Product> => {
+    const res = await baseClient.get(`/products/${id}${environment ? `?environment=${environment}` : ''}`);
+    return res.data;
+};
+
 export const getApis = async (): Promise<API[]> => {
     const res = await baseClient.get('/apis');
     return res.data;
@@ -71,6 +76,7 @@ export const requestPromotion = async (productId: string, targetEnv: string, pol
  */
 export const inventoryApi = {
     getProducts,
+    getProduct,
     getApis,
     createProduct,
     updateProduct,

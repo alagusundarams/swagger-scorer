@@ -58,8 +58,10 @@ export const SpecStudio: React.FC<SpecStudioProps> = ({
     useEffect(() => {
         if (initialContent) {
             setSpec(initialContent);
+            // Auto-trigger analysis for seamless UX
+            runAnalysis();
         }
-    }, [initialContent, setSpec]);
+    }, [initialContent, setSpec, runAnalysis]);
 
     useEffect(() => {
         if (result && onAnalysisComplete) {

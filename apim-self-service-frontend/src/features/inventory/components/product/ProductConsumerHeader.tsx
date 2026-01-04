@@ -1,3 +1,4 @@
+import { useSearchParams } from 'react-router-dom';
 import { type Product, type Team } from '../../../../shared/types/domain';
 import { getEnvironmentTheme } from '../../../../utils/statusUtils';
 
@@ -16,6 +17,17 @@ export function ProductConsumerHeader({
     hasPendingRequest,
     onRequestAccess
 }: ProductConsumerHeaderProps) {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const currentEnv = searchParams.get('environment') || product.environment || 'DEV';
+
+    const handleEnvChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const newEnv = e.target.value;
+        setSearchParams(prev => {
+            prev.set('environment', newEnv);
+            return prev;
+        });
+    };
+
     return (
         <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] p-10 mb-12 shadow-premium border border-gray-100 dark:border-slate-700/30">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
@@ -68,9 +80,21 @@ export function ProductConsumerHeader({
                 </div>
                 <div>
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Environment</p>
-                    <span className={`px - 2 py - 0.5 text - [9px] font - black rounded - lg border uppercase tracking - widest ${getEnvironmentTheme(product.environment || '').bg} ${getEnvironmentTheme(product.environment || '').text} ${getEnvironmentTheme(product.environment || '').border} `}>
-                        {product.environment}
-                    </span>
+                    <div className="relative group w-fit">
+                        <select
+                            value={currentEnv}
+                            onChange={handleEnvChange}
+                            className={`appearance-none cursor-pointer pl-3 pr-8 py-1 text-xs font-black rounded-lg border uppercase outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 transition-all ${getEnvironmentTheme(currentEnv).bg} ${getEnvironmentTheme(currentEnv).text} ${getEnvironmentTheme(currentEnv).border}`}
+                        >
+                            <option value="DEV">DEV (Draft)</option>
+                            <option value="QA">QA</option>
+                            <option value="STAGE">STAGE</option>
+                            <option value="PROD">PROD</option>
+                        </select>
+                        <div className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[8px] ${getEnvironmentTheme(currentEnv).text}`}>
+                            ▼
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

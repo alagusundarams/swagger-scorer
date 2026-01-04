@@ -61,7 +61,18 @@ export async function autoPromoteProduct(
 
         const product = productRes.rows[0];
 
-        // 2. Deploy to ARM/APIM
+        // 2. Prepare Policy (Smart Overlay Merge)
+        // Instead of blind copy, we try to find an overlay (mocked lookup or repo lookup)
+        // For MVP: We assume the base is what we deploy unless we implemented the full repo fetch here.
+        // But per design, we call OverlayService.
+        const { OverlayService } = await import('./OverlayService.js');
+        const overlayService = new OverlayService();
+
+        // Mock: In real life we'd fetch `policy.{env}.xml` from the repo using RepoService
+        // Here we just use the base product policy + simulate a merge if needed
+        const { finalXml } = await overlayService.mergePolicy(product.policy_xml, ''); // Empty overlay for now (Snapshot behavior preserved until explicit repo fetch added)
+
+        // 2b. Deploy to ARM/APIM
         console.log(`[Promotion] Deploying to ARM...`);
         const deployment = await deployProductToEnvironment(
             productId,
@@ -70,7 +81,7 @@ export async function autoPromoteProduct(
                 displayName: product.display_name,
                 description: product.description,
                 apiPath: product.api_path,
-                policyXml: product.policy_xml
+                policyXml: finalXml // Use merged XML
             }
         );
 
