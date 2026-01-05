@@ -73,9 +73,17 @@ async function main() {
     log(`🎯 Arguments: ${args.join(' ') || 'None (full sync)'}`);
     log(`⏰ Start time: ${startDate}\n`);
 
+    const skipAdo = args.includes('--skip-ado');
+
     try {
         await runScript('scripts/core/extract-apim-inventory.ts');
-        await runScript('scripts/core/extract-ado-metadata.ts');
+
+        if (!skipAdo) {
+            await runScript('scripts/core/extract-ado-metadata.ts');
+        } else {
+            log(`⏩ Skipping ADO Metadata extraction (--skip-ado flag detected)`);
+        }
+
         await runScript('scripts/core/reconcile-governance.ts');
 
         const endTime = Date.now();

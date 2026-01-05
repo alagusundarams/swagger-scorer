@@ -59,13 +59,21 @@ async function main() {
     const adoMetaPath = join(dataDir, 'ado-metadata.json');
     const apimMetaPath = join(dataDir, 'apim-metadata.json');
 
-    if (!existsSync(inventoryPath) || !existsSync(adoMetaPath) || !existsSync(apimMetaPath)) {
-        console.error("❌ Required JSON data missing. Run Part 1 and Part 2 first.");
+    if (!existsSync(inventoryPath) || !existsSync(apimMetaPath)) {
+        console.error("❌ Required Inventory/Metadata JSON missing. Run Part 1 first.");
         process.exit(1);
     }
 
     let inventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
-    const adoList: ADOMetadata[] = JSON.parse(readFileSync(adoMetaPath, 'utf8'));
+
+    // Load ADO Metadata if available, else warn and use empty
+    let adoList: ADOMetadata[] = [];
+    if (existsSync(adoMetaPath)) {
+        adoList = JSON.parse(readFileSync(adoMetaPath, 'utf8'));
+    } else {
+        console.warn("⚠️  ADO Metadata (ado-metadata.json) not found. Skipping DevOps linkage (All products will be PORTAL_MANAGED).");
+    }
+
     let apimMeta: MetadataStore = JSON.parse(readFileSync(apimMetaPath, 'utf8'));
 
     // Filter by environment if flag is provided
@@ -104,16 +112,22 @@ async function main() {
         // --- A. PRODUCTS RECONCILIATION ---
         console.log(`📋 Reconciling ${inventory.length} products...`);
         for (const prod of inventory) {
-            const ado = adoMap.get(prod.id);
-            if (!ado) continue;
+            const ado = adoMap.get(prod.id) || {
+                productId: prod.id,
+                productName: prod.name,
+                repository: null,
+                pipeline: null,
+                deployments: {},
+                status: 'ORPHAN'
+            };
 
             for (const envName of prod.environments) {
                 const uniqueProductId = `${prod.id}:${envName}:Global`;
-                const localDeploy = ado.deployments[envName];
-                const devDeploy = ado.deployments['DEV'];
-                const qaDeploy = ado.deployments['QA'];
-                const stageDeploy = ado.deployments['STAGE'];
-                const prodDeploy = ado.deployments['PROD'];
+                const localDeploy = (ado.deployments as any)[envName];
+                const devDeploy = (ado.deployments as any)['DEV'];
+                const qaDeploy = (ado.deployments as any)['QA'];
+                const stageDeploy = (ado.deployments as any)['STAGE'];
+                const prodDeploy = (ado.deployments as any)['PROD'];
 
                 await pool.query(`
                     INSERT INTO products (
@@ -145,8 +159,8 @@ async function main() {
                 `, [
                     uniqueProductId, prod.id, prod.name, null, 'published', envName, 'Global',  // version set to NULL (APIM doesn't have version)
                     localDeploy?.hash || null, localDeploy?.date || null,
-                    ado.pipeline ? `${config.devops.baseUrl}/${config.devops.organization}/${ado.repository.project}/_build?definitionId=${ado.pipeline.id}` : null,
-                    ado.repository ? `${config.devops.baseUrl}/${config.devops.organization}/${ado.repository.project}/_git/${ado.repository.name}` : null,
+                    ado.pipeline ? `${config.devops.baseUrl}/${config.devops.organization}/${(ado.repository as any)?.project}/_build?definitionId=${ado.pipeline.id}` : null,
+                    ado.repository ? `${config.devops.baseUrl}/${config.devops.organization}/${(ado.repository as any)?.project}/_git/${(ado.repository as any)?.name}` : null,
                     devDeploy?.hash || null, devDeploy?.date || null,
                     qaDeploy?.hash || null, qaDeploy?.date || null,
                     stageDeploy?.hash || null, stageDeploy?.date || null,

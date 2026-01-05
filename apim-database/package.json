@@ -13,6 +13,8 @@
         "discover:inventory": "tsx scripts/core/extract-apim-inventory.ts",
         "discover:ado": "tsx scripts/core/extract-ado-metadata.ts",
         "discover:reconcile": "tsx scripts/core/reconcile-governance.ts",
+        "discover:fast": "tsx scripts/core/discover-sync.ts --skip-ado",
+        "verify": "tsx scripts/utils/verify-db-integrity.ts",
         "fetch": "tsx scripts/utils/fetch-apim-data.ts",
         "fetch-ad-groups": "tsx scripts/utils/fetch-ad-groups.ts",
         "migrate": "tsx scripts/utils/migrate-to-postgres.ts",
