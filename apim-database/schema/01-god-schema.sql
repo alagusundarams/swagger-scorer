@@ -400,6 +400,22 @@ CREATE INDEX idx_drafts_product ON drafts(product_id);
 COMMENT ON TABLE drafts IS 'Tracks draft files before approval and deployment';
 
 -- =============================================================================
+-- ONBOARDING STAGING
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS api_onboarding_staging (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    api_name TEXT NOT NULL,
+    blob_path TEXT NOT NULL,
+    status TEXT NOT NULL,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- =============================================================================
 -- BLOB HISTORY (From Migration 02)
 -- =============================================================================
 

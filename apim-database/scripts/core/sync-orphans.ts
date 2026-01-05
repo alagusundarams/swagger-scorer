@@ -1,11 +1,23 @@
 import 'dotenv/config';
-import { ArmService } from '../services/apim/ArmService.js';
-import { query } from '../services/db.js';
+import { Pool } from 'pg';
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
 import axios from 'axios';
 
 /**
- * Smart Extraction Engine: APIM Resource Sync
+ * Smart Extraction Engine: APIM Resource Sync (Orphans)
+ * 
+ * Run: npx tsx apim-database/scripts/core/sync-orphans.ts
  */
+
+function loadConfig() {
+    const configPath = join(process.cwd(), 'apim-database', 'config.json');
+    if (existsSync(configPath)) return JSON.parse(readFileSync(configPath, 'utf8'));
+    return {};
+}
+
+const config = loadConfig();
+const DATABASE_URL = process.env.DATABASE_URL || config.database?.url || 'postgresql://postgres:postgrespassword@127.0.0.1:5432/apim_portal';
 
 async function getAccessToken() {
     const { AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET } = process.env;
@@ -31,27 +43,27 @@ async function getAccessToken() {
 
 async function sync() {
     console.log('🚀 Starting Smart Extraction Engine...');
+    const pool = new Pool({ connectionString: DATABASE_URL });
     const environment = process.env.SYNC_ENV || 'DEV';
     const token = await getAccessToken();
 
-    const arm = new ArmService({
-        subscriptionId: process.env.AZURE_SUBSCRIPTION_ID || 'mock-sub',
-        resourceGroup: process.env.AZURE_RESOURCE_GROUP || 'mock-rg',
-        serviceName: process.env.APIM_SERVICE_NAME || 'mock-apim',
-        accessToken: token
-    });
+    // Minimal ARM helpers if not importing backend service
+    const baseUrl = `https://management.azure.com/subscriptions/${process.env.AZURE_SUBSCRIPTION_ID}/resourceGroups/${process.env.AZURE_RESOURCE_GROUP}/providers/Microsoft.ApiManagement/service/${process.env.APIM_SERVICE_NAME}`;
+    const headers = { Authorization: `Bearer ${token}` };
 
     try {
         // 1. Sync Named Values
         console.log('📦 Syncing Named Values...');
-        const apimNamedValues = await arm.getNamedValues();
+        const nvRes = await axios.get(`${baseUrl}/namedValues?api-version=2022-08-01`, { headers });
+        const apimNamedValues = nvRes.data.value;
+
         for (const nv of apimNamedValues) {
             const properties = nv.properties || {};
             const tags = properties.tags || [];
 
-            let scope: string | null = null;
-            let productId: string | null = null;
-            let apiId: string | null = null;
+            let scope = null;
+            let productId = null;
+            let apiId = null;
 
             if (tags.includes('scope:global')) {
                 scope = 'GLOBAL';
@@ -68,7 +80,7 @@ async function sync() {
             }
 
             const nvId = `${environment}-${nv.name}`;
-            await query(`
+            await pool.query(`
                 INSERT INTO named_values (id, system_name, display_name, environment, value, is_secret, scope, product_id, scope_id, updated_at)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
                 ON CONFLICT (environment, system_name) DO UPDATE SET
@@ -83,12 +95,14 @@ async function sync() {
 
         // 2. Sync Backends
         console.log('🔗 Syncing Backends...');
-        const apimBackends = await arm.getBackends();
+        const beRes = await axios.get(`${baseUrl}/backends?api-version=2022-08-01`, { headers });
+        const apimBackends = beRes.data.value;
+
         for (const b of apimBackends) {
             const properties = b.properties || {};
             const description = properties.description || '';
-            let scope: string | null = null;
-            let productId: string | null = null;
+            let scope = null;
+            let productId = null;
             const tags = properties.tags || [];
 
             if (tags.includes('scope:global') || description.includes('[GLOBAL]')) {
@@ -101,7 +115,7 @@ async function sync() {
                 }
             }
 
-            await query(`
+            await pool.query(`
                 INSERT INTO governance_backends (id, environment, url, title, description, protocol, scope, product_id, updated_at)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
                 ON CONFLICT (id, environment) DO UPDATE SET
@@ -116,7 +130,9 @@ async function sync() {
         console.log(`✅ Synced ${apimBackends.length} Backends`);
     } catch (err) {
         console.error('❌ Sync failed:', err);
+    } finally {
+        await pool.end();
     }
-    process.exit(0);
 }
+
 sync();

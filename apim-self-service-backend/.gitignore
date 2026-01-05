@@ -30,3 +30,5 @@ Thumbs.db
 .vitest/
 
 /src/generated/prisma
+staging/
+database/
