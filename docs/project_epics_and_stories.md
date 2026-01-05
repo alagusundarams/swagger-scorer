@@ -92,10 +92,11 @@ This backlog outlines the features and capabilities of the APIM Self-Service Por
 50. **[DB] Subscription Model:** Schema for managing Consumer-to-Product relationships.
 51. **[KM] Secret Management:** Secure generation of Subscription Key identifiers.
 52. **[BE] Application Linkage:** Association of Client IDs (App Registrations) to Subscriptions.
-53. **[FE] Key Reveal UI:** Secure "Show/Hide" mechanism for API Keys.
-54. **[BE] Auto-Approval Logic:** Rule engine for "Open" vs "Protected" products.
-55. **[BE] Manual Approval Flow:** Workflow for Producers to grant/deny access.
-56. **[BE] Key Rotation:** Logic to invalidate and regenerate keys via APIM.
+53. **[FE] App Registration Display:** Show linked app registration details (Client ID, Display Name, App ID URI) in product detail view and admin governance pages.
+54. **[FE] Key Reveal UI:** Secure "Show/Hide" mechanism for API Keys.
+55. **[BE] Auto-Approval Logic:** Rule engine for "Open" vs "Protected" products.
+56. **[BE] Manual Approval Flow:** Workflow for Producers to grant/deny access.
+57. **[BE] Key Rotation:** Logic to invalidate and regenerate keys via APIM.
 
 ---
 

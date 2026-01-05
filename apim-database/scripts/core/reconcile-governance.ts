@@ -47,6 +47,7 @@ const config = loadConfig();
 // --- ARGS ---
 const args = process.argv.slice(2);
 const targetEnv = args.find(a => a.startsWith('--env='))?.split('=')[1]?.toUpperCase();
+const sourceMode = args.find(a => a.startsWith('--source='))?.split('=')[1] || 'inventory'; // 'inventory' or 'db'
 const verbose = !args.includes('--quiet');
 
 async function main() {
@@ -54,27 +55,46 @@ async function main() {
     if (targetEnv) console.log(`🎯 Filtering for Environment: ${targetEnv}\n`);
 
     // 1. Data Loading
-    const dataDir = join(process.cwd(), 'apim-database', 'scripts', 'data');
+    const dataDir = existsSync(join(process.cwd(), 'scripts', 'data'))
+        ? join(process.cwd(), 'scripts', 'data')
+        : join(process.cwd(), 'apim-database', 'scripts', 'data');
+
     const inventoryPath = join(dataDir, 'apim-inventory.json');
     const adoMetaPath = join(dataDir, 'ado-metadata.json');
     const apimMetaPath = join(dataDir, 'apim-metadata.json');
 
-    if (!existsSync(inventoryPath) || !existsSync(apimMetaPath)) {
-        console.error("❌ Required Inventory/Metadata JSON missing. Run Part 1 first.");
+    let inventory: any[] = [];
+    let apimMeta: MetadataStore = {
+        namedValues: {},
+        appIds: {},
+        apiContracts: {},
+        backends: {},
+        apiForensics: {},
+        productApiLinks: {}
+    };
+
+    if (sourceMode === 'db') {
+        console.log(`🔌 Source: db mode. Inventory will be loaded from database.`);
+    } else if (!existsSync(inventoryPath) || !existsSync(apimMetaPath)) {
+        console.error("❌ Required Inventory/Metadata JSON missing. Run Part 1 first or use --source=db.");
         process.exit(1);
     }
 
-    let inventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
+    if (existsSync(inventoryPath)) {
+        inventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
+    }
 
     // Load ADO Metadata if available, else warn and use empty
     let adoList: ADOMetadata[] = [];
     if (existsSync(adoMetaPath)) {
         adoList = JSON.parse(readFileSync(adoMetaPath, 'utf8'));
     } else {
-        console.warn("⚠️  ADO Metadata (ado-metadata.json) not found. Skipping DevOps linkage (All products will be PORTAL_MANAGED).");
+        console.warn("⚠️  ADO Metadata (ado-metadata.json) not found. Skipping DevOps linkage.");
     }
 
-    let apimMeta: MetadataStore = JSON.parse(readFileSync(apimMetaPath, 'utf8'));
+    if (existsSync(apimMetaPath)) {
+        apimMeta = JSON.parse(readFileSync(apimMetaPath, 'utf8'));
+    }
 
     // Filter by environment if flag is provided
     if (targetEnv) {
@@ -102,11 +122,32 @@ async function main() {
     const adoMap = new Map<string, ADOMetadata>(adoList.map(m => [m.productId, m]));
 
     // 2. DB Connection
-    const dbUrl = config.azure?.environments[0]?.databaseUrl || config.database?.url;
+    const dbUrl = process.env.DATABASE_URL || config.azure?.environments[0]?.databaseUrl || config.database?.url;
     if (!dbUrl) {
+        console.error("❌ Database URL missing in config.json or DATABASE_URL env var.");
         process.exit(1);
     }
     const pool = new Pool({ connectionString: dbUrl });
+
+    // 2.1 Fetch inventory from DB if source=db
+    if (sourceMode === 'db') {
+        try {
+            const res = await pool.query(`
+                SELECT id, name, array_agg(DISTINCT environment) as environments 
+                FROM products 
+                GROUP BY id, name
+            `);
+            inventory = res.rows.map(row => ({
+                id: row.id,
+                name: row.name,
+                environments: row.environments
+            }));
+            console.log(`   ✅ Loaded ${inventory.length} logical products from DB.`);
+        } catch (err: any) {
+            console.error(`❌ DB Connection failed during inventory fetch: ${err.message}`);
+            process.exit(1);
+        }
+    }
 
     try {
         // --- A. PRODUCTS RECONCILIATION ---

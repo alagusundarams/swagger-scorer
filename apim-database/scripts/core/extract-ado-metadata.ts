@@ -6,7 +6,7 @@
  * and performs targeted ADO discovery.
  */
 
-import { readFileSync, existsSync, writeFileSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { AzureService } from '../services/AzureService.js';
 import pkg from 'pg';
@@ -64,7 +64,10 @@ async function main() {
     // 1. Load Discovery Source
     if (sourceMode === 'db') {
         console.log(`🔌 Fetching unique products from Database...`);
-        const pool = new Pool(config.database);
+        const pool = new Pool({
+            connectionString: process.env.DATABASE_URL || (config.database ? config.database.url : undefined),
+            ...(typeof config.database === 'object' ? config.database : {})
+        });
         try {
             const res = await pool.query(`
                 SELECT id, name, array_agg(DISTINCT environment) as environments 
@@ -84,7 +87,10 @@ async function main() {
             await pool.end();
         }
     } else {
-        const inventoryPath = join(process.cwd(), 'apim-database', 'scripts', 'data', 'apim-inventory.json');
+        const inventoryDir = existsSync(join(process.cwd(), 'scripts', 'data'))
+            ? join(process.cwd(), 'scripts', 'data')
+            : join(process.cwd(), 'apim-database', 'scripts', 'data');
+        const inventoryPath = join(inventoryDir, 'apim-inventory.json');
         if (!existsSync(inventoryPath)) {
             console.error(`❌ Inventory file not found: ${inventoryPath}. Run Part 1 first!`);
             process.exit(1);
@@ -208,7 +214,12 @@ async function main() {
         }
     }
 
-    const outputPath = join(process.cwd(), 'apim-database', 'scripts', 'data', 'ado-metadata.json');
+    const dataDir = existsSync(join(process.cwd(), 'scripts', 'data'))
+        ? join(process.cwd(), 'scripts', 'data')
+        : join(process.cwd(), 'apim-database', 'scripts', 'data');
+    if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true });
+
+    const outputPath = join(dataDir, 'ado-metadata.json');
     writeFileSync(outputPath, JSON.stringify(results, null, 2));
     console.log(`\n✅ ADO Metadata Extraction Complete! Saved to: ${outputPath}`);
 }

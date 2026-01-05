@@ -77,7 +77,11 @@ async function main() {
     const skipAdo = args.includes('--skip-ado');
 
     try {
-        await runScript('scripts/core/extract-apim-inventory.ts');
+        if (sourceMode === 'inventory') {
+            await runScript('scripts/core/extract-apim-inventory.ts');
+        } else {
+            log(`⏩ Skipping APIM Inventory extraction (Source: ${sourceMode} mode detected)`);
+        }
 
         if (!skipAdo) {
             await runScript('scripts/core/extract-ado-metadata.ts');
@@ -86,6 +90,10 @@ async function main() {
         }
 
         await runScript('scripts/core/reconcile-governance.ts');
+
+        // 3. Run Policy Template Seed (Step 3 in plan)
+        log(`🌱 Running Policy Template Seed...`);
+        await runScript('scripts/core/seed-policy-templates.ts');
 
         const endTime = Date.now();
         const endDate = new Date().toLocaleString('en-US', { hour12: false });

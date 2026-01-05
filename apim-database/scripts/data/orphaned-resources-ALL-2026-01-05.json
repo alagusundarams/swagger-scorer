@@ -1,0 +1,34 @@
+{
+  "generated_at": "2026-01-05T20:48:16.339Z",
+  "environment": "ALL",
+  "summary": {
+    "total_orphaned": 2,
+    "orphaned_products": 2,
+    "orphaned_named_values": 0,
+    "orphaned_backends": 0,
+    "orphaned_apis": 0,
+    "orphaned_subscriptions": 0
+  },
+  "details": {
+    "products": [
+      {
+        "id": "prod-payment-v2:DEV:Global",
+        "name": "prod-payment-v2",
+        "environment": "DEV",
+        "status": "PORTAL_MANAGED",
+        "reason": "No Terraform pipeline or repository found"
+      },
+      {
+        "id": "prod-legacy:PROD:Global",
+        "name": "prod-legacy",
+        "environment": "PROD",
+        "status": "PORTAL_MANAGED",
+        "reason": "No Terraform pipeline or repository found"
+      }
+    ],
+    "named_values": [],
+    "backends": [],
+    "apis": [],
+    "subscriptions": []
+  }
+}

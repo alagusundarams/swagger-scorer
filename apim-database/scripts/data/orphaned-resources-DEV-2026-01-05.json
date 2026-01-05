@@ -1,0 +1,48 @@
+{
+  "generated_at": "2026-01-05T21:10:46.327Z",
+  "environment": "DEV",
+  "summary": {
+    "total_orphaned": 4,
+    "orphaned_products": 2,
+    "orphaned_named_values": 1,
+    "orphaned_backends": 1,
+    "orphaned_apis": 0,
+    "orphaned_subscriptions": 0
+  },
+  "details": {
+    "products": [
+      {
+        "id": "prod-payment-v2:DEV:Global",
+        "name": "prod-payment-v2",
+        "environment": "DEV",
+        "status": "PORTAL_MANAGED",
+        "reason": "No Terraform pipeline or repository found"
+      },
+      {
+        "id": "prod-payment-v2:DEV:Global:DEV:Global",
+        "name": "prod-payment-v2:DEV:Global",
+        "environment": "DEV",
+        "status": "PORTAL_MANAGED",
+        "reason": "No Terraform pipeline or repository found"
+      }
+    ],
+    "named_values": [
+      {
+        "system_name": "Dev_Endpoint",
+        "environment": "DEV",
+        "value_preview": "https://dev.backend.com",
+        "reason": "Not referenced by any API policy"
+      }
+    ],
+    "backends": [
+      {
+        "id": "be-02",
+        "environment": "DEV",
+        "url": "https://api.stripe.com",
+        "reason": "Backend exists but not used by any API"
+      }
+    ],
+    "apis": [],
+    "subscriptions": []
+  }
+}

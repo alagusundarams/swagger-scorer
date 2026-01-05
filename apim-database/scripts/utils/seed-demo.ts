@@ -51,6 +51,8 @@ async function seedDemoData() {
         await pool.query('DELETE FROM operations;');
         await pool.query('DELETE FROM apis;');
         await pool.query('DELETE FROM app_registrations;');
+        await pool.query('DELETE FROM named_values;');
+        await pool.query('DELETE FROM governance_backends;');
         await pool.query('DELETE FROM products;');
 
         // 3. Insert "Legacy Order API" (The Wild West)
@@ -185,6 +187,29 @@ async function seedDemoData() {
             );
         `);
         console.log('✅ Approval Request Seeded.');
+
+        // 6. Insert Named Values with environment and region
+        await pool.query(`
+            INSERT INTO named_values (id, system_name, display_name, value, is_secret, environment, region, product_id)
+            VALUES 
+                ('nv-01', 'Global_ApiKey', 'Global API Key', 'secret-v1', true, 'PROD', 'Global', 'prod-legacy'),
+                ('nv-02', 'Dev_Endpoint', 'Dev Service Endpoint', 'https://dev.backend.com', false, 'DEV', 'Global', 'prod-payment-v2'),
+                ('nv-03', 'Orphan_Secret', 'Orphaned Subscription Key', 'orphan-val', true, 'QA', 'Global', NULL)
+            ON CONFLICT (id) DO UPDATE SET
+                value = EXCLUDED.value,
+                environment = EXCLUDED.environment,
+                region = EXCLUDED.region;
+        `);
+        console.log('✅ Named Values Seeded.');
+
+        // 7. Insert Backends with environment and region
+        await pool.query(`
+            INSERT INTO governance_backends (id, title, url, environment, region, product_id)
+            VALUES 
+                ('be-01', 'Legacy ERP', 'https://erp.internal.com', 'PROD', 'Global', 'prod-legacy'),
+                ('be-02', 'Payment Processor', 'https://api.stripe.com', 'DEV', 'Global', 'prod-payment-v2');
+        `);
+        console.log('✅ Backends Seeded.');
 
     } catch (err) {
         console.error('❌ Seeding Failed:', err);
