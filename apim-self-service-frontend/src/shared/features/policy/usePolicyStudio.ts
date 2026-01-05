@@ -4,6 +4,7 @@ import jsyaml from 'js-yaml';
 import { ApiOperation, parseSwaggerOperations } from '../../../utils/swaggerParser';
 import { type PolicyStep, type PolicySection } from './types';
 import { parsePolicyXml, generateFullPolicyXml } from './templates';
+import { useStore } from '../../../store/useStore';
 
 export interface OperationPolicyState {
     enabled: boolean;
@@ -28,6 +29,7 @@ export function usePolicyStudio({
     initialApiPolicies,
     onSync
 }: UsePolicyStudioProps) {
+    const { policyTemplates, fetchPolicyTemplates } = useStore();
     const [operations, setOperations] = useState<ApiOperation[]>([]);
     const [selectedOpId, setSelectedOpId] = useState<string | null>(null);
     const [scanned, setScanned] = useState(false);
@@ -51,6 +53,13 @@ export function usePolicyStudio({
     const initialLoadDone = useRef(false);
     const prevSpecContent = useRef(specContent);
     const prevOpsLen = useRef(preParsedOperations?.length || 0);
+
+    // 0. Ensure Templates Loaded
+    useEffect(() => {
+        if (policyTemplates.length === 0) {
+            fetchPolicyTemplates();
+        }
+    }, [policyTemplates.length, fetchPolicyTemplates]);
 
     // 1. Loader Effect
     useEffect(() => {
@@ -89,7 +98,7 @@ export function usePolicyStudio({
                         opMap[id] = {
                             enabled: true,
                             mode: 'xml',
-                            steps: parsePolicyXml(xml),
+                            steps: parsePolicyXml(xml, policyTemplates),
                             xmlContent: xml,
                             isOverridden: true
                         };
@@ -101,7 +110,7 @@ export function usePolicyStudio({
                     opMap['product'] = {
                         enabled: true,
                         mode: 'simple',
-                        steps: productPolicyXml ? parsePolicyXml(productPolicyXml) : [],
+                        steps: productPolicyXml ? parsePolicyXml(productPolicyXml, policyTemplates) : [],
                         xmlContent: productPolicyXml || '',
                         isOverridden: !!productPolicyXml
                     };
@@ -143,7 +152,7 @@ export function usePolicyStudio({
             prevOpsLen.current = preParsedOperations?.length || 0;
         };
         loadOps();
-    }, [specContent, preParsedOperations, productPolicyXml, initialApiPolicies]);
+    }, [specContent, preParsedOperations, productPolicyXml, initialApiPolicies, policyTemplates]);
 
     // 3. Handlers
     const handleAddStep = useCallback((templateId: string, section: PolicySection = 'inbound') => {
@@ -159,7 +168,7 @@ export function usePolicyStudio({
             const backend = newSteps.filter(s => s.section === 'backend');
             const outbound = newSteps.filter(s => s.section === 'outbound');
             const onError = newSteps.filter(s => s.section === 'on-error');
-            const xml = generateFullPolicyXml(inbound, backend, outbound, onError);
+            const xml = generateFullPolicyXml(inbound, backend, outbound, onError, policyTemplates);
 
             if (isProductScope && onSync) onSync(xml);
 
@@ -168,7 +177,7 @@ export function usePolicyStudio({
                 [targetScopeId]: { ...current, steps: newSteps, xmlContent: xml, isOverridden: true }
             };
         });
-    }, [targetScopeId, isProductScope, onSync]);
+    }, [targetScopeId, isProductScope, onSync, policyTemplates]);
 
     const handleUpdateStep = useCallback((id: string, newValues: Record<string, any>) => {
         if (!targetScopeId) return;
@@ -184,7 +193,7 @@ export function usePolicyStudio({
             const backend = newSteps.filter(s => s.section === 'backend');
             const outbound = newSteps.filter(s => s.section === 'outbound');
             const onError = newSteps.filter(s => s.section === 'on-error');
-            const xml = generateFullPolicyXml(inbound, backend, outbound, onError);
+            const xml = generateFullPolicyXml(inbound, backend, outbound, onError, policyTemplates);
 
             if (isProductScope && onSync) onSync(xml);
 
@@ -193,7 +202,7 @@ export function usePolicyStudio({
                 [targetScopeId]: { ...current, steps: newSteps, xmlContent: xml, isOverridden: true }
             };
         });
-    }, [targetScopeId, isProductScope, onSync]);
+    }, [targetScopeId, isProductScope, onSync, policyTemplates]);
 
     const handleRemoveStep = useCallback((id: string) => {
         if (!targetScopeId) return;
@@ -207,7 +216,7 @@ export function usePolicyStudio({
             const backend = newSteps.filter(s => s.section === 'backend');
             const outbound = newSteps.filter(s => s.section === 'outbound');
             const onError = newSteps.filter(s => s.section === 'on-error');
-            const xml = generateFullPolicyXml(inbound, backend, outbound, onError);
+            const xml = generateFullPolicyXml(inbound, backend, outbound, onError, policyTemplates);
 
             if (isProductScope && onSync) onSync(xml);
 
@@ -216,7 +225,7 @@ export function usePolicyStudio({
                 [targetScopeId]: { ...current, steps: newSteps, xmlContent: xml, isOverridden: true }
             };
         });
-    }, [targetScopeId, isProductScope, onSync]);
+    }, [targetScopeId, isProductScope, onSync, policyTemplates]);
 
     const handleReorderSteps = useCallback((section: PolicySection, steps: PolicyStep[]) => {
         if (!targetScopeId) return;
@@ -231,7 +240,7 @@ export function usePolicyStudio({
             const backend = newSteps.filter(s => s.section === 'backend');
             const outbound = newSteps.filter(s => s.section === 'outbound');
             const onError = newSteps.filter(s => s.section === 'on-error');
-            const xml = generateFullPolicyXml(inbound, backend, outbound, onError);
+            const xml = generateFullPolicyXml(inbound, backend, outbound, onError, policyTemplates);
 
             if (isProductScope && onSync) onSync(xml);
 
@@ -240,7 +249,7 @@ export function usePolicyStudio({
                 [targetScopeId]: { ...current, steps: newSteps, xmlContent: xml, isOverridden: true }
             };
         });
-    }, [targetScopeId, isProductScope, onSync]);
+    }, [targetScopeId, isProductScope, onSync, policyTemplates]);
 
     const handleToggleMode = useCallback(() => {
         if (!targetScopeId) return;
@@ -251,7 +260,7 @@ export function usePolicyStudio({
             let updatedSteps = current.steps;
             if (newMode === 'simple' && current.mode === 'xml' && current.xmlContent) {
                 try {
-                    updatedSteps = parsePolicyXml(current.xmlContent);
+                    updatedSteps = parsePolicyXml(current.xmlContent, policyTemplates);
                 } catch {
                     alert("Failed to parse XML for Visual Mode.");
                     return prev;
@@ -262,7 +271,7 @@ export function usePolicyStudio({
                 [targetScopeId]: { ...current, mode: newMode, steps: updatedSteps }
             };
         });
-    }, [targetScopeId]);
+    }, [targetScopeId, policyTemplates]);
 
     const handleXmlChange = useCallback((newXml: string | undefined) => {
         if (!targetScopeId || newXml === undefined) return;

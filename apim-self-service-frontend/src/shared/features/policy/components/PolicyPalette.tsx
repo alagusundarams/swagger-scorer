@@ -1,7 +1,7 @@
 
 import React from 'react';
 
-import { POLICY_TEMPLATES } from '../templates';
+import { useStore } from '../../../../store/useStore';
 
 interface PolicyPaletteProps {
     activeSection: string;
@@ -16,7 +16,8 @@ export const PolicyPalette: React.FC<PolicyPaletteProps> = ({
     onSelect,
     readOnly
 }) => {
-    const categories = Array.from(new Set(POLICY_TEMPLATES.map(t => t.category)));
+    const { policyTemplates } = useStore();
+    const categories = Array.from(new Set(policyTemplates.map(t => t.category)));
     const sections = [
         { id: 'inbound', label: 'Inbound', color: 'indigo' },
         { id: 'backend', label: 'Backend', color: 'amber' },
@@ -52,7 +53,7 @@ export const PolicyPalette: React.FC<PolicyPaletteProps> = ({
                     <div key={cat} className="space-y-3">
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">{cat}</p>
                         <div className="space-y-2">
-                            {POLICY_TEMPLATES.filter(t => t.category === cat).map(template => (
+                            {policyTemplates.filter(t => t.category === cat).map(template => (
                                 <button
                                     key={template.id}
                                     disabled={readOnly}

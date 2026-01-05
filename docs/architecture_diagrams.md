@@ -4,31 +4,86 @@ This document provides visual representations of the APIM Self-Service Portal's 
 
 ---
 
+## 🛠️ 0. Technology Stack Overview
+High-level breakdown of the chosen technologies for each layer of the application.
+
+```mermaid
+graph TD
+    %% Styles
+    classDef azure fill:#0072C6,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef compute fill:#4caf50,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef db fill:#ff9800,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef ext fill:#607d8b,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef react fill:#61dafb,stroke:#fff,stroke-width:2px,color:#000;
+
+    subgraph Frontend
+        React["fa:fa-react React 18"]:::react
+        TS_FE["fa:fa-code TypeScript"]:::react
+        Tailwind["fa:fa-css3 Tailwind CSS"]:::react
+        Zustand["fa:fa-database Zustand State"]:::react
+        Vite["fa:fa-bolt Vite Bundler"]:::react
+    end
+    subgraph Backend
+        NodeJS["fa:fa-node Node.js 20"]:::compute
+        Fastify["fa:fa-server Fastify"]:::compute
+        TS_BE["fa:fa-code TypeScript"]:::compute
+        Spectral["fa:fa-check-circle Spectral Engine"]:::compute
+    end
+    subgraph Infrastructure
+        AKS["fa:fa-dharmachakra AKS"]:::azure
+        Postgres["fa:fa-database Azure Postgres"]:::db
+        APIM["fa:fa-cogs Azure APIM"]:::azure
+        KV["fa:fa-key Key Vault"]:::azure
+    end
+    subgraph Observability
+        Dynatrace["fa:fa-chart-line Dynatrace"]:::ext
+    end
+    subgraph DevOps
+        ADO["fa:fa-code-branch Azure DevOps"]:::azure
+    end
+
+    React --> NodeJS
+    NodeJS --> AKS
+    NodeJS --> Postgres
+    NodeJS --> APIM
+    NodeJS -.-> Dynatrace
+    NodeJS <-->|Sync| ADO
+```
+
+---
+
 ## 🧩 1. System Component Architecture (C4 Component)
 Modular breakdown of the system components and their interactions, highlighting the separation between UI, Service Layer, and Infrastructure.
 
 ```mermaid
 graph LR
+    %% Styles
+    classDef azure fill:#0072C6,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef compute fill:#4caf50,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef db fill:#ff9800,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef ext fill:#607d8b,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef fe fill:#61dafb,stroke:#fff,stroke-width:2px,color:#000;
+
     subgraph "UI Layer (Micro-Frontends)"
-        Catalog["Catalog MFE"]
-        Editor["Policy Editor MFE"]
-        Admin["Admin Dashboard MFE"]
-        SharedUI["Shared UI Kit"]
+        Catalog["fa:fa-book Catalog MFE"]:::fe
+        Editor["fa:fa-edit Policy Editor MFE"]:::fe
+        Admin["fa:fa-tachometer-alt Admin Dashboard MFE"]:::fe
+        SharedUI["fa:fa-layer-group Shared UI Kit"]:::fe
     end
 
     subgraph "Service Layer (Node.js)"
-        ProductSvc["Product Service"]
-        AuditSvc["Audit Service"]
-        SyncEngine["JIT Sync Engine"]
-        GitSvc["ADO Git Service"]
-        AuthSvc["Auth & RBAC Service"]
+        ProductSvc["fa:fa-box Product Service"]:::compute
+        AuditSvc["fa:fa-clipboard-list Audit Service"]:::compute
+        SyncEngine["fa:fa-sync JIT Sync Engine"]:::compute
+        GitSvc["fa:fa-code-branch ADO Git Service"]:::compute
+        AuthSvc["fa:fa-shield-alt Auth & RBAC Service"]:::compute
     end
 
     subgraph "Infrastructure & External"
-        DB[(PostgreSQL)]
-        APIM_API[APIM ARM API]
-        ADO_API[ADO REST API]
-        KV[Azure Key Vault]
+        DB[("fa:fa-database PostgreSQL")]:::db
+        APIM_API["fa:fa-cogs APIM ARM API"]:::azure
+        ADO_API["fa:fa-code-branch ADO REST API"]:::azure
+        KV["fa:fa-key Azure Key Vault"]:::azure
     end
 
     Catalog & Editor & Admin --> ProductSvc
@@ -49,49 +104,57 @@ graph LR
 The system is designed for high availability and scalability using a containerized micro-frontend and micro-service architecture on **Azure Kubernetes Service (AKS)**.
 
 ```mermaid
-graph TB
-    subgraph "External World"
-        User["User (Browser)"]
+graph LR
+    %% Styles
+    classDef azure fill:#0072C6,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef compute fill:#4caf50,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef db fill:#ff9800,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef ext fill:#607d8b,stroke:#fff,stroke-width:2px,color:#fff;
+
+    subgraph Lane1["User Zone"]
+        direction TB
+        User["fa:fa-user User (Browser)"]:::ext
     end
 
-    subgraph "Azure Tenant"
-        subgraph "AKS Cluster (apim-portal-aks)"
-            subgraph "Frontend Namespace"
-                FE["React MFE (Nginx)"]
-            end
-            subgraph "Backend Namespace"
-                BE["Node.js API (Fastify)"]
-                Scorer["Spectral Scorer Engine"]
-            end
-        end
-
-        subgraph "Data & State"
-            DB[("Azure SQL (PostgreSQL)")]
-            Storage["Azure Blob Storage (State/Templates/Drafts)"]
-        end
-
-        subgraph "External Integrations"
-            APIM["Azure API Management"]
-            ADO["Azure DevOps (Repos/Pipelines)"]
-            KeyVault["Azure Key Vault (Secrets)"]
-        end
-
-        subgraph "Ingress & Identity"
-            AGW["Azure App Gateway / Ingress Controller"]
-            EntraID["Microsoft Entra ID (Auth)"]
-        end
+    subgraph Lane2["Ingress & Identity"]
+        direction TB
+        AGW["fa:fa-shield-alt App Gateway (WAF)"]:::azure
+        EntraID["fa:fa-id-card Entra ID (Auth)"]:::azure
     end
 
-    User -->|HTTPS| AGW
-    AGW --> FE
-    FE -->|API Calls| BE
-    BE --> EntraID
+    subgraph Lane3["AKS Cluster (App Zone)"]
+        direction TB
+        FE["fa:fa-laptop-code React MFE (Nginx)"]:::compute
+        BE["fa:fa-server Node.js API (Fastify)"]:::compute
+        Scorer["fa:fa-check-circle Spectral Engine"]:::compute
+        FE --> BE
+        BE <--> Scorer
+    end
+
+    subgraph Lane4["Data & Observability"]
+        direction TB
+        DB[("fa:fa-database Azure SQL (Postgres)")]:::db
+        Storage["fa:fa-hdd Blob Storage"]:::db
+        KV["fa:fa-key Key Vault"]:::azure
+        Dynatrace["fa:fa-chart-line Dynatrace"]:::ext
+    end
+
+    subgraph Lane5["External Ecosystem"]
+        direction TB
+        APIM["fa:fa-cogs Azure APIM"]:::azure
+        ADO["fa:fa-code-branch Azure DevOps"]:::azure
+    end
+
+    %% Flows
+    User == HTTPS ==> AGW
+    AGW == Routing ==> FE
     BE --> DB
     BE --> Storage
+    BE --> KV
     BE --> APIM
     BE --> ADO
-    BE -->|Resolve Secrets| KeyVault
-    BE --> Scorer
+    BE -.-> Dynatrace
+    BE -.-> EntraID
 ```
 
 ---
@@ -223,30 +286,34 @@ sequenceDiagram
 
 ---
 
-## 🔄 5. Multi-Environment Promotion (GitOps)
-Lifecycle of a change from DEV to PROD, leveraging Git as the single source of truth.
+## 🔄 5. Multi-Environment Promotion (Saga Pattern)
+Lifecycle of a change from DEV to PROD. This can be orchestrated via an external CI/CD pipeline OR internally by the Node.js Service ("Saga" orchestrator) using ARM templates.
 
 ```mermaid
 sequenceDiagram
     participant P as Portal (Admin)
     participant DB as Postgres
+    participant Svc as Node.js Service
     participant ADO as Azure DevOps
-    participant Pipe as CI/CD Pipeline
-    participant APIM as APIM (QA/PROD)
+    participant ARM as Azure APIM (ARM)
 
     P->>DB: Check Promotion Readiness (Quality > 80)
-    P->>ADO: Trigger Branch Merge (dev -> qa)
-    ADO-->>P: Return New Commit Hash
+    P->>Svc: Trigger Promotion (dev -> qa)
     
-    P->>DB: Update 'qa_hash' for Product
+    rect rgb(240, 248, 255)
+        Note over Svc, ADO: Option A: GitOps (CI/CD)
+        Svc->>ADO: Trigger Branch Merge
+        ADO-->>Svc: Success (Pipeline Starts)
+    end
+
+    rect rgb(255, 248, 240)
+        Note over Svc, ARM: Option B: Direct Orchestration (Saga)
+        Svc->>ARM: Apply ARM Template (QA)
+        ARM-->>Svc: 200 OK
+    end
     
-    Note over ADO, APIM: Pipeline Triggers automatically
-    ADO->>Pipe: Start Deployment
-    Pipe->>APIM: Terraform/ARM Apply
-    APIM-->>Pipe: 200 OK
-    Pipe-->>ADO: Success
-    
-    Note over P, DB: Portal reflects state via hash comparison
+    Svc->>DB: Update 'qa_hash' for Product
+    Svc-->>P: Promotion Complete
 ```
 
 ---
@@ -273,11 +340,12 @@ flowchart TD
     
     Pass --> End([Return Payload])
     Warn --> End
+```
 
 ---
 
 ## 🎨 7. Policy Editor State Machine
-The Policy Editor manages a complex state transition between Visual (Tile-based) and Code (Monaco) modes, ensuring bi-directional synchronization and data preservation.
+The Policy Editor manages the lifecycle of the XML policy document, ensuring structural integrity and compliance.
 
 ```mermaid
 stateDiagram-v2
@@ -291,30 +359,18 @@ stateDiagram-v2
         StructuralCheck --> Invalid : Schema Fail
     }
 
-    Valid --> VisualMode : XML matched to Tiles
-    Invalid --> CodeMode : Fallback (Unparseable)
+    Valid --> EditorMode : Ready
+    Invalid --> EditorMode : Fallback (Raw Text)
     
-    state VisualMode {
+    state EditorMode {
         [*] --> Idle
-        Idle --> Dragging : User Interaction
-        Dragging --> Dropped : Tile Modification
-        Dropped --> SyncingCode : "Generate XML Chunk"
-        SyncingCode --> Idle
-    }
-
-    state CodeMode {
-        [*] --> CodeIdle
-        CodeIdle --> Editing : Monaco Change
+        Idle --> Editing : User Typing
         Editing --> Debouncing : 500ms Delay
         Debouncing --> Validating : Spectral Lint
-        Validating --> CodeIdle
+        Validating --> Idle
     }
 
-    VisualMode --> CodeMode : Switch to "View Code"
-    CodeMode --> VisualMode : Switch to "Visual" (If Valid)
-
-    VisualMode --> Saving : Click Save
-    CodeMode --> Saving : Click Save
+    EditorMode --> Saving : Click Save
     Saving --> [*]
 ```
 ```

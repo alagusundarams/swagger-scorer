@@ -118,3 +118,50 @@ flowchart TD
     
     Upsert --> Return
 ```
+
+---
+
+## 5. Error Handling & Observability
+We use a combination of structured logging, distributed tracing, and alerting.
+
+```mermaid
+graph TD
+    UserRequest[User Request] --> API[Node.js API]
+    API --> Logger[Winston Logger]
+    API --> Tracer[OpenTelemetry Tracer]
+    API --> DB[PostgreSQL]
+    
+    Logger --> Dynatrace[Dynatrace]
+    Tracer --> Dynatrace
+    
+    Dynatrace --> Alerts[Dynatrace Alerts]
+    Dynatrace --> Dashboards[Dynatrace Dashboards]
+```
+
+*   **Structured Logging:** All logs are JSON formatted, allowing for easy querying in Dynatrace.
+*   **Correlation IDs:** Every request gets a unique correlation ID, propagated through all downstream calls.
+*   **Health Checks:** `/health` endpoint for liveness/readiness probes.
+
+---
+
+## 6. Database Migrations (TypeORM)
+We use TypeORM for database migrations, ensuring schema evolution is managed.
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant CLI as TypeORM CLI
+    participant DB as PostgreSQL
+
+    Dev->>CLI: yarn typeorm migration:create -n AddProductsTable
+    CLI-->>Dev: Created migration file
+    
+    Dev->>Dev: Write SQL in migration file
+    
+    Dev->>CLI: yarn typeorm migration:run
+    CLI->>DB: SELECT * FROM migrations
+    DB-->>CLI: Applied migrations
+    CLI->>DB: EXECUTE migration SQL
+    DB-->>CLI: Success
+    CLI-->>Dev: Migrations applied
+```

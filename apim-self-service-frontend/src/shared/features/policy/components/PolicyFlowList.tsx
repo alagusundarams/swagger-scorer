@@ -5,8 +5,8 @@ import {
     verticalListSortingStrategy
 } from '@dnd-kit/sortable';
 import { type PolicyStep, type PolicySection } from '../types';
-import { POLICY_TEMPLATES } from '../templates';
 import { GenericPolicyRenderer } from './GenericPolicyRenderer';
+import { useStore } from '../../../../store/useStore';
 
 interface PolicyFlowListProps {
     section: PolicySection;
@@ -29,6 +29,8 @@ export const PolicyFlowList: React.FC<PolicyFlowListProps> = ({
     onRemove,
     readOnly
 }) => {
+    const { policyTemplates } = useStore();
+
     const sectionColors: Record<PolicySection, string> = {
         'inbound': 'indigo',
         'backend': 'amber',
@@ -77,7 +79,7 @@ export const PolicyFlowList: React.FC<PolicyFlowListProps> = ({
             <div className="space-y-4">
                 <SortableContext items={steps.map(s => s.id)} strategy={verticalListSortingStrategy}>
                     {steps.map((step) => {
-                        const template = POLICY_TEMPLATES.find(t => t.id === step.templateId);
+                        const template = policyTemplates.find(t => t.id === step.templateId);
                         if (!template) return null;
 
                         return (
@@ -85,6 +87,7 @@ export const PolicyFlowList: React.FC<PolicyFlowListProps> = ({
                                 key={step.id}
                                 id={step.id}
                                 step={step}
+                                template={template}
                                 onUpdate={onUpdate}
                                 onRemove={onRemove}
                                 readOnly={readOnly}

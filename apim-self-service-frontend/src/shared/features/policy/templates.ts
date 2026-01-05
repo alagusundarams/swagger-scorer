@@ -1,8 +1,8 @@
 
 import { type PolicyTemplate, type PolicyStep } from './types';
-import policyRegistry from './policies-registry.json';
 
-export const POLICY_TEMPLATES: PolicyTemplate[] = policyRegistry as any[];
+// REMOVED: import policyRegistry from './policies-registry.json';
+// REMOVED: export const POLICY_TEMPLATES: PolicyTemplate[] = policyRegistry as any[];
 
 /**
  * 🛠 XML Generation Engine (Fixed)
@@ -116,13 +116,13 @@ export const generatePolicyXml = (template: PolicyTemplate, values: Record<strin
 /**
  * Compiles a full flow into a <policies> block
  */
-export const generateFullPolicyXml = (inbound: PolicyStep[], backend: PolicyStep[], outbound: PolicyStep[], onError: PolicyStep[]): string => {
+export const generateFullPolicyXml = (inbound: PolicyStep[], backend: PolicyStep[], outbound: PolicyStep[], onError: PolicyStep[], templates: PolicyTemplate[]): string => {
     const renderSection = (steps: PolicyStep[]) => {
         // Start with base policy as standard
         let sectionXml = '    <base />\n';
 
         steps.forEach(step => {
-            const template = POLICY_TEMPLATES.find(t => t.id === step.templateId);
+            const template = templates.find(t => t.id === step.templateId);
             if (template) {
                 const fragment = generatePolicyXml(template, step.values);
                 // Proper indentation for each line
@@ -188,7 +188,7 @@ const sanitizeApimXml = (xml: string): string => {
     return output;
 };
 
-export const parsePolicyXml = (xmlString: string): PolicyStep[] => {
+export const parsePolicyXml = (xmlString: string, templates: PolicyTemplate[]): PolicyStep[] => {
     const steps: PolicyStep[] = [];
     if (!xmlString) return steps;
     try {
@@ -208,7 +208,7 @@ export const parsePolicyXml = (xmlString: string): PolicyStep[] => {
                 const tagName = element.tagName;
                 if (tagName === 'base') return;
 
-                const template = POLICY_TEMPLATES.find(t => (t.tagName || t.id) === tagName);
+                const template = templates.find(t => (t.tagName || t.id) === tagName);
                 if (template) {
                     const values: Record<string, any> = {};
 

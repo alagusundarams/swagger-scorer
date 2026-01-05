@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { type PolicyStep } from '../types';
-import { POLICY_TEMPLATES } from '../templates';
+import { PolicyTemplate } from '../../../../features/provisioning/components/policyTemplates';
 import { PolicyCard } from './PolicyCard';
 
 const SnippetButton = ({ onSelect, disabled }: { onSelect: (val: string) => void, disabled?: boolean }) => {
@@ -58,6 +58,7 @@ const SnippetButton = ({ onSelect, disabled }: { onSelect: (val: string) => void
 interface GenericPolicyRendererProps {
     id: string;
     step: PolicyStep;
+    template: PolicyTemplate;
     onUpdate: (id: string, updates: Record<string, any>) => void;
     onRemove: (id: string) => void;
     readOnly?: boolean;
@@ -66,12 +67,11 @@ interface GenericPolicyRendererProps {
 export const GenericPolicyRenderer = ({
     id,
     step,
+    template,
     onUpdate,
     onRemove,
     readOnly = false
 }: GenericPolicyRendererProps) => {
-    const template = POLICY_TEMPLATES.find(t => t.id === step.templateId);
-
     if (!template) {
         return (
             <div className="p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl text-xs font-bold">

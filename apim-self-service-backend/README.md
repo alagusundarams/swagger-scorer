@@ -142,7 +142,6 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318 npm start
 - **Git Integration**: Track spec changes by commit hash
 - **Approval Workflows**: Multi-stage promotion gates
 - **Prisma ORM**: Database persistence
-- **Redis Caching**: Performance optimization
 
 ## License
 MIT

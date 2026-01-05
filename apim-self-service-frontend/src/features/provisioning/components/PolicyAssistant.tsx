@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { POLICY_TEMPLATES, PolicyTemplate } from './policyTemplates';
+import { PolicyTemplate } from './policyTemplates';
+import { useStore } from '../../../store/useStore';
 
 /**
  * ------------------------------------------------------------------
@@ -37,14 +38,15 @@ interface PolicyAssistantProps {
  * - Matches against both `name` and `intent` fields for better recall.
  */
 export const PolicyAssistant = ({ onSelectTemplate, className = '' }: PolicyAssistantProps) => {
+    const { policyTemplates } = useStore();
     const [searchTerm, setSearchTerm] = useState('');
 
     // Filter logic: Match name OR intent description
     const matches = useMemo(() => {
-        if (!searchTerm) return POLICY_TEMPLATES; // Show all by default
+        if (!searchTerm) return policyTemplates; // Show all by default
 
         const lower = searchTerm.toLowerCase();
-        return POLICY_TEMPLATES.filter(t =>
+        return policyTemplates.filter(t =>
             t.name.toLowerCase().includes(lower) ||
             t.intent.toLowerCase().includes(lower) ||
             t.category.toLowerCase().includes(lower)

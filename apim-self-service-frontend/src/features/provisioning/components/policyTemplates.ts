@@ -30,7 +30,7 @@ export interface PolicyInput {
     name: string;
     label: string;
     type: 'text' | 'number' | 'boolean' | 'select' | 'textarea'; // Added textarea
-    options?: string[]; // For select
+    options?: (string | { label: string; value: string })[]; // Support objects
     default?: string;
     placeholder?: string;
     helperText?: string;
@@ -49,9 +49,12 @@ export interface PolicyTemplate {
     tagName?: string; // Optional: Override tag name for parsing
 }
 
-import policyRegistry from '../../../shared/features/policy/policies-registry.json';
 
-export const POLICY_TEMPLATES: PolicyTemplate[] = policyRegistry as PolicyTemplate[];
+// Removed static import
+// import policyRegistry from '../../../shared/features/policy/policies-registry.json';
+
+// DEPRECATED: Do not use. Use useStore().policyTemplates instead.
+export const POLICY_TEMPLATES: PolicyTemplate[] = [];
 
 // Helper to generate XML from config values
 export const generatePolicyXml = (template: PolicyTemplate, config: Record<string, unknown>): string => {
@@ -174,7 +177,7 @@ const sanitizeApimXml = (xml: string): string => {
     return output;
 };
 
-export const parsePolicyXml = (xmlString: string): ConfiguredPolicy[] => {
+export const parsePolicyXml = (xmlString: string, templates: PolicyTemplate[]): ConfiguredPolicy[] => {
     const policies: ConfiguredPolicy[] = [];
     if (!xmlString) return policies;
 
@@ -225,7 +228,7 @@ export const parsePolicyXml = (xmlString: string): ConfiguredPolicy[] => {
                 if (tagName === 'base') return;
 
                 // GENERIC MATCHING: Look for a template with matching tagName or ID
-                const template = POLICY_TEMPLATES.find(t => (t.tagName || t.id) === tagName);
+                const template = templates.find(t => (t.tagName || t.id) === tagName);
 
                 if (template) {
                     flushBuffer();

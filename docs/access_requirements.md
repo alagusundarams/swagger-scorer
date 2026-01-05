@@ -64,5 +64,5 @@ The portal integrates with Entra ID (formerly Azure AD) to manage Team membershi
 For the application to function correctly within a VNET or Firewalled environment:
 
 *   **Azure ARM API:** `management.azure.com:443` (APIM Control Plane)
-*   **Azure DevOps:** `dev.azure.com:443` (Source Control)
+*   **Azure DevOps:** `visualstudio.com:443` (Source Control)
 *   **PostgreSQL:** Internal connection to the database (typically port `5432`)

@@ -119,12 +119,11 @@ Deep defense layout using Zero Trust principles.
 ---
 
 ## 6. Policy Studio Engine (Internal Architecture)
-The Policy Studio is a **Hybrid XML/Visual Engine**.
+The Policy Studio is a **Hybrid Low-Code/Text Implementation**.
 
 ```mermaid
 flowchart LR
-    Visual["Visual Tiles"] -- Drag/Drop --> Generator["policyGenerator.ts"]
-    Generator -- Generates XML --> XML["Monaco Editor"]
+    Generator["policyGenerator.ts"] -- Generates XML --> XML["Monaco Editor"]
     XML -- On Save --> Analyzer["Spectral Linter"]
     Analyzer -- Valid --> Backend["Persistence API"]
 ```

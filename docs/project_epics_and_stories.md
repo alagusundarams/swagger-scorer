@@ -1,168 +1,138 @@
-# Enterprise Master Backlog (100+ Stories)
+# Portal Feature Backlog & Roadmap
 
 ## Overview
-This backlog represents the complete work breakdown structure (WBS) for the APIM Self-Service Portal. It includes all implemented engineering tasks, infrastructure setup, and refactoring efforts.
+This backlog outlines the features and capabilities of the APIM Self-Service Portal.
 
-**Total Estimated Points:** 480  
-**Phase:** Sprint 1 (Completed) & Sprint 2 (Backlog)
-
----
-
-## Epic 1: Infrastructure & Foundation (DevOps)
-**Goal:** Provision the secure runtime environment.
-
-1.  **[Infra] VNET Provisioning:** Create Azure VNET `10.0.0.0/16` with `app` and `db` subnets.
-2.  **[Infra] Azure Key Vault Setup:** Provision Standard Tier KV and enable RBAC.
-3.  **[Infra] PostgreSQL:** Deploy Azure Flexible Server (Burstable B1ms) with Private Endpoint.
-4.  **[Infra] APIM Deployment:** Provision APIM Premium and join to VNET (Internal Mode).
-5.  **[Infra] DNS Zones:** Configure Private DNS Zones for Postgres and Azure Key Vault.
-6.  **[DevOps] Dockerfile (Backend):** Create multi-stage Node.js build (Alpine).
-7.  **[DevOps] Dockerfile (Frontend):** Create Nginx-based production build for React.
-8.  **[DevOps] CI Pipeline:** GitHub Action/ADO Pipeline to lint, build, and push to ACR.
-9.  **[DevOps] Helm Charts:** Create `deployment.yaml`, `service.yaml`, `ingress.yaml`.
-10. **[DevOps] App Configuration:** Setup `config/loader.ts` to read `process.env`.
-11. **[Local] Docker Compose:** Create `docker-compose.yml` for local DB and API.
-12. **[DB] Seeding Script:** Create `seed.ts` to populate initial Teams data.
-13. **[Infra] Managed Identity:** Provision User-Assigned MI for the Container App.
-14. **[Infra] RBAC Assignments:** Assign `Key Vault Secrets User` to the Managed Identity (for Azure Key Vault).
+**Phase:** Active Development & Maintenance
 
 ---
 
-## Epic 2: Authentication & Identity (SecOps)
-**Goal:** Zero-Trust implementation.
+## Epic 1: Identity & Access Management (IAM)
+**Goal:** Zero-Trust implementation and Secure Access.
 
-15. **[FE] MSAL Setup:** Install `@azure/msal-react` and configure Public Client App.
-16. **[FE] Login Component:** Create `Login.tsx` with Redirect flow.
-17. **[BE] JWT Strategy:** Implement `fastify-jwt` to verify Entra ID signatures.
-18. **[BE] Auth Guard:** Create `auth.middleware.ts` to block 401 requests.
-19. **[BE] User Hydration:** Extract OID from token and upsert into `users` table.
-20. **[BE] Graph Integration:** Implement `GraphClient` to fetch `/me/memberOf`.
-21. **[BE] Role Mapper:** Map AD Groups (GUIDs) to App Roles (Admin/Producer).
-22. **[FE] Route Guards:** Create `<RequireAuth>` wrapper for React Router.
-23. **[FE] Token Refresh:** Implement silent token acquisition interceptor.
-24. **[FE] Logout Logic:** Clear LocalStorage and redirect to Entra Logout.
-25. **[Sec] CSP Headers:** Configure Helmet to enforce Content Security Policy.
-
----
-
-## Epic 3: Core Inventory Management
-**Goal:** The "CRUD" backbone of the application.
-
-26. **[DB] Schema Migration:** Create `001_initial_schema.sql` (Products, APIs).
-27. **[BE] Products Service:** Implement `getAllProducts()` with specific columns.
-28. **[BE] Create Logic:** Implement `createProduct()` with transaction handling.
-29. **[BE] Input Validation:** Add `zod` schema for `CreateProductDTO`.
-30. **[FE] Inventory Store:** Create `inventorySlice.ts` in Zustand.
-31. **[FE] Product List:** functionality for DataGrid with sorting/filtering.
-32. **[FE] Detail View:** Create `ProductDetail.page.tsx` scaffold.
-33. **[FE] API List Component:** Render list of APIs within a product.
-34. **[BE] Pagination:** Add `limit` and `offset` support to list endpoints.
-35. **[BE] Soft Delete:** Implement `deleted_at` logic for archival.
-36. **[FE] Empty States:** Design "No Products Found" UI.
+1.  **[FE] Identity Provider Integration:** Implement Entra ID (MSAL) for centralized authentication.
+2.  **[FE] Secure Login Flow:** Redirect-based authentication with state preservation.
+3.  **[BE] Token Validation:** JWT signature verification and audience checks.
+4.  **[BE] Access Control Layout:** Middleware to enforce Role-Based Access Control (RBAC).
+5.  **[BE] User Profile Sync:** Just-In-Time provisioning of user profiles upon first login.
+6.  **[BE] Group Entitlements:** Map Corporate AD Groups to Portal Roles (Admin vs. Producer).
+7.  **[FE] Protected Routes:** Navigation guards ensuring authorized access only.
+8.  **[FE] Session Management:** Secure token storage and silent refresh mechanisms.
+9.  **[FE] Sign-Out Protocol:** Global session termination and cleanup.
+10. **[Sec] Security Hardening:** Implementation of CSP, HSTS, and Secure Headers.
 
 ---
 
-## Epic 4: Just-In-Time (JIT) Sync Engine
-**Goal:** The intellectual property—syncing git to DB.
+## Epic 2: Digital Asset Inventory
+**Goal:** Centralized catalog for API Products and Services.
 
-37. **[BE] ADO Client:** Create `AzureDevOpsService` class.
-38. **[BE] Fetch File:** Implement `metrics/items` REST call to get raw YAML.
-39. **[BE] Swagger Parser:** Integrate `@apidevtools/swagger-parser`.
-40. **[BE] Operation Hash:** Logic to compute SHA256 of an operation to detect changes.
-41. **[BE] Sync Job:** `syncProductOperations(id)` logic flow.
-42. **[BE] Error Handling:** Handle "File Not Found" (404) natively.
-43. **[DB] Operations Table:** Design schema for `method`, `url`, `notes`.
-44. **[FE] Sync UI:** Add "Sync Now" button with spinner state.
-45. **[FE] Last Synced:** Display `last_updated` timestamp in UI.
-46. **[BE] Webhook Handler:** `POST /webhooks/ado` to trigger sync on git push.
-47. **[BE] Fallback Logic:** Try `openapi.json` if `openapi.yaml` fails.
-
----
-
-## Epic 5: Policy Studio (Visual Editor)
-**Goal:** No-Code interface.
-
-48. **[FE] Drag Logic:** Implement `react-dnd` monitors.
-49. **[FE] Policy Tiles:** Components for Rate Limit, IP Filter, CORS.
-50. **[FE] Inbound/Outbound:** Visual swimlanes for policy sections.
-51. **[Eng] XML Parser:** Logic to regex/parse `<inbound>` tags.
-52. **[Eng] XML Generator:** Logic to serialize State -> XML string.
-53. **[FE] Monaco Editor:** Integrate `react-monaco-editor`.
-54. **[FE] Dual Mode:** Toggle switch between Visual and Code view.
-55. **[FE] Validation UI:** Red squiggles for invalid XML.
-56. **[BE] Policy Service:** Endpoint to receive XML and validate.
-57. **[BE] Spectral Integration:** run `spectral lint` on payload.
-58. **[FE] Ghost Cards:** Logic to render inherited policies as read-only.
-59. **[FE] Custom Blocks:** Preservation of unknown XML tags.
+11. **[BE] Product Catalog API:** Service to retrieve and filter API Products.
+12. **[BE] Transactional Creation:** Atomic creation of Product and API metadata.
+13. **[BE] Input Validation Layer:** Strict schema validation for incoming asset payload.
+14. **[FE] Inventory State Management:** Global store for caching catalog data (Zustand).
+15. **[FE] Data Grid Experience:** Rich tabular view with sorting, filtering, and pagination.
+16. **[FE] Product Dashboard:** Detail view showing Analytics, APIs, and Subscriptions.
+17. **[FE] API Listing:** Nested view of APIs belonging to a Product.
+18. **[BE] Pagination Logic:** Efficient cursor/offset based data retrieval.
+19. **[BE] Archival Strategy:** Soft-delete mechanisms for data preservation.
+20. **[FE] Empty State Handling:** User guidance when no assets are found.
 
 ---
 
-## Epic 6: Automatic Onboarding Wizard
-**Goal:** Self-Service creation flow.
+## Epic 3: Just-In-Time (JIT) Sync Engine
+**Goal:** Ensuring specificiation parity between Git and the Portal.
 
-60. **[FE] Stepper UI:** "Dots" navigation (Step 1 -> 2 -> 3).
-61. **[FE] Wizard State:** `WizardStore` to hold transient form data.
-62. **[BE] ID Check:** `GET /check-availability` endpoint.
-63. **[FE] Async Select:** Component to search AD Groups via backend proxy.
-64. **[FE] Review Step:** Summary screen before final submit.
-65. **[BE] SAGA Orchestrator:** Manage the multi-step transaction.
-66. **[BE] Repo Provisioning:** Logic to call ADO API to create Git Repo.
-67. **[BE] Default Spec:** Commit a "Hello World" `openapi.yaml` to new repo.
-68. **[FE] Confetti:** Animation on successful creation.
-
----
-
-## Epic 7: Consumer Portal (Subscriptions)
-**Goal:** Access management.
-
-69. **[DB] Subscriptions Table:** Schema for `state`, `primary_key_ref`.
-70. **[KM] Azure Key Vault Logic:** Logic to generate generic Secret Identifier URI.
-71. **[BE] Request Access:** `POST /subscriptions` endpoint.
-72. **[FE] My Key:** UI to "Reveal" the generic key (simulated).
-73. **[BE] Approval Logic:** Auto-approve logic for "Open" products.
-74. **[FE] Linked App:** Form to input `ClientId` for OAuth.
-75. **[BE] App Registration:** Endpoint to link ClientId to Product Scope.
-76. **[BE] Rotation:** Logic to rotate secret in APIM/KV.
+21. **[BE] Source Control Integration:** Client for Azure DevOps REST API.
+22. **[BE] Spec Retrieval:** Logic to fetch raw OpenAPI/Swagger files from remote repos.
+23. **[BE] Spec Parsing:** Validation and parsing of OpenAPI 3.0+ documents.
+24. **[BE] Change Detection:** Hashing algorithm to detect drift between Git and DB.
+25. **[BE] Synchronization Logic:** Orchestration to update DB when Git changes are detected.
+26. **[BE] Resilience:** Handling upstream 404s or API failures gracefully.
+27. **[DB] Operation Registry:** Structured storage of individual API methods/paths.
+28. **[FE] Synchronization Controls:** Manual trigger for on-demand sync.
+29. **[FE] Sync Status Indicators:** Visual cues for "Last Synced" timestamps.
+30. **[BE] Webhook Listener:** Event-driven updates triggered by Git Push events.
+31. **[BE] Format Fallback:** Support for both JSON and YAML specification formats.
 
 ---
 
-## Epic 8: Governance & Auditing
-**Goal:** Compliance.
+## Epic 4: Policy Studio (Visual Editor)
+**Goal:** Low-Code interface for API Policy generation.
 
-77. **[BE] Audit Middleware:** Interceptor for all POST/PUT/DELETE.
-78. **[Eng] Diff Logic:** Utility to compare `old_row` vs `new_payload`.
-79. **[DB] Audit Schema:** `entity_type`, `action`, `diff_json`.
-80. **[FE] History Tab:** UI to render the diff log.
-81. **[BE] Orphan Job:** Cron to find deleted AD Groups.
-82. **[FE] Orphan Alert:** Banner on dashboard if ownership is lost.
-83. **[BE] Admin Stats:** Aggregation queries for Dashboard.
-
----
-
-## Epic 9: Frontend Architecture (MFE) Refactor
-**Goal:** Technical debt paydown.
-
-84. **[Refactor] Hook Extraction:** Move `fetch` from Views to `useHooks`.
-85. **[Refactor] Client Layer:** Create `api/*Client.ts` files.
-86. **[Refactor] Type Definitions:** Fix `any` types in `teams.service`.
-87. **[Refactor] Slice Pattern:** Split `RootStore` into domain slices.
-88. **[Refactor] UI Kit:** Move Buttons/Inputs to `shared/components`.
-89. **[Tech] Error Boundaries:** Add `ErrorBoundary` to catch React crashes.
-90. **[Tech] Suspense:** Add lazy loading for Routes.
-91. **[Tech] Toast System:** Implement `react-hot-toast` for notifications.
+32. **[FE] Policy Visualization:** Swimlane-based rendering of Inbound/Outbound policies.
+33. **[Eng] XML Parser:** Engine to convert raw XML into UI-friendly State objects.
+34. **[Eng] XML Serializer:** Engine to convert UI State back into valid APIM XML.
+35. **[FE] Code Editor:** Monaco-based editor for advanced "Raw Mode" editing.
+36. **[FE] Validation Feedback:** Real-time syntax highlighting and error reporting.
+37. **[BE] Policy Validator:** Dry-run validation against APIM schema.
+38. **[BE] Linting Engine:** Application of Spectral rules to enforce governance.
+39. **[Eng] Extension Support:** Handling of custom or unknown policy fragments (Preservation).
+40. **[FE] Dual View Mode:** Toggle switch between Low-Code (Templates) and Raw XML Code view.
 
 ---
 
-## Epic 10: Quality Assurance & Handover
-**Goal:** Production readiness.
+## Epic 5: Self-Service Onboarding Wizard
+**Goal:** Streamlined creation of new API Products.
 
-92. **[QA] Unit Tests (BE):** Jest tests for `products.service`.
-93. **[QA] Integration Tests:** Supertest for API endpoints.
-94. **[QA] Component Tests:** React Testing Library for `Button`.
-95. **[Doc] Architecture:** Generate Master Architecture Doc.
-96. **[Doc] API Reference:** Generate Swagger UI for internal API.
-97. **[Doc] User Guide:** Write "How to Onboard" guide.
-98. **[Doc] Runbook:** "How to Rotate Keys" disaster recovery doc.
-99. **[QA] Load Test:** k6 script for Inventory endpoint.
-100. **[QA] Accessibility:** Audit and fix contrast ratio issues.
-101. **[Meta] HTML Bundle:** Generate single-file HTML documentation.
+41. **[FE] Multi-Step Wizard:** Guided progression for Product setup.
+42. **[FE] Draft Management:** Persistence of "Work in Progress" wizard state.
+43. **[BE] Availability Checks:** Validation of unique Product IDs/Names.
+44. **[FE] Team Selector:** Searchable interface for AD Group assignment.
+45. **[FE] Summary Review:** Final confirmation screen before provisioning.
+46. **[BE] SAGA Orchestrator:** Management of the distributed transaction (DB + External).
+47. **[BE] Repository Strategy:** Integration with Governance tools (or ADO) to facilitate Repo creation.
+48. **[BE] Scaffolding:** Generation of initial `openapi.yaml` templates.
+49. **[FE] Success Feedback:** Visual confirmation and routing upon completion.
+
+---
+
+## Epic 6: Consumer Portal & Subscriptions
+**Goal:** Access management and API consumption.
+
+50. **[DB] Subscription Model:** Schema for managing Consumer-to-Product relationships.
+51. **[KM] Secret Management:** Secure generation of Subscription Key identifiers.
+52. **[BE] Application Linkage:** Association of Client IDs (App Registrations) to Subscriptions.
+53. **[FE] Key Reveal UI:** Secure "Show/Hide" mechanism for API Keys.
+54. **[BE] Auto-Approval Logic:** Rule engine for "Open" vs "Protected" products.
+55. **[BE] Manual Approval Flow:** Workflow for Producers to grant/deny access.
+56. **[BE] Key Rotation:** Logic to invalidate and regenerate keys via APIM.
+
+---
+
+## Epic 7: Governance & Auditing
+**Goal:** Compliance and traceability.
+
+57. **[BE] Audit Middleware:** Interceptor to log all write operations.
+58. **[Eng] Diff Engine:** Utility to compare "Before" vs "After" states for Audit logs.
+59. **[DB] Audit Store:** Immutable record of Who, What, When, and Why.
+60. **[FE] Audit Log UI:** History tab showing chronological changes.
+61. **[BE] Compliance Monitor:** Background job to detect orphaned resources.
+62. **[FE] Compliance Alerts:** Dashboard notifications for ownership issues.
+63. **[BE] Executive Reporting:** Aggregated stats for Platform Administrators.
+
+---
+
+## Epic 8: Frontend Modernization
+**Goal:** Scalability and maintainability of the UI.
+
+64. **[Refactor] Data Access Layer:** Centralized API clients for consistency.
+65. **[Refactor] Type Safety:** Comprehensive TypeScript interfaces for all Domain objects.
+66. **[Refactor] Domain Slicing:** Modular Redux/Zustand stores by feature.
+67. **[Refactor] Component Library:** Shared UI Kit for consistent design tokens.
+68. **[Tech] Error Handling:** Global Error Boundaries to prevent white-screens.
+69. **[Tech] Lazy Loading:** Route-level code splitting for performance.
+70. **[Tech] Notification System:** Centralized Toast/Snackbar manager.
+
+---
+
+## Epic 9: Quality Assurance & Launch
+**Goal:** Reliability and Production Readiness.
+
+71. **[QA] Backend Coverage:** Unit tests for Core Services and Business Logic.
+72. **[QA] API Testing:** Integration tests for REST Endpoints.
+73. **[QA] UI Testing:** Component-level tests for critical interactions.
+74. **[Doc] System Architecture:** Maintenance of master diagram sets.
+75. **[Doc] Developer Guide:** Onboarding documentation for new contributors.
+76. **[Doc] Operational Runbooks:** Procedures for Incident Management and Recovery.
+77. **[QA] Performance Profiling:** Load testing of critical paths (Inventory/Sync).
+78. **[QA] Accessibility Audit:** WCAG compliance checks (Contrast/Screen Readers).

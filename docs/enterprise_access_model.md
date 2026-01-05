@@ -52,3 +52,24 @@ The system maintains a rigid link between the **Platform Identity** (Managed Ide
 
 > [!IMPORTANT]
 > **Audit Completeness**: No platform change (APIM or ADO) is executed unless it is first successfully durably recorded in the Portal's Audit Database.
+
+---
+
+## 🤝 Automated Platform Entitlements (Negotiation & Compliance)
+To deliver a true Self-Service experience while respecting enterprise constraints, we require the following specific entitlements.
+
+### 1. Azure API Management (APIM)
+*   **Requirement**: The Portal's Managed Identity requires `Contributor` access (Create/Update/Delete) to the APIM instance.
+*   **Justification**: The Portal completely abstracts the Azure Portal for developers. It automates complex, error-prone tasks like XML Policy assembly and API versioning.
+*   **Control Mechanism (Double Audit)**:
+    1.  **Internal**: Every action is logged in our ACID-compliant `audit_log` linking the *Human User* to the intent.
+    2.  **External**: The action is executed by the *Managed Identity*, leaving a trace in Azure Monitor / Entra ID.
+    *   *Result*: Security can correlate "What happened in Azure" (ID) with "Who requested it" (User) at any time.
+
+### 2. Azure DevOps (ADO)
+*   **Primary Request**: We request `Create Repository`, `Create Branch`, and `Git Commit` permissions.
+    *   *Why?* To streamline onboarding (One-Click Product Creation) and GitOps (Policy Synchronization).
+*   **Fallback Strategy (If "Create Repo" is Restricted)**:
+    *   We understand if specific Governance tools (like **Port.io** or ServiceNow) own the "Repo Creation" lifecycle.
+    *   **Compromise**: The upstream tool can provision the repository and grant our Service Account `Contributor` access.
+    *   **Non-Negotiable**: We **must** retain `Git Commit` and `Branch Creation` access to manage the content (OpenAPI specs, Policies) within those repositories to ensure the system functions as a developer platform.

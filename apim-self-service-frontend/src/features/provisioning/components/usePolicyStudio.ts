@@ -21,7 +21,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import jsyaml from 'js-yaml';
 import { ApiOperation, parseSwaggerOperations } from '../../../utils/swaggerParser';
-import { POLICY_TEMPLATES, PolicyTemplate, generatePolicyXml, parsePolicyXml, ConfiguredPolicy } from './policyTemplates';
+import { PolicyTemplate, generatePolicyXml, parsePolicyXml, ConfiguredPolicy } from './policyTemplates';
+import { useStore } from '../../../store/useStore';
 
 export interface OperationPolicyState {
     enabled: boolean;
@@ -46,11 +47,19 @@ export function usePolicyStudio({
     initialApiPolicies,
     onNext
 }: UsePolicyStudioProps) {
+    const { policyTemplates, fetchPolicyTemplates } = useStore();
     const [operations, setOperations] = useState<ApiOperation[]>([]);
     const [selectedOpId, setSelectedOpId] = useState<string | null>(null);
     const [scanned, setScanned] = useState(false);
     const [xmlError, setXmlError] = useState<string | null>(null);
     const [policies, setPolicies] = useState<Record<string, OperationPolicyState>>({});
+
+    // 0. Initial Data Fetch
+    useEffect(() => {
+        if (policyTemplates.length === 0) {
+            fetchPolicyTemplates();
+        }
+    }, [policyTemplates.length, fetchPolicyTemplates]);
 
     const isProductScope = selectedOpId === 'product';
     const targetScopeId = isProductScope ? 'product' : selectedOpId;
@@ -90,7 +99,7 @@ export function usePolicyStudio({
                     opMap[id] = {
                         enabled: true,
                         mode: 'xml',
-                        activePolicies: parsePolicyXml(xml),
+                        activePolicies: parsePolicyXml(xml, policyTemplates),
                         xmlContent: xml,
                         isOverridden: true
                     };
@@ -101,7 +110,7 @@ export function usePolicyStudio({
                 opMap['product'] = {
                     enabled: true,
                     mode: 'simple',
-                    activePolicies: productPolicyXml ? parsePolicyXml(productPolicyXml) : [],
+                    activePolicies: productPolicyXml ? parsePolicyXml(productPolicyXml, policyTemplates) : [],
                     xmlContent: productPolicyXml || '',
                     isOverridden: !!productPolicyXml
                 };
@@ -122,11 +131,13 @@ export function usePolicyStudio({
             } catch { /* silent fail on spec parsing */ }
 
             setPolicies(opMap);
-            setSelectedOpId('product');
+            // Only set default if not already set, or if re-scanning forces a reset?
+            // Usually we want to preserve selection unless ops changed drastically.
+            if (!selectedOpId) setSelectedOpId('product');
             setScanned(true);
         };
         loadOps();
-    }, [specContent, preParsedOperations, productPolicyXml, initialApiPolicies]);
+    }, [specContent, preParsedOperations, productPolicyXml, initialApiPolicies, policyTemplates, selectedOpId]);
 
     // 2. XML Auto-Sync Effect
     useEffect(() => {
@@ -137,13 +148,13 @@ export function usePolicyStudio({
         const sections = ['inbound', 'backend', 'outbound', 'on-error'] as const;
 
         sections.forEach(section => {
-            xml += `  < ${section}>\n < base />\n`;
+            xml += `  <${section}>\n <base />\n`;
             const sectionPolicies = activePolicies.filter(p => p.section === section);
             sectionPolicies.forEach(p => {
-                const match = POLICY_TEMPLATES.find(t => t.id === p.templateId);
+                const match = policyTemplates.find(t => t.id === p.templateId);
                 if (match) {
                     const fragment = generatePolicyXml(match, p.values || {});
-                    xml += `    ${fragment.replace(/\n/g, '\n    ')} \n`;
+                    xml += `    ${fragment.replace(/\n/g, '\n    ')}\n`;
                 }
             });
             xml += `  </${section}>\n`;
@@ -157,7 +168,7 @@ export function usePolicyStudio({
                 [targetScopeId]: { ...prev[targetScopeId], xmlContent: xml }
             }));
         }
-    }, [activePolicies, targetScopeId, currentPolicy]);
+    }, [activePolicies, targetScopeId, currentPolicy, policyTemplates]);
 
     // 3. Handlers
     const handleAddPolicy = (template: PolicyTemplate) => {
@@ -227,7 +238,7 @@ export function usePolicyStudio({
 
             if (newMode === 'simple' && current.mode === 'xml' && current.xmlContent) {
                 try {
-                    updatedPolicies = parsePolicyXml(current.xmlContent);
+                    updatedPolicies = parsePolicyXml(current.xmlContent, policyTemplates);
                 } catch {
                     alert("Failed to parse XML for Visual Mode.");
                     return prev;
