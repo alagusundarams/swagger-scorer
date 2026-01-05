@@ -591,33 +591,28 @@ sequenceDiagram
 
 ---
 
-## 2. Microservices Decomposition Strategy
-The current system is a "Modular Monolith". As we scale to **10 million daily API calls** management, we must split it.
+## 2. Microservices Architecture
+The system is architected as a set of distributed **Microservices** to support scaling to **10 million daily API calls**.
 
-### The Split Plan (Target Architecture)
+### The Service Mesh
+
+### Service Architecture
 
 \`\`\`mermaid
 graph TD
-    classDef mono fill:#ffe0b2,stroke:#ef6c00,stroke-width:2px;
     classDef micro fill:#bbdefb,stroke:#0d47a1,stroke-width:2px;
 
     User[User Request]
 
-    subgraph Current["Current: Modular Monolith"]
-        Mono[Backend Service]:::mono
-    end
-
-    subgraph Future["Future: Microservices"]
-        Gateway[API Gateway / Ingress]
-        
-        Svc1[Core Inventory Service]:::micro
-        Svc2[ARM/IaC Worker]:::micro
-        Svc3[Audit & Compliance Service]:::micro
-        Svc4[Policy Intelligence Engine]:::micro
-        
-        DB1[(Inventory DB)]
-        DB2[(Audit DB)]
-    end
+    Gateway[API Gateway / Ingress]
+    
+    Svc1[Core Inventory Service]:::micro
+    Svc2[ARM/IaC Worker]:::micro
+    Svc3[Audit & Compliance Service]:::micro
+    Svc4[Policy Intelligence Engine]:::micro
+    
+    DB1[(Inventory DB)]
+    DB2[(Audit DB)]
 
     User --> Gateway
     Gateway --> Svc1
@@ -653,19 +648,19 @@ graph LR
 ---
 
 ## 4. JIT Sync Logic (Internal Flow)
-The "Just-In-Time" sync is the most CPU-intensive operation in the current monolith.
+The "Just-In-Time" sync is the most CPU-intensive operation.
 
 \`\`\`mermaid
 flowchart TD
-    Req[User requests API Details] --> Cache{Check Ops Cache?}
-    Cache -- Hit --> Return[Return DB Rows]
-    Cache -- Miss/Stale --> Fetch[Fetch YAML from ADO]
+    Req["User requests API Details"] --> Cache{"Check Ops Cache?"}
+    Cache -- Hit --> Return["Return DB Rows"]
+    Cache -- Miss/Stale --> Fetch["Fetch YAML from ADO"]
     
-    Fetch --> Parse[SwaggerParser.parse()]
-    Parse --> Validate{Spectral Lint Pass?}
+    Fetch --> Parse["SwaggerParser.parse()"]
+    Parse --> Validate{"Spectral Lint Pass?"}
     
-    Validate -- Valid --> Upsert[Bulk UPSERT to DB]
-    Validate -- Invalid --> Error[Mark as Broken]
+    Validate -- Valid --> Upsert["Bulk UPSERT to DB"]
+    Validate -- Invalid --> Error["Mark as Broken"]
     
     Upsert --> Return
 \`\`\`
@@ -695,27 +690,26 @@ graph TD
 
 ---
 
-## 6. Database Migrations (TypeORM)
-We use TypeORM for database migrations, ensuring schema evolution is managed.
+## 6. Database Migrations (Native SQL)
+We use raw SQL scripts for schema management to ensure zero-dependency portability.
 
 \`\`\`mermaid
 sequenceDiagram
     participant Dev as Developer
-    participant CLI as TypeORM CLI
+    participant Script as npm run setup-db
     participant DB as PostgreSQL
 
-    Dev->>CLI: yarn typeorm migration:create -n AddProductsTable
-    CLI-->>Dev: Created migration file
-    
-    Dev->>Dev: Write SQL in migration file
-    
-    Dev->>CLI: yarn typeorm migration:run
-    CLI->>DB: SELECT * FROM migrations
-    DB-->>CLI: Applied migrations
-    CLI->>DB: EXECUTE migration SQL
-    DB-->>CLI: Success
-    CLI-->>Dev: Migrations applied
+    Dev->>Script: Execute 01-god-schema.sql
+    Script->>DB: DROP SCHEMA public CASCADE
+    DB-->>Script: Schema Dropped
+    Script->>DB: EXECUTE DDL (CREATE TABLES)
+    DB-->>Script: Schema Created
+    Script-->>Dev: DB Reset & Ready
 \`\`\`
+
+*   **Logic:** \`apim-database/scripts/utils/setup-db.ts\`
+*   **Schema:** \`apim-database/schema/01-god-schema.sql\`
+*   **Philosophy:** We avoid ORMs for DDL to keep the database layer decoupled from the backend application logic.
 `,
 
     frontend_documentation: `# Frontend Developer Guide: Architecture & Scaling
