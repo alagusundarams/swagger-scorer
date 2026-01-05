@@ -50,7 +50,7 @@ npm run inspect
 | `npm run sync` | Full sync (APIM + ADO + operations) | Daily/weekly sync |
 | `npm run sync:fast` | Sync without ADO | When ADO credentials unavailable |
 | `npm run sync:db` | Update using DB as source | Skip external API calls |
-| `npm run ado` | **ADO metadata extraction only** | Run ADO sync separately |
+| `npm run ado` | **ADO metadata extraction only** | Run ADO sync separately (--env flag optional) |
 | `npm run verify` | Verify backend queries | After sync, validate data |
 | `npm run verify:operations` | Verify operations extraction | Check OpenAPI spec parsing |
 | `npm run inspect` | Inspect database schema | View all tables and columns |
@@ -70,9 +70,11 @@ npm run inspect
 - Saves to: `scripts/data/apim-inventory.json` and `apim-metadata.json`
 
 **2. ADO Metadata Extraction** (`extract-ado-metadata.ts`)
+- Processes all unique product names (or filtered by `--env` flag for testing)
 - Searches ADO for repositories matching product names
 - Fetches pipeline information
-- Captures deployment hashes and dates for all environments (DEV/QA/STAGE/PROD)
+- **Captures deployment hashes and dates for ALL environments** (DEV/QA/STAGE/PROD)
+- Note: `--env=DEV` flag is OPTIONAL - only filters which products to process, not which environments to fetch
 - Saves to: `scripts/data/ado-metadata.json`
 
 **3. Governance Reconciliation** (`reconcile-governance.ts`)
