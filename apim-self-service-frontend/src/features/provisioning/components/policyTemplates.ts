@@ -37,14 +37,22 @@ export interface PolicyInput {
     required?: boolean;
 }
 
+// Helper to get fields from either structure
+const getPolicyFields = (t: PolicyTemplate) => t.templateSchema?.fields || t.inputs || [];
+const getXmlTemplate = (t: PolicyTemplate) => t.templateSchema?.xmlTemplate || t.xmlTemplate || '';
+
 export interface PolicyTemplate {
     id: string;
     name: string;
     category: 'Traffic' | 'Transformation' | 'Security' | 'Mocking' | 'Restriction'; // Added Restriction
     intent: string;
     description: string;
-    inputs: PolicyInput[];
-    xmlTemplate: string;
+    inputs?: PolicyInput[];
+    xmlTemplate?: string;
+    templateSchema?: {
+        fields: PolicyInput[];
+        xmlTemplate: string;
+    };
     defaultSection: 'inbound' | 'backend' | 'outbound' | 'on-error'; // Smart Default
     tagName?: string; // Optional: Override tag name for parsing
 }
@@ -63,8 +71,10 @@ export const generatePolicyXml = (template: PolicyTemplate, config: Record<strin
         return (config['xml'] as string) || '';
     }
 
-    let xml = template.xmlTemplate;
-    template.inputs.forEach(input => {
+    let xml = getXmlTemplate(template);
+    const fields = getPolicyFields(template);
+
+    fields.forEach(input => {
         const val = config[input.name] !== undefined ? (config[input.name] as string) : (input.default || '');
         xml = xml.replace(new RegExp(`{{${input.name}}}`, 'g'), val);
     });
@@ -78,6 +88,11 @@ export interface ConfiguredPolicy {
     section: 'inbound' | 'backend' | 'outbound' | 'on-error';
     values: Record<string, unknown>;
 }
+
+// ... (existing code for sanitizeApimXml) ...
+
+
+
 
 // ------------------------------------------------------------------
 // REVERSE PARSER: DOM Strategy (Hybrid)
@@ -234,7 +249,8 @@ export const parsePolicyXml = (xmlString: string, templates: PolicyTemplate[]): 
                     flushBuffer();
                     const values: Record<string, unknown> = {};
 
-                    template.inputs.forEach(input => {
+                    const fields = getPolicyFields(template);
+                    fields.forEach(input => {
                         // Priority 1: Attribute
                         const attrVal = element.getAttribute(input.name);
                         if (attrVal !== null) {

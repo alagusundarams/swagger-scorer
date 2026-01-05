@@ -35,8 +35,12 @@ export interface PolicyTemplate {
     name: string;
     category: string;
     description: string;
-    inputs: PolicyInput[];
-    xmlTemplate: string;
+    inputs?: PolicyInput[];
+    xmlTemplate?: string;
+    templateSchema?: {
+        fields: PolicyInput[];
+        xmlTemplate: string;
+    };
     defaultSection: PolicySection;
     tagName?: string;
 }

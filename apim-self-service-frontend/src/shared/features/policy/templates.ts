@@ -1,6 +1,16 @@
 
 import { type PolicyTemplate, type PolicyStep } from './types';
 
+// Helper to safely get XML definition
+const getXml = (t: PolicyTemplate): string => {
+    return t.templateSchema?.xmlTemplate || t.xmlTemplate || '';
+};
+
+// Helper to safely get Inputs definition
+const getInputs = (t: PolicyTemplate) => {
+    return t.templateSchema?.fields || t.inputs || [];
+};
+
 // REMOVED: import policyRegistry from './policies-registry.json';
 // REMOVED: export const POLICY_TEMPLATES: PolicyTemplate[] = policyRegistry as any[];
 
@@ -17,7 +27,7 @@ export const generatePolicyXml = (template: PolicyTemplate, values: Record<strin
 
     // Special handling for Validate JWT
     if (template.id === 'validate-jwt') {
-        let xml = template.xmlTemplate;
+        let xml = getXml(template);
 
         // 1. Replace simple fields
         xml = xml.replace('{{header}}', (values['header'] as string) || 'Authorization');
@@ -46,7 +56,7 @@ export const generatePolicyXml = (template: PolicyTemplate, values: Record<strin
 
     // Special handling for CORS
     if (template.id === 'cors') {
-        let xml = template.xmlTemplate;
+        let xml = getXml(template);
 
         // 1. Simple fields
         xml = xml.replace('{{allowcredentials}}', (values['allowcredentials'] ? 'true' : 'false'));
@@ -77,32 +87,33 @@ export const generatePolicyXml = (template: PolicyTemplate, values: Record<strin
     // Special handling for optional attributes (Rate Limit / Quota)
     // To avoid empty attributes like bandwidth="" we clean them up if missing
     if (template.id === 'rate-limit' || template.id === 'quota') {
-        // This re-uses generic logic but pre-cleans the values? 
-        // Actually simpler to just let generic run then clean up empty attrs using regex in post-processing?
-        // No, let's do customized generic logic:
-        let xml = template.xmlTemplate;
-        template.inputs.forEach(input => {
-            const val = values[input.name] !== undefined ? String(values[input.name]).trim() : '';
-            if (!val && !input.required) {
-                // Remove the attribute entirely if empty and not required
-                // Regex: attribute-name="{{placeholder}}"
-                // We need to know the attribute name in XML. 
-                // Simple hack: replace attribute="" with nothing.
-                xml = xml.replace(new RegExp(`{{${input.name}}}`, 'g'), '');
-            } else {
-                xml = xml.replace(new RegExp(`{{${input.name}}}`, 'g'), val || String(input.default || ''));
-            }
-        });
+        const schema = template.templateSchema || (template as any); // Fallback for safety
+        let xml = schema.xmlTemplate;
+
+        // Handle fields (new structure) or inputs (old structure)
+        const fields = schema.fields || (template as any).inputs || [];
+
+        if (Array.isArray(fields)) {
+            fields.forEach((input: any) => {
+                const val = values[input.name] !== undefined ? String(values[input.name]).trim() : '';
+                if (!val && !input.required) {
+                    // Remove the attribute entirely if empty and not required
+                    xml = xml.replace(new RegExp(`{{${input.name}}}`, 'g'), '');
+                } else {
+                    xml = xml.replace(new RegExp(`{{${input.name}}}`, 'g'), val || String(input.default || ''));
+                }
+            });
+        }
 
         // Cleanup empty attributes [foo=""]
         xml = xml.replace(/\s+[a-zA-Z0-9-GU]+=""/g, '');
         return xml;
     }
 
-    let xml = template.xmlTemplate;
+    let xml = getXml(template);
 
     // Replace placeholders with real values (Generic Fallback)
-    template.inputs.forEach(input => {
+    getInputs(template).forEach(input => {
         const val = values[input.name] !== undefined
             ? String(values[input.name]).trim()
             : String(input.default || '').trim();
@@ -252,7 +263,7 @@ export const parsePolicyXml = (xmlString: string, templates: PolicyTemplate[]): 
 
                     } else {
                         // Generic Parser
-                        template.inputs.forEach(input => {
+                        getInputs(template).forEach(input => {
                             const attrVal = element.getAttribute(input.name);
                             if (attrVal !== null) { values[input.name] = attrVal; return; }
                             const nested = element.getElementsByTagName(input.name)[0];
