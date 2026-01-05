@@ -129,44 +129,50 @@ async function main() {
                 const stageDeploy = (ado.deployments as any)['STAGE'];
                 const prodDeploy = (ado.deployments as any)['PROD'];
 
-                await pool.query(`
-                    INSERT INTO products (
-                        id, name, display_name, version, state, environment, region,
-                        last_deployed_commit_hash, last_deployed_at,
-                        terraform_pipeline_url, github_url,
-                        dev_hash, dev_deployment_date,
-                        qa_hash, qa_deployment_date,
-                        stage_hash, stage_deployment_date,
-                        production_hash, production_deployment_date,
-                        management_mode, updated_at
-                    )
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, NOW())
-                    ON CONFLICT (id) DO UPDATE SET
-                        last_deployed_commit_hash = COALESCE(EXCLUDED.last_deployed_commit_hash, products.last_deployed_commit_hash),
-                        last_deployed_at = COALESCE(EXCLUDED.last_deployed_at, products.last_deployed_at),
-                        terraform_pipeline_url = COALESCE(EXCLUDED.terraform_pipeline_url, products.terraform_pipeline_url),
-                        github_url = COALESCE(EXCLUDED.github_url, products.github_url),
-                        dev_hash = EXCLUDED.dev_hash,
-                        dev_deployment_date = EXCLUDED.dev_deployment_date,
-                        qa_hash = EXCLUDED.qa_hash,
-                        qa_deployment_date = EXCLUDED.qa_deployment_date,
-                        stage_hash = EXCLUDED.stage_hash,
-                        stage_deployment_date = EXCLUDED.stage_deployment_date,
-                        production_hash = EXCLUDED.production_hash,
-                        production_deployment_date = EXCLUDED.production_deployment_date,
-                        management_mode = EXCLUDED.management_mode,
-                        updated_at = NOW();
-                `, [
-                    uniqueProductId, prod.id, prod.name, null, 'published', envName, 'Global',  // version set to NULL (APIM doesn't have version)
-                    localDeploy?.hash || null, localDeploy?.date || null,
-                    ado.pipeline ? `${config.devops.baseUrl}/${config.devops.organization}/${(ado.repository as any)?.project}/_build?definitionId=${ado.pipeline.id}` : null,
-                    ado.repository ? `${config.devops.baseUrl}/${config.devops.organization}/${(ado.repository as any)?.project}/_git/${(ado.repository as any)?.name}` : null,
-                    devDeploy?.hash || null, devDeploy?.date || null,
-                    qaDeploy?.hash || null, qaDeploy?.date || null,
-                    stageDeploy?.hash || null, stageDeploy?.date || null,
-                    prodDeploy?.hash || null, prodDeploy?.date || null,
-                    ado.status === 'MATCHED' ? 'TERRAFORM_MANAGED' : 'PORTAL_MANAGED'
-                ]);
+                try {
+                    await pool.query(`
+                        INSERT INTO products (
+                            id, name, display_name, version, state, environment, region,
+                            last_deployed_commit_hash, last_deployed_at,
+                            terraform_pipeline_url, github_url,
+                            dev_hash, dev_deployment_date,
+                            qa_hash, qa_deployment_date,
+                            stage_hash, stage_deployment_date,
+                            production_hash, production_deployment_date,
+                            management_mode, updated_at
+                        )
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, NOW())
+                        ON CONFLICT (id) DO UPDATE SET
+                            last_deployed_commit_hash = COALESCE(EXCLUDED.last_deployed_commit_hash, products.last_deployed_commit_hash),
+                            last_deployed_at = COALESCE(EXCLUDED.last_deployed_at, products.last_deployed_at),
+                            terraform_pipeline_url = COALESCE(EXCLUDED.terraform_pipeline_url, products.terraform_pipeline_url),
+                            github_url = COALESCE(EXCLUDED.github_url, products.github_url),
+                            dev_hash = EXCLUDED.dev_hash,
+                            dev_deployment_date = EXCLUDED.dev_deployment_date,
+                            qa_hash = EXCLUDED.qa_hash,
+                            qa_deployment_date = EXCLUDED.qa_deployment_date,
+                            stage_hash = EXCLUDED.stage_hash,
+                            stage_deployment_date = EXCLUDED.stage_deployment_date,
+                            production_hash = EXCLUDED.production_hash,
+                            production_deployment_date = EXCLUDED.production_deployment_date,
+                            management_mode = EXCLUDED.management_mode,
+                            updated_at = NOW();
+                    `, [
+                        uniqueProductId, prod.id, prod.name, null, 'published', envName, 'Global',
+                        localDeploy?.hash || null, localDeploy?.date || null,
+                        ado.pipeline ? `${config.devops.baseUrl}/${config.devops.organization}/${(ado.repository as any)?.project}/_build?definitionId=${ado.pipeline.id}` : null,
+                        ado.repository ? `${config.devops.baseUrl}/${config.devops.organization}/${(ado.repository as any)?.project}/_git/${(ado.repository as any)?.name}` : null,
+                        devDeploy?.hash || null, devDeploy?.date || null,
+                        qaDeploy?.hash || null, qaDeploy?.date || null,
+                        stageDeploy?.hash || null, stageDeploy?.date || null,
+                        prodDeploy?.hash || null, prodDeploy?.date || null,
+                        ado.status === 'MATCHED' ? 'TERRAFORM_MANAGED' : 'PORTAL_MANAGED'
+                    ]);
+                } catch (err: any) {
+                    console.error(`❌ FAILED to sync Product: "${prod.name}" (${envName})`);
+                    console.error(`   Details: ${err.message}`);
+                    throw err;
+                }
 
                 if (verbose) {
                     const mode = ado.status === 'MATCHED' ? '🔧 TERRAFORM' : '📦 PORTAL';
@@ -184,15 +190,21 @@ async function main() {
                     const apiName = typeof api === 'string' ? api : api.name;  // Backward compatibility (Option B)
                     const apiPath = typeof api === 'string' ? `/${api}` : (api.path || null);  // Use captured path or NULL (hybrid approach)
                     const uniqueApiId = `${uniqueProductId}:${apiName}`;
-                    await pool.query(`
-                        INSERT INTO apis (id, product_id, name, display_name, path, updated_at)
-                        VALUES ($1, $2, $3, $4, $5, NOW())
-                        ON CONFLICT (id) DO UPDATE SET
-                            name = EXCLUDED.name,
-                            display_name = EXCLUDED.display_name,
-                            path = EXCLUDED.path,
-                            updated_at = NOW();
-                    `, [uniqueApiId, uniqueProductId, apiName, apiName, apiPath]);
+                    try {
+                        await pool.query(`
+                            INSERT INTO apis (id, product_id, name, display_name, path, updated_at)
+                            VALUES ($1, $2, $3, $4, $5, NOW())
+                            ON CONFLICT (id) DO UPDATE SET
+                                name = EXCLUDED.name,
+                                display_name = EXCLUDED.display_name,
+                                path = EXCLUDED.path,
+                                updated_at = NOW();
+                        `, [uniqueApiId, uniqueProductId, apiName, apiName, apiPath]);
+                    } catch (err: any) {
+                        console.error(`❌ FAILED to sync API: "${apiName}" in Product "${prod.name}"`);
+                        console.error(`   Details: ${err.message}`);
+                        throw err;
+                    }
 
                     if (verbose) {
                         console.log(`         📄 API: "${apiName}"`);
@@ -234,16 +246,23 @@ async function main() {
                 // Deterministic ID for idempotency
                 const nvId = `nv-${env}-${nv.name}`;
 
-                await pool.query(`
-                    INSERT INTO named_values (id, product_id, display_name, system_name, value, type, is_secret, updated_at)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-                    ON CONFLICT (id) DO UPDATE SET
-                        display_name = EXCLUDED.display_name,
-                        value = EXCLUDED.value,
-                        type = EXCLUDED.type,
-                        is_secret = EXCLUDED.is_secret,
-                        updated_at = NOW();
-                `, [nvId, placeholderId, nv.displayName, nv.name, val, type, nv.isSecret]);
+                try {
+                    await pool.query(`
+                        INSERT INTO named_values (id, product_id, display_name, system_name, value, type, is_secret, updated_at)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+                        ON CONFLICT (id) DO UPDATE SET
+                            display_name = EXCLUDED.display_name,
+                            value = EXCLUDED.value,
+                            type = EXCLUDED.type,
+                            is_secret = EXCLUDED.is_secret,
+                            updated_at = NOW();
+                    `, [nvId, placeholderId, nv.displayName, nv.name, val, type, nv.isSecret]);
+                } catch (err: any) {
+                    console.error(`❌ FAILED to sync Named Value: "${nv.name}" (Env: ${env})`);
+                    console.error(`   Value: "${val}" (Is Secret: ${nv.isSecret})`);
+                    console.error(`   Details: ${err.message}`);
+                    throw err;
+                }
             }
         }
 
