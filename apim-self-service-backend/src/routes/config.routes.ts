@@ -13,7 +13,7 @@ import {
     getOrphanNamedValues,
     assignNamedValue
 } from '../services/named-values.service.js';
-import { getPolicyTemplates } from '../services/policies.service';
+
 import {
     getBackends,
     getBackend,
@@ -36,24 +36,6 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
     fastify.get('/environments', async (_request, _reply) => {
         const config = getAppConfig();
         // Return lowercase names to match frontend expectations
-    });
-
-    // ==========================================
-    // POLICY TEMPLATES ROUTES
-    // ==========================================
-
-    /**
-     * GET /api/v1/config/policy-templates
-     * Get all active policy templates
-     */
-    fastify.get('/config/policy-templates', async (_request, reply) => {
-        try {
-            const templates = await getPolicyTemplates();
-            return { success: true, count: templates.length, templates };
-        } catch (error: any) {
-            fastify.log.error({ err: error }, 'Failed to get policy templates');
-            return reply.code(500).send({ error: error.message });
-        }
     });
 
     // ==========================================
