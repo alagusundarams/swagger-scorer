@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { type PolicyStep } from '../types';
-import { PolicyTemplate } from '../../../../features/provisioning/components/policyTemplates';
+import { PolicyTemplate, getPolicyFields } from '../../../../features/provisioning/components/policyTemplates';
 import { PolicyCard } from './PolicyCard';
 
 const SnippetButton = ({ onSelect, disabled }: { onSelect: (val: string) => void, disabled?: boolean }) => {
@@ -96,7 +96,7 @@ export const GenericPolicyRenderer = ({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4 animate-in fade-in slide-in-from-top-2 duration-500 text-left">
-                {template.inputs.map(input => (
+                {getPolicyFields(template).map(input => (
                     <div key={input.name} className="space-y-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 flex items-center">
                             <span>{input.label}</span>

@@ -38,7 +38,7 @@ export interface PolicyInput {
 }
 
 // Helper to get fields from either structure
-const getPolicyFields = (t: PolicyTemplate) => t.templateSchema?.fields || t.inputs || [];
+export const getPolicyFields = (t: PolicyTemplate) => t.templateSchema?.fields || t.inputs || [];
 const getXmlTemplate = (t: PolicyTemplate) => t.templateSchema?.xmlTemplate || t.xmlTemplate || '';
 
 export interface PolicyTemplate {

@@ -14,6 +14,9 @@ export const API_CONFIG = {
     USE_MOCK_AUTH: import.meta.env.VITE_USE_MOCK_AUTH === undefined || String(import.meta.env.VITE_USE_MOCK_AUTH).toLowerCase().trim() !== 'false'
 };
 
+// Helper for legacy code expecting getApiUrl
+export const getApiUrl = () => API_CONFIG.BASE_URL;
+
 export const SSO_DOMAINS = ['company.com', 'example.org'];
 
 console.log(`[SYS] Environment Context:`, {
