@@ -139,24 +139,23 @@ graph TD
 
 ---
 
-## 6. Database Migrations (TypeORM)
-We use TypeORM for database migrations, ensuring schema evolution is managed.
+## 6. Database Migrations (Native SQL)
+We use raw SQL scripts for schema management to ensure zero-dependency portability.
 
 ```mermaid
 sequenceDiagram
     participant Dev as Developer
-    participant CLI as TypeORM CLI
+    participant Script as npm run setup-db
     participant DB as PostgreSQL
 
-    Dev->>CLI: yarn typeorm migration:create -n AddProductsTable
-    CLI-->>Dev: Created migration file
-    
-    Dev->>Dev: Write SQL in migration file
-    
-    Dev->>CLI: yarn typeorm migration:run
-    CLI->>DB: SELECT * FROM migrations
-    DB-->>CLI: Applied migrations
-    CLI->>DB: EXECUTE migration SQL
-    DB-->>CLI: Success
-    CLI-->>Dev: Migrations applied
+    Dev->>Script: Execute 01-god-schema.sql
+    Script->>DB: DROP SCHEMA public CASCADE
+    DB-->>Script: Schema Dropped
+    Script->>DB: EXECUTE DDL (CREATE TABLES)
+    DB-->>Script: Schema Created
+    Script-->>Dev: DB Reset & Ready
 ```
+
+*   **Logic:** `apim-database/scripts/utils/setup-db.ts`
+*   **Schema:** `apim-database/schema/01-god-schema.sql`
+*   **Philosophy:** We avoid ORMs for DDL to keep the database layer decoupled from the backend application logic.
