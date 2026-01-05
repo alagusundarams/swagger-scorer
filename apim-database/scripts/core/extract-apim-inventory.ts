@@ -45,10 +45,14 @@ interface MetadataStore {
     apiForensics: Record<string, Record<string, { guids: string[], backends: string[] }>>; // env -> apiName -> forensics
     productApiLinks: Record<string, Record<string, Array<{ name: string, path: string }>>>; // env -> productId -> { name, path }[]
 }
+const CONCURRENCY_LIMIT = 10;
 
-/**
- * Regex-based forensics to find Client IDs and Backends in XML
- */
+async function processInBatches<T, R>(items: T[], batchSize: number, task: (item: T) => Promise<R>): Promise<void> {
+    for (let i = 0; i < items.length; i += batchSize) {
+        const batch = items.slice(i, i + batchSize);
+        await Promise.all(batch.map(item => task(item)));
+    }
+}
 function extractForensicsFromPolicy(xml: string): { guids: string[], nvs: string[], backends: string[] } {
     if (!xml) return { guids: [], nvs: [], backends: [] };
     const guids = new Set<string>();
@@ -206,7 +210,7 @@ async function main() {
             const products = prodRes.value || [];
             console.log(`         Found ${products.length} products in ${env.name}`);
 
-            for (const p of products) {
+            await processInBatches(products, CONCURRENCY_LIMIT, async (p) => {
                 const prodId = p.name;
                 const prodName = p.properties.displayName;
                 if (verbose) {
@@ -244,7 +248,7 @@ async function main() {
                         }
                     }
                 } catch (e) { }
-            }
+            });
 
             // --- 2. Named Values ---
             console.log(`      🌏 Fetching Named Values...`);
@@ -289,7 +293,7 @@ async function main() {
             const uniqueApiNamesInEnv = new Set<string>();
             const apiIdMap = new Map<string, string>(); // name -> fullId
 
-            for (const p of products) {
+            await processInBatches(products, CONCURRENCY_LIMIT, async (p) => {
                 try {
                     const pApis = await AzureService.fetchAPIM<any>(apimConfig, `/products/${p.name}/apis`);
                     const apiDetails = (pApis.value || []).map((api: any) => {
@@ -311,14 +315,14 @@ async function main() {
                     });
                     metadata.productApiLinks[env.name][p.name] = apiDetails;
                 } catch (e) { }
-            }
+            });
 
             // --- 4. Deduplicated API Policies & Contracts ---
             console.log(`      📄 Scanning ${uniqueApiNamesInEnv.size} unique API Policies...`);
             metadata.apiForensics[env.name] = {};
             let apiProcessedCount = 0;
 
-            for (const apiName of uniqueApiNamesInEnv) {
+            await processInBatches(Array.from(uniqueApiNamesInEnv), CONCURRENCY_LIMIT, async (apiName) => {
                 const apiFullId = apiIdMap.get(apiName)!;
                 const apiDisplayName = apiName; // We'll update this if we fetch the contract
 
@@ -383,7 +387,7 @@ async function main() {
                         }
                     } catch (e) { }
                 }
-            }
+            });
 
             // --- 4. Resolve Named Values ---
             if (potentialNvs.size > 0) {
