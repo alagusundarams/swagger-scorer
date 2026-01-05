@@ -601,6 +601,40 @@ export class AzureService {
         }
         return { count: 0, results: [] };
     }
+    /**
+     * Fetch Items (Files/Folders) from a Repository
+     * Used for "File Crawler" to find OpenAPI specs
+     */
+    static async fetchRepoItems(
+        org: string,
+        project: string,
+        repoId: string,
+        pat: string,
+        scopePath: string = '/',
+        recursionLevel: 'OneLevel' | 'Full' = 'Full',
+        baseUrl: string = 'https://dev.azure.com',
+        bearerToken?: string
+    ): Promise<any[]> {
+        const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
+        const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const isLegacy = cleanBaseUrl.includes('visualstudio.com');
+        const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
+
+        const url = `${urlBase}/_apis/git/repositories/${repoId}/items?scopePath=${scopePath}&recursionLevel=${recursionLevel}&includeContentMetadata=true&api-version=7.1-preview.1`;
+
+        try {
+            const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+            if (response.ok) {
+                const data = await response.json() as { count: number, value: any[] };
+                return data.value || [];
+            } else {
+                console.warn(`      ⚠️  [Repo Items] Failed ${response.status}: ${response.statusText}`);
+            }
+        } catch (err) {
+            console.error(`      ❌ [Repo Items] Network Error:`, err);
+        }
+        return [];
+    }
 }
 
 export interface AzureADGroup {

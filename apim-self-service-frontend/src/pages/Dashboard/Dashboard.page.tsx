@@ -1,21 +1,14 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { type Product, type Environment } from '../../features/inventory/types/inventoryTypes';
-import { type Subscription } from '../../features/consumer/types/consumerTypes';
+import type { Product, Environment } from '../../features/inventory';
+import type { Subscription } from '../../features/consumer';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { useStore } from '../../store/useStore';
-import { useInventoryStore } from '../../features/inventory/hooks/useInventoryStore';
-import { useTeamsStore } from '../../features/teams/store/teamsStore';
-import { useConsumerStore } from '../../features/consumer/store/consumerStore';
-import { useGovernanceStore } from '../../features/governance/store/governanceStore';
-import { DashboardPagination } from '../../features/inventory/components/dashboard/DashboardPagination';
-import { DashboardHero } from '../../features/inventory/components/dashboard/DashboardHero';
-import { DashboardFilters } from '../../features/inventory/components/dashboard/DashboardFilters';
-import { getAccessibleEnvironments } from '../../features/inventory/utils/productRoleDetection';
-import { DashboardStatsGrid } from '../../features/inventory/components/dashboard/DashboardStatsGrid';
-import { DashboardTabs } from '../../features/inventory/components/dashboard/DashboardTabs';
-import { DashboardContent } from '../../features/inventory/components/dashboard/DashboardContent';
-import { GlobalInventory } from '../../features/admin/views/GlobalInventory.view';
+import { useInventoryStore, DashboardPagination, DashboardHero, DashboardFilters, DashboardStatsGrid, DashboardTabs, DashboardContent, getAccessibleEnvironments } from '../../features/inventory';
+import { useTeamsStore } from '../../features/teams';
+import { useConsumerStore } from '../../features/consumer';
+import { useGovernanceStore } from '../../features/governance';
+import { GlobalInventory } from '../../features/admin';
 import { filterProducts, matchesSearchQuery } from '../../utils/filterUtils';
 
 

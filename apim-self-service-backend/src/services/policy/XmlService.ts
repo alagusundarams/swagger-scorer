@@ -19,7 +19,7 @@ export class XmlService {
     validateXml(xmlString: string): boolean {
         const parser = new DOMParser({
             errorHandler: {
-                warning: (w) => { console.warn('XML Warning:', w); },
+                warning: (w) => { throw new Error(`XML Warning: ${w}`); },
                 error: (e) => { throw new Error(`XML Error: ${e}`); },
                 fatalError: (e) => { throw new Error(`XML Fatal Error: ${e}`); }
             }

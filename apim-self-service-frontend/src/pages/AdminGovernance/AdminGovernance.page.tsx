@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { useStore } from '../../store/useStore';
-import { TeamManager } from '../../features/admin/components/TeamManager';
-import { useGovernanceStore } from '../../features/governance/store/governanceStore';
-import { OrphanProductManager } from '../../features/admin/components/OrphanProductManager';
+import { TeamManager, OrphanProductManager } from '../../features/admin';
+import { useGovernanceStore } from '../../features/governance';
 
 /**
  * AdminGovernancePage Controller

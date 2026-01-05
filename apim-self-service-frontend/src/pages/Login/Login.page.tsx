@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../features/auth/hooks/useAuth';
+import { useAuth } from '../../features/auth';
 import { useStore } from '../../store/useStore';
 import { LoginButton } from '../../layouts/Header/LoginButton';
 import { SSO_DOMAINS } from '../../config/env';
-import '../../features/auth/auth.css';
+
 
 // Configure SSO domains - emails with these domains go to SSO
 // Moved to src/config/env.ts

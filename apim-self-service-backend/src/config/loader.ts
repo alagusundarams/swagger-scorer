@@ -123,6 +123,7 @@ export function setAppConfig(config: AppConfig): void {
 
 export function getAppConfig(): AppConfig {
     if (!globalAppConfig) {
+        console.error('❌ App config not initialized! Call setAppConfig first.');
         throw new Error('App config not initialized. Call setAppConfig first.');
     }
     return globalAppConfig;

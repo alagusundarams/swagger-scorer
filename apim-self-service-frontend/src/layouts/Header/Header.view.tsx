@@ -71,6 +71,7 @@ export const Header = () => {
                         <button
                             onClick={() => setUserMenuOpen(!userMenuOpen)}
                             className={`user-menu-trigger ${userMenuOpen ? 'active' : ''}`}
+                            aria-label="User Menu"
                         >
                             <div className="user-initial-avatar">{userInitial}</div>
                         </button>

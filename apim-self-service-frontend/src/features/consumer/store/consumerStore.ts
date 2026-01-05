@@ -14,6 +14,7 @@ interface ConsumerState {
     requestAccess: (productId: string, teamId: string) => Promise<void>;
     fetchAppRegistrations: (teamId?: string) => Promise<void>;
     registerApp: (app: Partial<AppRegistration>) => Promise<void>;
+    fetchSubscriptionSecrets: (subId: string) => Promise<{ primaryKey: string, secondaryKey: string } | null>;
 }
 
 /**
@@ -62,6 +63,15 @@ export const useConsumerStore = create<ConsumerState>()(
                     set((state) => ({ appRegistrations: [newApp, ...state.appRegistrations] }));
                 } catch (error: any) {
                     set({ error: error.message });
+                }
+            },
+
+            fetchSubscriptionSecrets: async (subId) => {
+                try {
+                    return await consumerApi.getSubscriptionSecrets(subId);
+                } catch (error: any) {
+                    set({ error: error.message });
+                    return null;
                 }
             }
         }),

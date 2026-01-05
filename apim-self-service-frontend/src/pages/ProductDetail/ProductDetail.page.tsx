@@ -1,13 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
-import { useAuth } from '../../features/auth/hooks/useAuth';
-import { useInventoryStore } from '../../features/inventory/hooks/useInventoryStore';
-import { useConsumerStore } from '../../features/consumer/store/consumerStore';
-import { getUserRoleForProduct, canAccessProduct } from '../../features/inventory/utils/productRoleDetection';
-import { ProductDetailProducer } from '../../features/inventory/views/ProductDetailProducer.view';
-import { ProductDetailConsumer } from '../../features/inventory/views/ProductDetailConsumer.view';
-import { RequestAccessModal } from '../../features/inventory/components/modals/RequestAccessModal';
+import { useAuth } from '../../features/auth';
+import { useInventoryStore, getUserRoleForProduct, canAccessProduct, ProductDetailProducer, ProductDetailConsumer, RequestAccessModal } from '../../features/inventory';
+import { useConsumerStore } from '../../features/consumer';
 
 /**
  * ProductDetailPage Controller

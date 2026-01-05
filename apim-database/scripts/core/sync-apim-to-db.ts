@@ -198,8 +198,11 @@ function extractClientIdsFromPolicy(xml: string): string[] {
     const attrMatches = xml.match(/(audience|application-id|client-id|azp|aud)=["']([^"']+)["']/gi);
     if (attrMatches) {
         attrMatches.forEach(m => {
-            const val = m.split(/["']/)[1];
-            addIfGuidOrNv(val);
+            const parts = m.split('=');
+            if (parts.length > 1) {
+                const val = parts[1].replace(/["']/g, '');
+                addIfGuidOrNv(val);
+            }
         });
     }
 
@@ -225,6 +228,9 @@ function extractClientIdsFromPolicy(xml: string): string[] {
 
     return Array.from(ids);
 }
+
+const productIdentities = new Map<string, Set<string>>();
+const apiIdentities = new Map<string, Set<string>>();
 
 function extractNamedValuesFromPolicy(xml: string): string[] {
     if (!xml) return [];
@@ -347,6 +353,7 @@ interface GitMetadata {
         hash: string;
         date: string;
     };
+    discoveredSpecs?: string[];
 }
 
 async function resolveGitMetadata(productName: string, productTags: Record<string, string>, devopsConfig: any, syncReport: SyncReport, currentEnv: string): Promise<GitMetadata> {
@@ -447,12 +454,35 @@ async function resolveGitMetadata(productName: string, productTags: Record<strin
             pipelineUrl = (runs[0] as any)._links?.web?.href || (runs[0] as any).web?.href;
         }
 
+        // D. File Crawler (Inline)
+        let discoveredSpecs: string[] = [];
+        try {
+            // Only crawl if we have a match
+            if (matchedRepo) {
+                const items = await AzureService.fetchRepoItems(
+                    devopsConfig.organization,
+                    matchedRepo.project,
+                    matchedRepo.id,
+                    devopsConfig.pat,
+                    '/',
+                    'Full',
+                    devopsConfig.baseUrl
+                );
+                discoveredSpecs = items
+                    .filter((i: any) => !i.isFolder && (i.path.endsWith('.yaml') || i.path.endsWith('.yml') || i.path.endsWith('.json')))
+                    .map((i: any) => i.path);
+            }
+        } catch (e) {
+            console.warn(`      ⚠️  [Sync] Crawler failed:`, e);
+        }
+
         return {
             hash: currentMetadata.hash,
             date: currentMetadata.date,
             pipelineUrl,
             repoUrl,
-            production: prodMetadata.hash ? prodMetadata : undefined
+            production: prodMetadata.hash ? prodMetadata : undefined,
+            discoveredSpecs
         };
 
     } catch (error) {
@@ -607,6 +637,13 @@ async function runWorker(envName: string) {
         // [ADO] Init Cache of all Repos
         await initAdoCache(config.devops);
 
+        // --- SCHEMA MIGRATIONS (IN-SCRIPT) ---
+        await pool.query(`ALTER TABLE app_registrations ADD COLUMN IF NOT EXISTS api_id TEXT;`);
+        await pool.query(`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS display_name TEXT;`);
+        await pool.query(`ALTER TABLE subscriptions DROP COLUMN IF EXISTS primary_key_value;`);
+        await pool.query(`ALTER TABLE subscriptions DROP COLUMN IF EXISTS secondary_key_value;`);
+        await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS policy_xml TEXT;`); // Add policy_xml column to products
+
         await pool.query(`
             INSERT INTO products (id, name, display_name, version, environment, state, owner_team_id, updated_at)
             VALUES ('unknown-product', 'unknown-product', 'Unknown Product', '0.0.0', $1, 'notPublished', NULL, NOW())
@@ -658,6 +695,7 @@ async function runWorker(envName: string) {
         }
 
         const nvMap = new Map<string, any>(namedValues.map(n => [n.name, n]));
+        const productGitMap = new Map<string, GitMetadata>();
 
         // --- WRITING TO DB ---
         for (const p of apimProducts) {
@@ -679,6 +717,7 @@ async function runWorker(envName: string) {
 
             // [REAL GIT INTEGRATION]
             const gitInfo = await resolveGitMetadata(p.name, tags, config.devops, syncReport, AZURE_CONFIG.environment);
+            productGitMap.set(p.name, gitInfo);
             const anomalies: string[] = [];
 
             // If hash is missing, it implies manual creation (drift)
@@ -703,8 +742,8 @@ async function runWorker(envName: string) {
             await pool.query(`
                 INSERT INTO products (id, name, display_name, version, environment, description, state, subscriber_count, owner_team_id, 
                     last_deployed_commit_hash, last_deployed_at, detected_anomalies, management_mode, terraform_pipeline_url, github_url, 
-                    production_deployment_date, production_hash, region, updated_at)
-                VALUES ($1, $2, $3, $15, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $16, $17, $18, NOW())
+                    production_deployment_date, production_hash, region, policy_xml, updated_at)
+                VALUES ($1, $2, $3, $15, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $16, $17, $18, $19, NOW())
                 ON CONFLICT (id) DO UPDATE SET
                     display_name = EXCLUDED.display_name,
                     state = EXCLUDED.state,
@@ -719,16 +758,22 @@ async function runWorker(envName: string) {
                     production_deployment_date = EXCLUDED.production_deployment_date,
                     production_hash = EXCLUDED.production_hash,
                     region = EXCLUDED.region,
+                    policy_xml = EXCLUDED.policy_xml,
                     updated_at = NOW();
             `, [
                 uniqueProductId, p.id, p.name, AZURE_CONFIG.environment, p.description, p.state, p.subscriptionCount, dbOwnerId,
                 gitInfo.hash, gitInfo.date, JSON.stringify(anomalies), derivedManagementMode,
                 gitInfo.pipelineUrl, gitInfo.repoUrl, extractedVersion,
-                gitInfo.production?.date || null, gitInfo.production?.hash || null, region
+                gitInfo.production?.date || null, gitInfo.production?.hash || null, region, p.policyXml
             ]);
+
+            // Register Identities found in Product Policy
+            const productIds = extractClientIdsFromPolicy(p.policyXml || '');
+            if (productIds.length > 0) {
+                productIdentities.set(uniqueProductId, new Set(productIds));
+            }
         }
 
-        const capturedAppIds = new Set<string>();
         for (const a of apimApis) {
             const rawData = JSON.stringify({
                 protocols: a.protocols,
@@ -748,20 +793,47 @@ async function runWorker(envName: string) {
             const parentProduct = productsRes.value?.[0];
             const linkedProductId = parentProduct ? `${parentProduct.name}:${AZURE_CONFIG.environment}:${region}` : 'unknown-product';
 
+            // Resolve Git Info from Parent Product
+            const gitInfo = parentProduct ? productGitMap.get(parentProduct.name) : null;
+            const repoUrl = gitInfo ? gitInfo.repoUrl : null;
+
+            // Fuzzy Match Spec File
+            // Strategy: Look for file that contains the API Name (sanitized)
+            let bestSpecPath: string | null = null;
+            if (gitInfo && gitInfo.discoveredSpecs && gitInfo.discoveredSpecs.length > 0) {
+                const cleanApiName = a.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+                // 1. Exact Name match (e.g. payment-api.yaml)
+                const exact = gitInfo.discoveredSpecs.find(f => f.toLowerCase().includes(`/${a.name}.`) || f.toLowerCase().includes(`/${a.name.replace(/-/g, '')}.`));
+
+                // 2. Fuzzy/Path match
+                // If API is "payment", look for "src/specs/payment.yaml"
+                const fuzzy = gitInfo.discoveredSpecs.find(f => f.toLowerCase().includes(cleanApiName));
+
+                bestSpecPath = exact || fuzzy || null;
+                if (bestSpecPath) { writeToLog('INFO', [`   Using Spec File: ${bestSpecPath}`]); }
+            }
+
             await pool.query(`
                 INSERT INTO apis(
-                id, name, display_name, path, product_id, apim_raw_data, updated_at
+                id, name, display_name, path, product_id, apim_raw_data, 
+                git_repo_url, git_file_path, updated_at
             )
-                VALUES($1, $2, $3, $4, $5, $6, NOW())
+                VALUES($1, $2, $3, $4, $5, $6, $7, $8, NOW())
                 ON CONFLICT(id) DO UPDATE SET
                     display_name = EXCLUDED.display_name,
                 path = EXCLUDED.path,
                 product_id = EXCLUDED.product_id,
                 apim_raw_data = EXCLUDED.apim_raw_data,
+                git_repo_url = EXCLUDED.git_repo_url,
+                git_file_path = EXCLUDED.git_file_path,
                 updated_at = NOW();
-            `, [uniqueApiId, a.id, a.name, a.path, linkedProductId, rawData]);
+            `, [uniqueApiId, a.id, a.name, a.path, linkedProductId, rawData, repoUrl, bestSpecPath]);
 
-            extractClientIdsFromPolicy(a.policyXml).forEach(cid => capturedAppIds.add(cid));
+            // Register Identities found in API Policy
+            const apiIdsFound = extractClientIdsFromPolicy(a.policyXml);
+            if (apiIdsFound.length > 0) {
+                apiIdentities.set(uniqueApiId, new Set(apiIdsFound));
+            }
 
             // Sync Operations
             for (const op of a.operations) {
@@ -804,14 +876,15 @@ async function runWorker(envName: string) {
             await pool.query(`
                 INSERT INTO subscriptions(
                     id, product_id, subscriber_team_id, state,
-                    primary_key_name, primary_key_value,
+                    primary_key_name, display_name,
                     created_at, updated_at
                 )
             VALUES($1, $2, $3, $4, 'primary', $5, $6, NOW())
                 ON CONFLICT(id) DO UPDATE SET
             state = EXCLUDED.state,
+                display_name = EXCLUDED.display_name,
                 updated_at = NOW();
-            `, [s.id, s.productId, s.userId, s.state, s.primaryKey, s.createdDate]);
+            `, [s.id, s.productId, s.userId, s.state, s.name, s.createdDate]);
         }
 
         // Ensure Table Exists (Self-Healing Schema)
@@ -908,15 +981,37 @@ async function runWorker(envName: string) {
             }
         }
 
-        console.log(`🔗 Resolving ${capturedAppIds.size} potential App Identities...`);
+        const capturedAppIds = new Set<string>();
         const realGuidCandidates: string[] = [];
         const appParams = new Map<string, { displayName: string, clientId: string }>();
+
+        // --- Final Identity Resolution and contextual Insert ---
+        const finalIdentities: Array<{ clientId: string, productId?: string, apiId?: string }> = [];
+
+        // 1. Collect from Product Contexts
+        for (const [uniqueProductId, idSet] of productIdentities.entries()) {
+            for (const cid of idSet) {
+                finalIdentities.push({ clientId: cid, productId: uniqueProductId });
+                capturedAppIds.add(cid);
+            }
+        }
+
+        // 2. Collect from API Contexts
+        for (const [uniqueApiId, idSet] of apiIdentities.entries()) {
+            for (const cid of idSet) {
+                // Link to API and its parent product if possible
+                // (Note: identifying the parent product from uniqueApiId might require a lookup, 
+                // but since apis are inserted first, we can assume relational integrity handles it in DB)
+                finalIdentities.push({ clientId: cid, apiId: uniqueApiId });
+                capturedAppIds.add(cid);
+            }
+        }
 
         for (const cid of capturedAppIds) {
             if (nvMap.has(cid)) {
                 const nv = nvMap.get(cid);
                 if (nv.keyVaultUrl) {
-                    appParams.set(cid, { clientId: cid, displayName: `KeyVault: ${nv.keyVaultUrl} ` });
+                    appParams.set(cid, { clientId: cid, displayName: `KeyVault: ${nv.keyVaultUrl}` });
                 } else if (!nv.isSecret && nv.value) {
                     const val = nv.value;
                     if (/^[0-9a-f]{8}-/i.test(val)) {
@@ -939,12 +1034,25 @@ async function runWorker(envName: string) {
             }
         }
 
-        for (const [key, val] of appParams.entries()) {
+        for (const identity of finalIdentities) {
+            const param = appParams.get(identity.clientId) || { clientId: identity.clientId, displayName: 'Unknown Identity' };
             await pool.query(`
-                INSERT INTO app_registrations(id, client_id, display_name, environment, product_id, owner_team_id)
-            VALUES($1, $1, $2, $3, 'unknown-product', NULL)
-                ON CONFLICT(id) DO UPDATE SET display_name = EXCLUDED.display_name;
-            `, [val.clientId, val.displayName, AZURE_CONFIG.environment]);
+                INSERT INTO app_registrations(id, client_id, display_name, environment, product_id, api_id, owner_team_id)
+            VALUES($1, $1, $2, $3, $4, $5, NULL)
+                ON CONFLICT(id) DO UPDATE SET 
+                    display_name = EXCLUDED.display_name,
+                    product_id = COALESCE(EXCLUDED.product_id, app_registrations.product_id),
+                    api_id = COALESCE(EXCLUDED.api_id, app_registrations.api_id);
+            `, [param.clientId, param.displayName, AZURE_CONFIG.environment, identity.productId || null, identity.apiId || null]);
+        }
+
+        // Handle catch-all for any orphaned captured IDs that didn't have a direct context (should be rare)
+        for (const [clientId, param] of appParams.entries()) {
+            await pool.query(`
+                INSERT INTO app_registrations(id, client_id, display_name, environment, product_id, api_id, owner_team_id)
+                VALUES($1, $1, $2, $3, 'unknown-product', NULL, NULL)
+                ON CONFLICT(id) DO NOTHING;
+            `, [clientId, param.displayName, AZURE_CONFIG.environment]);
         }
 
         console.log('✅ Sync Complete.');

@@ -20,6 +20,10 @@ async function seedDemoData() {
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS stage_hash TEXT;`);
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS prod_hash TEXT;`);
 
+        // API Schema Patch
+        await client.query(`ALTER TABLE apis ADD COLUMN IF NOT EXISTS git_repo_url TEXT;`);
+        await client.query(`ALTER TABLE apis ADD COLUMN IF NOT EXISTS git_file_path TEXT;`);
+
         // Approval Request Schema Patch
         await client.query(`ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS approver_team_id TEXT;`);
         await client.query(`ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS requester_name TEXT;`);
@@ -107,14 +111,16 @@ async function seedDemoData() {
 
         // Insert API for Legacy Product (so we can click "Visual Policy")
         await client.query(`
-            INSERT INTO apis (id, product_id, name, display_name, path, quality_score)
+            INSERT INTO apis (id, product_id, name, display_name, path, quality_score, git_repo_url, git_file_path)
             VALUES (
                 'api-legacy-01',
                 'prod-legacy',
                 'order-processing',
                 'Order Processing Endpoint',
                 '/orders/v1',
-                40.00
+                40.00,
+                NULL, -- No Repo (Legacy)
+                NULL
             );
         `);
         console.log('✅ Legacy Product Seeded.');
@@ -130,7 +136,7 @@ async function seedDemoData() {
                 owner_team_id, management_mode, authorized_teams,
                 detected_anomalies, quality_score, 
                 last_deployed_commit_hash, terraform_pipeline_url,
-                dev_hash, qa_hash, prod_hash
+                dev_hash, qa_hash, prod_hash, git_repo_url
             ) VALUES (
                 'prod-payment-v2',
                 'payment-gateway-v2',
@@ -147,20 +153,23 @@ async function seedDemoData() {
                 'https://dev.azure.com/contoso/project/_build?definitionId=123',
                 'new-feature-hash-xyz', -- DEV hash differs (Simulates "Changed in DEV")
                 'a1b2c3d', -- QA matched Base
-                'a1b2c3d'  -- PROD matches Base
+                'a1b2c3d',  -- PROD matches Base
+                'https://dev.azure.com/contoso/payment-gateway-v2'
             );
         `);
 
         // Insert API for Modern Product
         await client.query(`
-            INSERT INTO apis (id, product_id, name, display_name, path, quality_score)
+            INSERT INTO apis (id, product_id, name, display_name, path, quality_score, git_repo_url, git_file_path)
             VALUES (
                 'api-payment-v2',
                 'prod-payment-v2',
                 'payment-api',
                 'Payment API',
                 '/payments/v2',
-                99.00
+                99.00,
+                'https://dev.azure.com/contoso/payment-gateway-v2',
+                'src/specs/payment-v2.yaml'
             );
         `);
         console.log('✅ Modern Product Seeded.');

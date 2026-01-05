@@ -638,6 +638,7 @@ export async function generateManifest(productId: string, format: 'json' | 'tfva
         const payload = {
             product: product.name,
             environment: product.environment,
+            repoUrl: await getRepoUrlForResource(productId),
             configuration: {
                 shared: productValues.reduce((acc: any, nv: any) => ({
                     ...acc,
@@ -665,7 +666,10 @@ export async function generateManifest(productId: string, format: 'json' | 'tfva
         };
         return JSON.stringify(payload, null, 2);
     } else {
-        let tf = `# Product Configuration: ${product.display_name}\n\n`;
+        let tf = `# Product Configuration: ${product.display_name}\n`;
+        const repoUrl = await getRepoUrlForResource(productId);
+        if (repoUrl) tf += `# Repository: ${repoUrl}\n`;
+        tf += `\n`;
 
         // Product Level
         tf += `product_named_values = {\n`;

@@ -2,14 +2,11 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { useStore } from '../../store/useStore';
-import { useAuth } from '../../features/auth/hooks/useAuth';
-import { useInventoryStore } from '../../features/inventory/hooks/useInventoryStore';
-import { useConsumerStore } from '../../features/consumer/store/consumerStore';
-import { useTeamsStore } from '../../features/teams/store/teamsStore';
-import { DiscoveryHero } from '../../features/discovery/components/DiscoveryHero';
-import { DiscoveryProductCard } from '../../features/discovery/components/DiscoveryProductCard';
-import { SubscriptionConfirmModal } from '../../features/discovery/components/SubscriptionConfirmModal';
-import '../../features/discovery/discovery.css';
+import { useAuth } from '../../features/auth';
+import { useInventoryStore } from '../../features/inventory';
+import { useConsumerStore } from '../../features/consumer';
+import { useTeamsStore } from '../../features/teams';
+import { DiscoveryHero, DiscoveryProductCard, SubscriptionConfirmModal } from '../../features/discovery';
 import { filterProducts } from '../../utils/filterUtils';
 
 /**

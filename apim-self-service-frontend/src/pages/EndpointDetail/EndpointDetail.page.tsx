@@ -1,11 +1,7 @@
 import { useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
-import { useInventoryStore } from '../../features/inventory/hooks/useInventoryStore';
-import { EndpointHeader } from '../../features/inventory/components/api-details/EndpointHeader';
-import { RequestDefinitionCard } from '../../features/inventory/components/api-details/RequestDefinitionCard';
-import { ResponseStatesCard } from '../../features/inventory/components/api-details/ResponseStatesCard';
-import { EndpointImplementationGuide } from '../../features/inventory/components/api-details/EndpointImplementationGuide';
+import { useInventoryStore, EndpointHeader, RequestDefinitionCard, ResponseStatesCard, EndpointImplementationGuide } from '../../features/inventory';
 
 /**
  * EndpointDetailPage: Deep-dive into a specific API Operation.

@@ -43,6 +43,7 @@ interface ADOMetadata {
     repository?: { id: string; name: string; project: string; projectId: string };
     pipeline?: { id: number; name: string };
     deployments: Record<string, { hash: string; date: string }>;
+    discoveredSpecs?: string[]; // New: List of potential OpenAPI files found in repo
     status: 'MATCHED' | 'REPO_MISSING' | 'PIPELINE_MISSING' | 'ORPHAN';
 }
 

@@ -197,6 +197,19 @@ export const createInventorySlice: StateCreator<InventorySlice> = (set, get) => 
             }));
         } catch (error: any) {
             console.error("Failed to fetch operations", error);
+            // Break the loop by setting operations to empty on error
+            set((state) => ({
+                products: state.products.map(p => {
+                    if (p.id !== productId) return p;
+                    return {
+                        ...p,
+                        apis: p.apis.map(a => {
+                            if (a.id !== apiId) return a;
+                            return { ...a, operations: [] };
+                        })
+                    };
+                })
+            }));
         }
     }
 });

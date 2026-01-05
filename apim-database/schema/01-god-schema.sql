@@ -156,6 +156,10 @@ CREATE TABLE IF NOT EXISTS apis (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     
+    -- Source Control
+    git_repo_url TEXT,
+    git_file_path TEXT,
+
     -- APIM source data
     apim_raw_data JSONB
 );
@@ -192,6 +196,7 @@ CREATE TABLE IF NOT EXISTS app_registrations (
     display_name TEXT NOT NULL, -- Resolved from Graph or 'KeyVault:...'
     environment TEXT NOT NULL,
     product_id TEXT REFERENCES products(id),
+    api_id TEXT REFERENCES apis(id),
     owner_team_id TEXT REFERENCES teams(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -208,13 +213,12 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     product_id TEXT REFERENCES products(id) ON DELETE CASCADE NOT NULL,
     subscriber_team_id TEXT REFERENCES teams(id) NOT NULL,
     app_registration_id TEXT REFERENCES app_registrations(id), -- Optional link to App Registration
+    display_name TEXT,
     state TEXT NOT NULL CHECK (state IN ('active', 'suspended', 'submitted', 'pending', 'rejected', 'cancelled', 'expired')),
     
     -- Keys
     primary_key_name TEXT,
-    primary_key_value TEXT, -- Encrypted in production
     secondary_key_name TEXT,
-    secondary_key_value TEXT, -- Encrypted in production
     
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

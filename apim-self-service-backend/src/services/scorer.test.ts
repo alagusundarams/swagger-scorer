@@ -132,8 +132,9 @@ describe('Scorer Service', () => {
         const greenResult = calculateScore([], config, '3.0.0');
         expect(greenResult.status).toBe('green');
 
-        // Many violations to get score in amber range (85-94)
-        const amberViolations: Violation[] = Array(20)
+        // Many violations to get score in amber range (70-89)
+        // Security (30) + ApiDesign (20) = 50% of total weight.
+        const amberViolations: Violation[] = Array(50)
             .fill(null)
             .map((_, i) => ({
                 rule: `rule-${i}`,
@@ -141,7 +142,7 @@ describe('Scorer Service', () => {
                 message: 'Test violation',
                 path: 'test',
                 line: 1,
-                category: 'documentation',
+                category: i % 2 === 0 ? 'security' : 'apiDesign',
             }));
 
         const amberResult = calculateScore(amberViolations, config, '3.0.0');

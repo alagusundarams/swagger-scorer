@@ -8,12 +8,12 @@ import type { Subscription, AppRegistration } from '../../../shared/types/domain
  */
 export const getSubscriptions = async (): Promise<Subscription[]> => {
     const res = await baseClient.get('/subscriptions');
-    return res.data;
+    return res.data.subscriptions || [];
 };
 
 export const requestProductAccess = async (productId: string, teamId: string): Promise<Subscription> => {
     const res = await baseClient.post('/subscriptions', { productId, teamId });
-    return res.data;
+    return res.data.subscription;
 };
 
 export const updateSubscription = async (subId: string, updates: Partial<Subscription>): Promise<Subscription> => {
@@ -31,10 +31,16 @@ export const addAppRegistration = async (data: Partial<AppRegistration>): Promis
     return res.data;
 };
 
+export const getSubscriptionSecrets = async (subId: string): Promise<{ primaryKey: string, secondaryKey: string }> => {
+    const res = await baseClient.get(`/subscriptions/${subId}/secrets`);
+    return res.data.secrets;
+};
+
 export const consumerApi = {
     getSubscriptions,
     requestProductAccess,
     updateSubscription,
     getAppRegistrations,
-    addAppRegistration
+    addAppRegistration,
+    getSubscriptionSecrets
 };

@@ -123,8 +123,7 @@ export async function autoPromoteProduct(
 
         console.log(`[Promotion] Logged to audit trail`);
 
-        // 5. TODO: Send notification to requester
-        // await sendNotification(requesterId, `Deployed to ${targetEnvironment}`);
+
 
         return {
             success: true,

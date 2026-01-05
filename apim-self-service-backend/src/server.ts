@@ -28,6 +28,7 @@ import onboardingRoutes from './routes/onboarding.js';
 import policyHelpRoutes from './routes/policy-help.routes.js';
 import configManagementRoutes from './routes/config.routes.js';
 import policyTemplatesRoutes from './routes/policy-templates.routes.js';
+import subscriptionsRoutes from './routes/subscriptions.routes.js';
 import policyDisplayRoutes from './routes/policy-display.routes.js';
 import inventoryRoutes from './routes/inventory.routes.js';
 import { authRoutes } from './routes/auth.routes.js';
@@ -148,6 +149,7 @@ export async function build() {
     await fastify.register(policyHelpRoutes, { prefix: '/api/v1' });
     await fastify.register(configManagementRoutes, { prefix: '/api/v1' });
     await fastify.register(policyTemplatesRoutes, { prefix: '/api/v1' });
+    await fastify.register(subscriptionsRoutes, { prefix: '/api/v1' });
     await fastify.register(policyDisplayRoutes, { prefix: '/api/v1' });
     await fastify.register(inventoryRoutes, { prefix: '/api/v1' });
     await fastify.register(authRoutes, { prefix: '/api/v1/auth' });

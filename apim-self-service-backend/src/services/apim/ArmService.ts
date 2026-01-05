@@ -102,4 +102,19 @@ export class ArmService {
             return [];
         }
     }
+
+    /**
+     * Lists Secrets for a Subscription.
+     */
+    async listSubscriptionSecrets(subscriptionId: string): Promise<any> {
+        try {
+            // endpoint: /subscriptions/{subscriptionId}/listSecrets
+            const url = `${this.baseUrl}/subscriptions/${subscriptionId}/listSecrets?api-version=2022-08-01`;
+            const response = await axios.post(url, {}, { headers: this.headers });
+            return response.data;
+        } catch (e) {
+            console.error(`Failed to list secrets for subscription ${subscriptionId}`, e);
+            throw e;
+        }
+    }
 }

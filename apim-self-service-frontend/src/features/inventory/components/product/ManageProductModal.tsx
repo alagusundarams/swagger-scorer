@@ -114,7 +114,11 @@ export const ManageProductModal = ({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-xl z-[100] flex items-center justify-center p-6 animate-fade-in">
+        <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 bg-slate-900/80 backdrop-blur-xl z-[100] flex items-center justify-center p-6 animate-fade-in"
+        >
             <div className="bg-white dark:bg-slate-800 w-full max-w-2xl rounded-[2rem] shadow-2xl border border-white/10 overflow-hidden relative flex flex-col max-h-[90vh]">
 
                 {/* Header with Stage Indicator */}

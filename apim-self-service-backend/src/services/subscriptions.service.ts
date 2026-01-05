@@ -50,8 +50,8 @@ export async function getAllSubscriptions(userRole: string = 'admin', teamId?: s
         expirationDate: s.expiration_date,
         keysGeneratedAt: s.keys_generated_at,
         lastSyncedAt: s.last_synced_at,
-        primaryKey: { name: 'Primary', value: s.primary_key_value || '••••••••' },
-        secondaryKey: { name: 'Secondary', value: s.secondary_key_value || '••••••••' },
+        primaryKey: { name: 'Primary', value: (s as any).primary_key_value || '••••••••' },
+        secondaryKey: { name: 'Secondary', value: (s as any).secondary_key_value || '••••••••' },
         appRegistration: s.app_id ? {
             id: s.app_id,
             displayName: s.app_display_name,

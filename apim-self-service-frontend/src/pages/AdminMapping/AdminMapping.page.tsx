@@ -2,8 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { Typeahead } from '../../components/ui/Typeahead';
-import { useInventoryStore } from '../../features/inventory/hooks/useInventoryStore';
-import { useTeamsStore } from '../../features/teams/store/teamsStore';
+import { useInventoryStore } from '../../features/inventory';
+import { useTeamsStore } from '../../features/teams';
 import { toast } from 'react-hot-toast';
 
 interface ExtractedResource {
@@ -128,7 +128,7 @@ export const AdminMappingView = () => {
         setMatrixEntries([]); // Reset while loading
 
         try {
-            import('../../features/inventory/api/inventoryClient').then(async ({ getPermissionMatrix }) => {
+            import('../../features/inventory').then(async ({ getPermissionMatrix }) => {
                 const res = (await getPermissionMatrix(product.id)) as any;
                 setMatrixEntries(res.data);
             });
@@ -141,7 +141,7 @@ export const AdminMappingView = () => {
         if (!selectedProductForMatrix) return;
         setIsSavingMatrix(true);
         try {
-            const { updatePermissionMatrix } = await import('../../features/inventory/api/inventoryClient');
+            const { updatePermissionMatrix } = await import('../../features/inventory');
             await updatePermissionMatrix(selectedProductForMatrix.id, matrixEntries);
             toast.success('Permission matrix updated successfully');
             setSelectedProductForMatrix(null);

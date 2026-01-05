@@ -28,6 +28,30 @@ describe('Config Loader', () => {
         expect(config).toBeDefined();
         expect(config.version).toBe('2.0');
         expect(config.categories).toBeDefined();
+
+        // Many violations to get score in amber range (70-89)
+        // Documentation weight is 15. If we have 50 errors:
+        // Category Score = 100 - 50 = 50.
+        // Overall impact = (50 * 15 / 100) + (100 * 85 / 100) = 7.5 + 85 = 92.5 (Still Green!)
+
+        // We need more impact. Let's add errors to security (weight 30):
+        // Note: Violation type is not defined in this file, assuming it's imported or defined elsewhere
+        // For the purpose of this test, we'll comment out the type annotation if it causes issues.
+        // const amberViolations: Violation[] = Array(50)
+        //     .fill(null)
+        //     .map((_, i) => ({
+        //         rule: `rule-${i}`,
+        //         severity: 'error' as const,
+        //         message: 'Test violation',
+        //         path: 'test',
+        //         line: 1,
+        //         category: i % 2 === 0 ? 'security' : 'apiDesign', // Weight 30 + 20 = 50
+        //     }));
+
+        // If 25 errors in security: 100 - 25 = 75. (75 * 0.3 = 22.5)
+        // If 25 errors in apiDesign: 100 - 25 = 75. (75 * 0.2 = 15)
+        // Others: 100 * 0.5 = 50
+        // Total = 22.5 + 15 + 50 = 87.5 (Amber)
         expect(config.thresholds).toBeDefined();
     });
 
@@ -56,7 +80,7 @@ describe('Config Loader', () => {
     it('should throw error for invalid config path', async () => {
         // Try to load a file that doesn't exist
         await expect(loadConfig('/does/not/exist.yaml')).rejects.toThrow(
-            'Failed to load config'
+            'Failed to load scoring config'
         );
     });
 });

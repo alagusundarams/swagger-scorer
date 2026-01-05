@@ -18,7 +18,7 @@ export function DashboardHero({ activeTab }: DashboardHeroProps) {
     };
 
     return (
-        <div className="mb-14">
+        <div className="mb-14" data-testid="dashboard-hero">
             <div className="flex flex-col gap-4">
                 <h1 className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter uppercase">
                     {titles[activeTab]}

@@ -14,7 +14,7 @@ import {
     deleteNamedValue, syncProductOperations, getProductById, getApiById
 } from '../services/products.service.js';
 import { getAllTeams, createTeam, updateTeam } from '../services/teams.service.js';
-import { getAllSubscriptions, addSubscription, updateSubscriptionState } from '../services/subscriptions.service.js';
+// Subscriptions moved to dedicated routes
 import { getAllApprovals, updateApproval } from '../services/approvals.service.js';
 import { getAuditLogs } from '../services/audit.service.js';
 import { getAppRegistrations, addAppRegistration } from '../services/apps.service.js';
@@ -328,47 +328,7 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         }
     });
 
-    fastify.get('/subscriptions', async (request, reply) => {
-        try {
-            const { role, teamId } = request.query as any;
-            const subs = await getAllSubscriptions(role, teamId);
-            return subs;
-        } catch (error) {
-            fastify.log.error({ err: error }, 'Error fetching subscriptions');
-            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to fetch subscriptions' });
-        }
-    });
-
-    // PATCH /api/v1/subscriptions/:id
-    fastify.patch('/subscriptions/:id', async (request, reply) => {
-        const { id } = request.params as any;
-        const { state } = request.body as any;
-        try {
-            // In a real app, this would update keys, expiry, etc.
-            await updateSubscriptionState(id, state);
-            return { success: true };
-        } catch (error) {
-            fastify.log.error({ err: error }, 'Error updating subscription');
-            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to update subscription' });
-        }
-    });
-
-    // POST /api/v1/subscriptions (Request Access)
-    fastify.post('/subscriptions', async (request, reply) => {
-        const body = request.body as any;
-        const productId = body.productId;
-        const teamId = body.teamId || body.subscriberTeamId;
-        const appId = body.appId;
-        const justification = body.justification;
-        try {
-            const requester = { name: 'Portal User', email: 'user@portal.dev' };
-            const sub = await addSubscription(productId, teamId, requester, appId, justification);
-            return sub;
-        } catch (error) {
-            fastify.log.error({ err: error }, 'Error creating subscription');
-            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to request access' });
-        }
-    });
+    // NOTE: /subscriptions routes moved to src/routes/subscriptions.routes.ts
 
     // GET /api/v1/approvals
     fastify.get('/approvals', async (_request, reply) => {

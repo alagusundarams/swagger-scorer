@@ -82,7 +82,30 @@ export async function setupApiMocks(page: Page, options: { reset: boolean } = { 
             return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(tid ? statefulTeams.find(t => t.id === tid) : statefulTeams) });
         }
 
-        // 3. OTHERS
+        // 3. AUTH
+        if (url.includes('/auth/login')) {
+            let body = JSON.parse(route.request().postData() || '{}');
+            // Support WAF Safe Transport decoding
+            if (body._v) {
+                try {
+                    const decoded = decodeURIComponent(escape(atob(body._v)));
+                    body = JSON.parse(decoded);
+                } catch (e) {
+                    console.error("[E2E MOCKER] Failed to decode safe transport", e);
+                }
+            }
+
+            const mockUser = {
+                id: 'u1',
+                name: body.role === 'producer' ? 'Sarah Payments' : (body.role === 'admin' ? 'Admin User' : 'Mike Consumer'),
+                email: body.email || 'user@example.com',
+                role: body.role || 'producer',
+                defaultTeamId: 'team-1'
+            };
+            return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockUser) });
+        }
+
+        // 4. OTHERS
         if (url.includes('/environments')) return route.fulfill({ status: 200, body: JSON.stringify(MOCK_ENVIRONMENTS) });
         if (url.includes('/subscriptions')) return route.fulfill({ status: 200, body: JSON.stringify(statefulSubscriptions) }); // Global sub list
         if (url.includes('/apis')) return route.fulfill({ status: 200, body: JSON.stringify(MOCK_APIS) });

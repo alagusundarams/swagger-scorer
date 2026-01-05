@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { useStore } from '../../store/useStore';
-import { useInventoryStore } from '../../features/inventory/hooks/useInventoryStore';
+import { useInventoryStore } from '../../features/inventory';
 
 /**
  * MarketplacePage Controller

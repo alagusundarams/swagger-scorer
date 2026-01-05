@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { useStore } from '../../store/useStore';
-import { useConsumerStore } from '../../features/consumer/store/consumerStore';
+import { useConsumerStore } from '../../features/consumer';
 import { toast } from 'react-hot-toast';
 
 /**

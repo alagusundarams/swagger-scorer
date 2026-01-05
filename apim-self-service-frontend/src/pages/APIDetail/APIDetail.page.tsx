@@ -1,9 +1,8 @@
-import { useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
-import { useInventoryStore } from '../../features/inventory/hooks/useInventoryStore';
-import { ApiIdentityHeader } from '../../features/inventory/components/api-details/ApiIdentityHeader';
-import { OperationCatalog } from '../../features/inventory/components/api-details/OperationCatalog';
+import { SecurityTab, ApiIdentityHeader, OperationCatalog, useInventoryStore } from '../../features/inventory';
+import { CredentialsTab, useConsumerStore } from '../../features/consumer';
 
 /**
  * APIDetailPage: Provides a localized view of a specific API Resource.
@@ -17,20 +16,34 @@ import { OperationCatalog } from '../../features/inventory/components/api-detail
 export const APIDetailPage = () => {
     const { productId, apiId } = useParams<{ productId: string; apiId: string }>();
     const navigate = useNavigate();
+    const [activeTab, setActiveTab] = useState<'overview' | 'security' | 'credentials'>('overview');
 
     // --- Store Integration ---
     const { products, fetchOperations } = useInventoryStore();
+    const { subscriptions, fetchSubscriptions } = useConsumerStore();
 
     // --- Data Selectors ---
     const product = useMemo(() => products.find(p => p.id === productId), [products, productId]);
     const api = useMemo(() => product?.apis.find(a => a.id === apiId), [product, apiId]);
 
+    // Filtered Subscriptions for this product
+    const productSubscriptions = useMemo(() =>
+        subscriptions.filter((s: any) => s.productId === productId),
+        [subscriptions, productId]);
+
     // Fetch operations if missing
-    useMemo(() => {
-        if (productId && apiId && (!api?.operations || api.operations.length === 0)) {
+    useEffect(() => {
+        if (productId && apiId && api && !api.operations) {
             fetchOperations(productId, apiId);
         }
     }, [productId, apiId, api?.operations, fetchOperations]);
+
+    // Fetch subscriptions if missing
+    useEffect(() => {
+        if (subscriptions.length === 0) {
+            fetchSubscriptions();
+        }
+    }, [subscriptions.length, fetchSubscriptions]);
 
     // Handle missing data gracefully
     if (!product || !api) {
@@ -51,10 +64,50 @@ export const APIDetailPage = () => {
         );
     }
 
+    const tabs = [
+        { id: 'overview', label: 'Overview', icon: '📋' },
+        { id: 'security', label: 'Security', icon: '🛡️' },
+        { id: 'credentials', label: 'Credentials', icon: '🔑' },
+    ] as const;
+
     return (
         <MainLayout>
-            <ApiIdentityHeader product={product} api={api} />
-            <OperationCatalog productId={productId!} api={api} />
+            <div className="bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800">
+                <ApiIdentityHeader product={product} api={api} />
+
+                {/* Tab Navigation */}
+                <div className="max-w-7xl mx-auto px-6 mt-4">
+                    <div className="flex space-x-8">
+                        {tabs.map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`
+                                    pb-4 text-[10px] uppercase tracking-widest font-black transition-all border-b-2
+                                    ${activeTab === tab.id
+                                        ? 'text-blue-600 border-blue-600'
+                                        : 'text-gray-400 border-transparent hover:text-gray-600 dark:hover:text-slate-300'}
+                                `}
+                            >
+                                <span className="mr-2">{tab.icon}</span>
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            <div className="max-w-7xl mx-auto px-6 py-8">
+                {activeTab === 'overview' && (
+                    <OperationCatalog productId={productId!} api={api} />
+                )}
+                {activeTab === 'security' && (
+                    <SecurityTab api={api} />
+                )}
+                {activeTab === 'credentials' && (
+                    <CredentialsTab subscriptions={productSubscriptions} />
+                )}
+            </div>
         </MainLayout>
     );
 };

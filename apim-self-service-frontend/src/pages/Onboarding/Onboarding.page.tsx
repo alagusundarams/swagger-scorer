@@ -2,19 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { useStore } from '../../store/useStore';
-import { useTeamsStore } from '../../features/teams/store/teamsStore';
-import { OnboardingProgressBar } from '../../features/provisioning/components/OnboardingProgressBar';
-import { OnboardingIdentityStep } from '../../features/provisioning/components/OnboardingIdentityStep';
-import { OnboardingFulfillmentStep } from '../../features/provisioning/components/OnboardingFulfillmentStep';
-import { OnboardingSpecStep } from '../../features/provisioning/components/OnboardingSpecStep';
-// OnboardingProductPolicyStep removed (merged into ApiPolicyStep)
-import { OnboardingApiPolicyStep } from '../../features/provisioning/components/OnboardingApiPolicyStep';
-import { OnboardingIntentModal } from '../../features/provisioning/components/OnboardingIntentModal';
-import { OnboardingResolutionStep } from '../../features/provisioning/components/OnboardingResolutionStep';
-import { useInventoryStore } from '../../features/inventory/hooks/useInventoryStore';
-import { type Product } from '../../features/inventory/types/inventoryTypes';
-import { saveDraft, loadDraft } from '../../features/provisioning/api/draftClient';
-import '../../features/provisioning/provisioning.css';
+import { useTeamsStore } from '../../features/teams';
+import { OnboardingProgressBar, OnboardingIdentityStep, OnboardingFulfillmentStep, OnboardingSpecStep, OnboardingApiPolicyStep, OnboardingIntentModal, OnboardingResolutionStep, saveDraft, loadDraft } from '../../features/provisioning';
+import { useInventoryStore, type Product } from '../../features/inventory';
 
 /**
  * OnboardingPage Controller (Visual Wizard v2)

@@ -1,9 +1,8 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useInventoryStore } from '../../features/inventory/hooks/useInventoryStore';
-import { inventoryApi } from '../../features/inventory/api/inventoryClient';
+import { useInventoryStore, inventoryApi } from '../../features/inventory';
 import { Environment } from '../../core/types/commonTypes';
-import { OnboardingApiPolicyStep } from '../../features/provisioning/components/OnboardingApiPolicyStep';
+import { OnboardingApiPolicyStep } from '../../features/provisioning';
 import { ApiOperation } from '../../utils/swaggerParser';
 import toast from 'react-hot-toast';
 
