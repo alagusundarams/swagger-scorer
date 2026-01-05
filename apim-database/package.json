@@ -9,6 +9,7 @@
         "sync": "tsx scripts/core/discover-sync.ts",
         "sync:fast": "tsx scripts/core/discover-sync.ts --skip-ado",
         "sync:db": "tsx scripts/core/discover-sync.ts --source=db",
+        "extract-apim": "tsx scripts/core/extract-apim-inventory.ts",
         "ado": "tsx scripts/core/extract-ado-metadata.ts",
         "reconcile": "tsx scripts/core/reconcile-governance.ts",
         "verify": "tsx scripts/debug/verify-backend-queries.ts",
