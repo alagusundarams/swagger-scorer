@@ -266,6 +266,58 @@ async function main() {
                             }
                         }
                     }
+
+                    // --- OPERATIONS EXTRACTION FROM OPENAPI SPEC ---
+                    const apiContract = apimMeta.apiContracts[apiName];
+                    if (apiContract && apiContract.definition) {
+                        const spec = apiContract.definition;
+                        const paths = spec.paths || {};
+                        let operationsCount = 0;
+
+                        for (const [pathTemplate, pathItem] of Object.entries(paths)) {
+                            const methods = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'];
+
+                            for (const method of methods) {
+                                const operation = (pathItem as any)[method];
+                                if (operation) {
+                                    // Generate unique operation ID: apiId:method:path
+                                    const operationId = `${uniqueApiId}:${method}:${pathTemplate.replace(/\//g, '_')}`;
+                                    const operationName = operation.operationId || `${method}_${pathTemplate.replace(/\//g, '_')}`;
+                                    const summary = operation.summary || operation.description || pathTemplate;
+                                    const description = operation.description || '';
+
+                                    try {
+                                        await pool.query(`
+                                            INSERT INTO operations (id, api_id, name, display_name, method, url_template, description)
+                                            VALUES ($1, $2, $3, $4, $5, $6, $7)
+                                            ON CONFLICT (id) DO UPDATE SET
+                                                name = EXCLUDED.name,
+                                                display_name = EXCLUDED.display_name,
+                                                method = EXCLUDED.method,
+                                                url_template = EXCLUDED.url_template,
+                                                description = EXCLUDED.description;
+                                        `, [
+                                            operationId,
+                                            uniqueApiId,
+                                            operationName,
+                                            summary,
+                                            method.toUpperCase(),
+                                            pathTemplate,
+                                            description
+                                        ]);
+                                        operationsCount++;
+                                    } catch (err: any) {
+                                        console.error(`❌ FAILED to sync Operation: ${method.toUpperCase()} ${pathTemplate}`);
+                                        console.error(`   API: "${apiName}", Details: ${err.message}`);
+                                    }
+                                }
+                            }
+                        }
+
+                        if (verbose && operationsCount > 0) {
+                            console.log(`            📍 Operations: ${operationsCount} extracted from OpenAPI spec`);
+                        }
+                    }
                 }
             }
         }

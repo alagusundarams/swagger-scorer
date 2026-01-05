@@ -10,5 +10,17 @@
     "productName": "prod-payment-v2",
     "deployments": {},
     "status": "REPO_MISSING"
+  },
+  {
+    "productId": "prod-payment-v2:DEV:Global:DEV:Global",
+    "productName": "prod-payment-v2:DEV:Global",
+    "deployments": {},
+    "status": "REPO_MISSING"
+  },
+  {
+    "productId": "prod-payment-v2:DEV:Global:DEV:Global:DEV:Global",
+    "productName": "prod-payment-v2:DEV:Global:DEV:Global",
+    "deployments": {},
+    "status": "REPO_MISSING"
   }
 ]
