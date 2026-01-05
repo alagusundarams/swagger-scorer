@@ -11,8 +11,14 @@ import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
 function loadConfig() {
-    const configPath = join(process.cwd(), 'apim-database', 'config.json');
-    if (existsSync(configPath)) return JSON.parse(readFileSync(configPath, 'utf8'));
+    const configPaths = [
+        join(process.cwd(), 'apim-database', 'config.json'),
+        join(process.cwd(), 'config.json'),
+        join(process.cwd(), '..', 'config.json')
+    ];
+    for (const path of configPaths) {
+        if (existsSync(path)) return JSON.parse(readFileSync(path, 'utf8'));
+    }
     return {};
 }
 
