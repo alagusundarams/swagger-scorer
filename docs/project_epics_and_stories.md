@@ -12,10 +12,10 @@ This backlog represents the complete work breakdown structure (WBS) for the APIM
 **Goal:** Provision the secure runtime environment.
 
 1.  **[Infra] VNET Provisioning:** Create Azure VNET `10.0.0.0/16` with `app` and `db` subnets.
-2.  **[Infra] Key Vault Setup:** Provision Standard Tier KV and enable RBAC.
+2.  **[Infra] Azure Key Vault Setup:** Provision Standard Tier KV and enable RBAC.
 3.  **[Infra] PostgreSQL:** Deploy Azure Flexible Server (Burstable B1ms) with Private Endpoint.
 4.  **[Infra] APIM Deployment:** Provision APIM Premium and join to VNET (Internal Mode).
-5.  **[Infra] DNS Zones:** Configure Private DNS Zones for Postgres and KeyVault.
+5.  **[Infra] DNS Zones:** Configure Private DNS Zones for Postgres and Azure Key Vault.
 6.  **[DevOps] Dockerfile (Backend):** Create multi-stage Node.js build (Alpine).
 7.  **[DevOps] Dockerfile (Frontend):** Create Nginx-based production build for React.
 8.  **[DevOps] CI Pipeline:** GitHub Action/ADO Pipeline to lint, build, and push to ACR.
@@ -24,7 +24,7 @@ This backlog represents the complete work breakdown structure (WBS) for the APIM
 11. **[Local] Docker Compose:** Create `docker-compose.yml` for local DB and API.
 12. **[DB] Seeding Script:** Create `seed.ts` to populate initial Teams data.
 13. **[Infra] Managed Identity:** Provision User-Assigned MI for the Container App.
-14. **[Infra] RBAC Assignments:** Assign `Key Vault Secrets User` to the Managed Identity.
+14. **[Infra] RBAC Assignments:** Assign `Key Vault Secrets User` to the Managed Identity (for Azure Key Vault).
 
 ---
 
@@ -116,7 +116,7 @@ This backlog represents the complete work breakdown structure (WBS) for the APIM
 **Goal:** Access management.
 
 69. **[DB] Subscriptions Table:** Schema for `state`, `primary_key_ref`.
-70. **[KM] Key Vault Logic:** Logic to generate generic Secret Identifier URI.
+70. **[KM] Azure Key Vault Logic:** Logic to generate generic Secret Identifier URI.
 71. **[BE] Request Access:** `POST /subscriptions` endpoint.
 72. **[FE] My Key:** UI to "Reveal" the generic key (simulated).
 73. **[BE] Approval Logic:** Auto-approve logic for "Open" products.

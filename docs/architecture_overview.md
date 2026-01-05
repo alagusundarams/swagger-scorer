@@ -50,7 +50,7 @@ erDiagram
     subscriptions {
         uuid id PK
         string state "active/suspended"
-        string primary_key_ref "KeyVault URI"
+        string primary_key_ref "Azure Key Vault URI"
         string owner_app_id "Linked App Reg"
     }
 
@@ -105,7 +105,7 @@ The backend validation logic (`/analyze`) wraps the open-source **Spectral** lin
 Deep defense layout using Zero Trust principles.
 
 ### Data Security (At Rest & In Transit)
-*   **Key Vault References:** We **NEVER** store actual API keys or Secrets in the PostgreSQL database. We store a Key Vault Secret Identifier (`https://kv.azure.net/secrets/my-key`). The App authenticates via **Managed Identity** to resolve this only at runtime.
+*   **Azure Key Vault References:** We **NEVER** store actual API keys or Secrets in the PostgreSQL database. We store an **Azure Key Vault** Secret Identifier (`https://kv.azure.net/secrets/my-key`). The App authenticates via **Managed Identity** to resolve this only at runtime.
 *   **TDE:** Azure PostgreSQL enforces Transparent Data Encryption.
 *   **TLS 1.2+:** All internal traffic (App -> DB, App -> APIM) is encrypted.
 
@@ -153,10 +153,10 @@ C4Deployment
         }
         Deployment_Node(paas, "Azure PaaS") {
             Container(apim, "API Management", "VNET Integrated")
-            Container(kv, "Key Vault", "Standard")
+            Container(kv, "Azure Key Vault", "Standard")
         }
     }
     Rel(app_svc, postgres, "Private Link")
     Rel(app_svc, apim, "Management API")
-    Rel(app_svc, kv, "Managed Identity Auth")
+    Rel(app_svc, kv, "Azure Key Vault (Managed Identity Auth)")
 ```

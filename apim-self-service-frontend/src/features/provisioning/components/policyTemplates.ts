@@ -49,7 +49,7 @@ export interface PolicyTemplate {
     tagName?: string; // Optional: Override tag name for parsing
 }
 
-import policyRegistry from '../data/policies-registry.json';
+import policyRegistry from '../../../shared/features/policy/policies-registry.json';
 
 export const POLICY_TEMPLATES: PolicyTemplate[] = policyRegistry as PolicyTemplate[];
 

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { User } from '../../../types/commonTypes';
 
-import { login as apiLogin, logout as apiLogout } from '../api/authClient';
+import { login as apiLogin } from '../api/authClient';
 
 interface AuthContextType {
     user: User | null;
