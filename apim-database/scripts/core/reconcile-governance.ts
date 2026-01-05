@@ -229,7 +229,7 @@ async function main() {
             `, [placeholderId, env]);
 
             for (const nv of nvs) {
-                const val = nv.keyVaultUrl ? nv.keyVaultUrl : nv.value;
+                const val = nv.keyVaultUrl ? nv.keyVaultUrl : (nv.value || '');
                 const type = nv.keyVaultUrl ? 'key_vault' : 'literal';
                 // Deterministic ID for idempotency
                 const nvId = `nv-${env}-${nv.name}`;
