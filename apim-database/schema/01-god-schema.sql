@@ -742,7 +742,7 @@ INSERT INTO policy_templates (id, name, description, category, section, template
                 "defaultValue": "iss,sub,aud,exp"
             }
         ],
-        "xmlTemplate": "<validate-jwt header-name=\"{{headerName}}\">\n    <required-claims>\n        {{#each claimsArray}}<claim name=\"{{this}}\" />{{/each}}\n    </required-claims>\n</validate-jwt>"
+        "xmlTemplate": "<validate-jwt header-name=\"{{headerName}}\">\n    <required-claims>\n        {{#each requiredClaims}}<claim name=\"{{this}}\" />{{/each}}\n    </required-claims>\n</validate-jwt>"
     }'::jsonb,
     4
 );

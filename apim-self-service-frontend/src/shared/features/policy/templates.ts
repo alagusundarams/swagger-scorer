@@ -20,106 +20,51 @@ const getInputs = (t: PolicyTemplate) => {
  * This centralizes the logic for turning JSON state into APIM XML.
  * It removes previous bugs where spaces were added inside tags.
  */
-export const generatePolicyXml = (template: PolicyTemplate, values: Record<string, any>): string => {
+// Helper to generate XML from config values (Generic Handlebars-lite)
+export const generatePolicyXml = (template: PolicyTemplate, config: Record<string, unknown>): string => {
+    // Special handling for Custom XML (Direct Pass-through)
     if (template.id === 'custom-xml') {
-        return (values['xml'] as string) || '';
-    }
-
-    // Special handling for Validate JWT
-    if (template.id === 'validate-jwt') {
-        let xml = getXml(template);
-
-        // 1. Replace simple fields
-        xml = xml.replace('{{header}}', (values['header'] as string) || 'Authorization');
-        xml = xml.replace('{{issuer}}', (values['issuer'] as string) || '');
-
-        // 2. Build Claims Block
-        const claims: string[] = [];
-
-        // Helper to add multi-value claim
-        const addClaim = (name: string, csv: string) => {
-            if (!csv) return;
-            const items = csv.split(',').map(s => s.trim()).filter(Boolean);
-            if (items.length === 0) return;
-
-            const valuesXml = items.map(v => `      <value>${v}</value>`).join('\n');
-            claims.push(`    <claim name="${name}" match="any">\n${valuesXml}\n    </claim>`);
-        };
-
-        addClaim('aud', values['audiences']);
-        addClaim('azp', values['azp']);
-        addClaim('roles', values['roles']);
-
-        xml = xml.replace('{{claims_block}}', claims.join('\n'));
-        return xml;
-    }
-
-    // Special handling for CORS
-    if (template.id === 'cors') {
-        let xml = getXml(template);
-
-        // 1. Simple fields
-        xml = xml.replace('{{allowcredentials}}', (values['allowcredentials'] ? 'true' : 'false'));
-
-        // 2. Helper for multi-value blocks
-        const buildBlock = (csv: string, tag: string) => {
-            if (!csv) return '';
-            return csv.split(',')
-                .map(s => s.trim())
-                .filter(Boolean)
-                .map(v => `    <${tag}>${v}</${tag}>`)
-                .join('\n');
-        };
-
-        const origins = buildBlock(values['origins'], 'origin');
-        const methods = buildBlock(values['methods'], 'method');
-        const headers = buildBlock(values['allowheaders'], 'header');
-        const exposeHeaders = buildBlock(values['exposeheaders'], 'header');
-
-        xml = xml.replace('{{origins_block}}', origins);
-        xml = xml.replace('{{methods_block}}', methods);
-        xml = xml.replace('{{headers_block}}', headers);
-        xml = xml.replace('{{expose_headers_block}}', exposeHeaders);
-
-        return xml;
-    }
-
-    // Special handling for optional attributes (Rate Limit / Quota)
-    // To avoid empty attributes like bandwidth="" we clean them up if missing
-    if (template.id === 'rate-limit' || template.id === 'quota') {
-        const schema = template.templateSchema || (template as any); // Fallback for safety
-        let xml = schema.xmlTemplate;
-
-        // Handle fields (new structure) or inputs (old structure)
-        const fields = schema.fields || (template as any).inputs || [];
-
-        if (Array.isArray(fields)) {
-            fields.forEach((input: any) => {
-                const val = values[input.name] !== undefined ? String(values[input.name]).trim() : '';
-                if (!val && !input.required) {
-                    // Remove the attribute entirely if empty and not required
-                    xml = xml.replace(new RegExp(`{{${input.name}}}`, 'g'), '');
-                } else {
-                    xml = xml.replace(new RegExp(`{{${input.name}}}`, 'g'), val || String(input.default || ''));
-                }
-            });
-        }
-
-        // Cleanup empty attributes [foo=""]
-        xml = xml.replace(/\s+[a-zA-Z0-9-GU]+=""/g, '');
-        return xml;
+        return (config['xml'] as string) || '';
     }
 
     let xml = getXml(template);
+    const fields = getInputs(template);
 
-    // Replace placeholders with real values (Generic Fallback)
-    getInputs(template).forEach(input => {
-        const val = values[input.name] !== undefined
-            ? String(values[input.name]).trim()
-            : String(input.default || '').trim();
+    // 1. Handle {{#each ...}} blocks
+    // Pattern: {{#each fieldName}}...{{this}}...{{/each}}
+    const eachRegex = /\{\{#each\s+([a-zA-Z0-9_]+)\}\}([\s\S]*?)\{\{\/each\}\}/g;
+    xml = xml.replace(eachRegex, (_, fieldName, innerTemplate) => {
+        let value = config[fieldName];
 
-        xml = xml.replace(new RegExp(`{{${input.name}}}`, 'g'), val);
+        // Handle comma-separated strings as arrays (Common in our UI)
+        if (typeof value === 'string' && (value.includes(',') || fields.find(f => f.name === fieldName)?.type === 'array')) {
+            const parts = value.split(',').map(v => v.trim()).filter(Boolean);
+            return parts.map(p => innerTemplate.replace(/\{\{this\}\}/g, p)).join('\n        ');
+        }
+
+        if (Array.isArray(value)) {
+            return value.map(item => innerTemplate.replace(/\{\{this\}\}/g, String(item).trim())).join('\n        ');
+        }
+
+        return '';
     });
+
+    // 2. Replace regular {{fieldName}} with values
+    fields.forEach(input => {
+        const val = config[input.name] !== undefined ? config[input.name] : (input.default || '');
+        const placeholder = `{{${input.name}}}`;
+
+        // Handle Arrays in simple placeholders (join with comma)
+        if (Array.isArray(val)) {
+            xml = xml.replace(new RegExp(placeholder, 'g'), val.join(', '));
+        } else {
+            xml = xml.replace(new RegExp(placeholder, 'g'), String(val).trim());
+        }
+    });
+
+    // 3. Clean up unhandled conditionals (e.g. {{#if ...}})
+    // Simple stripping for cleaner output if logic isn't processed
+    xml = xml.replace(/\{\{#if.*?\}\}([\s\S]*?)\{\{\/if\}\}/g, '$1');
 
     return xml;
 };
