@@ -91,7 +91,8 @@ export const DashboardPage = () => {
     }, [allProducts, activeTeamId, activeEnv, searchQuery]);
 
     const consumerProducts = useMemo(() => {
-        let baseProducts = allSubscriptions
+        const subsList = Array.isArray(allSubscriptions) ? allSubscriptions : [];
+        let baseProducts = subsList
             .filter(s => {
                 const isSubscribed = activeTeamId === 'all'
                     ? user?.teams.includes(s.subscriberTeamId)

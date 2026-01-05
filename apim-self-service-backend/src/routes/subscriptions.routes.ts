@@ -4,7 +4,7 @@
 
 import { FastifyPluginAsync } from 'fastify';
 import { getSubscriptionSecrets } from '../services/credential.service.js';
-import { getAllSubscriptions, addSubscription } from '../services/subscriptions.service.js';
+import { getAllSubscriptions, addSubscription, assignSubscriptionTeam } from '../services/subscriptions.service.js';
 
 const subscriptionsRoutes: FastifyPluginAsync = async (fastify) => {
 
@@ -59,6 +59,27 @@ const subscriptionsRoutes: FastifyPluginAsync = async (fastify) => {
             return { success: true, subscription: sub };
         } catch (error: any) {
             fastify.log.error({ err: error, body: request.body }, 'Failed to request subscription');
+            return reply.code(500).send({ error: error.message });
+        }
+    });
+    /**
+     * PUT /api/v1/subscriptions/:id/assign
+     * Day 1: Assign an orphaned subscription to a team (Admin Only)
+     */
+    fastify.put('/subscriptions/:id/assign', async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const { teamId } = request.body as { teamId: string };
+        const user = (request as any).user || { role: 'user' };
+
+        if (user.role !== 'admin') {
+            return reply.code(403).send({ error: 'Only admins can assign legacy subscriptions.' });
+        }
+
+        try {
+            const sub = await assignSubscriptionTeam(id, teamId);
+            return { success: true, subscription: sub };
+        } catch (error: any) {
+            fastify.log.error({ err: error }, 'Failed to assign subscription team');
             return reply.code(500).send({ error: error.message });
         }
     });

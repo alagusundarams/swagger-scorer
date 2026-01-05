@@ -18,7 +18,10 @@ export async function getAllSubscriptions(userRole: string = 'admin', teamId?: s
     const queryParams: any[] = [];
 
     if (teamId && userRole !== 'admin') {
-        whereConditions.push('s.subscriber_team_id = $1');
+        // Dual-Role Visibility:
+        // 1. Consumer: See subscriptions I own (subscriber_team_id)
+        // 2. Producer: See subscriptions TO my products (p.owner_team_id)
+        whereConditions.push('(s.subscriber_team_id = $1 OR p.owner_team_id = $1)');
         queryParams.push(teamId);
     }
 
@@ -29,6 +32,7 @@ export async function getAllSubscriptions(userRole: string = 'admin', teamId?: s
     const res = await query(`
         SELECT s.*, 
                p.display_name as product_name, 
+               p.owner_team_id as product_owner_team_id,
                t.name as team_name,
                ar.id as app_id,
                ar.display_name as app_display_name,
@@ -36,7 +40,7 @@ export async function getAllSubscriptions(userRole: string = 'admin', teamId?: s
                ar.environment as app_environment
         FROM subscriptions s
         JOIN products p ON s.product_id = p.id
-        JOIN teams t ON s.subscriber_team_id = t.id
+        LEFT JOIN teams t ON s.subscriber_team_id = t.id
         LEFT JOIN app_registrations ar ON s.app_registration_id = ar.id
         ${whereClause}
         ORDER BY s.created_at DESC
@@ -46,6 +50,9 @@ export async function getAllSubscriptions(userRole: string = 'admin', teamId?: s
         ...s,
         productId: s.product_id,
         subscriberTeamId: s.subscriber_team_id,
+        productOwnerTeamId: s.product_owner_team_id,
+        // Day 1: Handle Orphans
+        teamName: s.team_name || '⚠️ Unassigned / Legacy',
         createdAt: s.created_at,
         expirationDate: s.expiration_date,
         keysGeneratedAt: s.keys_generated_at,
@@ -59,6 +66,37 @@ export async function getAllSubscriptions(userRole: string = 'admin', teamId?: s
             environment: s.app_environment
         } : null
     }));
+}
+
+/**
+ * DAY 1: Adopt an Orphaned Subscription
+ * Allows Admins to assign a legacy subscription to a valid team.
+ */
+export async function assignSubscriptionTeam(id: string, teamId: string) {
+    // 1. Validate Target Team
+    const teamCheck = await query('SELECT id FROM teams WHERE id = $1', [teamId]);
+    if (teamCheck.rows.length === 0) throw new Error('Target Team not found.');
+
+    // 2. Update Subscription
+    const res = await query(`
+        UPDATE subscriptions
+        SET subscriber_team_id = $1, updated_at = NOW()
+        WHERE id = $2
+        RETURNING *
+    `, [teamId, id]);
+
+    if (res.rowCount === 0) throw new Error('Subscription not found.');
+
+    // 3. Log Audit
+    await logAudit({
+        entityType: 'SUBSCRIPTION',
+        entityId: id,
+        action: 'ADOPT_ORPHAN',
+        userId: 'system-user',
+        changes: { newTeamId: teamId, note: 'Day 1 Adoption' }
+    });
+
+    return res.rows[0];
 }
 
 /**

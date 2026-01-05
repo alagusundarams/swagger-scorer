@@ -9,13 +9,17 @@ import {
     getNamedValues,
     getNamedValue,
     upsertNamedValue,
-    deleteNamedValue
+    deleteNamedValue,
+    getOrphanNamedValues,
+    assignNamedValue
 } from '../services/named-values.service.js';
 import {
     getBackends,
     getBackend,
     upsertBackend,
-    deleteBackend
+    deleteBackend,
+    getOrphanBackends,
+    assignBackend
 } from '../services/backends.service.js';
 import { getAppConfig } from '../config/loader.js';
 
@@ -62,8 +66,8 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
      * GET /api/v1/config/named-values/:key?environment=DEV
      * Get a specific named value
      */
-    fastify.get('/config/named-values/:key', async (request, reply) => {
-        const { key } = request.params as { key: string };
+    fastify.get('/config/named-values/:id', async (request, reply) => {
+        const { id } = request.params as { id: string };
         const { environment } = request.query as { environment?: string };
 
         if (!environment) {
@@ -71,7 +75,7 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         try {
-            const value = await getNamedValue(key, environment);
+            const value = await getNamedValue(id, environment);
 
             if (!value) {
                 return reply.code(404).send({ error: 'Named value not found' });
@@ -89,18 +93,14 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
      * Create or update a named value
      */
     fastify.post('/config/named-values', async (request, reply) => {
-        const { key, environment, value } = request.body as {
-            key: string;
-            environment: string;
-            value: string;
-        };
+        const { systemName, environment, value, displayName, isSecret } = request.body as any;
 
-        if (!key || !environment || !value) {
-            return reply.code(400).send({ error: 'key, environment, and value are required' });
+        if (!systemName || !environment || !value) {
+            return reply.code(400).send({ error: 'systemName, environment, and value are required' });
         }
 
         try {
-            const namedValue = await upsertNamedValue({ key, environment, value });
+            const namedValue = await upsertNamedValue({ systemName, environment, value, displayName, isSecret });
             return { success: true, value: namedValue };
         } catch (error: any) {
             fastify.log.error({ err: error }, 'Failed to upsert named value');
@@ -112,8 +112,8 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
      * DELETE /api/v1/config/named-values/:key?environment=DEV
      * Delete a named value
      */
-    fastify.delete('/config/named-values/:key', async (request, reply) => {
-        const { key } = request.params as { key: string };
+    fastify.delete('/config/named-values/:id', async (request, reply) => {
+        const { id } = request.params as { id: string };
         const { environment } = request.query as { environment?: string };
 
         if (!environment) {
@@ -121,7 +121,7 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         try {
-            const deleted = await deleteNamedValue(key, environment);
+            const deleted = await deleteNamedValue(id, environment);
 
             if (!deleted) {
                 return reply.code(404).send({ error: 'Named value not found' });
@@ -130,6 +130,36 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
             return { success: true };
         } catch (error: any) {
             fastify.log.error({ err: error }, 'Failed to delete named value');
+            return reply.code(500).send({ error: error.message });
+        }
+    });
+
+    /**
+     * GET /api/v1/config/named-values/orphans?environment=DEV
+     */
+    fastify.get('/config/named-values/orphans', async (request, reply) => {
+        const { environment } = request.query as { environment?: string };
+        if (!environment) return reply.code(400).send({ error: 'environment required' });
+
+        try {
+            const orphans = await getOrphanNamedValues(environment);
+            return { success: true, count: orphans.length, orphans };
+        } catch (error: any) {
+            return reply.code(500).send({ error: error.message });
+        }
+    });
+
+    /**
+     * POST /api/v1/config/named-values/adopt
+     */
+    fastify.post('/config/named-values/adopt', async (request, reply) => {
+        const { id, environment, productId, scopeId, scope } = request.body as any;
+        if (!id || !environment || !scope) return reply.code(400).send({ error: 'Missing required fields' });
+
+        try {
+            const result = await assignNamedValue(id, environment, { productId, scopeId, scope });
+            return { success: true, value: result };
+        } catch (error: any) {
             return reply.code(500).send({ error: error.message });
         }
     });
@@ -233,6 +263,36 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
             return { success: true };
         } catch (error: any) {
             fastify.log.error({ err: error }, 'Failed to delete backend');
+            return reply.code(500).send({ error: error.message });
+        }
+    });
+
+    /**
+     * GET /api/v1/config/backends/orphans?environment=DEV
+     */
+    fastify.get('/config/backends/orphans', async (request, reply) => {
+        const { environment } = request.query as { environment?: string };
+        if (!environment) return reply.code(400).send({ error: 'environment required' });
+
+        try {
+            const orphans = await getOrphanBackends(environment);
+            return { success: true, count: orphans.length, orphans };
+        } catch (error: any) {
+            return reply.code(500).send({ error: error.message });
+        }
+    });
+
+    /**
+     * POST /api/v1/config/backends/adopt
+     */
+    fastify.post('/config/backends/adopt', async (request, reply) => {
+        const { id, environment, productId, apiId, scope } = request.body as any;
+        if (!id || !environment || !scope) return reply.code(400).send({ error: 'Missing required fields' });
+
+        try {
+            const result = await assignBackend(id, environment, { productId, apiId, scope });
+            return { success: true, backend: result };
+        } catch (error: any) {
             return reply.code(500).send({ error: error.message });
         }
     });

@@ -75,7 +75,7 @@ export async function getAllProducts(environment?: string, userRole: string = 'a
             // Team ownership
             ownerTeamId: p.owner_team_id,
             ownerTeamName: p.owner_team_name,
-            authorizedTeams: p.authorized_teams || [],
+            authorizedTeams: Array.isArray(p.authorized_teams) ? p.authorized_teams : [],
 
             // Metrics
             subscriberCount: p.calculated_subscriber_count,
@@ -141,9 +141,71 @@ export async function getAllProducts(environment?: string, userRole: string = 'a
 }
 
 /**
- * Fetch a single product by ID with environment context
+ * ACCESS LEVEL DEFINITIONS
+ * - NONE: No access
+ * - READ: Consumer access (View Product, View Own Subscriptions)
+ * - WRITE: Producer access (Edit Policy, Edit Contract, View ALL Subscriptions)
  */
-export async function getProductById(id: string, environment?: string) {
+export type AccessLevel = 'NONE' | 'READ' | 'WRITE';
+
+/**
+ * Advanced RBAC: Calculate Access Level (Triple-Gate Logic)
+ * 
+ * Gate 1: Ownership/Authorization (Producer vs Consumer)
+ * Gate 2: Environment Protection (AD Group enforcement for STAGE/PROD)
+ * Gate 3: Deployment Check (Handled in getProductById)
+ * 
+ * Rules:
+ * 1. Admin -> WRITE (Global)
+ * 2. STAGE/PROD -> User MUST be in an AD group mapped to this product/env in permission_matrix.
+ * 3. Default -> Based on Team Ownership or Authorized Teams.
+ */
+export async function calculateAccessLevel(product: any, user: { role?: string, teams?: string[], groups: string[] }, environment: string): Promise<AccessLevel> {
+    const role = user.role || 'consumer';
+    const teams = user.teams || [];
+    const groups = user.groups || [];
+
+    // 1. Admin Override
+    if (role === 'admin') return 'WRITE';
+
+    const isOwner = teams.includes(product.owner_team_id);
+
+    // 2. Environment Protection (Gate 2)
+    if (['STAGE', 'PROD'].includes(environment)) {
+        const matrixRes = await productsRepo.getPermissionMatrix(product.id);
+        const envRules = matrixRes.rows.filter((r: any) => r.environment === environment);
+
+        if (envRules.length > 0) {
+            const userInAuthorizedGroup = envRules.some((rule: any) => groups.includes(rule.ad_group_id));
+            if (!userInAuthorizedGroup) {
+                return 'NONE'; // Block access entirely if not in authorized AD group
+            }
+
+            // Determine if Producer or Consumer within this environment
+            const hasWriteRule = envRules.some((rule: any) => groups.includes(rule.ad_group_id) && rule.role === 'PRODUCER');
+            if (hasWriteRule || isOwner) return 'WRITE';
+            return 'READ';
+        } else {
+            // Fallback to Owner Team's AD Group if matrix is empty
+            const teamRes = await productsRepo.getTeamById(product.owner_team_id);
+            if (teamRes.rows.length > 0) {
+                const ownerTeam = teamRes.rows[0];
+                if (ownerTeam.azure_ad_group_id && !groups.includes(ownerTeam.azure_ad_group_id)) {
+                    return 'NONE';
+                }
+            }
+        }
+    }
+
+    // 3. Default (Gate 1)
+    return isOwner ? 'WRITE' : 'READ';
+}
+
+/**
+ * Fetch a single product by ID with environment context
+ * Now supports Granular Dual-Role Access Level
+ */
+export async function getProductById(id: string, environment?: string, userContext: { role: string, teams: string[], groups: string[] } = { role: 'consumer', teams: [], groups: [] }) {
     const productRes = await productsRepo.getProductById(id);
     if (productRes.rows.length === 0) return null;
     const p = productRes.rows[0];
@@ -163,9 +225,29 @@ export async function getProductById(id: string, environment?: string) {
     };
 
     // Determine effective environment for the view
-    // If environment param is passed, we view it from that perspective
     const effectiveEnv = environment || p.environment;
+
+    // SECURITY: Calculate Access Level (Gate 2)
+    const accessLevel = await calculateAccessLevel(p, userContext, effectiveEnv);
+
+    // GATE 3: Deployment Check
     const currentEnvHash = envHashes[effectiveEnv as keyof typeof envHashes] || null;
+    const isDeployed = !!currentEnvHash;
+
+    // --- Strict Gating: Strip data if access is blocked ---
+    if (accessLevel === 'NONE') {
+        return {
+            id: p.id,
+            name: p.name,
+            displayName: p.display_name,
+            accessLevel,
+            isDeployed,
+            environment: effectiveEnv,
+            region: p.region,
+            ownerTeamName: p.owner_team_name,
+            apis: [] // Blocked
+        };
+    }
 
     return {
         // Core fields
@@ -176,13 +258,18 @@ export async function getProductById(id: string, environment?: string) {
         description: p.description,
         state: p.state,
         type: p.type || 'standard',
-        environment: effectiveEnv, // Return the requested environment
+        environment: effectiveEnv,
         region: p.region,
+
+        // RBAC Meta
+        accessLevel,
+        isDeployed,
+        envHashes, // Include for frontend to disable options
 
         // Team ownership
         ownerTeamId: p.owner_team_id,
         ownerTeamName: p.owner_team_name,
-        authorizedTeams: p.authorized_teams || [],
+        authorizedTeams: Array.isArray(p.authorized_teams) ? p.authorized_teams : [],
 
         // Metrics
         subscriberCount: p.calculated_subscriber_count,
@@ -195,8 +282,6 @@ export async function getProductById(id: string, environment?: string) {
         gitFilePath: p.git_file_path,
         lastDeployedCommitHash: p.last_deployed_commit_hash,
 
-        // Environment Hashes
-        envHashes,
 
         // Identity
         identity: p.identity_client_id ? {
@@ -211,13 +296,12 @@ export async function getProductById(id: string, environment?: string) {
 
         // APIs
         apis: await Promise.all(apiRes.rows.map(async (a: any) => {
-            // Computed Status Calculation
             let statusDetails = 'Synced';
             if (process.env.ENABLE_GIT_CHECKS === 'true' && a.git_repo_url && a.git_file_path) {
                 try {
                     const metadata = await repoService.getCommitMetadata(a.git_repo_url, a.git_file_path);
                     if (metadata && metadata.hash !== currentEnvHash) {
-                        statusDetails = `Changed in ${effectiveEnv}`; // Dynamic status
+                        statusDetails = `Changed in ${effectiveEnv}`;
                     }
                 } catch (e) {
                     // Ignore git errors
@@ -239,6 +323,60 @@ export async function getProductById(id: string, environment?: string) {
             };
         }))
     };
+}
+
+/**
+ * Securely fetch Product Spec with RBAC (Environment Awareness)
+ */
+export async function getSecureProductSpec(productId: string, userGroups: string[]) {
+    // 1. Fetch Product to determine Environment & Owner
+    const productRes = await productsRepo.getProductById(productId);
+    if (productRes.rows.length === 0) throw new Error('Product not found');
+    const product = productRes.rows[0];
+
+    // 2. Validate Access (Strict for Stage/Prod)
+    // We construct a partial user context since we only have groups here (Legacy sig)
+    // Ideally we should pass full user. For now, strict 'groups' check via Access Level.
+    const accessLevel = await calculateAccessLevel(product, { role: 'consumer', teams: [], groups: userGroups }, product.environment);
+
+    // Spec Fetching requires WRITE access? Or at least READ?
+    // If downgraded to READ (Consumer), can they see the full spec? Yes, Consumers need spec.
+    // The previous check was "validateEnvironmentAccess" which was strict for Stage/Prod.
+    // If accessLevel is 'READ' but we are in STAGE/PROD and they failed the AD Group check?
+    // `calculateAccessLevel` returns 'READ' if they fail region check.
+    // So if efficientEnv is STAGE/PROD, and they got READ, it means they are NOT in the AD Group.
+    // Re-implementing strict check based on AccessLevel isn't direct.
+    // Stuck with: If STAGE/PROD, we MUST be in AD Group.
+    // `calculateAccessLevel` handles role downgrades.
+    // We want to BLOCK if they are not allowed.
+
+    // Wait, if they are downgraded to READ, does that mean they CAN access the spec?
+    // Consumers CAN access specs (to subscribe).
+    // The restriction was: "If targeting STAGE/PROD, user MUST be in the AD Group".
+    // If they are NOT in the AD Group, they shouldn't even see the product in that env? 
+    // Or they see it but can't edit?
+    // The requirement was: "Granular Access... ensure users have appropriate read/write... Producers see all... Consumers see only their own."
+    // And "Environment Aware": "If not in AD Group, blocked from that environment?"
+    // AD Group usually implies "Producer Access" for that env.
+    // If they are just a consumer, do they need AD Group? No.
+    // So `READ` is fine for spec.
+
+    // However, if we want strict gating (e.g. Private Env), `calculateAccessLevel` assumes Public Read.
+    // Let's assume READ is sufficient for Spec.
+    if (accessLevel === 'NONE') {
+        throw new Error(`ACCESS_DENIED: User does not have access to ${product.environment} environment contracts.`);
+    }
+
+    // 3. Delegation (Preserve Mock Logic)
+    const config = getAppConfig();
+    const isMock = config.useBackendMocks;
+
+    // Dynamic import to match original behavior
+    const { fetchSpecForProduct } = isMock
+        ? await import('./spec-fetcher.mock.js')
+        : await import('./spec-fetcher.service.js');
+
+    return await fetchSpecForProduct(productId);
 }
 
 /**
@@ -387,15 +525,23 @@ export async function removeApi(apiId: string, productId: string) {
  * @param id The product ID
  * @param data Partial product data
  */
-export async function updateProduct(id: string, data: { ownerTeamId?: string }) {
+export async function updateProduct(id: string, data: { ownerTeamId?: string }, userContext: { role: string, teams: string[], groups: string[] }) {
     if (!id) throw new Error('Product ID is required');
 
     // 1. Fetch current product to check type
     const productRes = await productsRepo.getProductById(id);
     if (productRes.rows.length === 0) throw new Error(`Product ${id} not found`);
-    // Schema missing type column, standard logic applies
+    const product = productRes.rows[0];
 
-    // 2. Update the Product
+    // 2. Validate Access (Must have WRITE access)
+    // Note: If changing owner, do we check access to CURRENT owner or NEW owner?
+    // Standard: Must have WRITE access to the product as it currently exists.
+    const accessLevel = await calculateAccessLevel(product, userContext, product.environment);
+    if (accessLevel !== 'WRITE') {
+        throw new Error(`ACCESS_DENIED: You do not have permission to update this product.`);
+    }
+
+    // 3. Update the Product
     let result;
     if (data.ownerTeamId) {
         result = await productsRepo.updateProductOwner(id, data.ownerTeamId);
@@ -405,7 +551,7 @@ export async function updateProduct(id: string, data: { ownerTeamId?: string }) 
         result = productRes;
     }
 
-    // 3. Apply Cascading Rules
+    // 4. Apply Cascading Rules
     if (data.ownerTeamId) {
         // Fetch team's AD Group ID for ARM Sync
         const teamRes = await productsRepo.getTeamById(data.ownerTeamId);
@@ -842,7 +988,22 @@ export async function getProductPolicy(productId: string) {
 /**
  * Update Product Policy XML
  */
-export async function updateProductPolicy(productId: string, xml: string) {
+/**
+ * Update Product Policy XML
+ */
+export async function updateProductPolicy(productId: string, xml: string, userContext: { role: string, teams: string[], groups: string[] }) {
+    // 1. Fetch Product
+    const productRes = await productsRepo.getProductById(productId);
+    if (productRes.rows.length === 0) throw new Error('Product not found');
+    const product = productRes.rows[0];
+
+    // 2. Validate Access (Must have WRITE access)
+    const accessLevel = await calculateAccessLevel(product, userContext, product.environment);
+    if (accessLevel !== 'WRITE') {
+        throw new Error(`ACCESS_DENIED: You do not have permission to edit policies in ${product.environment}.`);
+    }
+
+    // 3. Update
     const res = await productsRepo.updateProductPolicy(productId, xml);
     if (res.rows.length === 0) throw new Error('Product not found');
 
@@ -850,7 +1011,7 @@ export async function updateProductPolicy(productId: string, xml: string) {
         entityType: 'PRODUCT',
         entityId: productId,
         action: 'UPDATE_POLICY',
-        userId: 'system-user',
+        userId: 'system-user', // Should use real user, but context passed for Authz
         changes: { note: 'Product Policy Updated via Policy Studio' }
     });
     return res.rows[0];
@@ -909,4 +1070,3 @@ export async function syncProductOperations(productId: string) {
         return undefined;
     }
 }
-

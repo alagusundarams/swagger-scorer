@@ -1,4 +1,5 @@
-import { useMemo, useState, lazy, Suspense } from 'react';
+import { useMemo, useState, lazy, Suspense, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { type Product, type API, type Subscription } from '../../../shared/types/domain';
 import { type User } from '../../../core/types/commonTypes';
 import { useAppData } from '../../../shared/context/AppDataContext';
@@ -6,7 +7,6 @@ import { ProductConsumerHeader } from '../components/product/ProductConsumerHead
 import { ProductGettingStarted } from '../components/product/ProductGettingStarted';
 import { ProductComplianceInfo } from '../components/product/ProductComplianceInfo';
 import { ApiInterfaceCatalog } from '../components/api-details/ApiInterfaceCatalog';
-import { ConfigurationTab } from '../components/api-details/ConfigurationTab';
 import { ProductAuditLog } from '../../governance/components/ProductAuditLog';
 import { inventoryApi } from '../../inventory/api/inventoryClient';
 
@@ -49,7 +49,8 @@ export const ProductDetailConsumer = ({
      * when team:created, team:updated, or team:deleted events are emitted.
      */
     const { teams: allTeams } = useAppData();
-    const [activeTab, setActiveTab] = useState<'overview' | 'config' | 'audit'>('overview');
+    const navigate = useNavigate();
+    const [activeTab, setActiveTab] = useState<'overview' | 'audit'>('overview');
 
     // Contract Editor State
     const [selectedApi, setSelectedApi] = useState<API | null>(null);
@@ -61,6 +62,10 @@ export const ProductDetailConsumer = ({
     const activeTeam = useMemo(() =>
         allTeams.find(t => t.id === subscription?.subscriberTeamId),
         [allTeams, subscription]);
+
+    const navigateToAPI = useCallback((apiId: string) => {
+        navigate(`/products/${product.id}/apis/${apiId}`);
+    }, [navigate, product.id]);
 
     return (
         <div className="max-w-7xl mx-auto px-6 py-8">
@@ -82,15 +87,6 @@ export const ProductDetailConsumer = ({
                         }`}
                 >
                     Overview
-                </button>
-                <button
-                    onClick={() => setActiveTab('config')}
-                    className={`pb-4 px-2 text-sm font-bold uppercase tracking-widest transition-colors ${activeTab === 'config'
-                        ? 'border-b-2 border-emerald-500 text-emerald-600 dark:text-emerald-400'
-                        : 'text-gray-400 hover:text-gray-600 dark:hover:text-slate-300'
-                        }`}
-                >
-                    Configuration
                 </button>
                 <button
                     onClick={() => setActiveTab('audit')}
@@ -146,6 +142,7 @@ export const ProductDetailConsumer = ({
 
                     <ApiInterfaceCatalog
                         product={product}
+                        onSelect={(api) => navigateToAPI(api.id)}
                         onViewContract={(api) => {
                             setSelectedApi(api);
                             setIsEditorOpen(true);
@@ -158,9 +155,6 @@ export const ProductDetailConsumer = ({
                 </div>
             )}
 
-            {activeTab === 'config' && (
-                <ConfigurationTab product={product} />
-            )}
 
             {activeTab === 'audit' && (
                 <div className="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-lg border border-gray-100 dark:border-slate-700 animate-fade-in mb-8">

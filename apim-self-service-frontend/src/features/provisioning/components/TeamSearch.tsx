@@ -32,7 +32,7 @@ export const TeamSearch: React.FC<TeamSearchProps> = ({
                     <button
                         key={team.id}
                         onClick={() => onToggleTeam(team.id)}
-                        className={`p-4 rounded-xl border font-bold text-sm transition-all ${selectedTeams.includes(team.id) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-100 text-gray-600 hover:border-gray-200'}`}
+                        className={`p-4 rounded-xl border font-bold text-sm transition-all ${Array.isArray(selectedTeams) && selectedTeams.includes(team.id) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-100 text-gray-600 hover:border-gray-200'}`}
                     >
                         {team.name}
                     </button>

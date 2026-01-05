@@ -113,3 +113,67 @@ export async function updateProduct(productId: string, updates: Partial<Product>
         throw err;
     }
 }
+
+/**
+ * Get all subscriptions (Admin view)
+ */
+export async function getSubscriptions(): Promise<any[]> {
+    const response = await fetch('/api/v1/subscriptions'); // Admin sees all by default on backend if no teamId passed
+    if (!response.ok) throw new Error('Failed to fetch subscriptions');
+    return await response.json();
+}
+
+/**
+ * Adopt an orphaned subscription
+ */
+export async function adoptSubscription(subscriptionId: string, teamId: string): Promise<any> {
+    const response = await fetch(`/api/v1/subscriptions/${subscriptionId}/adopt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamId })
+    });
+    if (!response.ok) throw new Error('Failed to adopt subscription');
+
+    const data = await response.json();
+
+    // Refresh relevant listeners
+    eventBus.emit('data:refresh', { dataType: 'subscriptions' });
+
+    return data;
+}
+
+export const getOrphanNamedValues = async (environment: string) => {
+    const response = await fetch(`/api/v1/config/named-values/orphans?environment=${environment}`);
+    if (!response.ok) throw new Error('Failed to fetch orphaned named values');
+    const data = await response.json();
+    return data.orphans;
+};
+
+export const adoptNamedValue = async (id: string, environment: string, data: { productId?: string, scopeId?: string, scope: 'PRODUCT' | 'API' | 'GLOBAL' }) => {
+    const response = await fetch('/api/v1/config/named-values/adopt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, environment, ...data })
+    });
+    if (!response.ok) throw new Error('Failed to adopt named value');
+    const result = await response.json();
+    return result.value;
+};
+
+export const getOrphanBackends = async (environment: string) => {
+    const response = await fetch(`/api/v1/config/backends/orphans?environment=${environment}`);
+    if (!response.ok) throw new Error('Failed to fetch orphaned backends');
+    const data = await response.json();
+    return data.orphans;
+};
+
+export const adoptBackend = async (id: string, environment: string, data: { productId?: string, apiId?: string, scope: 'PRODUCT' | 'API' | 'GLOBAL' }) => {
+    const response = await fetch('/api/v1/config/backends/adopt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, environment, ...data })
+    });
+    if (!response.ok) throw new Error('Failed to adopt backend');
+    const result = await response.json();
+    return result.backend;
+};

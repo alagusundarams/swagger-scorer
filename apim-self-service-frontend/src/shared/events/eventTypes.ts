@@ -172,7 +172,7 @@ export interface ApprovalProcessedPayload {
  */
 export interface DataRefreshRequestedPayload {
     /** Type of data that should be refreshed */
-    dataType: 'teams' | 'products' | 'approvals' | 'all';
+    dataType: 'teams' | 'products' | 'approvals' | 'subscriptions' | 'named-values' | 'backends' | 'all';
     /** Optional: specific IDs to refresh */
     ids?: string[];
 }

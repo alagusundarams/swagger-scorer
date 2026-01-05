@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useInventoryStore, inventoryApi } from '../../features/inventory';
+import { useInventoryStore, inventoryApi, getUserRoleForProduct } from '../../features/inventory';
+import { useAuth } from '../../features/auth';
 import { Environment } from '../../core/types/commonTypes';
 import { OnboardingApiPolicyStep } from '../../features/provisioning';
 import { ApiOperation } from '../../utils/swaggerParser';
@@ -10,6 +11,7 @@ export const PolicyEditorPage = () => {
     const { productId, apiId } = useParams<{ productId: string; apiId: string }>();
     const navigate = useNavigate();
     const { products, loadProducts } = useInventoryStore();
+    const { user } = useAuth();
 
     // Data Selectors
     const product = useMemo(() => products.find((p: any) => p.id === productId), [products, productId]);
@@ -100,6 +102,27 @@ export const PolicyEditorPage = () => {
             toast.error("Failed to eject product: " + error.message);
         }
     };
+
+    // --------------------------------------------------------------------------------
+    // 🔒 SECURITY GUARD: PRODUCER ONLY
+    // --------------------------------------------------------------------------------
+    // If the user does NOT have a producer role (Owner/Admin) for this product,
+    // they are strictly forbidden from entering the Policy Studio.
+    const userRole = getUserRoleForProduct(product || {} as any, user);
+
+    // Redirect Effect
+    useEffect(() => {
+        if (product && user && userRole === 'consumer' && user.role !== 'admin') {
+            toast.error("Security Alert: You do not have permission to edit policies.");
+            navigate(`/products/${productId}`);
+        }
+    }, [product, user, userRole, navigate, productId]);
+
+    // Render Guard (Prevent Flash)
+    if (userRole === 'consumer' && user?.role !== 'admin') {
+        return null;
+    }
+    // --------------------------------------------------------------------------------
 
     if (!product || !api) return <div className="p-8 text-center text-slate-500">Loading Configuration...</div>;
 

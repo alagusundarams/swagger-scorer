@@ -122,9 +122,9 @@ export async function validationRoutes(fastify: FastifyInstance, _options: Fasti
 
         try {
             const result = await query(`
-                SELECT key, environment, value
-                FROM access_control_lists
-                WHERE key = $1
+                SELECT system_name as key, environment, value
+                FROM named_values
+                WHERE system_name = $1
                 AND environment = $2
             `, [key, environment]);
 
@@ -349,8 +349,8 @@ async function validateNamedValueKey(params: any) {
     const { key, environment } = params;
     const result = await query(`
         SELECT COUNT(*) as count
-        FROM access_control_lists
-        WHERE key = $1 AND environment = $2
+        FROM named_values
+        WHERE system_name = $1 AND environment = $2
     `, [key, environment]);
 
     const count = parseInt(result.rows[0].count);

@@ -117,4 +117,13 @@ export class ArmService {
             throw e;
         }
     }
+
+    /**
+     * Fetches all Backends from APIM.
+     */
+    async getBackends(): Promise<any[]> {
+        const url = `${this.baseUrl}/backends?api-version=2022-08-01`;
+        const initial = await axios.get(url, { headers: this.headers });
+        return initial.data.value;
+    }
 }

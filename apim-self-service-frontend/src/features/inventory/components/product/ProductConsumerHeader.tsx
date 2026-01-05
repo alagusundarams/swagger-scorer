@@ -87,9 +87,9 @@ export function ProductConsumerHeader({
                             className={`appearance-none cursor-pointer pl-3 pr-8 py-1 text-xs font-black rounded-lg border uppercase outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 transition-all ${getEnvironmentTheme(currentEnv).bg} ${getEnvironmentTheme(currentEnv).text} ${getEnvironmentTheme(currentEnv).border}`}
                         >
                             <option value="DEV">DEV (Draft)</option>
-                            <option value="QA">QA</option>
-                            <option value="STAGE">STAGE</option>
-                            <option value="PROD">PROD</option>
+                            <option value="QA" disabled={!product.envHashes?.QA}>QA {!product.envHashes?.QA ? ' (Not Deployed)' : ''}</option>
+                            <option value="STAGE" disabled={!product.envHashes?.STAGE}>STAGE {!product.envHashes?.STAGE ? ' (Not Deployed)' : ''}</option>
+                            <option value="PROD" disabled={!product.envHashes?.PROD}>PROD {!product.envHashes?.PROD ? ' (Not Deployed)' : ''}</option>
                         </select>
                         <div className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[8px] ${getEnvironmentTheme(currentEnv).text}`}>
                             ▼

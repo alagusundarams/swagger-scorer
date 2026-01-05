@@ -13,6 +13,9 @@ export interface Backend {
     description?: string;
     title?: string;
     protocol?: string;
+    productId?: string;
+    apiId?: string;
+    scope?: 'PRODUCT' | 'API' | 'GLOBAL' | null;
     createdAt?: Date;
     updatedAt?: Date;
 }
@@ -22,7 +25,7 @@ export interface Backend {
  */
 export async function getBackends(environment: string): Promise<Backend[]> {
     const result = await query(`
-        SELECT id, environment, url, description, title, protocol, created_at, updated_at
+        SELECT id, environment, url, description, title, protocol, product_id, api_id, scope, created_at, updated_at
         FROM governance_backends
         WHERE environment = $1
         ORDER BY id ASC
@@ -35,6 +38,9 @@ export async function getBackends(environment: string): Promise<Backend[]> {
         description: row.description,
         title: row.title,
         protocol: row.protocol,
+        productId: row.product_id,
+        apiId: row.api_id,
+        scope: row.scope,
         createdAt: row.created_at,
         updatedAt: row.updated_at
     }));
@@ -114,4 +120,44 @@ export async function deleteBackend(id: string, environment: string): Promise<bo
     `, [id, environment]);
 
     return (result.rowCount || 0) > 0;
+}
+
+/**
+ * Get all orphaned backends (those without a linked product/api and not GLOBAL)
+ */
+export async function getOrphanBackends(environment: string): Promise<Backend[]> {
+    const result = await query(`
+        SELECT id, environment, url, description, title, protocol, product_id, api_id, scope, updated_at
+        FROM governance_backends
+        WHERE environment = $1
+        AND (scope IS NULL OR (scope != 'GLOBAL' AND product_id IS NULL))
+        ORDER BY id ASC
+    `, [environment]);
+
+    return result.rows.map(row => ({
+        id: row.id,
+        environment: row.environment,
+        url: row.url,
+        description: row.description,
+        title: row.title,
+        protocol: row.protocol,
+        productId: row.product_id,
+        apiId: row.api_id,
+        scope: row.scope,
+        updatedAt: row.updated_at
+    }));
+}
+
+/**
+ * Assign a backend to a product/api
+ */
+export async function assignBackend(id: string, environment: string, data: { productId?: string, apiId?: string, scope: 'PRODUCT' | 'API' | 'GLOBAL' }) {
+    const result = await query(`
+        UPDATE governance_backends
+        SET product_id = $1, api_id = $2, scope = $3, updated_at = NOW()
+        WHERE id = $4 AND environment = $5
+        RETURNING *
+    `, [data.productId || null, data.apiId || null, data.scope, id, environment]);
+
+    return result.rows[0];
 }

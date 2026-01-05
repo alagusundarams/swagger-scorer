@@ -11,7 +11,8 @@ import {
     getPermissionMatrix, updatePermissionMatrix, addProduct, addApi,
     getOperations, searchApis, removeApi, getProductPolicy,
     updateProductPolicy, ejectProduct, getNamedValues, addNamedValue,
-    deleteNamedValue, syncProductOperations, getProductById, getApiById
+    deleteNamedValue, syncProductOperations, getProductById, getApiById,
+    getSecureProductSpec
 } from '../services/products.service.js';
 import { getAllTeams, createTeam, updateTeam } from '../services/teams.service.js';
 // Subscriptions moved to dedicated routes
@@ -72,14 +73,25 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     // GET /api/v1/products/:id (Single Product + Env Context)
     fastify.get('/products/:id', async (request, reply) => {
         const { id } = request.params as any;
-        const { environment } = request.query as any;
+        const { environment, groups, role, teams } = request.query as any;
+
+        // Construct User Context for RBAC
+        const userContext = {
+            role: role || 'consumer',
+            teams: teams ? teams.split(',') : [],
+            groups: groups ? groups.split(',') : []
+        };
+
         try {
-            const product = await getProductById(id, environment);
+            const product = await getProductById(id, environment, userContext);
             if (!product) {
                 return reply.status(404).send({ error: 'Not Found', message: 'Product not found' });
             }
             return product;
-        } catch (error) {
+        } catch (error: any) {
+            if (error.message.includes('ACCESS_DENIED')) {
+                return reply.status(403).send({ error: 'Forbidden', message: error.message });
+            }
             fastify.log.error({ err: error }, 'Error fetching product');
             return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to fetch product' });
         }
@@ -88,10 +100,22 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     fastify.patch('/products/:id', async (request, reply) => {
         const { id } = request.params as any;
         const body = request.body as any;
+        const { groups, role, teams } = request.query as any;
+
+        // Construct User Context
+        const userContext = {
+            role: role || (request as any).user?.role || 'consumer',
+            teams: teams ? teams.split(',') : (request as any).user?.teams || [],
+            groups: groups ? groups.split(',') : (request as any).user?.groups || []
+        };
+
         try {
-            const product = await updateProduct(id, body);
+            const product = await updateProduct(id, body, userContext);
             return product;
-        } catch (error) {
+        } catch (error: any) {
+            if (error.message.includes('ACCESS_DENIED')) {
+                return reply.status(403).send({ error: 'Forbidden', message: error.message });
+            }
             fastify.log.error({ err: error }, 'Error updating product');
             return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to update product' });
         }
@@ -132,10 +156,21 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     fastify.put('/products/:id/policy', async (request, reply) => {
         const { id } = request.params as any;
         const { xml } = request.body as any;
+        const { groups, role, teams } = request.query as any;
+
+        const userContext = {
+            role: role || (request as any).user?.role || 'consumer',
+            teams: teams ? teams.split(',') : (request as any).user?.teams || [],
+            groups: groups ? groups.split(',') : (request as any).user?.groups || []
+        };
+
         try {
-            const result = await updateProductPolicy(id, xml);
+            const result = await updateProductPolicy(id, xml, userContext);
             return result;
         } catch (error: any) {
+            if (error.message.includes('ACCESS_DENIED')) {
+                return reply.status(403).send({ error: 'Forbidden', message: error.message });
+            }
             fastify.log.error({ err: error }, 'Error updating product policy');
             return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
         }
@@ -178,15 +213,11 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     // GET /api/v1/products/:id/spec (Product Spec)
     fastify.get('/products/:id/spec', async (request, reply) => {
         const { id } = request.params as any;
-        try {
-            const config = getAppConfig();
-            const isMock = config.useBackendMocks;
-            // Keeping dynamic import for mocks as spec-fetcher structure implies separation
-            const { fetchSpecForProduct } = isMock
-                ? await import('../services/spec-fetcher.mock.js')
-                : await import('../services/spec-fetcher.service.js');
+        const { groups } = request.query as any;
 
-            const spec = await fetchSpecForProduct(id);
+        try {
+            const userGroups = groups ? groups.split(',') : [];
+            const spec = await getSecureProductSpec(id, userGroups);
 
             // Trigger background sync of operations
             // This ensures the "Interface Catalog" is populated with endpoints found in this spec
@@ -196,6 +227,9 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
 
             return { spec };
         } catch (error: any) {
+            if (error.message.includes('ACCESS_DENIED')) {
+                return reply.status(403).send({ error: 'Forbidden', message: error.message });
+            }
             fastify.log.error({ err: error }, 'Error fetching product spec');
             return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
         }

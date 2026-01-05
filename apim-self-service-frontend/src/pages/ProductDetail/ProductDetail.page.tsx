@@ -96,8 +96,6 @@ export const ProductDetailPage = () => {
     }, [productId, environmentParam, fetchProduct]);
 
     // --- Data Selectors ---
-    // Use currentProduct directly, as fetchProduct now populates it
-    // Fallback to allProducts look up if currentProduct is not yet set (or for initial load)
     const product = currentProduct || allProducts.find(p => p.id === productId);
 
     const subscription = useMemo(() => {
@@ -108,10 +106,15 @@ export const ProductDetailPage = () => {
     const hasPendingRequest = subscription?.state === 'pending' || isPending;
 
     // --- Role Detection ---
-    const userRole = getUserRoleForProduct(product || {} as any, user);
+    // Prioritize backend accessLevel if available, otherwise fallback to local logic
+    const effectiveRole = useMemo(() => {
+        if (product?.accessLevel) {
+            return product.accessLevel === 'WRITE' ? 'producer' : 'consumer';
+        }
+        return getUserRoleForProduct(product || {} as any, user);
+    }, [product, user]);
 
     // --- Handlers ---
-    // TODO: Implement handleRequestAccessClick when modal functionality is ready
 
     // --- Render Logic ---
 
@@ -145,8 +148,54 @@ export const ProductDetailPage = () => {
         );
     }
 
+    // 1. Access Denied (Triple-Gate: Gate 2)
+    if (product?.accessLevel === 'NONE') {
+        return (
+            <MainLayout>
+                <div className="max-w-7xl mx-auto px-6 py-24 text-center animate-fade-in">
+                    <div className="w-24 h-24 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center text-4xl mx-auto mb-8 shadow-xl">
+                        🔒
+                    </div>
+                    <h1 className="text-4xl font-black text-gray-900 dark:text-white mb-4 tracking-tight uppercase">Access Restricted</h1>
+                    <p className="text-gray-500 dark:text-slate-400 mb-10 max-w-lg mx-auto font-medium text-lg">
+                        This environment ({environmentParam || 'STAGE/PROD'}) requires explicit AD Group membership.
+                        Please contact the {product.ownerTeamName || 'Product Owner'} for authorization.
+                    </p>
+                    <div className="flex flex-col items-center gap-6">
+                        <Link to="/" className="px-8 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:scale-105 transition-all">
+                            Back to Dashboard
+                        </Link>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            Context: {user?.id} | Region: {product.region || 'Default'}
+                        </p>
+                    </div>
+                </div>
+            </MainLayout>
+        );
+    }
+
+    // 2. Not Deployed (Triple-Gate: Gate 3)
+    if (product && !product.isDeployed && environmentParam && environmentParam !== 'DEV') {
+        return (
+            <MainLayout>
+                <div className="max-w-7xl mx-auto px-6 py-20 text-center animate-fade-in">
+                    <div className="w-20 h-20 bg-amber-50 dark:bg-amber-900/20 rounded-3xl flex items-center justify-center text-3xl mx-auto mb-6 shadow-lg">
+                        🚧
+                    </div>
+                    <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-4 tracking-tight">Environment Not Active</h1>
+                    <p className="text-gray-500 dark:text-slate-400 mb-8 font-medium">
+                        Product <span className="text-amber-600 font-bold">{product.displayName}</span> has not been promoted to <span className="font-bold border-b-2 border-amber-500">{environmentParam}</span> yet.
+                    </p>
+                    <Link to={`/products/${productId}?environment=DEV`} className="text-blue-600 hover:underline font-black uppercase tracking-widest text-[10px]">
+                        Switch to DEV Draft
+                    </Link>
+                </div>
+            </MainLayout>
+        );
+    }
+
     // 1. Loading / Access Enforcement
-    if (!product || !canAccessProduct(product, user)) {
+    if (!product || (product.visibility !== 'public' && !canAccessProduct(product, user))) {
         return (
             <MainLayout>
                 <div className="max-w-7xl mx-auto px-6 py-20 text-center">
@@ -159,7 +208,7 @@ export const ProductDetailPage = () => {
     }
 
     // 2. Producer View (or Admin)
-    if ((userRole === 'producer' || user?.role === 'admin') && user) {
+    if ((effectiveRole === 'producer' || user?.role === 'admin') && user) {
         return (
             <MainLayout>
                 <ProductDetailProducer product={product} user={user} />

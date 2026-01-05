@@ -118,6 +118,14 @@ export interface Product {
     region?: string;
     ownerTeamName?: string;
     namedValues?: NamedValue[];
+    accessLevel?: 'NONE' | 'READ' | 'WRITE';
+    isDeployed?: boolean;
+    envHashes?: {
+        DEV?: string;
+        QA?: string;
+        STAGE?: string;
+        PROD?: string;
+    };
 }
 
 // --- Consumer Domain ---

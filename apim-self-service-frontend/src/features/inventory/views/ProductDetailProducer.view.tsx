@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect, lazy, Suspense } from 'react
 import { useNavigate, useLocation } from 'react-router-dom';
 import { type Product, type API, type Subscription, type ApprovalRequest } from '../../../shared/types/domain';
 import { type User } from '../../../core/types/commonTypes';
-import { getScoreTheme, getNextEnvironment } from '../../../utils/statusUtils';
+import { getNextEnvironment } from '../../../utils/statusUtils';
 import { useStore } from '../../../store/useStore';
 import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
 import { useAppData } from '../../../shared/context/AppDataContext';
@@ -363,108 +363,35 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
 
             {/* Content: APIs */}
             {activeTab === 'apis' && (
-                <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-slate-700 animate-fade-in">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-black text-gray-900 dark:text-white">APIs in this Product</h2>
-                        <button
-                            onClick={() => setIsAddApiOpen(true)}
-                            className="px-4 py-2 bg-blue-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-blue-700 transition"
-                        >
-                            + Add API
-                        </button>
-                    </div>
-                    <div className="space-y-3">
-                        {product.apis.map((api) => (
-                            <div
-                                key={api.id}
-                                onClick={() => navigateToAPI(api.id)}
-                                className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-900 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer transition"
-                                role="button"
-                                tabIndex={0}
-                                onKeyPress={(e) => e.key === 'Enter' && navigateToAPI(api.id)}
-                            >
-                                <div className="flex-1">
-                                    <div className="font-semibold text-gray-900 dark:text-white">{api.displayName}</div>
-                                    <div className="text-xs text-gray-500 dark:text-slate-500">{api.description}</div>
-                                    <div className="text-xs text-gray-400 dark:text-slate-600 mt-1">
-                                        {api.operations.length} operations
-                                        {api.computedStatus && (
-                                            <span className="ml-2 font-bold text-amber-600 dark:text-amber-400">
-                                                • {api.computedStatus}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    {api.qualityScore && (
-                                        <div className={`text-sm font-bold ${getScoreTheme(api.qualityScore).split(' ')[0]}`}>
-                                            {api.qualityScore}%
-                                        </div>
-                                    )}
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setSelectedApi(api);
-                                            setIsEditorOpen(true);
-                                        }}
-                                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${isInfraLocked
-                                            ? 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-                                            : 'bg-blue-500 text-white hover:bg-blue-600'
-                                            }`}
-                                        data-testid="edit-contract-btn"
-                                    >
-                                        {isInfraLocked ? (
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                                            </svg>
-                                        ) : (
-                                            <span>✏️</span>
-                                        )}
-                                        {isInfraLocked ? 'View Contract' : 'Edit Contract'}
-                                    </button>
-
-                                    {/* Policy Visualizer Button */}
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setSelectedApi(api);
-                                            setIsPolicyStudioOpen(true);
-                                        }}
-                                        className="px-3 py-1.5 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 bg-purple-50 text-purple-600 hover:bg-purple-100 dark:bg-purple-900/20 dark:text-purple-300 dark:hover:bg-purple-900/40"
-                                    >
-                                        <span className="text-lg">👓</span>
-                                        {product.type === 'grp' ? 'View API Policy' : 'Visual Policy'}
-                                    </button>
-
-                                    {/* DELETE ACTION - Corrected Logic */}
-                                    {!isInfraLocked && (
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (confirm(`Are you sure you want to remove ${api.displayName}? This action cannot be undone.`)) {
-                                                    removeApiFromProduct(product.id, api.id)
-                                                        .then(() => setLocalToast({ message: 'API removed successfully', type: 'success' }))
-                                                        .catch((err: any) => setLocalToast({ message: 'Failed to remove API: ' + err.message, type: 'warning' }));
-                                                }
-                                            }}
-                                            className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
-                                            title="Remove API"
-                                        >
-                                            🗑️
-                                        </button>
-                                    )}
-                                </div>
+                <div className="space-y-8 animate-fade-in">
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 shadow-premium border border-gray-100 dark:border-slate-700/30">
+                        <div className="flex justify-between items-center mb-8">
+                            <div>
+                                <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Product Interfaces</h2>
+                                <p className="text-gray-500 dark:text-slate-400 font-medium text-sm">Manage the API surface area and contract definitions.</p>
                             </div>
-                        ))}
-                    </div>
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-slate-700 animate-fade-in">
+                            <button
+                                onClick={() => setIsAddApiOpen(true)}
+                                className="px-6 py-3 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+                            >
+                                + Add Interface
+                            </button>
+                        </div>
+
                         <ApiInterfaceCatalog
                             product={product}
+                            onSelect={(api) => navigateToAPI(api.id)}
                             onManage={(api) => navigateToAPI(api.id)}
                             onViewContract={(api) => {
                                 setSelectedApi(api);
                                 setIsEditorOpen(true);
+                            }}
+                            onDelete={(api) => {
+                                if (confirm(`Are you sure you want to remove ${api.displayName}? This action cannot be undone.`)) {
+                                    removeApiFromProduct(product.id, api.id)
+                                        .then(() => setLocalToast({ message: 'API removed successfully', type: 'success' }))
+                                        .catch((err: any) => setLocalToast({ message: 'Failed to remove API: ' + err.message, type: 'warning' }));
+                                }
                             }}
                         />
                     </div>

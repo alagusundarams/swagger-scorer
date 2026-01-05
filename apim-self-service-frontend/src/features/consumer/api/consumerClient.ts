@@ -8,7 +8,15 @@ import type { Subscription, AppRegistration } from '../../../shared/types/domain
  */
 export const getSubscriptions = async (): Promise<Subscription[]> => {
     const res = await baseClient.get('/subscriptions');
-    return res.data.subscriptions || [];
+    // Robust check: Handle wrapped ({ subscriptions: [] }) vs unwrapped ([]) vs undefined
+    const data = res.data;
+    if (data?.subscriptions && Array.isArray(data.subscriptions)) {
+        return data.subscriptions;
+    }
+    if (Array.isArray(data)) {
+        return data;
+    }
+    return [];
 };
 
 export const requestProductAccess = async (productId: string, teamId: string): Promise<Subscription> => {

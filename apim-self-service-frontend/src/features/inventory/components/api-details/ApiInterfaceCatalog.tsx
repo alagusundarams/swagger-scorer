@@ -11,6 +11,8 @@ interface ApiInterfaceCatalogProps {
     product: Product;
     onViewContract?: (api: API) => void;
     onManage?: (api: API) => void;
+    onSelect?: (api: API) => void;
+    onDelete?: (api: API) => void;
 }
 
 /**
@@ -20,7 +22,7 @@ interface ApiInterfaceCatalogProps {
  * **Permission**: READ-ONLY.
  * **Features**: Drill-down to operations, view documentation, and VIEW CONTRACT.
  */
-export function ApiInterfaceCatalog({ product, onViewContract, onManage }: ApiInterfaceCatalogProps) {
+export function ApiInterfaceCatalog({ product, onViewContract, onManage, onSelect, onDelete }: ApiInterfaceCatalogProps) {
     const [expandedApi, setExpandedApi] = useState<string | null>(null);
 
     return (
@@ -40,8 +42,14 @@ export function ApiInterfaceCatalog({ product, onViewContract, onManage }: ApiIn
                                 }`}
                         >
                             <div
-                                className="p-8 flex items-center justify-between cursor-pointer"
-                                onClick={() => setExpandedApi(isExpanded ? null : api.id)}
+                                className="p-8 flex items-center justify-between cursor-pointer hover:bg-gray-50/50 dark:hover:bg-slate-700/30 transition-colors"
+                                onClick={() => {
+                                    if (onSelect) {
+                                        onSelect(api);
+                                    } else {
+                                        setExpandedApi(isExpanded ? null : api.id);
+                                    }
+                                }}
                             >
                                 <div className="flex items-center gap-8">
                                     <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl flex items-center justify-center text-xl">
@@ -49,7 +57,7 @@ export function ApiInterfaceCatalog({ product, onViewContract, onManage }: ApiIn
                                     </div>
                                     <div>
                                         <h3
-                                            className={`text-lg font-black text-gray-900 dark:text-white mb-1 ${onManage ? 'hover:text-emerald-600 cursor-pointer transition-colors' : ''}`}
+                                            className={`text-lg font-black text-gray-900 dark:text-white mb-1 ${(onManage || onSelect) ? 'hover:text-emerald-600 cursor-pointer transition-colors' : ''}`}
                                             onClick={(e) => {
                                                 if (onManage) {
                                                     e.stopPropagation();
@@ -88,13 +96,29 @@ export function ApiInterfaceCatalog({ product, onViewContract, onManage }: ApiIn
                                             View Source ⚡
                                         </button>
                                     )}
+
+                                    {onDelete && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onDelete(api);
+                                            }}
+                                            className="p-2 text-red-100 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
+                                            title="Remove API"
+                                        >
+                                            🗑️
+                                        </button>
+                                    )}
+
                                     <div className="text-right hidden md:block">
                                         <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">Endpoints</p>
                                         <span className="text-sm font-bold text-gray-500">{api.operations.length} Managed</span>
                                     </div>
-                                    <div className={`w-8 h-8 rounded-full border border-gray-100 dark:border-slate-700 flex items-center justify-center transition-transform duration-300 ${isExpanded ? 'rotate-180 bg-emerald-50 dark:bg-slate-700 border-emerald-200 text-emerald-600' : 'text-gray-300'}`}>
-                                        ↓
-                                    </div>
+                                    {!onSelect && (
+                                        <div className={`w-8 h-8 rounded-full border border-gray-100 dark:border-slate-700 flex items-center justify-center transition-transform duration-300 ${isExpanded ? 'rotate-180 bg-emerald-50 dark:bg-slate-700 border-emerald-200 text-emerald-600' : 'text-gray-300'}`}>
+                                            ↓
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

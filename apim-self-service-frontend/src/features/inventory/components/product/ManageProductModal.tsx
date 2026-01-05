@@ -322,7 +322,7 @@ export const ManageProductModal = ({
                                             allTeams={allTeams}
                                             selectedTeams={formData.authorizedTeams}
                                             onToggleTeam={(id: string) => {
-                                                const current = formData.authorizedTeams;
+                                                const current = Array.isArray(formData.authorizedTeams) ? formData.authorizedTeams : [];
                                                 setFormData({
                                                     ...formData,
                                                     authorizedTeams: current.includes(id)
