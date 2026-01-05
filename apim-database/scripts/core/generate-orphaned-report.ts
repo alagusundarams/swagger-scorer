@@ -94,7 +94,7 @@ async function main() {
     try {
         // --- 1. ORPHANED PRODUCTS ---
         console.log(`📦 Scanning for orphaned products...`);
-        const envFilter = targetEnv ? `WHERE environment = '${targetEnv}'` : '';
+
 
         const orphanedProducts = await pool.query<OrphanedProduct>(`
             SELECT 
@@ -109,8 +109,8 @@ async function main() {
                     ELSE 'Unknown orphan reason'
                 END as reason
             FROM products
-            ${envFilter}
-            AND management_mode = 'PORTAL_MANAGED'
+            WHERE management_mode = 'PORTAL_MANAGED'
+            ${targetEnv ? `AND environment = '${targetEnv}'` : ''}
             ORDER BY environment, name
         `);
         console.log(`   Found ${orphanedProducts.rows.length} orphaned products`);
