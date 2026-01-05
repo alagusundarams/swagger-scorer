@@ -34,7 +34,7 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
      * Get list of available environment names
      */
     fastify.get('/environments', async (_request, _reply) => {
-        const config = getAppConfig();
+        getAppConfig(); // Just call to ensure loaded if needed, or remove entirely
         // Return lowercase names to match frontend expectations
     });
 
@@ -54,7 +54,12 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         try {
-            const values = await getNamedValues(environment);
+            const { groups, role } = request.query as any;
+            const userContext = {
+                role: role || (request as any).user?.role || 'consumer',
+                groups: groups ? groups.split(',') : (request as any).user?.groups || []
+            };
+            const values = await getNamedValues(environment, userContext);
             return { success: true, count: values.length, values };
         } catch (error: any) {
             fastify.log.error({ err: error }, 'Failed to get named values');
@@ -75,7 +80,12 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         try {
-            const value = await getNamedValue(id, environment);
+            const { groups, role } = request.query as any;
+            const userContext = {
+                role: role || (request as any).user?.role || 'consumer',
+                groups: groups ? groups.split(',') : (request as any).user?.groups || []
+            };
+            const value = await getNamedValue(id, environment, userContext);
 
             if (!value) {
                 return reply.code(404).send({ error: 'Named value not found' });
@@ -121,7 +131,12 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         try {
-            const deleted = await deleteNamedValue(id, environment);
+            const { groups, role } = request.query as any;
+            const userContext = {
+                role: role || (request as any).user?.role || 'consumer',
+                groups: groups ? groups.split(',') : (request as any).user?.groups || []
+            };
+            const deleted = await deleteNamedValue(id, environment, userContext);
 
             if (!deleted) {
                 return reply.code(404).send({ error: 'Named value not found' });
@@ -157,7 +172,7 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
         if (!id || !environment || !scope) return reply.code(400).send({ error: 'Missing required fields' });
 
         try {
-            const result = await assignNamedValue(id, environment, { productId, scopeId, scope });
+            const result = await assignNamedValue(id, environment, { productId, scopeId });
             return { success: true, value: result };
         } catch (error: any) {
             return reply.code(500).send({ error: error.message });
@@ -180,7 +195,12 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         try {
-            const backends = await getBackends(environment);
+            const { groups, role } = request.query as any;
+            const userContext = {
+                role: role || (request as any).user?.role || 'consumer',
+                groups: groups ? groups.split(',') : (request as any).user?.groups || []
+            };
+            const backends = await getBackends(environment, userContext);
             return { success: true, count: backends.length, backends };
         } catch (error: any) {
             fastify.log.error({ err: error }, 'Failed to get backends');
@@ -201,7 +221,12 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         try {
-            const backend = await getBackend(id, environment);
+            const { groups, role } = request.query as any;
+            const userContext = {
+                role: role || (request as any).user?.role || 'consumer',
+                groups: groups ? groups.split(',') : (request as any).user?.groups || []
+            };
+            const backend = await getBackend(id, environment, userContext);
 
             if (!backend) {
                 return reply.code(404).send({ error: 'Backend not found' });
@@ -254,7 +279,12 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         try {
-            const deleted = await deleteBackend(id, environment);
+            const { groups, role } = request.query as any;
+            const userContext = {
+                role: role || (request as any).user?.role || 'consumer',
+                groups: groups ? groups.split(',') : (request as any).user?.groups || []
+            };
+            const deleted = await deleteBackend(id, environment, userContext);
 
             if (!deleted) {
                 return reply.code(404).send({ error: 'Backend not found' });

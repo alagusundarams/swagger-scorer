@@ -4,7 +4,7 @@
  * PURPOSE:
  * 1. Merges Inventory, ADO Metadata, and APIM Metadata into the database.
  * 2. Resolves App identities via Microsoft Graph.
- * 3. Updates Products, ACLs (Named Values), and App Registrations.
+ * 3. Updates Products, Named Values, and App Registrations.
  */
 
 import { Pool } from 'pg';
@@ -232,31 +232,25 @@ async function main() {
         // --- B. ACCESS CONTROL (NAMED VALUES) ---
         console.log(`🌍 Reconciling Named Values...`);
         for (const [env, nvs] of Object.entries(apimMeta.namedValues)) {
-            // Ensure placeholder product exists for this environment
-            const placeholderId = `unknown-product:${env}:Global`;
-            await pool.query(`
-                INSERT INTO products (id, name, display_name, version, state, environment, region, management_mode, updated_at)
-                VALUES ($1, 'unknown-product', 'Global Named Values', '0.0.0', 'notPublished', $2, 'Global', 'PORTAL_MANAGED', NOW())
-                ON CONFLICT (id) DO NOTHING
-            `, [placeholderId, env]);
-
             for (const nv of nvs) {
                 const val = nv.keyVaultUrl ? nv.keyVaultUrl : (nv.value || '');
                 const type = nv.keyVaultUrl ? 'key_vault' : 'literal';
-                // Deterministic ID for idempotency
+
+                // Deterministic ID for idempotency: env + systemName + optional scope
                 const nvId = `nv-${env}-${nv.name}`;
 
                 try {
                     await pool.query(`
-                        INSERT INTO named_values (id, product_id, display_name, system_name, value, type, is_secret, updated_at)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-                        ON CONFLICT (id) DO UPDATE SET
+                        INSERT INTO named_values (id, product_id, display_name, system_name, value, type, is_secret, environment, region, updated_at)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+                        ON CONFLICT (system_name, environment, product_id, scope_id) 
+                        DO UPDATE SET
                             display_name = EXCLUDED.display_name,
                             value = EXCLUDED.value,
                             type = EXCLUDED.type,
                             is_secret = EXCLUDED.is_secret,
                             updated_at = NOW();
-                    `, [nvId, placeholderId, nv.displayName, nv.name, val, type, nv.isSecret]);
+                    `, [nvId, null, nv.displayName, nv.name, val, type, nv.isSecret, env, 'Global']);
                 } catch (err: any) {
                     console.error(`❌ FAILED to sync Named Value: "${nv.name}" (Env: ${env})`);
                     console.error(`   Value: "${val}" (Is Secret: ${nv.isSecret})`);

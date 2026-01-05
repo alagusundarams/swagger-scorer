@@ -67,6 +67,8 @@ export interface NamedValue {
     value: string;
     type: 'literal' | 'key_vault';
     isSecret: boolean;
+    environment?: string;
+    region?: string;
     scopeId?: string;
     scopeName?: string;
     createdAt?: string;

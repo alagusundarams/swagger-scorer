@@ -520,6 +520,14 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     // GET /api/v1/products/:id/named-values
     fastify.get('/products/:id/named-values', async (request, reply) => {
         const { id } = request.params as any;
+        const { groups, role, teams } = request.query as any;
+
+        const userContext = {
+            role: role || (request as any).user?.role || 'consumer',
+            teams: teams ? teams.split(',') : (request as any).user?.teams || [],
+            groups: groups ? groups.split(',') : (request as any).user?.groups || []
+        };
+
         try {
             const values = await getNamedValues(id);
             return values;

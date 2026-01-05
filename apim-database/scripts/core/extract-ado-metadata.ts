@@ -2,14 +2,15 @@
  * @fileoverview PART 2: ADO METADATA EXTRACTION
  * 
  * PURPOSE:
- * Consumes the product inventory from Part 1 and performs targeted ADO discovery.
- * Links products to Pipeline IDs and surgically recovers the latest successful hashes
- * for DEV, QA, STAGE, and PROD.
+ * Consumes the product inventory from Part 1 or the existing DB
+ * and performs targeted ADO discovery.
  */
 
 import { readFileSync, existsSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { AzureService } from '../services/AzureService.js';
+import pkg from 'pg';
+const { Pool } = pkg;
 
 // --- CONFIG LOADER ---
 function loadConfig() {
@@ -28,6 +29,7 @@ const config = loadConfig();
 // --- ARGS ---
 const args = process.argv.slice(2);
 const targetEnv = args.find(a => a.startsWith('--env='))?.split('=')[1]?.toUpperCase();
+const sourceMode = args.find(a => a.startsWith('--source='))?.split('=')[1] || 'inventory'; // 'inventory' or 'db'
 const verbose = !args.includes('--quiet');
 const limit = parseInt(args.find(a => a.startsWith('--limit='))?.split('=')[1] || '0', 10);
 
@@ -43,12 +45,12 @@ interface ADOMetadata {
     repository?: { id: string; name: string; project: string; projectId: string };
     pipeline?: { id: number; name: string };
     deployments: Record<string, { hash: string; date: string }>;
-    discoveredSpecs?: string[]; // New: List of potential OpenAPI files found in repo
+    discoveredSpecs?: string[];
     status: 'MATCHED' | 'REPO_MISSING' | 'PIPELINE_MISSING' | 'ORPHAN';
 }
 
 async function main() {
-    console.log(`🚀 [PART 2] Starting ADO Metadata Extraction...\n`);
+    console.log(`🚀 [PART 2] Starting ADO Metadata Extraction (Source: ${sourceMode})...\n`);
     if (targetEnv) console.log(`🎯 Filtering for Environment: ${targetEnv}\n`);
 
     const devops = config.devops;
@@ -57,13 +59,38 @@ async function main() {
         process.exit(1);
     }
 
-    // 1. Load Inventory
-    const inventoryPath = join(process.cwd(), 'apim-database', 'scripts', 'data', 'apim-inventory.json');
-    if (!existsSync(inventoryPath)) {
-        console.error(`❌ Inventory file not found: ${inventoryPath}. Run Part 1 first!`);
-        process.exit(1);
+    let inventory: ProductIdentity[] = [];
+
+    // 1. Load Discovery Source
+    if (sourceMode === 'db') {
+        console.log(`🔌 Fetching unique products from Database...`);
+        const pool = new Pool(config.database);
+        try {
+            const res = await pool.query(`
+                SELECT id, name, array_agg(DISTINCT environment) as environments 
+                FROM products 
+                GROUP BY id, name
+            `);
+            inventory = res.rows.map(row => ({
+                id: row.id,
+                name: row.name,
+                environments: row.environments
+            }));
+            console.log(`   ✅ Loaded ${inventory.length} logical products from DB.`);
+        } catch (err: any) {
+            console.error(`❌ DB Connection failed: ${err.message}`);
+            process.exit(1);
+        } finally {
+            await pool.end();
+        }
+    } else {
+        const inventoryPath = join(process.cwd(), 'apim-database', 'scripts', 'data', 'apim-inventory.json');
+        if (!existsSync(inventoryPath)) {
+            console.error(`❌ Inventory file not found: ${inventoryPath}. Run Part 1 first!`);
+            process.exit(1);
+        }
+        inventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
     }
-    let inventory: ProductIdentity[] = JSON.parse(readFileSync(inventoryPath, 'utf8'));
 
     // Filter by environment if flag is provided
     if (targetEnv) {
@@ -78,8 +105,8 @@ async function main() {
         console.log(`📊 Loaded ${inventory.length} unique products for discovery.`);
     }
 
-    // 2. Setup Auth (PAT first, CLI as last resort)
-    console.log(`🔐 [AUTH] Using PAT for ADO operations (Azure CLI will be tried as fallback if PAT fails)...`);
+    // 2. Setup Auth
+    console.log(`🔐 [AUTH] Using PAT for ADO operations...`);
 
     // 3. Discovery Loop
     const results: ADOMetadata[] = [];
@@ -87,16 +114,12 @@ async function main() {
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
     for (const prod of inventory) {
-        // --- SAFETY THROTTLE ---
-        // User-specified 4-second delay to stay well within ADO API limits
-        // This prevents 429 rate limit errors without needing retry logic
-        await sleep(4000);
+        await sleep(2000); // Reduced delay slightly as we are being more targeted
 
         console.log(`\n🔹 Processing: ${prod.name} (${prod.id})`);
         const meta: ADOMetadata = { productId: prod.id, productName: prod.name, deployments: {}, status: 'ORPHAN' };
 
         try {
-            // A. Repository Search (Exhaustive & Ranked)
             const cleanProd = sanitize(prod.name);
             const quotedName = prod.name.includes(' ') ? `"${prod.name}"` : prod.name;
             const searchTerm = `${quotedName} (ext:tf OR ext:tfvars)`;
@@ -109,205 +132,85 @@ async function main() {
                 continue;
             }
 
-            // DEBUG: Log what we actually got from ADO
-            console.log(`   📊 DEBUG: Search returned ${searchResp.results.length} results`);
-            if (searchResp.results.length > 0 && verbose) {
-                console.log(`   📊 DEBUG: First result structure:`, JSON.stringify(searchResp.results[0], null, 2));
-            }
-
-            // --- RANKING LOGIC ---
-            // More lenient filter: only require repository and repository.name
-            console.log(`   🔍 DEBUG: Starting filter/ranking for cleanProd="${cleanProd}"...`);
-
             const repoCandidates = searchResp.results
-                .map((r, idx) => {
-                    console.log(`   🔍 DEBUG: Result ${idx}: hasRepository=${!!r.repository}, repoName=${r.repository?.name || 'MISSING'}`);
-                    return r;
-                })
-                .filter(r => {
-                    const hasRepo = r.repository && r.repository.name;
-                    if (!hasRepo) {
-                        console.log(`   🔍 DEBUG: ❌ Filtered out - missing repository.name`);
-                    }
-                    return hasRepo;
-                })
+                .filter(r => r.repository && r.repository.name)
                 .map(r => {
                     const rName = r.repository.name;
                     const cleanRepo = sanitize(rName);
                     let score = 0;
-
-                    if (cleanRepo === cleanProd) score += 100; // Perfect match
-                    else if (cleanRepo.includes(cleanProd)) score += 50; // Name included
-
+                    if (cleanRepo === cleanProd) score += 100;
+                    else if (cleanRepo.includes(cleanProd)) score += 50;
                     if (cleanRepo.includes('grp')) score -= 20;
                     if (cleanRepo.includes('shared') || cleanRepo.includes('common')) score -= 30;
-
-                    console.log(`   🔍 DEBUG: Repo "${rName}" -> cleanRepo="${cleanRepo}", score=${score}`);
                     return { repo: r.repository, score, name: rName };
                 }).sort((a, b) => b.score - a.score);
 
-            console.log(`   🔍 DEBUG: After filter/rank: ${repoCandidates.length} candidates`);
-            if (repoCandidates.length > 0) {
-                console.log(`   🔍 DEBUG: Top candidate: ${repoCandidates[0].name} (score: ${repoCandidates[0].score})`);
-            }
-
             if (repoCandidates.length === 0) {
-                console.log(`   ⚠️  REPO_MISSING: All ${searchResp.results.length} search results had missing repository data for "${prod.name}"`);
                 meta.status = 'REPO_MISSING';
                 results.push(meta);
                 continue;
             }
 
             const repo = repoCandidates[0].repo;
-            const repoScore = repoCandidates[0].score;
-
-            if (repoScore < 30) {
-                console.log(`   ⚠️  LOW_CONFIDENCE_REPO: Nearest match "${repo.name}" has score ${repoScore}.`);
-            }
-
-            // Null safety for repo fields - same pattern as debug-git-logic
-            const repoId = repo.id || repo.name; // Fallback to name if ID missing
+            const repoId = repo.id || repo.name;
             let project = repo.project?.name || "Unknown";
             let projectId = repo.project?.id || "";
 
-            // If project details are missing, attempt to fetch them
             if (project === "Unknown" || !projectId) {
                 try {
-                    console.log(`   🔍 DEBUG: Project info missing, fetching repo details for ${repoId}...`);
                     const repoDetails = await AzureService.fetchRepoById(devops.organization, repoId, devops.pat, devops.baseUrl);
                     project = repoDetails.project.name;
                     projectId = repoDetails.project.id;
-                    console.log(`      ✅ Recovered Project: ${project}`);
-                } catch (e) {
-                    console.log(`      ⚠️  Could not fetch repo details: ${e instanceof Error ? e.message : String(e)}`);
-                }
+                } catch (e) { }
             }
 
-            meta.repository = {
-                id: repoId,
-                name: repo.name,
-                project: project,
-                projectId: projectId || project
-            };
-            console.log(`   ✅ Repo: ${repo.name} (Score: ${repoScore})`);
+            meta.repository = { id: repoId, name: repo.name, project: project, projectId: projectId || project };
+            console.log(`   ✅ Repo: ${repo.name} (Score: ${repoCandidates[0].score})`);
 
-            // B. Pipeline Discovery & Ranking
-            const projectIdentifier = projectId || project;
-            const pipelines = await AzureService.fetchADOPipelines(devops.organization, projectIdentifier, repoId, devops.pat, devops.baseUrl);
-
-            if (pipelines.length === 0) {
-                console.log(`   ⚠️  PIPELINE_MISSING: No pipelines in repo.`);
-                meta.status = 'PIPELINE_MISSING';
-                results.push(meta);
-                continue;
-            }
-
+            const pipelines = await AzureService.fetchADOPipelines(devops.organization, projectId || project, repoId, devops.pat, devops.baseUrl);
             const pipeCandidates = pipelines.map(p => {
                 const cleanPipe = sanitize(p.name);
                 let score = 0;
                 if (cleanPipe.includes(cleanProd)) score += 50;
                 if (cleanPipe.includes('deploy') || cleanPipe.includes('iac')) score += 10;
-                if (cleanPipe.includes('apim')) score += 5;
                 return { pipe: p, score, name: p.name };
             }).sort((a, b) => b.score - a.score);
 
-            const matchedPipeline = pipeCandidates[0].pipe;
-            const pipeScore = pipeCandidates[0].score;
-
-            if (pipeScore < 10) {
-                console.log(`   ⚠️  PIPELINE_MISSING: Only low-confidence matching pipelines found.`);
+            if (pipeCandidates.length === 0 || pipeCandidates[0].score < 10) {
                 meta.status = 'PIPELINE_MISSING';
                 results.push(meta);
                 continue;
             }
 
+            const matchedPipeline = pipeCandidates[0].pipe;
             meta.pipeline = { id: matchedPipeline.id, name: matchedPipeline.name };
             meta.status = 'MATCHED';
-            console.log(`   ✅ Pipeline: ${matchedPipeline.name} (Score: ${pipeScore})`);
+            console.log(`   ✅ Pipeline: ${matchedPipeline.name}`);
 
-            // C. Surgical Hash Sync (Hybrid Strategy: Environments API + Adaptive Fallback)
-            // If --env is specified, only sync that environment. Otherwise, sync all.
-            const envsToSync = targetEnv ? [targetEnv] : ['DEV', 'QA', 'STAGE', 'PROD'];
-            const timelineCache = new Map<number, any[]>();
-
-            // Phase 1: Surgical Strikes (Environments API) - Ultra Fast
+            const envsToSync = targetEnv ? [targetEnv] : prod.environments;
             for (const envName of envsToSync) {
                 const deploy = await AzureService.fetchLatestEnvironmentDeployment(
-                    devops.organization, projectIdentifier, matchedPipeline.id, envName, devops.pat, devops.baseUrl
+                    devops.organization, projectId || project, matchedPipeline.id, envName, devops.pat, devops.baseUrl
                 );
 
                 if (deploy) {
-                    const commitHash = deploy.build?.sourceVersion || 'unknown';
                     meta.deployments[envName] = {
-                        hash: commitHash,
+                        hash: deploy.build?.sourceVersion || 'unknown',
                         date: deploy.finishTime || deploy.startTime
                     };
-                    console.log(`      🎯 ${envName.padEnd(5)}: Surgical Hit! Captured ${commitHash.substring(0, 7)} (Deployment ${deploy.id})`);
+                    console.log(`      🎯 ${envName.padEnd(5)}: Surgical Hit! Captured ${meta.deployments[envName].hash.substring(0, 7)}`);
                 }
             }
-
-            // Phase 2: Adaptive Fallback (Timeline Scanner) - For projects not using ADO Environments
-            const missingEnvs = envsToSync.filter(e => !meta.deployments[e]);
-            if (missingEnvs.length > 0) {
-                let skip = 0;
-                const pageSize = 20;
-                const maxDepth = 100;
-
-                while (Object.keys(meta.deployments).length < envsToSync.length && skip < maxDepth) {
-                    const builds = await AzureService.fetchBuildsByDefinition(
-                        devops.organization, projectIdentifier, matchedPipeline.id, devops.pat, devops.baseUrl, undefined, pageSize, skip
-                    );
-
-                    if (builds.length === 0) break;
-
-                    for (const run of builds) {
-                        if (Object.keys(meta.deployments).length === envsToSync.length) break;
-
-                        if (!timelineCache.has(run.id)) {
-                            timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdentifier, run.id, devops.pat, devops.baseUrl));
-                        }
-
-                        const timeline = timelineCache.get(run.id)!;
-                        for (const envName of envsToSync) {
-                            if (meta.deployments[envName]) continue;
-
-                            const record = timeline.find((t: any) => {
-                                const type = (t.type || '').toLowerCase();
-                                const isContainer = ['stage', 'job', 'phase'].includes(type);
-                                const nameMatches = sanitize(t.name).includes(sanitize(envName));
-                                const isSuccess = t.result === 'succeeded' || t.result === 'partiallySucceeded';
-                                return isContainer && nameMatches && isSuccess;
-                            });
-
-                            if (record) {
-                                const commitHash = (run as any).sourceVersion || 'unknown';
-                                meta.deployments[envName] = {
-                                    hash: commitHash,
-                                    date: record.finishTime || run.finishedDate
-                                };
-                                console.log(`      📍 ${envName.padEnd(5)}: Scanner Hit! Captured ${commitHash.substring(0, 7)} (Build ${run.id} via ${record.name})`);
-                            }
-                        }
-                    }
-                    skip += pageSize;
-                }
-            }
-
             results.push(meta);
-
         } catch (e: any) {
             console.error(`   ❌ Error: ${e.message}`);
             results.push(meta);
         }
     }
 
-    // 4. Save Metadata
     const outputPath = join(process.cwd(), 'apim-database', 'scripts', 'data', 'ado-metadata.json');
     writeFileSync(outputPath, JSON.stringify(results, null, 2));
-
-    console.log(`\n✅ ADO Metadata Extraction Complete!`);
-    console.log(`📊 Matched ${results.filter(r => r.status === 'MATCHED').length} / ${inventory.length} products.`);
-    console.log(`💾 Saved to: ${outputPath}`);
+    console.log(`\n✅ ADO Metadata Extraction Complete! Saved to: ${outputPath}`);
 }
 
 main().catch(err => {

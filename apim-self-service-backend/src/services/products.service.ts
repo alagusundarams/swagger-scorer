@@ -681,6 +681,11 @@ export async function addNamedValue(productId: string, data: {
     scopeId?: string, // Optional API ID
     allowOverwrite?: boolean
 }) {
+    // 0. Fetch Product to get Environment context
+    const productsRes = await productsRepo.getProductById(productId);
+    if (productsRes.rowCount === 0) throw new Error('Product not found.');
+    const product = productsRes.rows[0];
+
     // 1. If scoped to API, verify API belongs to Product
     if (data.scopeId) {
         const apiCheck = await productsRepo.checkApiBelongsToProduct(data.scopeId, productId);
@@ -688,8 +693,7 @@ export async function addNamedValue(productId: string, data: {
     }
 
     // 1b. Value Collision Check (Audit Only)
-    // Warn/Audit if this exact value is used elsewhere (risk of shared secret sprawl)
-    if (!data.isSecret) { // Skip strict secret comparison for now, focus on configs
+    if (!data.isSecret) {
         const collision = await productsRepo.checkNamedValueCollision(data.value);
         if (collision.rowCount > 0) {
             await logAudit({
@@ -709,6 +713,12 @@ export async function addNamedValue(productId: string, data: {
     // 2. Check for Duplicates
     const existing = await productsRepo.getExistingNamedValue(productId, data.systemName, data.scopeId);
 
+    const fullData = {
+        ...data,
+        environment: product.environment,
+        region: product.region || 'Global'
+    };
+
     if (existing.rowCount > 0) {
         if (!data.allowOverwrite) {
             throw new Error('DUPLICATE_CONFIRMATION_REQUIRED: Value exists. Confirm overwrite?');
@@ -716,7 +726,7 @@ export async function addNamedValue(productId: string, data: {
 
         // 3a. Overwrite (Update)
         const idToUpdate = existing.rows[0].id;
-        const res = await productsRepo.updateNamedValue(idToUpdate, data);
+        const res = await productsRepo.updateNamedValue(idToUpdate, fullData);
 
         await logAudit({
             entityType: 'NAMED_VALUE',
@@ -730,7 +740,7 @@ export async function addNamedValue(productId: string, data: {
     }
 
     // 3b. Insert New
-    const res = await productsRepo.createNamedValue(productId, data);
+    const res = await productsRepo.createNamedValue(productId, fullData);
 
     await logAudit({
         entityType: 'NAMED_VALUE',

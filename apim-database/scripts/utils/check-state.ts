@@ -16,10 +16,7 @@ async function check() {
         console.log('\n--- Named Values ---');
         console.log('Count:', nvs.rows.length);
 
-        // Check if access_control_lists table even exists/has data
-        const acls = await pool.query('SELECT * FROM access_control_lists');
-        console.log('\n--- Legacy ACLs ---');
-        console.log('Count:', acls.rows.length);
+
 
     } catch (e) {
         console.error(e);

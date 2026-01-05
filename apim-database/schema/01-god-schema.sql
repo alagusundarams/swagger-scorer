@@ -50,16 +50,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_azure_ad ON users(azure_ad_object_id);
 
--- User team memberships (many-to-many)
-CREATE TABLE IF NOT EXISTS user_teams (
-    user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-    team_id TEXT REFERENCES teams(id) ON DELETE CASCADE,
-    is_lead BOOLEAN DEFAULT FALSE,
-    PRIMARY KEY (user_id, team_id)
-);
 
-CREATE INDEX idx_user_teams_team ON user_teams(team_id);
-CREATE INDEX idx_user_teams_leads ON user_teams(is_lead) WHERE is_lead = TRUE;
 
 -- =============================================================================
 -- PRODUCTS
@@ -307,18 +298,7 @@ CREATE TABLE IF NOT EXISTS api_backends (
     PRIMARY KEY (api_id, backend_id, environment)
 );
 
--- =============================================================================
--- ACCESS CONTROL LISTS (Named Values / Config) - LEGACY
--- Note: Kept for backward compat if needed, but 'named_values' is the new standard
--- =============================================================================
 
-CREATE TABLE IF NOT EXISTS access_control_lists (
-    key TEXT NOT NULL,
-    environment TEXT NOT NULL,
-    value TEXT NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    PRIMARY KEY (key, environment)
-);
 
 -- =============================================================================
 -- NAMED VALUES (NEW STANDARD)
@@ -334,9 +314,11 @@ CREATE TABLE IF NOT EXISTS named_values (
     value TEXT NOT NULL,
     type TEXT CHECK (type IN ('literal', 'key_vault')),
     is_secret BOOLEAN DEFAULT false,
+    environment TEXT NOT NULL, -- Standardizing with backends
+    region TEXT DEFAULT 'Global', -- Standardizing with backends
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(product_id, system_name, scope_id)
+    UNIQUE(system_name, environment, product_id, scope_id)
 );
 
 -- =============================================================================

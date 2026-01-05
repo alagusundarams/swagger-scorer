@@ -644,11 +644,12 @@ async function runWorker(envName: string) {
         await pool.query(`ALTER TABLE subscriptions DROP COLUMN IF EXISTS secondary_key_value;`);
         await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS policy_xml TEXT;`); // Add policy_xml column to products
 
-        await pool.query(`
-            INSERT INTO products (id, name, display_name, version, environment, state, owner_team_id, updated_at)
-            VALUES ('unknown-product', 'unknown-product', 'Unknown Product', '0.0.0', $1, 'notPublished', NULL, NOW())
-            ON CONFLICT (id) DO NOTHING
-        `, [AZURE_CONFIG.environment]);
+        // Legacy placeholder cleanup - no longer needed with environment/region identity
+        // await pool.query(`
+        //     INSERT INTO products (id, name, display_name, version, environment, state, owner_team_id, updated_at)
+        //     VALUES ('unknown-product', 'unknown-product', 'Unknown Product', '0.0.0', $1, 'notPublished', NULL, NOW())
+        //     ON CONFLICT (id) DO NOTHING
+        // `, [AZURE_CONFIG.environment]);
 
         const myGroups = await AzureService.fetchUserGroups();
         console.log(`👥 Found ${myGroups.length} AD Groups`);
@@ -672,7 +673,6 @@ async function runWorker(envName: string) {
 
         // Build Known Product ID Set for FK integrity
         const knownProductIds = new Set<string>(apimProducts.map(p => p.id));
-        knownProductIds.add('unknown-product'); // Add default fallback if used
 
         let apimSubs: any[] = [];
         try {
@@ -791,7 +791,7 @@ async function runWorker(envName: string) {
             const apiToProductUrl = `/apis/${a.id}/products`;
             const productsRes = await AzureService.fetchAPIM<any>(apimConfig, apiToProductUrl);
             const parentProduct = productsRes.value?.[0];
-            const linkedProductId = parentProduct ? `${parentProduct.name}:${AZURE_CONFIG.environment}:${region}` : 'unknown-product';
+            const linkedProductId = parentProduct ? `${parentProduct.name}:${AZURE_CONFIG.environment}:${region}` : null;
 
             // Resolve Git Info from Parent Product
             const gitInfo = parentProduct ? productGitMap.get(parentProduct.name) : null;
@@ -898,9 +898,11 @@ async function runWorker(envName: string) {
                 value TEXT NOT NULL,
                 type TEXT CHECK (type IN ('literal', 'key_vault')),
                 is_secret BOOLEAN DEFAULT false,
+                environment TEXT NOT NULL,
+                region TEXT DEFAULT 'Global',
                 created_at TIMESTAMPTZ DEFAULT NOW(),
                 updated_at TIMESTAMPTZ DEFAULT NOW(),
-                UNIQUE(product_id, system_name, scope_id)
+                UNIQUE(system_name, environment, product_id, scope_id)
             )
         `);
 
@@ -937,10 +939,9 @@ async function runWorker(envName: string) {
 
             const nvs = extractNamedValuesFromPolicy(a.policyXml);
             for (const nvName of nvs) {
-                if (!nvUsageMap.has(nvName)) nvUsageMap.set(nvName, []);
-                // We link to 'unknown-product' (global placeholder) BUT scoped to this API.
-                // This ensures it shows up in the API config.
-                nvUsageMap.get(nvName)!.push({ uniqueProductId: 'unknown-product', scopeId: uniqueApiId });
+                // orphaned values use product_id = NULL
+                // This ensures it shows up in the API config even without a parent product.
+                nvUsageMap.get(nvName)!.push({ uniqueProductId: null as any, scopeId: uniqueApiId });
             }
         }
 
@@ -952,31 +953,30 @@ async function runWorker(envName: string) {
             const usages = nvUsageMap.get(nv.name) || [];
 
             if (usages.length === 0) {
-                // Orphan / Unused -> Assign to Global/Unknown
-                // This ensures we don't lose data, but it won't be visible in a specific product.
+                // Orphan / Unused -> Global
                 await pool.query(`
-                    INSERT INTO named_values(product_id, scope_id, display_name, system_name, value, type, is_secret, updated_at)
-                    VALUES('unknown-product', NULL, $1, $2, $3, $4, $5, NOW())
-                    ON CONFLICT(product_id, system_name, scope_id) DO UPDATE SET
-                        display_name = EXCLUDED.display_name,
-                        value = EXCLUDED.value,
-                        type = EXCLUDED.type,
-                        is_secret = EXCLUDED.is_secret,
-                        updated_at = NOW();
-                `, [nv.name, nv.name, val, type, nv.isSecret]);
-            } else {
-                // Insert for EACH usage
-                for (const usage of usages) {
-                    await pool.query(`
-                        INSERT INTO named_values(product_id, scope_id, display_name, system_name, value, type, is_secret, updated_at)
+                        INSERT INTO named_values(display_name, system_name, value, type, is_secret, environment, region, updated_at)
                         VALUES($1, $2, $3, $4, $5, $6, $7, NOW())
-                        ON CONFLICT(product_id, system_name, scope_id) DO UPDATE SET
+                        ON CONFLICT(system_name, environment, product_id, scope_id) DO UPDATE SET
                             display_name = EXCLUDED.display_name,
                             value = EXCLUDED.value,
                             type = EXCLUDED.type,
                             is_secret = EXCLUDED.is_secret,
                             updated_at = NOW();
-                    `, [usage.uniqueProductId, usage.scopeId || null, nv.name, nv.name, val, type, nv.isSecret]);
+                    `, [nv.name, nv.name, val, type, nv.isSecret, AZURE_CONFIG.environment, region]);
+            } else {
+                // Insert for EACH usage
+                for (const usage of usages) {
+                    await pool.query(`
+                            INSERT INTO named_values(product_id, scope_id, display_name, system_name, value, type, is_secret, environment, region, updated_at)
+                            VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+                            ON CONFLICT(system_name, environment, product_id, scope_id) DO UPDATE SET
+                                display_name = EXCLUDED.display_name,
+                                value = EXCLUDED.value,
+                                type = EXCLUDED.type,
+                                is_secret = EXCLUDED.is_secret,
+                                updated_at = NOW();
+                        `, [usage.uniqueProductId === 'unknown-product' ? null : usage.uniqueProductId, usage.scopeId || null, nv.name, nv.name, val, type, nv.isSecret, AZURE_CONFIG.environment, region]);
                 }
             }
         }
@@ -1050,7 +1050,7 @@ async function runWorker(envName: string) {
         for (const [clientId, param] of appParams.entries()) {
             await pool.query(`
                 INSERT INTO app_registrations(id, client_id, display_name, environment, product_id, api_id, owner_team_id)
-                VALUES($1, $1, $2, $3, 'unknown-product', NULL, NULL)
+                VALUES($1, $1, $2, $3, NULL, NULL, NULL)
                 ON CONFLICT(id) DO NOTHING;
             `, [clientId, param.displayName, AZURE_CONFIG.environment]);
         }

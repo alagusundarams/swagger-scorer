@@ -21,7 +21,7 @@ const DATABASE_URL = process.env.DATABASE_URL || config.database?.url || 'postgr
 const pool = new Pool({ connectionString: DATABASE_URL });
 
 async function inspect() {
-    const tables = ['governance_backends', 'named_values', 'access_control_lists'];
+    const tables = ['governance_backends', 'named_values'];
     for (const table of tables) {
         console.log(`--- ${table} ---`);
         try {

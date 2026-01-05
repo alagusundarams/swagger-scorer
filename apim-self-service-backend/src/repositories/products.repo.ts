@@ -35,10 +35,13 @@ export class ProductsRepository {
         return await query(`
             SELECT p.*, 
                    t.name as owner_team_name,
-                   p.dev_hash, p.qa_hash, p.stage_hash, p.prod_hash,
-                   COALESCE(sub_counts.active_subscribers, 0) as calculated_subscriber_count
+                   p.dev_hash, p.qa_hash, p.stage_hash, p.production_hash as prod_hash,
+                   COALESCE(sub_counts.active_subscribers, 0) as calculated_subscriber_count,
+                   ar.client_id as identity_client_id,
+                   ar.display_name as identity_display_name
             FROM products p
             LEFT JOIN teams t ON p.owner_team_id = t.id
+            LEFT JOIN app_registrations ar ON ar.product_id = p.id AND ar.api_id IS NULL
             LEFT JOIN LATERAL (
                 SELECT COUNT(*) as active_subscribers
                 FROM subscriptions
@@ -156,7 +159,15 @@ export class ProductsRepository {
     }
 
     async getProductById(id: string) {
-        return await query('SELECT * FROM products WHERE id = $1', [id]);
+        return await query(`
+            SELECT p.*, 
+                   p.production_hash as prod_hash,
+                   ar.client_id as identity_client_id,
+                   ar.display_name as identity_display_name
+            FROM products p
+            LEFT JOIN app_registrations ar ON ar.product_id = p.id AND ar.api_id IS NULL
+            WHERE p.id = $1
+        `, [id]);
     }
 
     async getApiById(id: string) {
@@ -291,19 +302,19 @@ export class ProductsRepository {
     async updateNamedValue(id: string, data: any) {
         return await query(`
             UPDATE named_values 
-            SET display_name = $1, value = $2, type = $3, is_secret = $4, updated_at = NOW()
-            WHERE id = $5
+            SET display_name = $1, value = $2, type = $3, is_secret = $4, environment = $5, region = $6, updated_at = NOW()
+            WHERE id = $7
             RETURNING *
-        `, [data.displayName, data.value, data.type, data.isSecret, id]);
+        `, [data.displayName, data.value, data.type, data.isSecret, data.environment, data.region || 'Global', id]);
     }
 
     async createNamedValue(productId: string, data: any) {
         return await query(`
             INSERT INTO named_values (
-                product_id, scope_id, display_name, system_name, value, type, is_secret
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                product_id, scope_id, display_name, system_name, value, type, is_secret, environment, region
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
-        `, [productId, data.scopeId || null, data.displayName, data.systemName, data.value, data.type, data.isSecret]);
+        `, [productId, data.scopeId || null, data.displayName, data.systemName, data.value, data.type, data.isSecret, data.environment, data.region || 'Global']);
     }
 
     async deleteNamedValue(productId: string, valueId: string) {

@@ -40,7 +40,7 @@ interface OrphanedProduct {
 }
 
 interface OrphanedNamedValue {
-    key: string;
+    system_name: string;
     environment: string;
     value_preview: string;
     reason: string;
@@ -120,16 +120,17 @@ async function main() {
         // Named values that exist but are never referenced in any API forensics
         const orphanedNamedValues = await pool.query<OrphanedNamedValue>(`
             SELECT 
-                key,
-                environment,
+                nv.system_name,
+                p.environment,
                 CASE 
-                    WHEN LENGTH(value) > 50 THEN LEFT(value, 47) || '...'
-                    ELSE value
+                    WHEN LENGTH(nv.value) > 50 THEN LEFT(nv.value, 47) || '...'
+                    ELSE nv.value
                 END as value_preview,
                 'Not referenced by any API policy' as reason
-            FROM access_control_lists acl
-            ${targetEnv ? `WHERE environment = '${targetEnv}'` : ''}
-            ORDER BY environment, key
+            FROM named_values nv
+            JOIN products p ON nv.product_id = p.id
+            ${targetEnv ? `WHERE p.environment = '${targetEnv}'` : ''}
+            ORDER BY p.environment, nv.system_name
         `);
         console.log(`   Found ${orphanedNamedValues.rows.length} named values (manual review required)`);
 

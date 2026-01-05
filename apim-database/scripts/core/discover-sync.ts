@@ -22,7 +22,8 @@ if (!existsSync(logsDir)) mkdirSync(logsDir, { recursive: true });
 
 const timestamp = new Date().toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replace(/[\\/,: ]/g, '-');
 const envSuffix = args.find(a => a.startsWith('--env='))?.split('=')[1] || 'ALL';
-const logFile = join(logsDir, `discover-sync_${envSuffix}_${timestamp}.log`);
+const sourceMode = args.find(a => a.startsWith('--source='))?.split('=')[1] || 'inventory';
+const logFile = join(logsDir, `discover-sync_${envSuffix}_${sourceMode}_${timestamp}.log`);
 const logStream = createWriteStream(logFile, { flags: 'a' });
 
 // Dual logging helper with timestamp

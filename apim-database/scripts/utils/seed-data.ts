@@ -46,7 +46,7 @@ async function seed() {
         await query('DELETE FROM products');
         await query('DELETE FROM audit_log');
         await query('DELETE FROM approval_requests');
-        await query('DELETE FROM user_teams');
+
         await query('DELETE FROM users');
         await query('DELETE FROM teams');
 
@@ -236,9 +236,7 @@ async function seed() {
             `, [a.id, a.display_name, a.client_id, a.environment, a.owner_team_id, a.product_id]);
         }
 
-        // 8. Seed Named Values (Configuration)
-        console.log('⚙️ Seeding Named Values (Configuration)...');
-        await query('DELETE FROM access_control_lists');
+
 
         const namedValues = [
             // Product Level for 'prod-001'
@@ -252,18 +250,7 @@ async function seed() {
             { id: 'nv-005', product_id: 'prod-001', scope_id: null, display_name: 'Cloud Storage Account', system_name: 'storage_account', value: 'https://storage.windows.net', type: 'literal', is_secret: false }
         ];
 
-        // Map to legacy access_control_lists format for now (Key, Env, Value)
-        for (const nv of namedValues) {
-            // For seed data, we'll assume these apply to 'DEV' environment for simplicity 
-            // or mimic how legacy used to work (Product name specific keys?)
-            // Actually, inspection of previous seed-db.ts shows it populated named_values too?
-            // Wait, let me check the *original* seed-db.ts I read earlier. 
-            // It had 'Removed: CREATE TABLE IF NOT EXISTS named_values'.
-            // So the BACKEND script WAS using named_values??
-            // But the SERVICE uses access_control_lists?
-            // This implies the backend might be broken independently or I misread something.
-            // Let me re-read the grep output.
-        }
+
 
         // Re-reading service: 
         // export async function getNamedValues... FROM access_control_lists
@@ -279,22 +266,13 @@ async function seed() {
             await query(`
                 INSERT INTO named_values (id, product_id, scope_id, display_name, system_name, value, type, is_secret)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                ON CONFLICT DO NOTHING
+                ON CONFLICT (id) DO UPDATE SET
+                    display_name = EXCLUDED.display_name,
+                    value = EXCLUDED.value,
+                    type = EXCLUDED.type,
+                    is_secret = EXCLUDED.is_secret,
+                    updated_at = NOW();
             `, [nv.id, nv.product_id, nv.scope_id, nv.display_name, nv.system_name, nv.value, nv.type, nv.is_secret]);
-
-            // Legacy Table (Best Effort Mapping)
-            // We'll map system_name -> key, 'DEV' -> environment
-            // This ensures backend sees something.
-            await query(`
-                INSERT INTO access_control_lists (key, environment, value, updated_at)
-                VALUES ($1, 'DEV', $2, NOW()) 
-                ON CONFLICT (key, environment) DO UPDATE SET value = $2
-            `, [nv.system_name, nv.value]);
-            await query(`
-                INSERT INTO access_control_lists (key, environment, value, updated_at)
-                VALUES ($1, 'PROD', $2, NOW()) 
-                ON CONFLICT (key, environment) DO UPDATE SET value = $2
-            `, [nv.system_name, nv.value]);
         }
 
         // 9. Seed Permission Matrix (RBAC)

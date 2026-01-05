@@ -20,16 +20,44 @@ export interface Backend {
     updatedAt?: Date;
 }
 
+interface UserContext {
+    role: string;
+    groups: string[];
+}
+
 /**
- * Get all backends for an environment
+ * Get all backends for an environment, filtered by permissions
  */
-export async function getBackends(environment: string): Promise<Backend[]> {
+export async function getBackends(environment: string, userContext: UserContext): Promise<Backend[]> {
+    const isAdmin = userContext.role === 'admin';
+    const accessFilter = isAdmin ? '' : `
+        AND (
+            gb.product_id IS NULL 
+            OR EXISTS (
+                SELECT 1 FROM permission_matrix pm 
+                WHERE pm.product_id = gb.product_id 
+                AND pm.ad_group_id = ANY($2::text[])
+                AND pm.environment = $1
+            )
+            OR EXISTS (
+                SELECT 1 FROM products p
+                WHERE p.id = gb.product_id
+                AND p.owner_team_id IN (
+                    SELECT id FROM teams WHERE azure_ad_group_id = ANY($2::text[])
+                )
+            )
+        )
+    `;
+
+    const params = isAdmin ? [environment] : [environment, userContext.groups];
+
     const result = await query(`
-        SELECT id, environment, url, description, title, protocol, product_id, api_id, scope, created_at, updated_at
-        FROM governance_backends
-        WHERE environment = $1
-        ORDER BY id ASC
-    `, [environment]);
+        SELECT gb.id, gb.environment, gb.url, gb.description, gb.title, gb.protocol, gb.product_id, gb.api_id, gb.scope, gb.created_at, gb.updated_at
+        FROM governance_backends gb
+        WHERE gb.environment = $1
+        ${accessFilter}
+        ORDER BY gb.id ASC
+    `, params);
 
     return result.rows.map(row => ({
         id: row.id,
@@ -47,14 +75,30 @@ export async function getBackends(environment: string): Promise<Backend[]> {
 }
 
 /**
- * Get a specific backend
+ * Get a specific backend with permission check
  */
-export async function getBackend(id: string, environment: string): Promise<Backend | null> {
+export async function getBackend(id: string, environment: string, userContext: UserContext): Promise<Backend | null> {
+    const isAdmin = userContext.role === 'admin';
+    const accessFilter = isAdmin ? '' : `
+        AND (
+            gb.product_id IS NULL 
+            OR EXISTS (
+                SELECT 1 FROM permission_matrix pm 
+                WHERE pm.product_id = gb.product_id 
+                AND pm.ad_group_id = ANY($3::text[])
+                AND pm.environment = $2
+            )
+        )
+    `;
+
+    const params = isAdmin ? [id, environment] : [id, environment, userContext.groups];
+
     const result = await query(`
-        SELECT id, environment, url, description, title, protocol, created_at, updated_at
-        FROM governance_backends
-        WHERE id = $1 AND environment = $2
-    `, [id, environment]);
+        SELECT gb.*
+        FROM governance_backends gb
+        WHERE gb.id = $1 AND gb.environment = $2
+        ${accessFilter}
+    `, params);
 
     if (result.rows.length === 0) {
         return null;
@@ -68,6 +112,9 @@ export async function getBackend(id: string, environment: string): Promise<Backe
         description: row.description,
         title: row.title,
         protocol: row.protocol,
+        productId: row.product_id,
+        apiId: row.api_id,
+        scope: row.scope,
         createdAt: row.created_at,
         updatedAt: row.updated_at
     };
@@ -113,7 +160,11 @@ export async function upsertBackend(params: {
 /**
  * Delete a backend
  */
-export async function deleteBackend(id: string, environment: string): Promise<boolean> {
+export async function deleteBackend(id: string, environment: string, userContext: UserContext): Promise<boolean> {
+    if (userContext.role !== 'admin') {
+        throw new Error('Forbidden: Only administrators can delete backends');
+    }
+
     const result = await query(`
         DELETE FROM governance_backends
         WHERE id = $1 AND environment = $2
