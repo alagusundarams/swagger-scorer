@@ -10,6 +10,7 @@
         "sync:fast": "tsx scripts/core/discover-sync.ts --skip-ado",
         "sync:db": "tsx scripts/core/discover-sync.ts --source=db",
         "ado": "tsx scripts/core/extract-ado-metadata.ts",
+        "reconcile": "tsx scripts/core/reconcile-governance.ts",
         "verify": "tsx scripts/debug/verify-backend-queries.ts",
         "verify:operations": "tsx scripts/debug/verify-operations.ts",
         "inspect": "tsx scripts/debug/inspect-schema.ts",
