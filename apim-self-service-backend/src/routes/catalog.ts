@@ -54,7 +54,7 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
             return products;
         } catch (error) {
             fastify.log.error({ err: error }, 'Error fetching products');
-            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to fetch products' });
+            return reply.status(500).send({ error: 'Internal Server Error', message: (error as Error).message });
         }
     });
 

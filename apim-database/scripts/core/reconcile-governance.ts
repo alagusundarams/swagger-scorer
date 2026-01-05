@@ -204,17 +204,32 @@ async function main() {
         }
 
         // --- B. ACCESS CONTROL (NAMED VALUES) ---
-        console.log(`🌍 Reconciling Named Values (ACL)...`);
+        console.log(`🌍 Reconciling Named Values...`);
         for (const [env, nvs] of Object.entries(apimMeta.namedValues)) {
+            // Ensure placeholder product exists for this environment
+            const placeholderId = `unknown-product:${env}:Global`;
+            await pool.query(`
+                INSERT INTO products (id, name, display_name, version, state, environment, region, management_mode, updated_at)
+                VALUES ($1, 'unknown-product', 'Global Named Values', '0.0.0', 'notPublished', $2, 'Global', 'PORTAL_MANAGED', NOW())
+                ON CONFLICT (id) DO NOTHING
+            `, [placeholderId, env]);
+
             for (const nv of nvs) {
-                const val = nv.keyVaultUrl ? `KeyVault Ref: ${nv.keyVaultUrl}` : (nv.isSecret ? '***' : nv.value);
+                const val = nv.keyVaultUrl ? nv.keyVaultUrl : nv.value;
+                const type = nv.keyVaultUrl ? 'key_vault' : 'literal';
+                // Deterministic ID for idempotency
+                const nvId = `nv-${env}-${nv.name}`;
+
                 await pool.query(`
-                    INSERT INTO access_control_lists (key, environment, value, updated_at)
-                    VALUES ($1, $2, $3, NOW())
-                    ON CONFLICT (key, environment) DO UPDATE SET
+                    INSERT INTO named_values (id, product_id, display_name, system_name, value, type, is_secret, updated_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+                    ON CONFLICT (id) DO UPDATE SET
+                        display_name = EXCLUDED.display_name,
                         value = EXCLUDED.value,
+                        type = EXCLUDED.type,
+                        is_secret = EXCLUDED.is_secret,
                         updated_at = NOW();
-                `, [nv.name, env, val]);
+                `, [nvId, placeholderId, nv.displayName, nv.name, val, type, nv.isSecret]);
             }
         }
 

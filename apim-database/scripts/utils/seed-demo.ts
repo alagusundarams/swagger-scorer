@@ -109,7 +109,7 @@ async function seedDemoData() {
         `);
 
         await pool.query(`
-            INSERT INTO apis (id, product_id, name, display_name, path, quality_score, git_repo_url, git_file_path, environment)
+            INSERT INTO apis (id, product_id, name, display_name, path, quality_score, git_repo_url, git_file_path)
             VALUES (
                 'api-legacy-01',
                 'prod-legacy',
@@ -118,8 +118,7 @@ async function seedDemoData() {
                 '/orders/v1',
                 40.00,
                 NULL,
-                NULL,
-                'PROD'
+                NULL
             );
         `);
         console.log('✅ Legacy Product Seeded.');
@@ -155,7 +154,7 @@ async function seedDemoData() {
         `);
 
         await pool.query(`
-            INSERT INTO apis (id, product_id, name, display_name, path, quality_score, git_repo_url, git_file_path, environment)
+            INSERT INTO apis (id, product_id, name, display_name, path, quality_score, git_repo_url, git_file_path)
             VALUES (
                 'api-payment-v2',
                 'prod-payment-v2',
@@ -164,8 +163,7 @@ async function seedDemoData() {
                 '/payments/v2',
                 99.00,
                 'https://dev.azure.com/contoso/payment-gateway-v2',
-                'src/specs/payment-v2.yaml',
-                'DEV'
+                'src/specs/payment-v2.yaml'
             );
         `);
         console.log('✅ Modern Product Seeded.');
