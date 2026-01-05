@@ -40,33 +40,28 @@ sequenceDiagram
 
 ---
 
-## 2. Microservices Decomposition Strategy
-The current system is a "Modular Monolith". As we scale to **10 million daily API calls** management, we must split it.
+## 2. Microservices Architecture
+The system is architected as a set of distributed **Microservices** to support scaling to **10 million daily API calls**.
 
-### The Split Plan (Target Architecture)
+### The Service Mesh
+
+### Service Architecture
 
 ```mermaid
 graph TD
-    classDef mono fill:#ffe0b2,stroke:#ef6c00,stroke-width:2px;
     classDef micro fill:#bbdefb,stroke:#0d47a1,stroke-width:2px;
 
     User[User Request]
 
-    subgraph Current["Current: Modular Monolith"]
-        Mono[Backend Service]:::mono
-    end
-
-    subgraph Future["Future: Microservices"]
-        Gateway[API Gateway / Ingress]
-        
-        Svc1[Core Inventory Service]:::micro
-        Svc2[ARM/IaC Worker]:::micro
-        Svc3[Audit & Compliance Service]:::micro
-        Svc4[Policy Intelligence Engine]:::micro
-        
-        DB1[(Inventory DB)]
-        DB2[(Audit DB)]
-    end
+    Gateway[API Gateway / Ingress]
+    
+    Svc1[Core Inventory Service]:::micro
+    Svc2[ARM/IaC Worker]:::micro
+    Svc3[Audit & Compliance Service]:::micro
+    Svc4[Policy Intelligence Engine]:::micro
+    
+    DB1[(Inventory DB)]
+    DB2[(Audit DB)]
 
     User --> Gateway
     Gateway --> Svc1
@@ -102,19 +97,19 @@ graph LR
 ---
 
 ## 4. JIT Sync Logic (Internal Flow)
-The "Just-In-Time" sync is the most CPU-intensive operation in the current monolith.
+The "Just-In-Time" sync is the most CPU-intensive operation.
 
 ```mermaid
 flowchart TD
-    Req[User requests API Details] --> Cache{Check Ops Cache?}
-    Cache -- Hit --> Return[Return DB Rows]
-    Cache -- Miss/Stale --> Fetch[Fetch YAML from ADO]
+    Req["User requests API Details"] --> Cache{"Check Ops Cache?"}
+    Cache -- Hit --> Return["Return DB Rows"]
+    Cache -- Miss/Stale --> Fetch["Fetch YAML from ADO"]
     
-    Fetch --> Parse[SwaggerParser.parse()]
-    Parse --> Validate{Spectral Lint Pass?}
+    Fetch --> Parse["SwaggerParser.parse()"]
+    Parse --> Validate{"Spectral Lint Pass?"}
     
-    Validate -- Valid --> Upsert[Bulk UPSERT to DB]
-    Validate -- Invalid --> Error[Mark as Broken]
+    Validate -- Valid --> Upsert["Bulk UPSERT to DB"]
+    Validate -- Invalid --> Error["Mark as Broken"]
     
     Upsert --> Return
 ```

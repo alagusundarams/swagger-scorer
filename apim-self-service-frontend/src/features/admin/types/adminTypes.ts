@@ -1,7 +1,7 @@
 /**
  * Admin Domain Types
  * 
- * Decentralized from the legacy entities monolith.
+ * Decentralized from the unified entities structure.
  */
 
 export interface GlobalDeployment {
