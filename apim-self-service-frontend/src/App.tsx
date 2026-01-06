@@ -13,7 +13,7 @@ const BrowsePage = lazy(() => import('./pages/Browse/Browse.page').then(module =
 const MarketplacePage = lazy(() => import('./pages/Marketplace/Marketplace.page').then(module => ({ default: module.MarketplacePage })));
 const AnalyzerPage = lazy(() => import('./pages/Analyzer/Analyzer.page').then(module => ({ default: module.AnalyzerPage })));
 const AdminGovernancePage = lazy(() => import('./pages/AdminGovernance/AdminGovernance.page').then(module => ({ default: module.AdminGovernancePage })));
-const AdminMappingView = lazy(() => import('./pages/AdminMapping/AdminMapping.page').then(module => ({ default: module.AdminMappingView })));
+
 const PolicyStudioContainer = lazy(() => import('./features/policy-studio/PolicyStudio.container').then(module => ({ default: module.PolicyStudioContainer })));
 const GlobalInventoryPage = lazy(() => import('./pages/GlobalInventory/GlobalInventory.page').then(module => ({ default: module.GlobalInventory })));
 const AppsPage = lazy(() => import('./pages/Apps/Apps.page').then(module => ({ default: module.AppsPage })));
