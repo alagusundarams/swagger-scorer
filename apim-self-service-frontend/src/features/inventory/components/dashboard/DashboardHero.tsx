@@ -1,17 +1,24 @@
 interface DashboardHeroProps {
     activeTab: 'produced' | 'consumed' | 'admin' | 'approvals';
+    userRole?: string;
+    activeTeamId?: string;
 }
 
-export function DashboardHero({ activeTab }: DashboardHeroProps) {
+export function DashboardHero({ activeTab, userRole, activeTeamId }: DashboardHeroProps) {
+    // For admin viewing all teams, use different copy
+    const isAdminViewingAll = userRole === 'admin' && activeTeamId === 'all';
+
     const titles = {
-        produced: 'Your Provider Portfolio',
+        produced: isAdminViewingAll ? 'Platform Portfolio' : 'Your Provider Portfolio',
         consumed: 'Active Subscriptions',
         approvals: 'Governance Pipeline',
         admin: "Global Systems Overview"
     };
 
     const descriptions = {
-        produced: "Manage your team's API lifecycle, monitor quality scores, and oversee consumer access guardrails.",
+        produced: isAdminViewingAll
+            ? "Monitor all API products across teams, environments, and quality metrics for platform-wide governance."
+            : "Manage your team's API lifecycle, monitor quality scores, and oversee consumer access guardrails.",
         consumed: "Monitor and manage your team's active API subscriptions and application credentials.",
         approvals: "Review pending access requests and visibility changes with a security-first vetting mindset.",
         admin: "High-level operational metrics and health status across all teams and environments."

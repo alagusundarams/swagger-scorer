@@ -212,7 +212,7 @@ export const DashboardPage = () => {
             )}
 
             <div className="max-w-7xl mx-auto w-full px-6 py-12 relative z-20">
-                <DashboardHero activeTab={activeTab} />
+                <DashboardHero activeTab={activeTab} userRole={user?.role} activeTeamId={activeTeamId} />
                 <DashboardStatsGrid heroStats={heroStats} />
                 <DashboardFilters
                     searchQuery={searchQuery}
