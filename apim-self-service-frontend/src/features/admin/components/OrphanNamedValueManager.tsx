@@ -53,7 +53,9 @@ export const OrphanNamedValueManager: React.FC = () => {
     const loadProducts = async () => {
         try {
             const data = await getProducts();
-            setProducts(data || []);
+            // Handle both paginated and non-paginated responses
+            const productsList = Array.isArray(data) ? data : data.products;
+            setProducts(productsList || []);
         } catch (err) {
             console.error('Failed to load products', err);
         }
