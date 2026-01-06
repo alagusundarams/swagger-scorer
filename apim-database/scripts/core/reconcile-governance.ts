@@ -419,17 +419,33 @@ async function main() {
                 // Check if this is a default subscription (naming pattern: default_{productName})
                 const isDefaultSubscription = sub.displayName?.startsWith('default_');
 
-                // Auto-assign default subscription to product owner (if product has a team)
-                let subscriberTeamId = ownerUserId; // Default to ownerId (may be NULL)
+                // Start with NULL - only assign if team exists
+                let subscriberTeamId: string | null = null;
 
                 if (isDefaultSubscription) {
-                    // Get product owner team
+                    // For default subscriptions, try to auto-assign to product owner
                     const prodQuery = await pool.query('SELECT owner_team_id FROM products WHERE id = $1', [productId]);
                     if (prodQuery.rows.length > 0 && prodQuery.rows[0].owner_team_id) {
-                        subscriberTeamId = prodQuery.rows[0].owner_team_id;
-                        if (verbose) {
-                            console.log(`      ✅ Auto-assigned default subscription to product owner: ${subscriberTeamId}`);
+                        const potentialTeamId = prodQuery.rows[0].owner_team_id;
+
+                        // Verify team exists in teams table
+                        const teamCheck = await pool.query('SELECT id FROM teams WHERE id = $1', [potentialTeamId]);
+                        if (teamCheck.rows.length > 0) {
+                            subscriberTeamId = potentialTeamId;
+                            if (verbose) {
+                                console.log(`      ✅ Auto-assigned default subscription to product owner: ${subscriberTeamId}`);
+                            }
+                        } else if (verbose) {
+                            console.log(`      ⚠️  Product owner team ${potentialTeamId} not found in teams table`);
                         }
+                    }
+                } else if (ownerUserId) {
+                    // For non-default subscriptions, check if ownerUserId is a valid team
+                    const teamCheck = await pool.query('SELECT id FROM teams WHERE id = $1', [ownerUserId]);
+                    if (teamCheck.rows.length > 0) {
+                        subscriberTeamId = ownerUserId;
+                    } else if (verbose) {
+                        console.log(`      ⚠️  Owner ${ownerUserId} not found in teams table - subscription will be orphaned`);
                     }
                 }
 
