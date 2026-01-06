@@ -17,9 +17,37 @@ import type { Product, API } from '../../../shared/types/domain';
  * Manages only Product and API resources.
  * Teams, Subscriptions, and Governance logic has been decentralized.
  */
-export const getProducts = async (): Promise<Product[]> => {
-    const res = await baseClient.get('/products');
-    return res.data;
+
+export interface PaginatedResponse<T> {
+    products: T[];
+    pagination?: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+    };
+}
+
+/**
+ * Get products with optional pagination
+ * @param page - Page number (1-indexed), omit for all products
+ * @param limit - Items per page, omit for all products
+ */
+export const getProducts = async (page?: number, limit?: number): Promise<Product[] | PaginatedResponse<Product>> => {
+    const params = new URLSearchParams();
+    if (page !== undefined) params.append('page', String(page));
+    if (limit !== undefined) params.append('limit', String(limit));
+
+    const url = `/products${params.toString() ? `?${params.toString()}` : ''}`;
+    const res = await baseClient.get(url);
+
+    // If pagination params were provided, return paginated response
+    if (page !== undefined && limit !== undefined) {
+        return res.data as PaginatedResponse<Product>;
+    }
+
+    // Otherwise return just the products array (backward compatible)
+    return Array.isArray(res.data) ? res.data : res.data.products;
 };
 
 export const getProduct = async (id: string, environment?: string): Promise<Product> => {
