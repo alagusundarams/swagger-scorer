@@ -336,7 +336,7 @@ async function main() {
                     await pool.query(`
                         INSERT INTO named_values (id, product_id, display_name, system_name, value, type, is_secret, environment, region, updated_at)
                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
-                        ON CONFLICT (system_name, environment, product_id, scope_id) 
+                        ON CONFLICT (id) 
                         DO UPDATE SET
                             display_name = EXCLUDED.display_name,
                             value = EXCLUDED.value,
