@@ -1,217 +1,299 @@
 /**
- * Admin Delete Routes
+ * Admin Delete Routes (Saga-based)
  * 
  * Endpoints for admin-only deletion of orphaned resources.
- * Includes:
- * - Single resource delete
- * - Bulk delete
- * - Soft delete with audit trail
+ * Uses saga orchestration pattern for distributed transactions:
+ * - APIM deletion
+ * - Database deletion  
+ * - Git commit (for resources with config)
+ * - Automatic rollback on any failure
  */
 
-import { Router } from 'express';
-import { db } from '../config/database';
-import { requireAdmin } from '../middleware/auth';
-import { auditService } from '../services/auditService';
-import { emailService } from '../services/emailService';
+import { FastifyPluginAsync } from 'fastify';
+import { deleteSaga } from '../services/deleteSaga.js';
+import { getUserId } from '../middleware/auth.js';
 
-const router = Router();
+const adminDeleteRoutes: FastifyPluginAsync = async (fastify) => {
+    /**
+     * DELETE /api/v1/admin/products/:id
+     * Delete a single orphaned product (admin only)
+     */
+    fastify.delete('/admin/products/:id', async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const { reason } = request.body as { reason?: string };
 
-/**
- * DELETE /api/v1/admin/products/:id
- * Delete a single orphaned product (admin only)
- */
-router.delete('/admin/products/:id',
-    requireAdmin,
-    async (req, res) => {
-        const { id } = req.params;
-        const { reason } = req.body;
-
+        // Validate reason
         if (!reason || reason.trim().length < 10) {
-            return res.status(400).json({
+            return reply.status(400).send({
                 error: 'Deletion reason required (minimum 10 characters)'
             });
         }
 
         try {
-            // 1. Get product details before delete
-            const product = await db('products')
-                .where({ id })
-                .whereNull('deleted_at')
-                .first();
+            // Get user context
+            const userId = getUserId(request);
+            const userEmail = (request.headers as any)['x-user-email'] as string || userId;
+            const userRole = 'admin'; // TODO: Get from auth middleware
 
-            if (!product) {
-                return res.status(404).json({ error: 'Product not found or already deleted' });
-            }
+            // Extract environment from product ID (format: "product-name:env:environment")
+            const environment = id.split(':env:')[1] || 'Global';
 
-            // 2. Check dependencies (prevent deletion if has active subscriptions)
-            const activeSubsCount = await db('subscriptions')
-                .where({ product_id: id })
-                .whereNull('deleted_at')
-                .count('* as count')
-                .first();
-
-            if (activeSubsCount && parseInt(activeSubsCount.count as string) > 0) {
-                return res.status(400).json({
-                    error: `Cannot delete - has ${activeSubsCount.count} active subscriptions`
-                });
-            }
-
-            // 3. Soft delete
-            await db('products')
-                .where({ id })
-                .update({
-                    deleted_at: new Date(),
-                    deleted_by: req.user.email,
-                    deletion_reason: reason.trim()
-                });
-
-            // 4. Audit log
-            const auditId = await auditService.log({
-                userId: req.user.id,
-                userEmail: req.user.email,
-                userRole: req.user.role,
-                action: 'DELETE',
+            // Execute delete saga
+            const result = await deleteSaga.executeDelete({
                 resourceType: 'product',
                 resourceId: id,
-                resourceName: product.name || product.display_name,
-                details: {
-                    reason: reason.trim(),
-                    environment: product.environment,
-                    ownerTeamId: product.owner_team_id
-                },
-                ipAddress: req.ip
-            });
-
-            // 5. Email notification (stub - logs to console)
-            await emailService.sendDeletionNotification({
-                deletedBy: req.user.name || req.user.email,
-                deletedByEmail: req.user.email,
-                resourceType: 'product',
-                resourceName: product.name || product.display_name,
-                resourceId: id,
+                resourceName: id.split(':')[0],
+                environment,
                 reason: reason.trim(),
-                auditLogId: auditId
+                userId,
+                userEmail,
+                userRole,
+                ipAddress: request.ip
             });
 
-            res.json({ success: true, auditLogId: auditId });
+            if (!result.success) {
+                return reply.status(500).send({
+                    error: 'Delete saga failed',
+                    details: result.error,
+                    failedStep: result.failedStep,
+                    completedSteps: result.completedSteps
+                });
+            }
+
+            return reply.send({
+                success: true,
+                auditLogId: result.auditLogId,
+                completedSteps: result.completedSteps
+            });
 
         } catch (error: any) {
-            console.error('[Delete] Product deletion failed:', error);
-            res.status(500).json({ error: 'Delete operation failed', details: error.message });
+            fastify.log.error('[Delete] Product deletion failed:', error);
+            return reply.status(500).send({
+                error: 'Delete operation failed',
+                details: error.message
+            });
         }
-    }
-);
+    });
 
-/**
- * POST /api/v1/admin/products/bulk-delete
- * Bulk delete multiple orphaned products (admin only)
- */
-router.post('/admin/products/bulk-delete',
-    requireAdmin,
-    async (req, res) => {
-        const { productIds, reason } = req.body;
+    /**
+     * POST /api/v1/admin/products/bulk-delete
+     * Bulk delete multiple orphaned products (admin only)
+     */
+    fastify.post('/admin/products/bulk-delete', async (request, reply) => {
+        const { productIds, reason } = request.body as {
+            productIds?: string[];
+            reason?: string;
+        };
 
+        // Validate inputs
         if (!reason || reason.trim().length < 10) {
-            return res.status(400).json({
+            return reply.status(400).send({
                 error: 'Deletion reason required (minimum 10 characters)'
             });
         }
 
         if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
-            return res.status(400).json({ error: 'Product IDs array required' });
+            return reply.status(400).send({ error: 'Product IDs array required' });
         }
 
         const succeeded: string[] = [];
-        const failed: Array<{ id: string; error: string }> = [];
+        const failed: Array<{ id: string; error: string; failedStep?: string }> = [];
 
         try {
+            // Get user context
+            const userId = getUserId(request);
+            const userEmail = (request.headers as any)['x-user-email'] as string || userId;
+            const userRole = 'admin';
+
+            // Execute saga for each product
             for (const id of productIds) {
                 try {
-                    // Get product
-                    const product = await db('products')
-                        .where({ id })
-                        .whereNull('deleted_at')
-                        .first();
+                    const environment = id.split(':env:')[1] || 'Global';
+                    const productName = id.split(':')[0];
 
-                    if (!product) {
-                        failed.push({ id, error: 'Not found or already deleted' });
-                        continue;
-                    }
+                    const result = await deleteSaga.executeDelete({
+                        resourceType: 'product',
+                        resourceId: id,
+                        resourceName: productName,
+                        environment,
+                        reason: reason.trim(),
+                        userId,
+                        userEmail,
+                        userRole,
+                        ipAddress: request.ip
+                    });
 
-                    // Check dependencies
-                    const activeSubsCount = await db('subscriptions')
-                        .where({ product_id: id })
-                        .whereNull('deleted_at')
-                        .count('* as count')
-                        .first();
-
-                    if (activeSubsCount && parseInt(activeSubsCount.count as string) > 0) {
-                        failed.push({ id, error: `Has ${activeSubsCount.count} active subscriptions` });
-                        continue;
-                    }
-
-                    // Soft delete
-                    await db('products')
-                        .where({ id })
-                        .update({
-                            deleted_at: new Date(),
-                            deleted_by: req.user.email,
-                            deletion_reason: reason.trim()
+                    if (result.success) {
+                        succeeded.push(productName);
+                    } else {
+                        failed.push({
+                            id,
+                            error: result.error || 'Unknown error',
+                            failedStep: result.failedStep
                         });
-
-                    succeeded.push(product.name || product.display_name || id);
+                    }
 
                 } catch (itemError: any) {
                     failed.push({ id, error: itemError.message });
                 }
             }
 
-            // Single audit log for bulk operation
-            const auditId = await auditService.log({
-                userId: req.user.id,
-                userEmail: req.user.email,
-                userRole: req.user.role,
-                action: 'BULK_DELETE',
-                resourceType: 'product',
-                resourceId: productIds.join(','),
-                details: {
-                    reason: reason.trim(),
-                    count: succeeded.length,
-                    succeeded,
-                    failed
-                },
-                ipAddress: req.ip
-            });
-
-            // Email notification
-            if (succeeded.length > 0) {
-                await emailService.sendDeletionNotification({
-                    deletedBy: req.user.name || req.user.email,
-                    deletedByEmail: req.user.email,
-                    resourceType: 'product',
-                    resourceName: `${succeeded.length} products`,
-                    resourceId: 'bulk',
-                    reason: reason.trim(),
-                    count: succeeded.length,
-                    auditLogId: auditId
-                });
-            }
-
-            res.json({
+            return reply.send({
                 deleted: succeeded.length,
                 failed: failed.length,
                 failures: failed,
-                auditLogId: auditId
+                succeeded
             });
 
         } catch (error: any) {
-            console.error('[Delete] Bulk deletion failed:', error);
-            res.status(500).json({ error: 'Bulk delete operation failed', details: error.message });
+            fastify.log.error('[Delete] Bulk deletion failed:', error);
+            return reply.status(500).send({
+                error: 'Bulk delete operation failed',
+                details: error.message
+            });
         }
-    }
-);
+    });
 
-// Repeat for subscriptions, named_values, backends
-// (Identical pattern - omitted for brevity, implement when needed)
+    /**
+     * DELETE /api/v1/admin/subscriptions/:id
+     * Delete a single orphaned subscription
+     */
+    fastify.delete('/admin/subscriptions/:id', async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const { reason } = request.body as { reason?: string };
 
-export default router;
+        if (!reason || reason.trim().length < 10) {
+            return reply.status(400).send({
+                error: 'Deletion reason required (minimum 10 characters)'
+            });
+        }
+
+        try {
+            const userId = getUserId(request);
+            const userEmail = (request.headers as any)['x-user-email'] as string || userId;
+            const environment = id.split(':env:')[1] || 'Global';
+
+            const result = await deleteSaga.executeDelete({
+                resourceType: 'subscription',
+                resourceId: id,
+                resourceName: id,
+                environment,
+                reason: reason.trim(),
+                userId,
+                userEmail,
+                userRole: 'admin',
+                ipAddress: request.ip
+            });
+
+            if (!result.success) {
+                return reply.status(500).send({
+                    error: 'Delete saga failed',
+                    details: result.error,
+                    failedStep: result.failedStep
+                });
+            }
+
+            return reply.send({ success: true, auditLogId: result.auditLogId });
+
+        } catch (error: any) {
+            fastify.log.error('[Delete] Subscription deletion failed:', error);
+            return reply.status(500).send({ error: 'Delete operation failed', details: error.message });
+        }
+    });
+
+    /**
+     * DELETE /api/v1/admin/named-values/:id
+     * Delete a single orphaned named value
+     */
+    fastify.delete('/admin/named-values/:id', async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const { reason } = request.body as { reason?: string };
+
+        if (!reason || reason.trim().length < 10) {
+            return reply.status(400).send({
+                error: 'Deletion reason required (minimum 10 characters)'
+            });
+        }
+
+        try {
+            const userId = getUserId(request);
+            const userEmail = (request.headers as any)['x-user-email'] as string || userId;
+            const environment = id.split(':env:')[1] || 'Global';
+
+            const result = await deleteSaga.executeDelete({
+                resourceType: 'named_value',
+                resourceId: id,
+                resourceName: id.split(':')[0],
+                environment,
+                reason: reason.trim(),
+                userId,
+                userEmail,
+                userRole: 'admin',
+                ipAddress: request.ip
+            });
+
+            if (!result.success) {
+                return reply.status(500).send({
+                    error: 'Delete saga failed',
+                    details: result.error,
+                    failedStep: result.failedStep
+                });
+            }
+
+            return reply.send({ success: true, auditLogId: result.auditLogId });
+
+        } catch (error: any) {
+            fastify.log.error('[Delete] Named value deletion failed:', error);
+            return reply.status(500).send({ error: 'Delete operation failed', details: error.message });
+        }
+    });
+
+    /**
+     * DELETE /api/v1/admin/backends/:id
+     * Delete a single orphaned backend
+     */
+    fastify.delete('/admin/backends/:id', async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const { reason } = request.body as { reason?: string };
+
+        if (!reason || reason.trim().length < 10) {
+            return reply.status(400).send({
+                error: 'Deletion reason required (minimum 10 characters)'
+            });
+        }
+
+        try {
+            const userId = getUserId(request);
+            const userEmail = (request.headers as any)['x-user-email'] as string || userId;
+            const environment = id.split(':env:')[1] || 'Global';
+
+            const result = await deleteSaga.executeDelete({
+                resourceType: 'backend',
+                resourceId: id,
+                resourceName: id.split(':')[0],
+                environment,
+                reason: reason.trim(),
+                userId,
+                userEmail,
+                userRole: 'admin',
+                ipAddress: request.ip
+            });
+
+            if (!result.success) {
+                return reply.status(500).send({
+                    error: 'Delete saga failed',
+                    details: result.error,
+                    failedStep: result.failedStep
+                });
+            }
+
+            return reply.send({ success: true, auditLogId: result.auditLogId });
+
+        } catch (error: any) {
+            fastify.log.error('[Delete] Backend deletion failed:', error);
+            return reply.status(500).send({ error: 'Delete operation failed', details: error.message });
+        }
+    });
+};
+
+export default adminDeleteRoutes;
