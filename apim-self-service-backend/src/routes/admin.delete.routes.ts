@@ -177,7 +177,7 @@ const adminDeleteRoutes: FastifyPluginAsync = async (fastify) => {
     /**
      * POST /api/v1/admin/named-values/bulk-delete
      */
-    fastify.post('/admin/named_values/bulk-delete', async (request, reply) => {
+    fastify.post('/admin/named-values/bulk-delete', async (request, reply) => {
         const { named_valueIds, reason } = request.body as { named_valueIds?: string[]; reason?: string; };
         // frontend sends named_valueIds based on key=${resourceType}Ids logic in client
         return handleBulkDelete(request, reply, 'named_value', named_valueIds, reason);
