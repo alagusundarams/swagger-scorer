@@ -48,10 +48,18 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
 
     fastify.get('/products', async (request, reply) => {
         try {
-            const { environment, role, teamId, groups } = request.query as any;
+            const { environment, role, teamId, groups, page, limit } = request.query as any;
             const userGroups = groups ? groups.split(',') : [];
-            const products = await getAllProducts(environment, role, teamId, userGroups);
-            return products;
+
+            // Parse pagination params
+            const pageNum = page ? parseInt(page) : undefined;
+            const limitNum = limit ? parseInt(limit) : undefined;
+
+            const result = await getAllProducts(
+                environment, role, teamId, userGroups, pageNum, limitNum
+            );
+
+            return result; // Returns { products } or { products, pagination }
         } catch (error) {
             fastify.log.error({ err: error }, 'Error fetching products');
             return reply.status(500).send({ error: 'Internal Server Error', message: (error as Error).message });

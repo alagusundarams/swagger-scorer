@@ -40,16 +40,60 @@ async function getApimService() {
  * @param userRole Optional user role (admin sees all, others see team-filtered)
  * @param teamId Optional team ID filter (ignored if userRole is 'admin')
  * @param userGroups Optional list of AD Group IDs the user belongs to
+ * @param page Optional page number for pagination (1-indexed)
+ * @param limit Optional number of items per page
  */
-export async function getAllProducts(environment?: string, userRole: string = 'admin', teamId?: string, userGroups: string[] = []) {
+export async function getAllProducts(
+    environment?: string,
+    userRole: string = 'admin',
+    teamId?: string,
+    userGroups: string[] = [],
+    page?: number,
+    limit?: number
+) {
+    const usePagination = page !== undefined && limit !== undefined;
+
+    // If pagination requested, use paginated query
+    if (usePagination) {
+        const offset = ((page || 1) - 1) * (limit || 20);
+        const paginatedResult = await productsRepo.getAllProductsPaginated(
+            environment, userRole, teamId, userGroups, limit!, offset
+        );
+
+        const productRes = paginatedResult;
+        const total = paginatedResult.total;
+        const apiRes = await productsRepo.getAllApis();
+
+        // Assemble products with metadata
+        const products = await assembleProducts(productRes.rows, apiRes.rows);
+
+        return {
+            products,
+            pagination: {
+                page: page || 1,
+                limit: limit || 20,
+                total,
+                totalPages: Math.ceil(total / (limit || 20))
+            }
+        };
+    }
+
+    // Otherwise, use original non-paginated query (backward compatibility)
     const productRes = await productsRepo.getAllProducts(environment, userRole, teamId, userGroups);
     const apiRes = await productsRepo.getAllApis();
 
-    // Instantiate Repo Service for metadata checks
+    const products = await assembleProducts(productRes.rows, apiRes.rows);
+
+    return { products };
+}
+
+/**
+ * Helper function to assemble product data with APIs and metadata
+ */
+async function assembleProducts(productRows: any[], apiRows: any[]) {
     const repoService = new RepoService();
 
-    // 3. Assemble with complete field mapping
-    const products = await Promise.all(productRes.rows.map(async (p: any) => {
+    return await Promise.all(productRows.map(async (p: any) => {
         // Map Hashes
         const envHashes = {
             DEV: p.dev_hash,
