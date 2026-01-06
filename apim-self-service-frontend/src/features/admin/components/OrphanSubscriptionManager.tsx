@@ -43,6 +43,8 @@ export const OrphanSubscriptionManager = () => {
 
     const [selectedSubIds, setSelectedSubIds] = useState<Set<string>>(new Set());
     const [targetTeamId, setTargetTeamId] = useState<string>('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [envFilter, setEnvFilter] = useState<string>('ALL');
 
     // Identify Orphans: No subscriberTeamId
     const orphans = useMemo(() => {
@@ -52,6 +54,26 @@ export const OrphanSubscriptionManager = () => {
         return subsList.filter(s => !s.subscriberTeamId || !teamIds.has(s.subscriberTeamId));
     }, [subscriptions, teams]);
 
+    // Apply filters
+    const filteredOrphans = useMemo(() => {
+        let filtered = orphans;
+
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            filtered = filtered.filter(s =>
+                s.appDisplayName?.toLowerCase().includes(query) ||
+                s.id?.toLowerCase().includes(query) ||
+                s.productName?.toLowerCase().includes(query)
+            );
+        }
+
+        if (envFilter !== 'ALL') {
+            filtered = filtered.filter(s => s.environment === envFilter);
+        }
+
+        return filtered;
+    }, [orphans, searchQuery, envFilter]);
+
     const handleSelect = (id: string) => {
         const next = new Set(selectedSubIds);
         if (next.has(id)) next.delete(id);
@@ -60,10 +82,10 @@ export const OrphanSubscriptionManager = () => {
     };
 
     const handleSelectAll = () => {
-        if (selectedSubIds.size === orphans.length) {
+        if (selectedSubIds.size === filteredOrphans.length) {
             setSelectedSubIds(new Set());
         } else {
-            setSelectedSubIds(new Set(orphans.map(s => s.id)));
+            setSelectedSubIds(new Set(filteredOrphans.map(s => s.id)));
         }
     };
 
@@ -96,6 +118,36 @@ export const OrphanSubscriptionManager = () => {
 
     return (
         <div className="space-y-8 animate-fade-in">
+            {/* Filters Bar */}
+            <div className="flex gap-4 items-center bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="flex-1">
+                    <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2">🔍</span>
+                        <input
+                            type="text"
+                            placeholder="Search by app name, ID, or product..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+                </div>
+                <select
+                    value={envFilter}
+                    onChange={(e) => setEnvFilter(e.target.value)}
+                    className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+                >
+                    <option value="ALL">All Environments</option>
+                    <option value="DEV">DEV</option>
+                    <option value="QA">QA</option>
+                    <option value="STAGE">STAGE</option>
+                    <option value="PROD">PROD</option>
+                </select>
+                <div className="text-xs text-slate-500">
+                    Showing {filteredOrphans.length} of {orphans.length} orphans
+                </div>
+            </div>
+
             {/* Action Bar */}
             <div className="bg-amber-50 dark:bg-amber-900/10 p-6 rounded-2xl border border-amber-200 dark:border-amber-900/30 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
@@ -140,7 +192,7 @@ export const OrphanSubscriptionManager = () => {
                             <th className="p-5 w-14 text-center">
                                 <input
                                     type="checkbox"
-                                    checked={orphans.length > 0 && selectedSubIds.size === orphans.length}
+                                    checked={filteredOrphans.length > 0 && selectedSubIds.size === filteredOrphans.length}
                                     onChange={handleSelectAll}
                                     className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
                                 />
@@ -152,7 +204,7 @@ export const OrphanSubscriptionManager = () => {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                        {orphans.length === 0 ? (
+                        {filteredOrphans.length === 0 ? (
                             <tr>
                                 <td colSpan={5} className="p-16 text-center">
                                     <div className="text-4xl mb-4">✨</div>
@@ -161,7 +213,7 @@ export const OrphanSubscriptionManager = () => {
                                 </td>
                             </tr>
                         ) : (
-                            orphans.map(sub => (
+                            filteredOrphans.map(sub => (
                                 <tr key={sub.id} className={`group hover:bg-amber-50/30 dark:hover:bg-amber-900/5 transition-colors ${selectedSubIds.has(sub.id) ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''}`}>
                                     <td className="p-5 text-center">
                                         <input
