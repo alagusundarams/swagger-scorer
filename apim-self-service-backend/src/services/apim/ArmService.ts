@@ -119,6 +119,21 @@ export class ArmService {
     }
 
     /**
+     * Lists all Subscriptions for a Product.
+     */
+    async listProductSubscriptions(productId: string): Promise<any[]> {
+        try {
+            // endpoint: /products/{productId}/subscriptions
+            const url = `${this.baseUrl}/products/${productId}/subscriptions?api-version=2022-08-01`;
+            const response = await axios.get(url, { headers: this.headers });
+            return response.data.value || [];
+        } catch (e) {
+            console.error(`Failed to list subscriptions for product ${productId}`, e);
+            throw e;
+        }
+    }
+
+    /**
      * Fetches all Backends from APIM.
      */
     async getBackends(): Promise<any[]> {
