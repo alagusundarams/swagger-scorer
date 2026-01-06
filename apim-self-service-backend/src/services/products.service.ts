@@ -181,7 +181,7 @@ async function assembleProducts(productRows: any[], apiRows: any[]) {
         };
     }));
 
-    return products;
+
 }
 
 /**
