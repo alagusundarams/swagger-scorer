@@ -46,8 +46,11 @@ export const OrphanSubscriptionManager = () => {
 
     // Identify Orphans: No subscriberTeamId
     const orphans = useMemo(() => {
-        return subscriptions.filter(s => !s.subscriberTeamId);
-    }, [subscriptions]);
+        const teamIds = new Set(teams.map(t => t.id));
+        // Ensure subscriptions is an array
+        const subsList = Array.isArray(subscriptions) ? subscriptions : [];
+        return subsList.filter(s => !s.subscriberTeamId || !teamIds.has(s.subscriberTeamId));
+    }, [subscriptions, teams]);
 
     const handleSelect = (id: string) => {
         const next = new Set(selectedSubIds);
