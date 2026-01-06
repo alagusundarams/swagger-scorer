@@ -37,7 +37,7 @@ export const AdminGovernancePage = () => {
     const [activeTab, setActiveTab] = useState<'teams' | 'orphans' | 'subscriptions' | 'named-values' | 'backends'>('teams');
 
     useEffect(() => {
-        setPageTitle('Admin Governance');
+        setPageTitle('');
         if (user && user.role !== 'admin') {
             navigate('/');
         }

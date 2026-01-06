@@ -241,10 +241,10 @@ export const OrphanProductManager = () => {
             </div>
 
             {/* Action Bar */}
-            <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row justify-between items-end gap-4">
                 <div>
                     <h3 className="text-lg font-bold text-slate-800 dark:text-white">Orphaned / Legacy Products</h3>
-                    <p className="text-sm text-slate-500">Found <span className="font-bold text-red-500">{orphans.length}</span> unassigned APIs requiring governance.</p>
+                    <p className="text-sm text-slate-500 mt-1">Found <span className="font-bold text-red-600 text-base">{orphans.length}</span> unassigned APIs requiring governance.</p>
                 </div>
 
                 <div className="flex items-center gap-3 w-full md:w-auto">
@@ -285,7 +285,7 @@ export const OrphanProductManager = () => {
                     <button
                         onClick={handleAssign}
                         disabled={selectedProductIds.size === 0 || !targetTeamId}
-                        className="px-6 py-2 bg-blue-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-lg transition-all flex items-center gap-2 h-10 self-start"
+                        className="px-6 py-2 bg-blue-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-sm transition-all flex items-center gap-2 h-10"
                     >
                         <span>Assign Selected</span>
                         {selectedProductIds.size > 0 && (
@@ -296,7 +296,7 @@ export const OrphanProductManager = () => {
                     <button
                         onClick={handleDelete}
                         disabled={selectedProductIds.size === 0 || isLoading}
-                        className="px-6 py-2 bg-red-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed hover:bg-red-700 text-white text-sm font-bold rounded-lg shadow-lg transition-all flex items-center gap-2 h-10 self-start"
+                        className="px-6 py-2 bg-red-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed hover:bg-red-700 text-white text-sm font-bold rounded-lg shadow-sm transition-all flex items-center gap-2 h-10"
                     >
                         <span>Delete</span>
                         {selectedProductIds.size > 0 && (
@@ -316,7 +316,7 @@ export const OrphanProductManager = () => {
                 <table className="w-full text-left text-sm">
                     <thead className="bg-gray-50 dark:bg-slate-800/80 border-b border-gray-100 dark:border-slate-700">
                         <tr>
-                            <th className="p-4 w-12 text-center">
+                            <th className="p-3 w-12 text-center">
                                 <input
                                     type="checkbox"
                                     checked={orphans.length > 0 && selectedProductIds.size === orphans.length}
@@ -324,10 +324,10 @@ export const OrphanProductManager = () => {
                                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                 />
                             </th>
-                            <th className="p-4 font-bold text-slate-600 dark:text-slate-300">Product Name</th>
-                            <th className="p-4 font-bold text-slate-600 dark:text-slate-300">Version</th>
-                            <th className="p-4 font-bold text-slate-600 dark:text-slate-300">Last Updated</th>
-                            <th className="p-4 font-bold text-slate-600 dark:text-slate-300">Current Status</th>
+                            <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-xs uppercase tracking-wider">Product Name</th>
+                            <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-xs uppercase tracking-wider">Version</th>
+                            <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-xs uppercase tracking-wider">Last Updated</th>
+                            <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-xs uppercase tracking-wider">Current Status</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
@@ -340,7 +340,7 @@ export const OrphanProductManager = () => {
                         ) : (
                             orphans.map(product => (
                                 <tr key={product.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                    <td className="p-4 text-center">
+                                    <td className="p-3 text-center">
                                         <input
                                             type="checkbox"
                                             checked={selectedProductIds.has(product.id)}
@@ -348,18 +348,18 @@ export const OrphanProductManager = () => {
                                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                         />
                                     </td>
-                                    <td className="p-4 font-medium text-slate-900 dark:text-white">
+                                    <td className="p-3 font-medium text-slate-900 dark:text-white">
                                         {product.displayName || product.name}
                                         <div className="text-xs text-slate-400 font-mono mt-0.5">{product.id}</div>
                                     </td>
-                                    <td className="p-4 text-slate-600 dark:text-slate-400">
+                                    <td className="p-3 text-slate-600 dark:text-slate-400">
                                         <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-xs font-mono">{product.version}</span>
                                     </td>
-                                    <td className="p-4 text-slate-500">
+                                    <td className="p-3 text-slate-500 text-xs">
                                         {new Date(product.updatedAt).toLocaleDateString()}
                                     </td>
-                                    <td className="p-4">
-                                        <span className="text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">
+                                    <td className="p-3">
+                                        <span className="text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded-full border border-red-200 dark:border-red-800">
                                             No Owner
                                         </span>
                                     </td>
