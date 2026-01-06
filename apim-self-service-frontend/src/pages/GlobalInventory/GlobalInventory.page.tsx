@@ -67,7 +67,7 @@ export const GlobalInventory = ({ embedded = false }: { embedded?: boolean }) =>
                     </div>
                     <div className="flex items-center gap-3">
                         <button
-                            onClick={() => navigate('/admin/mapping')}
+                            onClick={() => navigate('/admin/governance')}
                             className="px-6 py-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-bold text-xs uppercase tracking-widest rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2"
                         >
                             <span>⚠️</span>

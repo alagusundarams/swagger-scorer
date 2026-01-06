@@ -232,7 +232,7 @@ export const DashboardPage = () => {
                         <div className="animate-fade-in">
                             <div className="flex justify-end mb-4">
                                 <button
-                                    onClick={() => navigate('/admin/mapping')}
+                                    onClick={() => navigate('/admin/governance')}
                                     className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-bold text-[10px] uppercase tracking-widest rounded-lg hover:bg-indigo-100 transition-all flex items-center gap-2"
                                 >
                                     <span>⚠️</span>

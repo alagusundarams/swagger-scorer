@@ -127,14 +127,8 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/admin/mapping"
-            element={
-              <ProtectedRoute>
-                <AdminMappingView />
-              </ProtectedRoute>
-            }
-          />
+          {/* DEPRECATED: AdminMapping consolidated into AdminGovernance */}
+          <Route path="/admin/mapping" element={<Navigate to="/admin/governance" replace />} />
           <Route
             path="/admin/global-inventory"
             element={
