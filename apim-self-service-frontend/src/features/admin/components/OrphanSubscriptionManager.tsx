@@ -251,6 +251,17 @@ export const OrphanSubscriptionManager = () => {
                             <span className="bg-white/30 px-2 py-0.5 rounded-full text-[10px]">{selectedSubIds.size}</span>
                         )}
                     </button>
+
+                    <button
+                        onClick={handleDelete}
+                        disabled={selectedSubIds.size === 0 || isLoading}
+                        className="px-6 py-2.5 bg-red-600 disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:cursor-not-allowed hover:bg-red-700 text-white text-sm font-black rounded-xl shadow-xl shadow-red-500/20 transition-all flex items-center gap-2 h-11 whitespace-nowrap"
+                    >
+                        <span>Delete</span>
+                        {selectedSubIds.size > 0 && (
+                            <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">{selectedSubIds.size}</span>
+                        )}
+                    </button>
                 </div>
             </div>
 

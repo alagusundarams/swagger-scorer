@@ -154,62 +154,62 @@ const adminDeleteRoutes: FastifyPluginAsync = async (fastify) => {
         }
     });
 
-});
 
-/**
- * POST /api/v1/admin/subscriptions/bulk-delete
- */
-fastify.post('/admin/subscriptions/bulk-delete', async (request, reply) => {
-    const { subscriptionIds, reason } = request.body as { subscriptionIds?: string[]; reason?: string; };
-    return handleBulkDelete(request, reply, 'subscription', subscriptionIds, reason);
-});
 
-/**
- * DELETE /api/v1/admin/subscriptions/:id
- * Delete a single orphaned subscription
- */
-fastify.delete('/admin/subscriptions/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const { reason } = request.body as { reason?: string };
-    return handleDelete(request, reply, 'subscription', id, reason);
-});
+    /**
+     * POST /api/v1/admin/subscriptions/bulk-delete
+     */
+    fastify.post('/admin/subscriptions/bulk-delete', async (request, reply) => {
+        const { subscriptionIds, reason } = request.body as { subscriptionIds?: string[]; reason?: string; };
+        return handleBulkDelete(request, reply, 'subscription', subscriptionIds, reason);
+    });
 
-/**
- * POST /api/v1/admin/named-values/bulk-delete
- */
-fastify.post('/admin/named_values/bulk-delete', async (request, reply) => {
-    const { named_valueIds, reason } = request.body as { named_valueIds?: string[]; reason?: string; };
-    // frontend sends named_valueIds based on key=${resourceType}Ids logic in client
-    return handleBulkDelete(request, reply, 'named_value', named_valueIds, reason);
-});
+    /**
+     * DELETE /api/v1/admin/subscriptions/:id
+     * Delete a single orphaned subscription
+     */
+    fastify.delete('/admin/subscriptions/:id', async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const { reason } = request.body as { reason?: string };
+        return handleDelete(request, reply, 'subscription', id, reason);
+    });
 
-/**
- * DELETE /api/v1/admin/named-values/:id
- * Delete a single orphaned named value
- */
-fastify.delete('/admin/named-values/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const { reason } = request.body as { reason?: string };
-    return handleDelete(request, reply, 'named_value', id, reason);
-});
+    /**
+     * POST /api/v1/admin/named-values/bulk-delete
+     */
+    fastify.post('/admin/named_values/bulk-delete', async (request, reply) => {
+        const { named_valueIds, reason } = request.body as { named_valueIds?: string[]; reason?: string; };
+        // frontend sends named_valueIds based on key=${resourceType}Ids logic in client
+        return handleBulkDelete(request, reply, 'named_value', named_valueIds, reason);
+    });
 
-/**
- * POST /api/v1/admin/backends/bulk-delete
- */
-fastify.post('/admin/backends/bulk-delete', async (request, reply) => {
-    const { backendIds, reason } = request.body as { backendIds?: string[]; reason?: string; };
-    return handleBulkDelete(request, reply, 'backend', backendIds, reason);
-});
+    /**
+     * DELETE /api/v1/admin/named-values/:id
+     * Delete a single orphaned named value
+     */
+    fastify.delete('/admin/named-values/:id', async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const { reason } = request.body as { reason?: string };
+        return handleDelete(request, reply, 'named_value', id, reason);
+    });
 
-/**
- * DELETE /api/v1/admin/backends/:id
- * Delete a single orphaned backend
- */
-fastify.delete('/admin/backends/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const { reason } = request.body as { reason?: string };
-    return handleDelete(request, reply, 'backend', id, reason);
-});
+    /**
+     * POST /api/v1/admin/backends/bulk-delete
+     */
+    fastify.post('/admin/backends/bulk-delete', async (request, reply) => {
+        const { backendIds, reason } = request.body as { backendIds?: string[]; reason?: string; };
+        return handleBulkDelete(request, reply, 'backend', backendIds, reason);
+    });
+
+    /**
+     * DELETE /api/v1/admin/backends/:id
+     * Delete a single orphaned backend
+     */
+    fastify.delete('/admin/backends/:id', async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const { reason } = request.body as { reason?: string };
+        return handleDelete(request, reply, 'backend', id, reason);
+    });
 };
 
 // Helper for single delete
