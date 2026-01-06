@@ -193,7 +193,8 @@ export const OrphanProductManager = () => {
             }
 
             setSelectedProductIds(new Set());
-            fetchOrphans();
+            // Trigger refetch by resetting to page 1
+            setPagination(prev => ({ ...prev, page: prev.page })); // Force update
 
         } catch (err: any) {
             toast.error(`Delete failed: ${err.response?.data?.error || err.message}`);
