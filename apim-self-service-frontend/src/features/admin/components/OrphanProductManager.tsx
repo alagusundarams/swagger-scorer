@@ -138,6 +138,71 @@ export const OrphanProductManager = () => {
         }
     };
 
+    const handleDelete = async () => {
+        if (selectedProductIds.size === 0) return;
+
+        // Confirmation
+        const confirmed = confirm(
+            `⚠️ DELETE ${selectedProductIds.size} orphaned products?\n\n` +
+            `This will:\n` +
+            `• Permanently remove from active inventory\n` +
+            `• Create audit trail\n` +
+            `• Cannot be undone\n\n` +
+            `Proceed?`
+        );
+
+        if (!confirmed) return;
+
+        // Get reason (required)
+        const reason = prompt(
+            'REQUIRED: Enter reason for deletion\n\n' +
+            'Examples:\n' +
+            '• "Migrated to new API"\n' +
+            '• "Test data cleanup"\n' +
+            '• "Deprecated service"\n\n' +
+            'Minimum 10 characters:'
+        );
+
+        if (!reason || reason.trim().length < 10) {
+            toast.error('Deletion reason required (minimum 10 characters)');
+            return;
+        }
+
+        // Call API
+        setIsLoading(true);
+        try {
+            const { bulkDeleteOrphans } = await import('../api/adminDeleteClient');
+
+            const result = await bulkDeleteOrphans(
+                'product',
+                Array.from(selectedProductIds),
+                reason.trim()
+            );
+
+            if (result.deleted > 0) {
+                toast.success(
+                    `✅ Deleted ${result.deleted} products. ` +
+                    (result.failed > 0 ? `${result.failed} failed. ` : '') +
+                    `Audit: ${result.auditLogId.substring(0, 8)}...`
+                );
+            }
+
+            if (result.failed > 0) {
+                console.warn('[Delete] Failures:', result.failures);
+                toast.error(`${result.failed} products failed to delete`);
+            }
+
+            setSelectedProductIds(new Set());
+            fetchOrphans();
+
+        } catch (err: any) {
+            toast.error(`Delete failed: ${err.response?.data?.error || err.message}`);
+            console.error('[Delete] Error:', err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const handlePageChange = (newPage: number) => {
         setPagination(prev => ({ ...prev, page: newPage }));
     };
@@ -315,8 +380,8 @@ export const OrphanProductManager = () => {
                                     key={page}
                                     onClick={() => handlePageChange(page)}
                                     className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${pagination.page === page
-                                            ? 'bg-blue-600 text-white shadow-lg'
-                                            : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                        ? 'bg-blue-600 text-white shadow-lg'
+                                        : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                                         }`}
                                 >
                                     {page}
