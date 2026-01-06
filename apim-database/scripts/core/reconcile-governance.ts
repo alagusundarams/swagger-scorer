@@ -28,6 +28,7 @@ interface MetadataStore {
     backends: Record<string, any[]>;
     apiForensics: Record<string, Record<string, { guids: string[], backends: string[] }>>;
     productApiLinks: Record<string, Record<string, Array<{ name: string, path: string }>>>; // Updated to match extract-apim-inventory
+    subscriptions: Record<string, any[]>;
 }
 
 // --- CONFIG LOADER ---
@@ -70,7 +71,8 @@ async function main() {
         apiContracts: {},
         backends: {},
         apiForensics: {},
-        productApiLinks: {}
+        productApiLinks: {},
+        subscriptions: {}
     };
 
     if (sourceMode === 'db') {
