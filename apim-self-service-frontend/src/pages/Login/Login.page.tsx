@@ -46,7 +46,13 @@ export const LoginPage: React.FC = () => {
 
     useEffect(() => {
         if (isAuthenticated) {
-            navigate('/');
+            // Role-based redirect: Admins land on governance page with orphan tabs
+            const user = useStore.getState().user;
+            if (user?.role === 'admin') {
+                navigate('/admin/governance');
+            } else {
+                navigate('/');
+            }
         }
     }, [isAuthenticated, navigate]);
 
