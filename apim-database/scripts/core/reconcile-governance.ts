@@ -416,6 +416,23 @@ async function main() {
                 const ownerMatch = sub.ownerId?.match(/\/users\/(.+)/);
                 const ownerUserId = ownerMatch ? ownerMatch[1] : null;
 
+                // Check if this is a default subscription (naming pattern: default_{productName})
+                const isDefaultSubscription = sub.displayName?.startsWith('default_');
+
+                // Auto-assign default subscription to product owner (if product has a team)
+                let subscriberTeamId = ownerUserId; // Default to ownerId (may be NULL)
+
+                if (isDefaultSubscription) {
+                    // Get product owner team
+                    const prodQuery = await pool.query('SELECT owner_team_id FROM products WHERE id = $1', [productId]);
+                    if (prodQuery.rows.length > 0 && prodQuery.rows[0].owner_team_id) {
+                        subscriberTeamId = prodQuery.rows[0].owner_team_id;
+                        if (verbose) {
+                            console.log(`      ✅ Auto-assigned default subscription to product owner: ${subscriberTeamId}`);
+                        }
+                    }
+                }
+
                 try {
                     await pool.query(`
                         INSERT INTO subscriptions (
@@ -431,12 +448,16 @@ async function main() {
                     `, [
                         subId,
                         productId,
-                        ownerUserId, // Will be NULL initially - can be mapped to teams later
+                        subscriberTeamId, // Auto-assigned for default, NULL for others (orphaned)
                         sub.displayName,
                         sub.state,
                         sub.createdDate,
                         sub.expirationDate
                     ]);
+
+                    if (!subscriberTeamId && !isDefaultSubscription && verbose) {
+                        console.log(`      ⚠️  Orphaned subscription: ${sub.displayName} - needs admin assignment`);
+                    }
                 } catch (err: any) {
                     console.error(`❌ FAILED to sync Subscription: ${sub.id}`);
                     console.error(`   Details: ${err.message}`);
