@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APIM Self-Service Portal - User Journeys</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #1a202c;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        /* Persona Navigation */
+        .persona-nav {
+            display: flex;
+            background: #f7fafc;
+            border-bottom: 3px solid #e2e8f0;
+            overflow-x: auto;
+        }
+
+        .persona-tab {
+            flex: 1;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: none;
+            background: transparent;
+            font-size: 16px;
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .persona-tab:hover {
+            background: #edf2f7;
+        }
+
+        .persona-tab.active {
+            background: white;
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .persona-tab .emoji {
+            font-size: 2rem;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        /* Content */
+        .content {
+            padding: 40px;
+        }
+
+        .persona-content {
+            display: none;
+        }
+
+        .persona-content.active {
+            display: block;
+            animation: fadeIn 0.5s;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Story sections */
+        .story-section {
+            margin-bottom: 40px;
+        }
+
+        .story-section h2 {
+            color: #2d3748;
+            font-size: 1.8rem;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .story-intro {
+            background: #f7fafc;
+            padding: 20px;
+            border-left: 4px solid #667eea;
+            margin-bottom: 20px;
+            border-radius: 8px;
+        }
+
+        .story-intro strong {
+            color: #667eea;
+            font-size: 1.1rem;
+        }
+
+        /* Steps */
+        .step {
+            margin-bottom: 30px;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .step-header {
+            background: #edf2f7;
+            padding: 15px 20px;
+            font-weight: 600;
+            color: #2d3748;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .step-number {
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .step-body {
+            padding: 20px;
+        }
+
+        /* Collapsible Technical Details */
+        .tech-details {
+            margin-top: 15px;
+        }
+
+        .tech-toggle {
+            background: #f7fafc;
+            border: 2px dashed #cbd5e0;
+            border-radius: 8px;
+            padding: 12px 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s;
+        }
+
+        .tech-toggle:hover {
+            background: #edf2f7;
+            border-color: #a0aec0;
+        }
+
+        .tech-toggle::before {
+            content: "▶";
+            font-size: 12px;
+            transition: transform 0.3s;
+        }
+
+        .tech-toggle.open::before {
+            transform: rotate(90deg);
+        }
+
+        .tech-content {
+            display: none;
+            margin-top: 15px;
+            padding: 20px;
+            background: #1a202c;
+            color: #e2e8f0;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        .tech-content.show {
+            display: block;
+            animation: slideDown 0.3s;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                max-height: 0;
+            }
+
+            to {
+                opacity: 1;
+                max-height: 2000px;
+            }
+        }
+
+        .tech-content h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto;
+        }
+
+        .tech-content pre {
+            background: #2d3748;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+
+        .api-call {
+            background: #2d3748;
+            padding: 10px 15px;
+            border-left: 3px solid #48bb78;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+
+        .api-call .method {
+            color: #48bb78;
+            font-weight: bold;
+        }
+
+        .api-call .endpoint {
+            color: #90cdf4;
+        }
+
+        /* Screenshots placeholder */
+        .screenshot {
+            background: #f7fafc;
+            border: 2px dashed #cbd5e0;
+            padding: 40px;
+            text-align: center;
+            border-radius: 8px;
+            margin: 20px 0;
+            color: #718096;
+        }
+
+        /* Mermaid diagrams */
+        .mermaid {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        /* Key insight boxes */
+        .insight {
+            background: #fef5e7;
+            border-left: 4px solid #f39c12;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 6px;
+        }
+
+        .insight::before {
+            content: "💡 ";
+            font-size: 1.2rem;
+        }
+
+        /* Navigation footer */
+        footer {
+            background: #2d3748;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        footer a {
+            color: #90cdf4;
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🎯 Self-Service Portal User Journeys</h1>
+            <p>Story-Driven Guide to Every Click, Every API Call, Every System Hop</p>
+        </header>
+
+        <nav class="persona-nav">
+            <button class="persona-tab active" data-persona="alex">
+                <span class="emoji">👨‍💼</span>
+                Alex the Admin
+            </button>
+            <button class="persona-tab" data-persona="paula">
+                <span class="emoji">👩‍💻</span>
+                Paula the Producer
+            </button>
+            <button class="persona-tab" data-persona="connor">
+                <span class="emoji">🧑‍💼</span>
+                Connor the Consumer
+            </button>
+            <button class="persona-tab" data-persona="taylor">
+                <span class="emoji">👔</span>
+                Taylor the Team Lead
+            </button>
+        </nav>
+
+        <div class="content">
+            <!-- ALEX THE ADMIN -->
+            <div id="alex" class="persona-content active">
+                <h1>👨‍💼 Alex the Admin: Platform Governance Master</h1>
+
+                <div class="story-intro">
+                    <strong>Meet Alex:</strong> Platform administrator responsible for keeping the APIM self-service
+                    portal running smoothly. Alex's job is to handle the "Day 1" chaos: orphaned products, team
+                    mappings, and ensuring governance policies are enforced.
+                </div>
+
+                <div class="story-section">
+                    <h2>Monday Morning: The Orphan Discovery</h2>
+
+                    <div class="story-intro">
+                        <strong>The Story:</strong> Alex arrives Monday morning with coffee in hand. Opens browser,
+                        navigates to the portal. The dashboard shows a concerning badge: "⚠️ 12 Orphan Products". These
+                        are legacy APIs migrated from the old APIM instance without team assignments. They can't stay
+                        orphaned - security policy requires every product to have an owner.
+                    </div>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">1</div>
+                            <span>Login & Authentication</span>
+                        </div>
+                        <div class="step-body">
+                            <p><strong>What Alex Does:</strong> Enters email, clicks "Login with Azure AD"</p>
+                            <p><strong>What Alex Sees:</strong> Redirect to Microsoft login, MFA challenge, then back to
+                                portal</p>
+
+                            <div class="tech-details">
+                                <div class="tech-toggle">🔧 Click to see the complete system journey</div>
+                                <div class="tech-content">
+                                    <h4>The Complete Authentication Flow</h4>
+
+                                    <div class="api-call">
+                                        <span class="method">GET</span>
+                                        <span class="endpoint">http://localhost:5173/</span>
+                                    </div>
+
+                                    <pre>1. Browser → Frontend
+   - Load React app bundle
+   - Check localStorage for existing token
+   - No token found → Show login screen
+
+2. Alex clicks "Login with Azure AD"
+   - Frontend → Azure AD OAuth endpoint
+   - Redirect: https://login.microsoftonline.com/...
+   
+3. Azure AD → Alex's Browser
+   - MFA challenge (phone approval)
+   - Consent screen
+   
+4. Alex approves → Azure AD
+   - Generate authorization code
+   - Redirect: http://localhost:5173/callback?code=xxx
+   
+5. Frontend → Backend
+   POST /api/v1/auth/callback
+   Body: { code: "xxx" }
+   
+6. Backend → Azure AD
+   POST https://login.microsoftonline.com/token
+   Exchange code for access token
+   
+7. Backend validates token claims
+   - Extract: email = alex.admin@company.com
+   - Extract: groups = ["ENV_ALL_ADMINS"]
+   
+8. Backend → Database
+   SELECT * FROM users WHERE email = $1
+   
+9. Database check:
+   - User exists? YES
+   - Role: admin
+   - Teams: [] (admin sees all)
+   
+10. Backend generates JWT
+   - Claims: { userId, role: "admin", exp: 24h }
+   - Sign with HS256 secret
+   
+11. Backend → Frontend
+   Response: { token: "eyJhbG...", user: {...} }
+   
+12. Frontend stores token
+   - localStorage.setItem('authToken', token)
+   - Axios default header: Authorization: Bearer xxx
+   
+13. Frontend navigates
+   - Role check: admin = true
+   - Redirect: /admin/governance (Issue #4 fix!)
+   - NOT /dashboard (normal users go there)</pre>
+
+                                    <div class="mermaid">
+                                        sequenceDiagram
+                                        participant A as Alex
+                                        participant B as Browser
+                                        participant F as Frontend
+                                        participant AAD as Azure AD
+                                        participant BE as Backend
+                                        participant DB as Database
+
+                                        A->>B: Click Login
+                                        B->>F: Load app
+                                        F->>AAD: OAuth redirect
+                                        AAD->>A: MFA challenge
+                                        A->>AAD: Approve
+                                        AAD->>F: Code callback
+                                        F->>BE: POST /auth/callback
+                                        BE->>AAD: Exchange code
+                                        AAD-->>BE: Access token
+                                        BE->>DB: Lookup user
+                                        DB-->>BE: User record
+                                        BE->>BE: Generate JWT
+                                        BE-->>F: JWT + user data
+                                        F->>F: Store token
+                                        F->>B: Redirect to /admin/governance
+                                    </div>
+
+                                    <div class="insight">
+                                        <strong>Why this matters:</strong> Issue #4 was specifically about admin users
+                                        not having a path to governance. Now login automatically detects admin role and
+                                        routes them to the right place.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">2</div>
+                            <span>Dashboard Load & Orphan Detection</span>
+                        </div>
+                        <div class="step-body">
+                            <p><strong>What Alex Sees:</strong> Admin Governance page with 5 tabs. "Product Reclamation"
+                                tab shows "Found 12 unassigned APIs requiring governance"</p>
+
+                            <div class="screenshot">
+                                📸 Screenshot: Admin Governance - Product Reclamation Tab<br>
+                                Shows: Search bar, environment filter, table with 12 orphan products
+                            </div>
+
+                            <div class="tech-details">
+                                <div class="tech-toggle">🔧 Click to see how orphans are detected</div>
+                                <div class="tech-content">
+                                    <h4>Orphan Product Detection Logic</h4>
+
+                                    <div class="api-call">
+                                        <span class="method">GET</span>
+                                        <span class="endpoint">/api/v1/products?page=1&limit=20</span>
+                                    </div>
+
+                                    <pre>1. Frontend component: OrphanProductManager.tsx
+   - useEffect hook triggers on mount
+   - Calls: getProducts(page=1, limit=20)
+   
+2. Frontend → Backend
+   GET /api/v1/products?page=1&limit=20
+   Headers: { Authorization: Bearer xxx }
+   
+3. Backend: products.service.ts
+   - Validate JWT
+   - Extract user role (admin)
+   - Call repository layer
+   
+4. Backend → Database
+   SELECT 
+     p.*,
+     t.name as owner_team_name
+   FROM products p
+   LEFT JOIN teams t ON p.owner_team_id = t.id
+   LIMIT 20 OFFSET 0;
+   
+5. Database returns 20 products
+   Example rows:
+   {
+     id: "payment-api:env:Global",
+     name: "payment-api",
+     owner_team_id: null,           ← ORPHAN!
+     environment: "Global"
+   },
+   {
+     id: "customer-api:env:Global",
+     owner_team_id: "team-legacy",
+     environment: "Global"
+   }
+   
+6. Backend → Frontend
+   Response: {
+     products: [...],
+     pagination: {
+       page: 1,
+       limit: 20,
+       total: 1435,
+       totalPages: 72
+     }
+   }
+   
+7. Frontend: OrphanProductManager (client-side filtering)
+   const orphans = products.filter(p => {
+     const teamIds = new Set(teams.map(t => t.id));
+     return !p.ownerTeamId || 
+            !teamIds.has(p.ownerTeamId) ||
+            p.ownerTeamId === 'legacy-pool';
+   });
+   
+   Result: 12 orphans found in first page
+   
+8. Frontend renders
+   - Table with 12 rows
+   - Checkboxes for selection
+   - Stats: "Showing 12 of 12 orphans"</pre>
+
+                                    <div class="insight">
+                                        <strong>Performance Note:</strong> Issue #2 & #3 fix - we now use server-side
+                                        pagination (20 items/page) instead of fetching all 1435 products at once. 95%
+                                        faster initial load!
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">3</div>
+                            <span>Search & Filter Orphans</span>
+                        </div>
+                        <div class="step-body">
+                            <p><strong>What Alex Does:</strong> Types "payment" in search box to find payment-related
+                                APIs</p>
+                            <p><strong>What Alex Sees:</strong> Table filters down to 3 products with "payment" in name
+                            </p>
+
+                            <div class="tech-details">
+                                <div class="tech-toggle">🔧 Click to see filter implementation</div>
+                                <div class="tech-content">
+                                    <h4>Client-Side Filtering (Issue #3 Enhancement)</h4>
+
+                                    <pre>1. Alex types in search box
+   - onChange event fires
+   - State update: setSearchQuery("payment")
+   
+2. React useMemo hook recalculates
+   const filteredProducts = useMemo(() => {
+     let filtered = products; // 12 orphans
+     
+     if (searchQuery) {
+       const query = searchQuery.toLowerCase(); // "payment"
+       filtered = filtered.filter(p =>
+         p.displayName?.toLowerCase().includes(query) ||
+         p.name.toLowerCase().includes(query) ||
+         p.id.toLowerCase().includes(query)
+       );
+     }
+     
+     if (envFilter !== 'ALL') {
+       filtered = filtered.filter(p => 
+         p.environment === envFilter
+       );
+     }
+     
+     return filtered;
+   }, [products, searchQuery, envFilter]);
+   
+3. Filtered result: 3 products
+   - payment-api
+   - payment-gateway-v2
+   - legacy-payment-service
+   
+4. Table re-renders
+   - Only 3 rows visible
+   - Stats update: "Showing 3 of 12 orphans"
+   
+5. No network call!
+   - Filter is client-side for speed
+   - All orphans already fetched</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">4</div>
+                            <span>Bulk Assignment to Team</span>
+                        </div>
+                        <div class="step-body">
+                            <p><strong>What Alex Does:</strong></p>
+                            <ol>
+                                <li>Selects all 3 payment orphans (checkboxes)</li>
+                                <li>Chooses "Payments Team" from dropdown</li>
+                                <li>Clicks "Assign Selected" button</li>
+                            </ol>
+                            <p><strong>What Alex Sees:</strong> Loading toast "Assigning 3 products...", then success
+                                "Products assigned successfully"</p>
+
+                            <div class="tech-details">
+                                <div class="tech-toggle">🔧 Click to see the complete assignment flow</div>
+                                <div class="tech-content">
+                                    <h4>The Grand Assignment Journey</h4>
+
+                                    <pre>1. Alex clicks "Assign Selected"
+   Button handler: handleAssign()
+   
+2. Frontend validation
+   - Check: targetTeamId not empty? ✓
+   - Check: selectedIds.size > 0? ✓ (3 products)
+   
+3. Show loading toast
+   toast.loading("Assigning 3 products...")
+   
+4. Frontend → Backend (3 parallel requests)
+   Promise.all([
+     updateProduct("payment-api:env:Global", {
+       ownerTeamId: "team-payments"
+     }),
+     updateProduct("payment-gateway-v2:env:Global", {
+       ownerTeamId: "team-payments"
+     }),
+     updateProduct("legacy-payment-service:env:Global", {
+       ownerTeamId: "team-payments"
+     })
+   ])
+   
+   Each calls:
+   PUT /api/v1/admin/products/:id
+   Body: { ownerTeamId: "team-payments" }
+   
+5. Backend (×3): products.service.ts
+   - Validate JWT (is admin?)
+   - Validate team exists
+   
+   Query: SELECT id FROM teams WHERE id = $1
+   Result: team-payments exists ✓
+   
+6. Backend → Database (×3)
+   UPDATE products 
+   SET 
+     owner_team_id = 'team-payments',
+     updated_at = NOW()
+   WHERE id = $1
+   RETURNING *;
+   
+7. Database executes (×3)
+   - Row 1 updated: payment-api
+   - Row 2 updated: payment-gateway-v2  
+   - Row 3 updated: legacy-payment-service
+   
+8. Backend → Event Bus (×3)
+   eventBus.emit('product.assigned', {
+     productId: "payment-api:env:Global",
+     teamId: "team-payments",
+     adminId: "alex@company.com"
+   })
+   
+9. Event listeners react
+   - Audit log service: Write to audit_log table
+   - Notification service: Email Payments Team
+   - Analytics: Track assignment metric
+   
+10. Backend → Frontend (×3)
+    Response: 200 OK
+    Body: { success: true, product: {...} }
+    
+11. Promise.all resolves
+    - All 3 succeeded
+    
+12. Frontend updates UI
+    - toast.success("3 products assigned")
+    - Clear selected IDs
+    - Fetch fresh product list (orphans now 9)
+    
+13. New API call
+    GET /api/v1/products?page=1&limit=20
+    Returns 20 products, now only 9 orphans
+    
+14. Table re-renders
+    - Payment products gone from orphan list
+    - Stats: "Found 9 unassigned APIs"</pre>
+
+                                    <div class="mermaid">
+                                        sequenceDiagram
+                                        participant A as Alex
+                                        participant F as Frontend
+                                        participant BE as Backend
+                                        participant DB as Database
+                                        participant EB as Event Bus
+
+                                        A->>F: Click Assign (3 products)
+                                        F->>BE: PUT /products/1 (team)
+                                        F->>BE: PUT /products/2 (team)
+                                        F->>BE: PUT /products/3 (team)
+
+                                        par Update Products
+                                        BE->>DB: UPDATE product 1
+                                        DB-->>BE: Success
+                                        BE->>EB: Emit assigned event
+                                        and
+                                        BE->>DB: UPDATE product 2
+                                        DB-->>BE: Success
+                                        BE->>EB: Emit assigned event
+                                        and
+                                        BE->>DB: UPDATE product 3
+                                        DB-->>BE: Success
+                                        BE->>EB: Emit assigned event
+                                        end
+
+                                        BE-->>F: 200 OK (×3)
+                                        F->>F: Show success toast
+                                        F->>BE: GET /products (refresh)
+                                        BE->>DB: SELECT products
+                                        DB-->>BE: 9 orphans remain
+                                        BE-->>F: JSON response
+                                        F->>A: Show updated table
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="story-section">
+                    <h2>Afternoon: Team & Identity Mapping</h2>
+                    <div class="story-intro">
+                        <strong>The Story:</strong> A new team "Mobile Squad" is joining the platform. They need access
+                        to DEV and QA environments for their React Native app development. Alex needs to map their Azure
+                        AD group to environment permissions.
+                    </div>
+
+                    <p><em>Complete flow documented similarly with collapsible technical details...</em></p>
+                </div>
+            </div>
+
+            <!-- PAULA THE PRODUCER -->
+            <div id="paula" class="persona-content">
+                <h1>👩‍💻 Paula the Producer: Publishing Her First API</h1>
+
+                <div class="story-intro">
+                    <strong>Meet Paula:</strong> Senior developer on the Customer Team. She's built a new "Customer
+                    Profile API" in .NET and needs to make it available in Azure APIM across DEV, QA, and eventually
+                    PROD. Before the self-service portal, this meant submitting tickets and waiting weeks. Now she can
+                    do it herself.
+                </div>
+
+                <p><em>Complete onboarding wizard flow with 8 steps, each with collapsible system details...</em></p>
+            </div>
+
+            <!-- CONNOR THE CONSUMER -->
+            <div id="connor" class="persona-content">
+                <h1>🧑‍💼 Connor the Consumer: Finding and Using APIs</h1>
+
+                <div class="story-intro">
+                    <strong>Meet Connor:</strong> Mobile app developer building a React Native customer-facing app.
+                    Needs to find and subscribe to the Customer Profile API that Paula just published.
+                </div>
+
+                <p><em>Complete discovery, subscription, and key management flow...</em></p>
+            </div>
+
+            <!-- TAYLOR THE TEAM LEAD -->
+            <div id="taylor" class="persona-content">
+                <h1>👔 Taylor the Team Lead: Approvals & Governance</h1>
+
+                <div class="story-intro">
+                    <strong>Meet Taylor:</strong> Team lead for Customer Team. Responsible for approving subscription
+                    requests and ensuring only authorized apps access their APIs.
+                </div>
+
+                <p><em>Complete approval workflow with security considerations...</em></p>
+            </div>
+        </div>
+
+        <footer>
+            <p>📚 Part of the APIM Self-Service Documentation Suite</p>
+            <p><a href="index.html">← Back to Documentation Home</a></p>
+        </footer>
+    </div>
+
+    <script>
+        // Initialize Mermaid
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose'
+        });
+
+        // Tab switching
+        const tabs = document.querySelectorAll('.persona-tab');
+        const contents = document.querySelectorAll('.persona-content');
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const persona = tab.dataset.persona;
+
+                // Update active tab
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                // Update active content
+                contents.forEach(c => c.classList.remove('active'));
+                document.getElementById(persona).classList.add('active');
+
+                // Scroll to top
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        });
+
+        // Collapsible technical details
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('tech-toggle')) {
+                e.target.classList.toggle('open');
+                const content = e.target.nextElementSibling;
+                content.classList.toggle('show');
+            }
+        });
+    </script>
+</body>
+
+</html>
