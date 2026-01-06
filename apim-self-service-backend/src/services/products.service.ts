@@ -147,7 +147,7 @@ async function assembleProducts(productRows: any[], apiRows: any[]) {
             updatedAt: p.updated_at,
 
             // APIs
-            apis: await Promise.all(apiRes.rows
+            apis: await Promise.all(apiRows
                 .filter((a: any) => a.product_id === p.id)
                 .map(async (a: any) => {
                     // Computed Status Calculation
