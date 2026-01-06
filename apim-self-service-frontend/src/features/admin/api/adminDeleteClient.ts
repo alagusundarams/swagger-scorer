@@ -4,7 +4,7 @@
  * Frontend API client for admin delete functionality
  */
 
-import { baseClient } from '../../inventory/api/baseClient';
+import { api as baseClient } from '../../../api/baseClient';
 
 export type ResourceType = 'product' | 'subscription' | 'named_value' | 'backend';
 
