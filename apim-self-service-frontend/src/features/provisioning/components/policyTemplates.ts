@@ -30,7 +30,7 @@ export interface PolicyInput {
     name: string;
     label: string;
     type: 'text' | 'number' | 'boolean' | 'select' | 'textarea'; // Added textarea
-    options?: (string | { label: string; value: string })[]; // Support objects
+    options?: { value: string; label: string }[] | string[]; // Aligned with shared types
     default?: string;
     placeholder?: string;
     helperText?: string;
