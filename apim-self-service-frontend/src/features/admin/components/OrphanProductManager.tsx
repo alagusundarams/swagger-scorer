@@ -3,6 +3,7 @@ import { useAppData } from '../../../shared/context/AppDataContext';
 import { eventBus } from '../../../shared/events/eventBus';
 import type { Product } from '../../../shared/types/domain';
 import { updateProduct } from '../api/adminClient';
+import { getProducts, type PaginatedResponse } from '../../../features/inventory/api/inventoryClient';
 import toast from 'react-hot-toast';
 
 export const OrphanProductManager = () => {
@@ -13,18 +14,29 @@ export const OrphanProductManager = () => {
      */
     const { teams } = useAppData();
     const [products, _setProducts] = useState<Product[]>([]);
+    const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
+    const [searchQuery, setSearchQuery] = useState('');
+    const [envFilter, setEnvFilter] = useState<string>('ALL');
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
-        // Fetch products to identify orphans
+        // Fetch products with pagination
         const controller = new AbortController();
         const fetchOrphans = async () => {
+            setIsLoading(true);
             try {
-                // In a real MFE, we would use the adminClient.
-                const res = await fetch('/api/v1/products', { signal: controller.signal });
-                const data = await res.json();
-                _setProducts(data);
+                const response = await getProducts(pagination.page, pagination.limit) as PaginatedResponse<Product>;
+                _setProducts(response.products);
+                if (response.pagination) {
+                    setPagination(response.pagination);
+                }
             } catch (err: any) {
-                if (err.name !== 'AbortError') console.error('Failed to fetch products for orphan check', err);
+                if (err.name !== 'AbortError') {
+                    console.error('Failed to fetch products for orphan check', err);
+                    toast.error('Failed to load products');
+                }
+            } finally {
+                setIsLoading(false);
             }
         };
         fetchOrphans();
@@ -40,7 +52,7 @@ export const OrphanProductManager = () => {
             controller.abort();
             unsubscribe();
         };
-    }, []);
+    }, [pagination.page, pagination.limit]);
     const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
     const [targetTeamId, setTargetTeamId] = useState<string>('');
     const [targetAdGroupId, setTargetAdGroupId] = useState<string>('');
@@ -53,15 +65,37 @@ export const OrphanProductManager = () => {
     // or just list ALL products and allow re-assignment (easier for Admin).
     // Let's stick to "Re-assignment Manager" logic: List all, highlight those without valid teams.
 
+    // Apply local filters (search + environment) to fetched products
+    const filteredProducts = useMemo(() => {
+        let filtered = products;
+
+        // Search filter
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            filtered = filtered.filter(p =>
+                p.displayName?.toLowerCase().includes(query) ||
+                p.name.toLowerCase().includes(query) ||
+                p.id.toLowerCase().includes(query)
+            );
+        }
+
+        // Environment filter
+        if (envFilter !== 'ALL') {
+            filtered = filtered.filter(p => p.environment === envFilter);
+        }
+
+        return filtered;
+    }, [products, searchQuery, envFilter]);
+
     const orphans = useMemo(() => {
         const teamIds = new Set(teams.map(t => t.id));
-        return products.filter(p => !p.ownerTeamId || !teamIds.has(p.ownerTeamId) || p.ownerTeamId === 'legacy-pool');
-    }, [products, teams]);
+        return filteredProducts.filter(p => !p.ownerTeamId || !teamIds.has(p.ownerTeamId) || p.ownerTeamId === 'legacy-pool');
+    }, [filteredProducts, teams]);
 
     const activeInventory = useMemo(() => {
         const teamIds = new Set(teams.map(t => t.id));
-        return products.filter(p => p.ownerTeamId && teamIds.has(p.ownerTeamId) && p.ownerTeamId !== 'legacy-pool');
-    }, [products, teams]);
+        return filteredProducts.filter(p => p.ownerTeamId && teamIds.has(p.ownerTeamId) && p.ownerTeamId !== 'legacy-pool');
+    }, [filteredProducts, teams]);
 
     const targetTeam = useMemo(() => teams.find(t => t.id === targetTeamId), [teams, targetTeamId]);
 
@@ -104,8 +138,42 @@ export const OrphanProductManager = () => {
         }
     };
 
+    const handlePageChange = (newPage: number) => {
+        setPagination(prev => ({ ...prev, page: newPage }));
+    };
+
     return (
         <div className="space-y-8">
+            {/* Filters Bar */}
+            <div className="flex gap-4 items-center bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="flex-1">
+                    <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2">🔍</span>
+                        <input
+                            type="text"
+                            placeholder="Search by name or ID..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+                </div>
+                <select
+                    value={envFilter}
+                    onChange={(e) => setEnvFilter(e.target.value)}
+                    className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+                >
+                    <option value="ALL">All Environments</option>
+                    <option value="DEV">DEV</option>
+                    <option value="QA">QA</option>
+                    <option value="STAGE">STAGE</option>
+                    <option value="PROD">PROD</option>
+                </select>
+                <div className="text-xs text-slate-500">
+                    Showing {orphans.length} of {pagination.total} products (Page {pagination.page}/{pagination.totalPages})
+                </div>
+            </div>
+
             {/* Action Bar */}
             <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
@@ -163,6 +231,11 @@ export const OrphanProductManager = () => {
 
             {/* Orphan List */}
             <div className="border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm">
+                {isLoading && (
+                    <div className="absolute inset-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-10">
+                        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                )}
                 <table className="w-full text-left text-sm">
                     <thead className="bg-gray-50 dark:bg-slate-800/80 border-b border-gray-100 dark:border-slate-700">
                         <tr>
@@ -220,9 +293,49 @@ export const OrphanProductManager = () => {
                 </table>
             </div>
 
-            {/* Just for Context: Active Inventory Count */}
-            <div className="text-center text-xs text-slate-400 mt-8">
-                Total Managed Inventory: {activeInventory.length} Products
+            {/* Pagination Controls */}
+            {pagination.totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 mt-6">
+                    <button
+                        onClick={() => handlePageChange(pagination.page - 1)}
+                        disabled={pagination.page === 1}
+                        className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold uppercase disabled:opacity-30 hover:bg-slate-200 transition-all"
+                    >
+                        Previous
+                    </button>
+                    <div className="flex gap-1">
+                        {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
+                            .filter(page =>
+                                page === 1 ||
+                                page === pagination.totalPages ||
+                                (page >= pagination.page - 2 && page <= pagination.page + 2)
+                            )
+                            .map(page => (
+                                <button
+                                    key={page}
+                                    onClick={() => handlePageChange(page)}
+                                    className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${pagination.page === page
+                                            ? 'bg-blue-600 text-white shadow-lg'
+                                            : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                        }`}
+                                >
+                                    {page}
+                                </button>
+                            ))}
+                    </div>
+                    <button
+                        onClick={() => handlePageChange(pagination.page + 1)}
+                        disabled={pagination.page === pagination.totalPages}
+                        className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold uppercase disabled:opacity-30 hover:bg-slate-200 transition-all"
+                    >
+                        Next
+                    </button>
+                </div>
+            )}
+
+            {/* Stats */}
+            <div className="text-center text-xs text-slate-400 mt-4">
+                Total Managed Inventory: {activeInventory.length} Products · Showing {orphans.length} orphans
             </div>
         </div>
     );
