@@ -154,146 +154,172 @@ const adminDeleteRoutes: FastifyPluginAsync = async (fastify) => {
         }
     });
 
-    /**
-     * DELETE /api/v1/admin/subscriptions/:id
-     * Delete a single orphaned subscription
-     */
-    fastify.delete('/admin/subscriptions/:id', async (request, reply) => {
-        const { id } = request.params as { id: string };
-        const { reason } = request.body as { reason?: string };
+});
 
-        if (!reason || reason.trim().length < 10) {
-            return reply.status(400).send({
-                error: 'Deletion reason required (minimum 10 characters)'
-            });
-        }
+/**
+ * POST /api/v1/admin/subscriptions/bulk-delete
+ */
+fastify.post('/admin/subscriptions/bulk-delete', async (request, reply) => {
+    const { subscriptionIds, reason } = request.body as { subscriptionIds?: string[]; reason?: string; };
+    return handleBulkDelete(request, reply, 'subscription', subscriptionIds, reason);
+});
 
-        try {
-            const userId = getUserId(request);
-            const userEmail = (request.headers as any)['x-user-email'] as string || userId;
-            const environment = id.split(':env:')[1] || 'Global';
+/**
+ * DELETE /api/v1/admin/subscriptions/:id
+ * Delete a single orphaned subscription
+ */
+fastify.delete('/admin/subscriptions/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { reason } = request.body as { reason?: string };
+    return handleDelete(request, reply, 'subscription', id, reason);
+});
 
-            const result = await deleteSaga.executeDelete({
-                resourceType: 'subscription',
-                resourceId: id,
-                resourceName: id,
-                environment,
-                reason: reason.trim(),
-                userId,
-                userEmail,
-                userRole: 'admin',
-                ipAddress: request.ip
-            });
+/**
+ * POST /api/v1/admin/named-values/bulk-delete
+ */
+fastify.post('/admin/named_values/bulk-delete', async (request, reply) => {
+    const { named_valueIds, reason } = request.body as { named_valueIds?: string[]; reason?: string; };
+    // frontend sends named_valueIds based on key=${resourceType}Ids logic in client
+    return handleBulkDelete(request, reply, 'named_value', named_valueIds, reason);
+});
 
-            if (!result.success) {
-                return reply.status(500).send({
-                    error: 'Delete saga failed',
-                    details: result.error,
-                    failedStep: result.failedStep
-                });
-            }
+/**
+ * DELETE /api/v1/admin/named-values/:id
+ * Delete a single orphaned named value
+ */
+fastify.delete('/admin/named-values/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { reason } = request.body as { reason?: string };
+    return handleDelete(request, reply, 'named_value', id, reason);
+});
 
-            return reply.send({ success: true, auditLogId: result.auditLogId });
+/**
+ * POST /api/v1/admin/backends/bulk-delete
+ */
+fastify.post('/admin/backends/bulk-delete', async (request, reply) => {
+    const { backendIds, reason } = request.body as { backendIds?: string[]; reason?: string; };
+    return handleBulkDelete(request, reply, 'backend', backendIds, reason);
+});
 
-        } catch (error: any) {
-            fastify.log.error('[Delete] Subscription deletion failed:', error);
-            return reply.status(500).send({ error: 'Delete operation failed', details: error.message });
-        }
-    });
-
-    /**
-     * DELETE /api/v1/admin/named-values/:id
-     * Delete a single orphaned named value
-     */
-    fastify.delete('/admin/named-values/:id', async (request, reply) => {
-        const { id } = request.params as { id: string };
-        const { reason } = request.body as { reason?: string };
-
-        if (!reason || reason.trim().length < 10) {
-            return reply.status(400).send({
-                error: 'Deletion reason required (minimum 10 characters)'
-            });
-        }
-
-        try {
-            const userId = getUserId(request);
-            const userEmail = (request.headers as any)['x-user-email'] as string || userId;
-            const environment = id.split(':env:')[1] || 'Global';
-
-            const result = await deleteSaga.executeDelete({
-                resourceType: 'named_value',
-                resourceId: id,
-                resourceName: id.split(':')[0],
-                environment,
-                reason: reason.trim(),
-                userId,
-                userEmail,
-                userRole: 'admin',
-                ipAddress: request.ip
-            });
-
-            if (!result.success) {
-                return reply.status(500).send({
-                    error: 'Delete saga failed',
-                    details: result.error,
-                    failedStep: result.failedStep
-                });
-            }
-
-            return reply.send({ success: true, auditLogId: result.auditLogId });
-
-        } catch (error: any) {
-            fastify.log.error('[Delete] Named value deletion failed:', error);
-            return reply.status(500).send({ error: 'Delete operation failed', details: error.message });
-        }
-    });
-
-    /**
-     * DELETE /api/v1/admin/backends/:id
-     * Delete a single orphaned backend
-     */
-    fastify.delete('/admin/backends/:id', async (request, reply) => {
-        const { id } = request.params as { id: string };
-        const { reason } = request.body as { reason?: string };
-
-        if (!reason || reason.trim().length < 10) {
-            return reply.status(400).send({
-                error: 'Deletion reason required (minimum 10 characters)'
-            });
-        }
-
-        try {
-            const userId = getUserId(request);
-            const userEmail = (request.headers as any)['x-user-email'] as string || userId;
-            const environment = id.split(':env:')[1] || 'Global';
-
-            const result = await deleteSaga.executeDelete({
-                resourceType: 'backend',
-                resourceId: id,
-                resourceName: id.split(':')[0],
-                environment,
-                reason: reason.trim(),
-                userId,
-                userEmail,
-                userRole: 'admin',
-                ipAddress: request.ip
-            });
-
-            if (!result.success) {
-                return reply.status(500).send({
-                    error: 'Delete saga failed',
-                    details: result.error,
-                    failedStep: result.failedStep
-                });
-            }
-
-            return reply.send({ success: true, auditLogId: result.auditLogId });
-
-        } catch (error: any) {
-            fastify.log.error('[Delete] Backend deletion failed:', error);
-            return reply.status(500).send({ error: 'Delete operation failed', details: error.message });
-        }
-    });
+/**
+ * DELETE /api/v1/admin/backends/:id
+ * Delete a single orphaned backend
+ */
+fastify.delete('/admin/backends/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { reason } = request.body as { reason?: string };
+    return handleDelete(request, reply, 'backend', id, reason);
+});
 };
+
+// Helper for single delete
+async function handleDelete(request: any, reply: any, resourceType: any, id: string, reason?: string) {
+    if (!reason || reason.trim().length < 10) {
+        return reply.status(400).send({
+            error: 'Deletion reason required (minimum 10 characters)'
+        });
+    }
+
+    try {
+        const userId = getUserId(request);
+        const userEmail = (request.headers as any)['x-user-email'] as string || userId;
+        const userRole = 'admin';
+        const environment = id.split(':env:')[1] || 'Global';
+
+        const result = await deleteSaga.executeDelete({
+            resourceType,
+            resourceId: id,
+            resourceName: id.split(':')[0],
+            environment,
+            reason: reason.trim(),
+            userId,
+            userEmail,
+            userRole,
+            ipAddress: request.ip
+        });
+
+        if (!result.success) {
+            return reply.status(500).send({
+                error: 'Delete saga failed',
+                details: result.error,
+                failedStep: result.failedStep,
+                completedSteps: result.completedSteps
+            });
+        }
+
+        return reply.send({ success: true, auditLogId: result.auditLogId, completedSteps: result.completedSteps });
+
+    } catch (error: any) {
+        request.log.error(`[Delete] ${resourceType} deletion failed:`, error);
+        return reply.status(500).send({ error: 'Delete operation failed', details: error.message });
+    }
+}
+
+// Helper for bulk delete
+async function handleBulkDelete(request: any, reply: any, resourceType: any, ids?: string[], reason?: string) {
+    if (!reason || reason.trim().length < 10) {
+        return reply.status(400).send({
+            error: 'Deletion reason required (minimum 10 characters)'
+        });
+    }
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return reply.status(400).send({ error: 'IDs array required' });
+    }
+
+    const succeeded: string[] = [];
+    const failed: Array<{ id: string; error: string; failedStep?: string }> = [];
+
+    try {
+        const userId = getUserId(request);
+        const userEmail = (request.headers as any)['x-user-email'] as string || userId;
+        const userRole = 'admin';
+
+        for (const id of ids) {
+            try {
+                const environment = id.split(':env:')[1] || 'Global';
+                const resourceName = id.split(':')[0];
+
+                const result = await deleteSaga.executeDelete({
+                    resourceType,
+                    resourceId: id,
+                    resourceName,
+                    environment,
+                    reason: reason.trim(),
+                    userId,
+                    userEmail,
+                    userRole,
+                    ipAddress: request.ip
+                });
+
+                if (result.success) {
+                    succeeded.push(resourceName);
+                } else {
+                    failed.push({
+                        id,
+                        error: result.error || 'Unknown error',
+                        failedStep: result.failedStep
+                    });
+                }
+            } catch (itemError: any) {
+                failed.push({ id, error: itemError.message });
+            }
+        }
+
+        return reply.send({
+            deleted: succeeded.length,
+            failed: failed.length,
+            failures: failed,
+            succeeded
+        });
+
+    } catch (error: any) {
+        request.log.error(`[Delete] Bulk ${resourceType} deletion failed:`, error);
+        return reply.status(500).send({
+            error: 'Bulk delete operation failed',
+            details: error.message
+        });
+    }
+}
 
 export default adminDeleteRoutes;

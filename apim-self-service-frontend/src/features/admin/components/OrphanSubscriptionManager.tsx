@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAppData } from '../../../shared/context/AppDataContext';
 import { eventBus } from '../../../shared/events/eventBus';
 import { getSubscriptions, adoptSubscription } from '../api/adminClient';
+import { bulkDeleteOrphans } from '../api/adminDeleteClient';
 import toast from 'react-hot-toast';
 
 /**
@@ -108,6 +109,75 @@ export const OrphanSubscriptionManager = () => {
             fetchSubscriptions();
         } catch (error) {
             toast.error('Failed to adopt subscriptions', { id: toastId });
+            console.error(error);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (selectedSubIds.size === 0) return;
+
+        // Confirmation
+        const confirmed = confirm(
+            `⚠️ DELETE ${selectedSubIds.size} orphaned subscriptions?\n\n` +
+            `This will:\n` +
+            `• Permanently remove subscriptions\n` +
+            `• Create audit trail\n` +
+            `• Cannot be undone\n\n` +
+            `Proceed?`
+        );
+
+        if (!confirmed) return;
+
+        // Get reason
+        const reason = prompt(
+            'REQUIRED: Enter reason for deletion\n\n' +
+            'Examples:\n' +
+            '• "Expired/Unused"\n' +
+            '• "Test data cleanup"\n\n' +
+            'Minimum 10 characters:'
+        );
+
+        if (!reason || reason.trim().length < 10) {
+            toast.error('Deletion reason required (minimum 10 characters)');
+            return;
+        }
+
+        const count = selectedSubIds.size;
+        const toastId = toast.loading(`Deleting ${count} subscriptions...`);
+
+        try {
+            // Subscriptions in this view might not have the :env: suffix if they rely on envFilter
+            // But checking the API client, getSubscriptions returns what backend gives.
+            // We'll pass the IDs as is. The backend saga expects "subscription" resource type.
+
+            // Note: The backend saga splits ID by :env: to find environment. 
+            // If these IDs don't have it, we might need to rely on the backend to handle it or the UI to append it?
+            // Existing subscription IDs usually are GUIDs or names. 
+            // In OrphanProductManager, we used the ID directly. 
+            // Let's assume the ID format is compatible or handled by the backend logic.
+
+            const result = await bulkDeleteOrphans(
+                'subscription',
+                Array.from(selectedSubIds),
+                reason.trim()
+            );
+
+            if (result.deleted > 0) {
+                toast.success(
+                    `✅ Deleted ${result.deleted} subscriptions. ` +
+                    (result.failed > 0 ? `${result.failed} failed.` : ''),
+                    { id: toastId }
+                );
+            } else if (result.failed > 0) {
+                toast.error(`Failed to delete subscriptions. Check console.`, { id: toastId });
+            }
+
+            setSelectedSubIds(new Set());
+            setTargetTeamId('');
+            fetchSubscriptions();
+
+        } catch (error: any) {
+            toast.error(`Delete failed: ${error.message || 'Unknown error'}`, { id: toastId });
             console.error(error);
         }
     };

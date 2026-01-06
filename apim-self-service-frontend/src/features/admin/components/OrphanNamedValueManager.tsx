@@ -3,6 +3,7 @@ import {
     getOrphanNamedValues,
     adoptNamedValue
 } from '../api/adminClient';
+import { bulkDeleteOrphans } from '../api/adminDeleteClient';
 import { getProducts } from '../../inventory/api/inventoryClient';
 import { toast } from 'react-hot-toast';
 import './OrphanManager.css'; // Assume shared styles
@@ -95,16 +96,58 @@ export const OrphanNamedValueManager: React.FC = () => {
     const handleDelete = async () => {
         if (selectedIds.length === 0) return;
 
-        if (!confirm(`Are you sure you want to DELETE ${selectedIds.length} orphaned named values? This cannot be undone.`)) {
+        // Confirmation
+        const confirmed = confirm(
+            `⚠️ DELETE ${selectedIds.length} orphaned named values?\n\n` +
+            `This will:\n` +
+            `• Permanently remove values\n` +
+            `• Create audit trail\n` +
+            `• Cannot be undone\n\n` +
+            `Proceed?`
+        );
+
+        if (!confirmed) return;
+
+        // Get reason
+        const reason = prompt(
+            'REQUIRED: Enter reason for deletion\n\n' +
+            'Examples:\n' +
+            '• "Deprecated/Unused"\n' +
+            '• "Cleanup"\n' +
+            'Minimum 10 characters:'
+        );
+
+        if (!reason || reason.trim().length < 10) {
+            toast.error('Deletion reason required (minimum 10 characters)');
             return;
         }
 
         setAdopting(true);
+        const toastId = toast.loading(`Deleting ${selectedIds.length} named values...`);
+
         try {
-            // TODO: Implement delete API endpoint
-            toast.error('Delete functionality coming soon');
-        } catch (err) {
-            toast.error('Delete failed');
+            const result = await bulkDeleteOrphans(
+                'named_value',
+                selectedIds,
+                reason.trim()
+            );
+
+            if (result.deleted > 0) {
+                toast.success(
+                    `✅ Deleted ${result.deleted} named values. ` +
+                    (result.failed > 0 ? `${result.failed} failed.` : ''),
+                    { id: toastId }
+                );
+            } else if (result.failed > 0) {
+                toast.error(`Failed to delete items. Check console.`, { id: toastId });
+            }
+
+            setSelectedIds([]);
+            loadData();
+
+        } catch (err: any) {
+            toast.error(`Delete failed: ${err.message || 'Unknown error'}`, { id: toastId });
+            console.error(err);
         } finally {
             setAdopting(false);
         }
