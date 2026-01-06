@@ -410,7 +410,7 @@ async function main() {
 
             for (const sub of subs) {
                 const subId = `${env}:${sub.id}`;
-                const productId = `${env}:${sub.productId}`;
+                const productId = `${sub.productId}:${env}:Global`; // Match products table format
 
                 // Extract owner ID from APIM path (e.g., "/users/abc123" -> "abc123")
                 const ownerMatch = sub.ownerId?.match(/\/users\/(.+)/);

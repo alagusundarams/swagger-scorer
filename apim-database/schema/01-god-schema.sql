@@ -202,7 +202,7 @@ CREATE INDEX idx_app_reg_client_id ON app_registrations(client_id);
 CREATE TABLE IF NOT EXISTS subscriptions (
     id TEXT PRIMARY KEY,
     product_id TEXT REFERENCES products(id) ON DELETE CASCADE NOT NULL,
-    subscriber_team_id TEXT REFERENCES teams(id) NOT NULL,
+    subscriber_team_id TEXT REFERENCES teams(id), -- Nullable for orphaned subscriptions
     app_registration_id TEXT REFERENCES app_registrations(id), -- Optional link to App Registration
     display_name TEXT,
     state TEXT NOT NULL CHECK (state IN ('active', 'suspended', 'submitted', 'pending', 'rejected', 'cancelled', 'expired')),
