@@ -109,7 +109,8 @@ This backlog outlines the features and capabilities of the APIM Self-Service Por
 60. **[FE] Audit Log UI:** History tab showing chronological changes.
 61. **[BE] Compliance Monitor:** Background job to detect orphaned resources.
 62. **[FE] Compliance Alerts:** Dashboard notifications for ownership issues.
-63. **[BE] Executive Reporting:** Aggregated stats for Platform Administrators.
+63. **[FE] Orphaned API Manager:** Admin UI to identify and assign orphaned APIs that are not linked to any product (Future - currently APIs are tightly coupled to products).
+64. **[BE] Executive Reporting:** Aggregated stats for Platform Administrators.
 
 ---
 
