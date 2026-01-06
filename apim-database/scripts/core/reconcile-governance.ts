@@ -399,6 +399,49 @@ async function main() {
             }
         }
 
+        // --- D. SUBSCRIPTIONS RECONCILIATION ---
+        console.log(`🔑 Reconciling Subscriptions...`);
+        for (const [env, subs] of Object.entries(apimMeta.subscriptions || {})) {
+            if (!subs || subs.length === 0) continue;
+
+            console.log(`   [${env}] Processing ${subs.length} subscriptions`);
+
+            for (const sub of subs) {
+                const subId = `${env}:${sub.id}`;
+                const productId = `${env}:${sub.productId}`;
+
+                // Extract owner ID from APIM path (e.g., "/users/abc123" -> "abc123")
+                const ownerMatch = sub.ownerId?.match(/\/users\/(.+)/);
+                const ownerUserId = ownerMatch ? ownerMatch[1] : null;
+
+                try {
+                    await pool.query(`
+                        INSERT INTO subscriptions (
+                            id, product_id, subscriber_team_id, display_name, state,
+                            created_at, expiration_date, updated_at
+                        )
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+                        ON CONFLICT (id) DO UPDATE SET
+                            state = EXCLUDED.state,
+                            display_name = EXCLUDED.display_name,
+                            expiration_date = EXCLUDED.expiration_date,
+                            updated_at = NOW();
+                    `, [
+                        subId,
+                        productId,
+                        ownerUserId, // Will be NULL initially - can be mapped to teams later
+                        sub.displayName,
+                        sub.state,
+                        sub.createdDate,
+                        sub.expirationDate
+                    ]);
+                } catch (err: any) {
+                    console.error(`❌ FAILED to sync Subscription: ${sub.id}`);
+                    console.error(`   Details: ${err.message}`);
+                }
+            }
+        }
+
         // Backends linked via APIs already handled in A.2 loop for better context
 
         console.log(`\n✅ Reconciliation Complete!`);

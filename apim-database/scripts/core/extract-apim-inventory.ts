@@ -44,6 +44,7 @@ interface MetadataStore {
     backends: Record<string, any[]>;    // env -> backend[]
     apiForensics: Record<string, Record<string, { guids: string[], backends: string[] }>>; // env -> apiName -> forensics
     productApiLinks: Record<string, Record<string, Array<{ name: string, path: string }>>>; // env -> productId -> { name, path }[]
+    subscriptions: Record<string, any[]>; // env -> subscription[]
 }
 const CONCURRENCY_LIMIT = 10;
 
@@ -151,7 +152,8 @@ async function main() {
         apiContracts: {},
         backends: {},
         apiForensics: {},
-        productApiLinks: {}
+        productApiLinks: {},
+        subscriptions: {}
     };
 
     let envConfigs = config.azure?.environments || [];
@@ -245,6 +247,39 @@ async function main() {
                         nvs.forEach((nv: string) => potentialNvs.add(nv));
                         if (verbose && (guids.length > 0 || nvs.length > 0)) {
                             console.log(`            📄 Product Policy: ${guids.length} GUIDs, ${nvs.length} NVs`);
+                        }
+                    }
+                } catch (e) { }
+
+                // --- SUBSCRIPTIONS for this Product ---
+                try {
+                    const subsRes = await fetch(`https://management.azure.com${p.id}/subscriptions?api-version=2022-08-01`, {
+                        headers: { 'Authorization': `Bearer ${azureToken}` }
+                    });
+                    if (subsRes.ok) {
+                        const subsData: any = await subsRes.json();
+                        const subs = subsData.value || [];
+
+                        if (!metadata.subscriptions[env.name]) {
+                            metadata.subscriptions[env.name] = [];
+                        }
+
+                        subs.forEach((sub: any) => {
+                            metadata.subscriptions[env.name].push({
+                                id: sub.name,
+                                productId: prodId,
+                                displayName: sub.properties.displayName || `default_${prodId}`,
+                                state: sub.properties.state,
+                                ownerId: sub.properties.ownerId, // e.g., "/users/abc123"
+                                scope: sub.properties.scope,
+                                createdDate: sub.properties.createdDate,
+                                expirationDate: sub.properties.expirationDate,
+                                // Note: Keys are NOT extracted here - fetched on-demand
+                            });
+                        });
+
+                        if (verbose && subs.length > 0) {
+                            console.log(`            🔑 Subscriptions: ${subs.length} found`);
                         }
                     }
                 } catch (e) { }
