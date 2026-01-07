@@ -2,7 +2,7 @@
  * @fileoverview Comprehensive Orphaned Resources Report Generator
  * 
  * Analyzes the database after sync to identify orphaned resources:
- * - Products without Terraform management (PORTAL_MANAGED)
+ * - Products without Terraform management (UNTRACKED)
  * - Named Values not referenced by any API
  * - Backends not used by any API
  * - APIs not linked to any product
@@ -103,13 +103,13 @@ async function main() {
                 environment,
                 management_mode as status,
                 CASE 
-                    WHEN management_mode = 'PORTAL_MANAGED' THEN 'No Terraform pipeline or repository found'
+                    WHEN management_mode = 'UNTRACKED' THEN 'No Terraform pipeline or repository found'
                     WHEN terraform_pipeline_url IS NULL THEN 'Missing pipeline URL'
                     WHEN github_url IS NULL THEN 'Missing GitHub URL'
                     ELSE 'Unknown orphan reason'
                 END as reason
             FROM products
-            WHERE management_mode = 'PORTAL_MANAGED'
+            WHERE management_mode = 'UNTRACKED'
             ${targetEnv ? `AND environment = '${targetEnv}'` : ''}
             ORDER BY environment, name
         `);

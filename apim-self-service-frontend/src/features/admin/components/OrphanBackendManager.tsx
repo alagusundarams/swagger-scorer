@@ -29,7 +29,7 @@ export const OrphanBackendManager: React.FC = () => {
     const [targetScope, setTargetScope] = useState<'PRODUCT' | 'API' | 'GLOBAL'>('PRODUCT');
     const [adopting, setAdopting] = useState(false);
 
-    const environments = ['DEV', 'QA', 'PROD'];
+    const environments = ['DEV', 'QA', 'STAGE', 'PROD'];
 
     useEffect(() => {
         loadData();

@@ -131,7 +131,7 @@ async function seed() {
         for (const p of products) {
             await query(`
                 INSERT INTO products (id, name, display_name, version, description, state, owner_team_id, environment, quality_score, subscriber_count, type, management_mode, created_at, updated_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'PORTAL_MANAGED', NOW(), NOW())
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'UNTRACKED', NOW(), NOW())
             `, [p.id, p.name, p.display_name, p.version, p.description, p.state, p.owner_team_id, p.environment, p.quality_score, p.subscriber_count, p.type]);
         }
 

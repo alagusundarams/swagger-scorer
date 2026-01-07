@@ -131,7 +131,7 @@ export const ManageProductModal = ({
                     </div>
                     <div className="flex items-center gap-3">
                         {/* Management Mode Badge */}
-                        {product.managementMode && product.managementMode !== 'PORTAL_MANAGED' && (
+                        {product.managementMode && product.managementMode !== 'UNTRACKED' && (
                             <span className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border flex items-center gap-1.5 ${product.managementMode === 'TERRAFORM_MANAGED'
                                 ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800'
                                 : 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800'

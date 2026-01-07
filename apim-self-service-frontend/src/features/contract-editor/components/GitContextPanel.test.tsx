@@ -6,7 +6,7 @@ import { type API, type Product } from '../../inventory/types/inventoryTypes';
 const mockProduct: Product = {
     id: 'prod-1',
     name: 'test-product',
-    management_mode: 'PORTAL_MANAGED',
+    management_mode: 'UNTRACKED',
 } as any;
 
 const mockApi: API = {

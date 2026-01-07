@@ -97,7 +97,7 @@ export interface Product {
         displayName: string;
         appIdUri: string;
     };
-    managementMode?: 'TERRAFORM_MANAGED' | 'HYBRID' | 'PORTAL_MANAGED';
+    managementMode?: 'TERRAFORM_MANAGED' | 'HYBRID' | 'UNTRACKED';
     terraformPipelineUrl?: string;
     gitRepoUrl?: string;
     gitFilePath?: string;

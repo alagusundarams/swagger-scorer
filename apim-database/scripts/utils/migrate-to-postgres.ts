@@ -194,7 +194,7 @@ async function migrateProducts(pool: Pool, products: any[], importEnv: string) {
                 null,
                 targetEnv,
                 'internal',
-                product.management_mode || (gitRepoUrl ? 'TERRAFORM_MANAGED' : 'PORTAL_MANAGED'),
+                product.managementMode || (gitRepoUrl ? 'TERRAFORM_MANAGED' : 'UNTRACKED'),
                 gitRepoUrl,
                 gitFilePath,
                 pipelineUrl,

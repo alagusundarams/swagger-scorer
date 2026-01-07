@@ -12,7 +12,7 @@ const mockProduct: Product = {
     ownerTeamId: 'team-1',
     environment: 'PROD',
     apis: ['api-1'],
-    management_mode: 'PORTAL_MANAGED',
+    management_mode: 'UNTRACKED',
     state: 'Published',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()

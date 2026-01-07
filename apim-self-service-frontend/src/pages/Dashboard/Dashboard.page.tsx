@@ -86,9 +86,10 @@ export const DashboardPage = () => {
         return filterProducts(allProducts, {
             ownerTeamId: activeTeamId,
             environment: activeEnv,
+            region: activeRegion,
             searchQuery
         });
-    }, [allProducts, activeTeamId, activeEnv, searchQuery]);
+    }, [allProducts, activeTeamId, activeEnv, activeRegion, searchQuery]);
 
     const consumerProducts = useMemo(() => {
         const subsList = Array.isArray(allSubscriptions) ? allSubscriptions : [];
@@ -111,9 +112,10 @@ export const DashboardPage = () => {
 
         return filterProducts(baseProducts, {
             environment: activeEnv,
+            region: activeRegion,
             searchQuery
         });
-    }, [allSubscriptions, allProducts, activeTeamId, user, activeEnv, searchQuery]);
+    }, [allSubscriptions, allProducts, activeTeamId, user, activeEnv, activeRegion, searchQuery]);
 
     const approvalRequests = useMemo(() => {
         let result = enhancedApprovals;
@@ -122,6 +124,10 @@ export const DashboardPage = () => {
             result = result.filter(r => r.approverTeamId === activeTeamId);
         } else if (user) {
             result = result.filter(r => user.leadsTeams.includes(r.approverTeamId) || user.role === 'admin');
+        }
+
+        if (activeEnv !== 'ALL') {
+            result = result.filter(r => r.details.environment?.toUpperCase() === activeEnv.toUpperCase());
         }
 
         if (searchQuery) {
@@ -134,7 +140,7 @@ export const DashboardPage = () => {
         }
 
         return result;
-    }, [enhancedApprovals, activeTeamId, user, searchQuery]);
+    }, [enhancedApprovals, activeTeamId, user, activeEnv, searchQuery]);
 
     const currentItems = activeTab === 'produced' ? producerProducts : activeTab === 'consumed' ? consumerProducts : approvalRequests;
     const totalPages = Math.ceil(currentItems.length / itemsPerPage);
@@ -240,7 +246,7 @@ export const DashboardPage = () => {
                                 </button>
                             </div>
                             {/* Global Inventory Table */}
-                            <GlobalInventory products={allProducts} embedded />
+                            <GlobalInventory products={producerProducts} embedded />
                         </div>
                     ) : (
                         <>

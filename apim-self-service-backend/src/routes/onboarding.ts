@@ -148,7 +148,7 @@ export default async function onboardingRoutes(fastify: FastifyInstance, config:
                 state: 'published',
                 ownerTeamId: body.ownerTeamId,
                 environment: body.environment,
-                managementMode: 'PORTAL_MANAGED'
+                managementMode: 'UNTRACKED'
             });
 
             // 3. Create API (Attached to Product)

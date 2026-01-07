@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS products (
     authorized_teams JSONB, -- Array of team IDs per environment: {"DEV": ["team1"], "PROD": ["team2"]}
     
     -- Management mode (ALL start as TERRAFORM_MANAGED)
-    management_mode TEXT CHECK (management_mode IN ('TERRAFORM_MANAGED', 'HYBRID', 'PORTAL_MANAGED')) DEFAULT 'TERRAFORM_MANAGED',
+    management_mode TEXT CHECK (management_mode IN ('TERRAFORM_MANAGED', 'HYBRID', 'UNTRACKED')) DEFAULT 'UNTRACKED',
     terraform_pipeline_url TEXT,
     github_url TEXT,
     

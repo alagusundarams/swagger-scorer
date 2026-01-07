@@ -194,7 +194,7 @@ export class ProductsRepository {
             RETURNING *
         `, [
             product.id, product.name, product.displayName, product.description, product.state, product.ownerTeamId, product.environment,
-            product.managementMode || 'PORTAL_MANAGED', product.gitRepoUrl, product.gitFilePath,
+            product.managementMode || 'UNTRACKED', product.gitRepoUrl, product.gitFilePath,
             product.devHash || null, product.qaHash || null, product.stageHash || null, product.prodHash || null
         ]);
     }
@@ -288,8 +288,8 @@ export class ProductsRepository {
                     'managementMode', p.management_mode,
                     'qualityScore', p.quality_score,
                     'reconciliationStatus', CASE 
-                        WHEN p.management_mode = 'PORTAL_MANAGED' AND (p.git_repo_url IS NULL OR p.git_repo_url = '') THEN 'GHOST'
-                        WHEN p.management_mode = 'PORTAL_MANAGED' THEN 'MANUAL'
+                        WHEN p.management_mode = 'UNTRACKED' AND (p.git_repo_url IS NULL OR p.git_repo_url = '') THEN 'GHOST'
+                        WHEN p.management_mode = 'UNTRACKED' THEN 'MANUAL'
                         ELSE 'RECONCILED'
                     END
                 )) as deployments

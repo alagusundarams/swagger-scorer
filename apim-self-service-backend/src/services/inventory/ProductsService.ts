@@ -899,7 +899,7 @@ export async function generateManifest(productId: string, format: 'json' | 'tfva
  * Eject Product from Terraform Management to Self-Service
  * 
  * 1. Snapshots the live state (Mocked: Assumes DB is sync'd)
- * 2. Unlocks the DB record (Sets management_mode = PORTAL_MANAGED)
+ * 2. Unlocks the DB record (Sets management_mode = UNTRACKED)
  * 3. Logs the "Smart Decomposition" event
  */
 export async function ejectProduct(productId: string) {
@@ -1006,7 +1006,7 @@ export async function ejectProduct(productId: string) {
     }
 
     // 3. Update Database State
-    const result = await productsRepo.setProductManagementMode(productId, 'PORTAL_MANAGED', 'MANUAL');
+    const result = await productsRepo.setProductManagementMode(productId, 'UNTRACKED', 'MANUAL');
 
     // 4. Log Audit
     await logAudit({
@@ -1016,7 +1016,7 @@ export async function ejectProduct(productId: string) {
         userId: 'system-user',
         changes: {
             fromMode: 'TERRAFORM_MANAGED',
-            toMode: 'PORTAL_MANAGED',
+            toMode: 'UNTRACKED',
             extractedEnvs: Object.keys(envConfigs).filter(k => Object.keys(envConfigs[k]).length > 0)
         }
     });

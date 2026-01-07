@@ -113,7 +113,7 @@ export const ProductProducerCard: React.FC<ProductProducerCardProps> = ({
                         )}
 
                         {/* Management Mode Badge */}
-                        {product.managementMode && product.managementMode !== 'PORTAL_MANAGED' && (
+                        {product.managementMode && product.managementMode !== 'UNTRACKED' && (
                             <span className={`px-2 py-1 text-[8px] font-black rounded-md border uppercase tracking-wider flex items-center gap-1 ${product.managementMode === 'TERRAFORM_MANAGED'
                                 ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800'
                                 : 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800'

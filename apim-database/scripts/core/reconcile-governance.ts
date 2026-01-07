@@ -209,7 +209,7 @@ async function main() {
                         qaDeploy?.hash || null, qaDeploy?.date || null,
                         stageDeploy?.hash || null, stageDeploy?.date || null,
                         prodDeploy?.hash || null, prodDeploy?.date || null,
-                        ado.status === 'MATCHED' ? 'TERRAFORM_MANAGED' : 'PORTAL_MANAGED'
+                        ado.status === 'MATCHED' ? 'TERRAFORM_MANAGED' : 'UNTRACKED'
                     ]);
                 } catch (err: any) {
                     console.error(`❌ FAILED to sync Product: "${prod.name}" (${envName})`);
@@ -488,12 +488,12 @@ async function main() {
         const productCount = await pool.query(`SELECT COUNT(*) FROM products${targetEnv ? ` WHERE environment = '${targetEnv}'` : ''}`);
         const apiCount = await pool.query(`SELECT COUNT(*) FROM apis`);
         const terraformManaged = await pool.query(`SELECT COUNT(*) FROM products WHERE management_mode = 'TERRAFORM_MANAGED'${targetEnv ? ` AND environment = '${targetEnv}'` : ''}`);
-        const portalManaged = await pool.query(`SELECT COUNT(*) FROM products WHERE management_mode = 'PORTAL_MANAGED'${targetEnv ? ` AND environment = '${targetEnv}'` : ''}`);
+        const untracked = await pool.query(`SELECT COUNT(*) FROM products WHERE management_mode = 'UNTRACKED'${targetEnv ? ` AND environment = '${targetEnv}'` : ''}`);
 
         console.log(`   Products: ${productCount.rows[0].count}`);
         console.log(`   APIs: ${apiCount.rows[0].count}`);
         console.log(`   🔧 Terraform-Managed: ${terraformManaged.rows[0].count}`);
-        console.log(`   📦 Portal-Managed: ${portalManaged.rows[0].count}`);
+        console.log(`   📦 Untracked: ${untracked.rows[0].count}`);
 
     } catch (e: any) {
         console.error(`\n❌ Reconciliation Failed:`, e.message);

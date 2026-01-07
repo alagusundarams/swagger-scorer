@@ -5,7 +5,7 @@ import { type Product } from '../../inventory/types/inventoryTypes';
 
 const mockProduct: Product = {
     id: 'prod-1',
-    management_mode: 'PORTAL_MANAGED',
+    management_mode: 'UNTRACKED',
 } as any;
 
 describe('ContractCommitForm', () => {
