@@ -13,12 +13,15 @@ import { CredentialsTab, useConsumerStore } from '../../features/consumer';
  * - Architecture: Strict separation between product-level and API-level metadata.
  */
 
+import { useAuth } from '../../features/auth';
+
 export const APIDetailPage = () => {
     const { productId, apiId } = useParams<{ productId: string; apiId: string }>();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'overview' | 'security' | 'credentials'>('overview');
 
     // --- Store Integration ---
+    const { user } = useAuth();
     const { products, fetchOperations } = useInventoryStore();
     const { subscriptions, fetchSubscriptions } = useConsumerStore();
 
@@ -30,6 +33,23 @@ export const APIDetailPage = () => {
     const productSubscriptions = useMemo(() =>
         subscriptions.filter((s: any) => s.productId === productId),
         [subscriptions, productId]);
+
+    // --- Permission Logic ---
+    const canEditPolicies = useMemo(() => {
+        if (!user || !product || !api) return false;
+        if (user.role === 'admin') return true;
+
+        const isApiOwner = api.originTeamId && user.teams?.includes(api.originTeamId);
+        const isProductOwner = user.teams?.includes(product.ownerTeamId);
+
+        // Critical GRP Check: GRP Members are Product Owners but CANNOT edit API Policies unless they own the API
+        if (product.type === 'grp') {
+            return !!isApiOwner;
+        }
+
+        // Standard Product: Product Owner OR API Owner can edit
+        return !!(isProductOwner || isApiOwner);
+    }, [user, product, api]);
 
     // Fetch operations if missing
     useEffect(() => {
@@ -73,7 +93,7 @@ export const APIDetailPage = () => {
     return (
         <MainLayout>
             <div className="bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800">
-                <ApiIdentityHeader product={product} api={api} />
+                <ApiIdentityHeader product={product} api={api} canEditPolicies={canEditPolicies} />
 
                 {/* Tab Navigation */}
                 <div className="max-w-7xl mx-auto px-6 mt-4">

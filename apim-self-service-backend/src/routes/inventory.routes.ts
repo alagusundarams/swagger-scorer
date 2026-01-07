@@ -5,8 +5,8 @@
  */
 
 import { FastifyPluginAsync } from 'fastify';
-import { getOrphanedResources, getAdGroups } from '../services/orphaned-resources.service.js';
-import * as productsService from '../services/products.service.js';
+import { getOrphanedResources, getAdGroups } from '../services/governance/OrphanedResourcesService.js';
+import * as productsService from '../services/inventory/ProductsService.js';
 
 const inventoryRoutes: FastifyPluginAsync = async (fastify) => {
     /**

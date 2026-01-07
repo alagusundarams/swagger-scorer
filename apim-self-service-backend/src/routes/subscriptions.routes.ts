@@ -3,8 +3,8 @@
  */
 
 import { FastifyPluginAsync } from 'fastify';
-import { getSubscriptionSecrets } from '../services/credential.service.js';
-import { getAllSubscriptions, addSubscription, assignSubscriptionTeam } from '../services/subscriptions.service.js';
+import { getSubscriptionSecrets } from '../services/identity/CredentialService.js';
+import { getAllSubscriptions, addSubscription, assignSubscriptionTeam } from '../services/inventory/SubscriptionsService.js';
 
 const subscriptionsRoutes: FastifyPluginAsync = async (fastify) => {
 

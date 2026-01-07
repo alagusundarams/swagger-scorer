@@ -155,32 +155,43 @@ export const OrphanBackendManager: React.FC = () => {
             {/* Filters Bar - Matching other tabs */}
             <div className="flex gap-4 items-center bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
                 <div className="flex-1">
-                    <span className="text-xs font-bold uppercase text-slate-500 tracking-widest">Environment:</span>
+                    <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+                        <input
+                            type="text"
+                            placeholder="Search by backend ID or URL..."
+                            className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
                 </div>
-                <select
-                    value={env}
-                    onChange={(e) => setEnv(e.target.value)}
-                    className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500"
-                >
-                    {environments.map(e => <option key={e} value={e}>{e}</option>)}
-                </select>
-                <div className="text-xs text-slate-500">
+                <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Environment</span>
+                    <select
+                        value={env}
+                        onChange={(e) => setEnv(e.target.value)}
+                        className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-xs font-bold focus:ring-2 focus:ring-blue-500 dark:text-white"
+                    >
+                        {environments.map(e => <option key={e} value={e}>{e}</option>)}
+                    </select>
+                </div>
+                <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
+                <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
                     Found {orphans.length} orphans in {env}
                 </div>
             </div>
 
             {/* Action Bar */}
-            <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
-                    <h3 className="text-lg font-bold text-slate-800 dark:text-white">Orphaned Backends</h3>
-                    <p className="text-sm text-slate-500">Found <span className="font-bold text-amber-600">{orphans.length}</span> unassigned backends requiring action.</p>
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white tracking-tight">Orphaned Infrastructure Backends</h3>
+                    <p className="text-sm text-slate-500 mt-1">Found <span className="font-bold text-red-600">{orphans.length}</span> unassigned backend gateways requiring ownership.</p>
                 </div>
 
                 <div className="flex items-center gap-3 w-full md:w-auto">
                     <select
+                        className="w-full md:w-64 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none dark:text-white transition-all shadow-sm"
                         value={targetScope}
                         onChange={(e) => setTargetScope(e.target.value as any)}
-                        className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500"
                     >
                         <option value="PRODUCT">Assign to Product</option>
                         <option value="GLOBAL">Mark as GLOBAL</option>
@@ -191,9 +202,9 @@ export const OrphanBackendManager: React.FC = () => {
                             value={targetProductId}
                             onChange={(e) => setTargetProductId(e.target.value)}
                             disabled={adopting}
-                            className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+                            className="w-full md:w-64 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none dark:text-white transition-all shadow-sm"
                         >
-                            <option value="">Select Target Product...</option>
+                            <option value="">Select Governing Team...</option>
                             {products.map(p => (
                                 <option key={p.id} value={p.id}>{p.name}</option>
                             ))}
@@ -203,7 +214,7 @@ export const OrphanBackendManager: React.FC = () => {
                     <button
                         onClick={handleAdopt}
                         disabled={selectedIds.length === 0 || adopting}
-                        className="px-6 py-2 bg-blue-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-lg transition-all whitespace-nowrap"
+                        className="px-8 py-2.5 bg-blue-600 disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:cursor-not-allowed hover:bg-blue-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/10 transition-all h-11 whitespace-nowrap"
                     >
                         {adopting ? 'Processing...' : `Reclaim (${selectedIds.length})`}
                     </button>
@@ -211,19 +222,19 @@ export const OrphanBackendManager: React.FC = () => {
                     <button
                         onClick={handleDelete}
                         disabled={selectedIds.length === 0 || adopting}
-                        className="px-6 py-2 bg-red-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed hover:bg-red-700 text-white text-sm font-bold rounded-lg shadow-lg transition-all whitespace-nowrap"
+                        className="px-6 py-2.5 bg-red-600 disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:cursor-not-allowed hover:bg-red-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-red-500/10 transition-all h-11 whitespace-nowrap"
                     >
-                        Delete ({selectedIds.length})
+                        Delete
                     </button>
                 </div>
             </div>
 
             {/* Table */}
-            <div className="border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm">
-                <table className="w-full text-left text-sm">
-                    <thead className="bg-gray-50 dark:bg-slate-800/80 border-b border-gray-100 dark:border-slate-700">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-premium">
+                <table className="w-full text-left">
+                    <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
                         <tr>
-                            <th className="p-4 w-12 text-center">
+                            <th className="p-5 w-14 text-center">
                                 <input
                                     type="checkbox"
                                     checked={orphans.length > 0 && selectedIds.length === orphans.length}
@@ -234,54 +245,54 @@ export const OrphanBackendManager: React.FC = () => {
                                             setSelectedIds(orphans.map(b => b.id));
                                         }
                                     }}
-                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                 />
                             </th>
-                            <th className="p-4 font-bold text-slate-600 dark:text-slate-300">Backend ID</th>
-                            <th className="p-4 font-bold text-slate-600 dark:text-slate-300">Target URL</th>
-                            <th className="p-4 font-bold text-slate-600 dark:text-slate-300 w-24">Scope</th>
-                            <th className="p-4 font-bold text-slate-600 dark:text-slate-300">Last Updated</th>
+                            <th className="p-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Backend ID</th>
+                            <th className="p-5 text-[10px) font-black uppercase tracking-widest text-slate-400">Target URL</th>
+                            <th className="p-5 text-[10px] font-black uppercase tracking-widest text-slate-400 w-24 text-center">Scope</th>
+                            <th className="p-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Last Updated</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                    <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
                         {loading ? (
                             <tr>
-                                <td colSpan={5} className="p-12 text-center">
+                                <td colSpan={5} className="p-16 text-center">
                                     <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                                    <p className="text-slate-400 font-bold uppercase tracking-widest text-xs mt-4">Loading...</p>
+                                    <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-4">Hydrating Infrastructure...</p>
                                 </td>
                             </tr>
                         ) : orphans.length === 0 ? (
                             <tr>
                                 <td colSpan={5} className="p-16 text-center">
-                                    <div className="text-4xl mb-4">✨</div>
+                                    <div className="text-4xl mb-4 text-white">✨</div>
                                     <div className="text-slate-900 dark:text-white font-black text-lg mb-1">No Orphans Found</div>
-                                    <div className="text-slate-500 text-sm">All backends in {env} are properly assigned.</div>
+                                    <div className="text-slate-500 text-sm font-medium">All backends in {env} are properly assigned.</div>
                                 </td>
                             </tr>
                         ) : (
                             orphans.map(b => (
-                                <tr key={b.id} className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${selectedIds.includes(b.id) ? 'bg-blue-50 dark:bg-blue-900/10' : ''}`}>
-                                    <td className="p-4 text-center">
+                                <tr key={b.id} className={`group hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors ${selectedIds.includes(b.id) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}>
+                                    <td className="p-5 text-center">
                                         <input
                                             type="checkbox"
                                             checked={selectedIds.includes(b.id)}
                                             onChange={() => handleSelect(b.id)}
-                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                         />
                                     </td>
-                                    <td className="p-4">
-                                        <code className="text-xs bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded font-mono text-blue-600 dark:text-blue-400">{b.title || b.id}</code>
+                                    <td className="p-5">
+                                        <code className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded font-mono text-blue-600 dark:text-blue-400 uppercase font-black">{b.title || b.id}</code>
                                     </td>
-                                    <td className="p-4 font-medium text-slate-900 dark:text-white">
-                                        <code className="text-xs">{b.url}</code>
+                                    <td className="p-5 font-medium text-slate-900 dark:text-white">
+                                        <code className="text-[10px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 px-2 py-1 rounded-lg border border-slate-100 dark:border-slate-800">{b.url}</code>
                                     </td>
-                                    <td className="p-4">
-                                        <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded text-xs font-bold uppercase">
+                                    <td className="p-5 text-center">
+                                        <span className="inline-block text-[10px] font-black px-3 py-1 rounded-full border border-amber-100 bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-900/30 uppercase tracking-tighter">
                                             {b.scope || 'ORPHAN'}
                                         </span>
                                     </td>
-                                    <td className="p-4 text-sm text-slate-500">
+                                    <td className="p-5 text-right text-xs text-slate-500 font-medium tracking-tight">
                                         {b.updatedAt ? new Date(b.updatedAt).toLocaleDateString() : 'N/A'}
                                     </td>
                                 </tr>

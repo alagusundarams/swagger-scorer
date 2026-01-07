@@ -1,4 +1,4 @@
-import { query } from '../services/db.js';
+import { query } from '../services/core/db.js';
 
 export class ProductsRepository {
     async getAllProducts(environment?: string, userRole: string = 'admin', teamId?: string, userGroups: string[] = []) {
@@ -184,8 +184,9 @@ export class ProductsRepository {
 
     async addProduct(product: any) {
         return await query(`
+            INSERT INTO products (
                 id, name, display_name, description, state, owner_team_id, environment, management_mode, git_repo_url, git_file_path, 
-                dev_hash, qa_hash, stage_hash, prod_hash,
+                dev_hash, qa_hash, stage_hash, production_hash,
                 created_at, updated_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
                 $11, $12, $13, $14,

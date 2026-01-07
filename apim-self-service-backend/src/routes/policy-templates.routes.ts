@@ -11,7 +11,7 @@ import {
     getPolicyTemplate,
     generateXmlFromTemplate,
     upsertPolicyTemplate
-} from '../services/policy-templates.service.js';
+} from '../services/policy/PolicyTemplatesService.js';
 
 const policyTemplatesRoutes: FastifyPluginAsync = async (fastify) => {
     /**

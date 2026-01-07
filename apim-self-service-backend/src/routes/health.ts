@@ -6,7 +6,7 @@
  */
 
 import { FastifyInstance } from 'fastify';
-import { query } from '../services/db.js';
+import { query } from '../services/core/db.js';
 
 /**
  * Register health check route

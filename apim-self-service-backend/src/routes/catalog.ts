@@ -13,13 +13,16 @@ import {
     updateProductPolicy, ejectProduct, getNamedValues, addNamedValue,
     deleteNamedValue, syncProductOperations, getProductById, getApiById,
     getSecureProductSpec
-} from '../services/products.service.js';
-import { getAllTeams, createTeam, updateTeam } from '../services/teams.service.js';
+} from '../services/inventory/ProductsService.js';
+import {
+    updateApproval,
+    getAllApprovals
+} from '../services/workflow/ApprovalsService.js';
+import { getAllTeams, createTeam, updateTeam } from '../services/identity/TeamsService.js';
 // Subscriptions moved to dedicated routes
-import { getAllApprovals, updateApproval } from '../services/approvals.service.js';
-import { getAuditLogs } from '../services/audit.service.js';
-import { getAppRegistrations, addAppRegistration } from '../services/apps.service.js';
-import { promoteProduct } from '../services/promotion.service.js';
+import { auditService } from '../services/core/AuditService.js';
+import { getAppRegistrations, addAppRegistration } from '../services/identity/AppsService.js';
+import { promoteProduct } from '../services/workflow/PromotionService.js';
 
 // Mocks (Conditionally used or effectively swapped at runtime if needed, 
 // but for static imports we rely on the main service having fallback or logic)
@@ -400,7 +403,7 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     fastify.get('/audit-logs', async (request, reply) => {
         const { entityId } = request.query as any;
         try {
-            const logs = await getAuditLogs(entityId);
+            const logs = await auditService.queryLogs({ resourceId: entityId, limit: 100 });
             return logs;
         } catch (error) {
             fastify.log.error({ err: error }, 'Error fetching audit logs');
@@ -414,8 +417,8 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
             const config = getAppConfig();
             const isMock = config.useBackendMocks;
             const { scoreAllProducts } = isMock
-                ? await import('../services/scoring.service.mock.js')
-                : await import('../services/scoring.service.js');
+                ? await import('../services/policy/ScoringService.mock.js')
+                : await import('../services/policy/ScoringService.js');
 
             // Trigger background job (don't await - return immediately)
             scoreAllProducts()
@@ -440,8 +443,8 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
             const config = getAppConfig();
             const isMock = config.useBackendMocks;
             const { scoreProductById } = isMock
-                ? await import('../services/scoring.service.mock.js')
-                : await import('../services/scoring.service.js');
+                ? await import('../services/policy/ScoringService.mock.js')
+                : await import('../services/policy/ScoringService.js');
 
             const score = await scoreProductById(id);
             if (score === null) {
@@ -528,13 +531,13 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     // GET /api/v1/products/:id/named-values
     fastify.get('/products/:id/named-values', async (request, reply) => {
         const { id } = request.params as any;
-        const { groups, role, teams } = request.query as any;
+        // const { groups, role, teams } = request.query as any;
 
-        const userContext = {
-            role: role || (request as any).user?.role || 'consumer',
-            teams: teams ? teams.split(',') : (request as any).user?.teams || [],
-            groups: groups ? groups.split(',') : (request as any).user?.groups || []
-        };
+        // const userContext = {
+        //     role: role || (request as any).user?.role || 'consumer',
+        //     teams: teams ? teams.split(',') : (request as any).user?.teams || [],
+        //     groups: groups ? groups.split(',') : (request as any).user?.groups || []
+        // };
 
         try {
             const values = await getNamedValues(id);

@@ -15,7 +15,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { resolve } from 'path';
 import { loadConfig, validateConfig, loadAppConfig, setAppConfig } from './config/loader.js';
-import { initDb } from './services/db.js';
+import { initDb } from './services/core/db.js';
 import { healthRoutes } from './routes/health.js';
 import { configRoutes } from './routes/config.js';
 import { analyzeRoutes } from './routes/analyze.js';

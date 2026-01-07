@@ -31,7 +31,11 @@
         /* Skip Lib Check */
         "skipLibCheck": true,
         /* Module Resolution */
-        "resolveJsonModule": true
+        "resolveJsonModule": true,
+        "types": [
+            "node",
+            "vitest/globals"
+        ]
     },
     "include": [
         "src/**/*"

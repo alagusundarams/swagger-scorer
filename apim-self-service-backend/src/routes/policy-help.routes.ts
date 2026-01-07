@@ -13,7 +13,7 @@ import {
     getHelpMessages,
     updateHelpRequestStatus,
     getOpenHelpRequests
-} from '../services/policy-help.service.js';
+} from '../services/policy/PolicyHelpService.js';
 import { getUserContext } from '../middleware/auth.js';
 
 const policyHelpRoutes: FastifyPluginAsync = async (fastify) => {

@@ -12,9 +12,9 @@
  */
 
 import { FastifyInstance } from 'fastify';
-import { parseOpenAPI, validateOpenAPIStructure, detectOpenAPIVersion, extractOperations } from '../services/parser.js';
-import { createSpectral, analyzeWithSpectral } from '../services/spectral.js';
-import { calculateScore } from '../services/scorer.js';
+import { parseOpenAPI, validateOpenAPIStructure, detectOpenAPIVersion, extractOperations } from '../services/policy/ParserService.js';
+import { createSpectral, analyzeWithSpectral } from '../services/policy/SpectralService.js';
+import { calculateScore } from '../services/policy/ScorerService.js';
 import { AnalyzeRequest, ScoringConfig } from '../types/index.js';
 
 /**
@@ -161,8 +161,8 @@ export async function analyzeRoutes(
                 // Import spec fetcher service (Mocked if requested)
                 const isMock = process.env.USE_BACKEND_MOCKS === 'true';
                 const { fetchSpecForProduct } = isMock
-                    ? await import('../services/spec-fetcher.mock.js')
-                    : await import('../services/spec-fetcher.service.js');
+                    ? await import('../services/utils/SpecFetcherService.mock.js')
+                    : await import('../services/utils/SpecFetcherService.js');
 
                 // Fetch spec from Git or APIM
                 fastify.log.info({ productId }, 'Fetching OpenAPI spec for product');

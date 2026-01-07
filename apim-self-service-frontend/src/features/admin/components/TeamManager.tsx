@@ -56,9 +56,11 @@ export const TeamManager = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-slate-800 dark:text-white">Active Teams ({teams.length})</h2>
-                {/* Future: Add 'Create Team' button */}
+            <div className="flex justify-between items-center mb-2">
+                <div>
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">Active Teams</h2>
+                    <p className="text-sm text-slate-500 mt-1">Found <span className="font-bold text-indigo-600">{teams.length}</span> verified organizational units.</p>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 gap-6">
@@ -70,20 +72,29 @@ export const TeamManager = () => {
 
                             {/* Header / Summary */}
                             <div className="flex justify-between items-start mb-4">
-                                <div>
-                                    <div className="flex items-center gap-3">
-                                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">{team.name}</h3>
-                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${team.type === 'producer' ? 'bg-purple-100 text-purple-700' : team.type === 'consumer' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                                            {team.type}
-                                        </span>
+                                <div className="flex items-center gap-3">
+                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">{team.name}</h3>
+                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${team.type === 'producer' ? 'bg-purple-50 text-purple-600 border-purple-100 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-900/30' : team.type === 'consumer' ? 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-900/30' : 'bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-900/30'}`}>
+                                        {team.type}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-4 mt-2">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ID:</span>
+                                        <code className="text-[10px] font-mono text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-100 dark:border-slate-800">{team.id}</code>
                                     </div>
-                                    <div className="text-xs text-slate-500 mt-1 font-mono">ID: {team.id} | Members: {team.memberCount}</div>
+                                    <div className="h-3 w-px bg-slate-200 dark:bg-slate-700"></div>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Members:</span>
+                                        <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{team.memberCount}</span>
+                                    </div>
                                 </div>
                                 {!isEditing && (
                                     <button
                                         onClick={() => handleEditClick(team)}
-                                        className="text-sm font-semibold text-blue-500 hover:text-blue-600"
+                                        className="px-4 py-2 bg-slate-50 hover:bg-white dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-900/50 transition-all shadow-sm flex items-center gap-2"
                                     >
+                                        <span>⚙️</span>
                                         Edit Config
                                     </button>
                                 )}

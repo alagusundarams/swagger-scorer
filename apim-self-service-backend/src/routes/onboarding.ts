@@ -1,11 +1,11 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { onboardingStorageService } from '../services/OnboardingStorageService.js';
-import { parseOpenAPI, detectOpenAPIVersion } from '../services/parser.js';
-import { createSpectral, analyzeWithSpectral } from '../services/spectral.js';
-import { calculateScore } from '../services/scorer.js';
-import { query } from '../services/db.js';
-import { addProduct, addApi } from '../services/products.service.js';
-import { logAudit } from '../services/audit.service.js';
+import { onboardingStorageService } from '../services/storage/OnboardingStorageService.js';
+import { parseOpenAPI, detectOpenAPIVersion } from '../services/policy/ParserService.js';
+import { createSpectral, analyzeWithSpectral } from '../services/policy/SpectralService.js';
+import { calculateScore } from '../services/policy/ScorerService.js';
+import { query } from '../services/core/db.js';
+import { addProduct, addApi } from '../services/inventory/ProductsService.js';
+import { logAudit } from '../services/core/AuditService.js';
 import { v4 as uuidv4 } from 'uuid';
 import { ScoringConfig } from '../types/index.js';
 

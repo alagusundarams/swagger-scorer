@@ -156,4 +156,37 @@ export class ArmService {
             throw new Error(`ARM PUT Failed: ${JSON.stringify(e.response?.data?.error || e.message)}`);
         }
     }
+
+    /**
+     * Gets a Resource (Generic). Useful for Snapshots.
+     */
+    async getResource(relativePath: string): Promise<any> {
+        const url = `${this.baseUrl}/${relativePath}?api-version=2022-08-01`;
+        try {
+            const response = await axios.get(url, { headers: this.headers });
+            return response.data;
+        } catch (e: any) {
+            if (e.response?.status === 404) return null;
+            throw new Error(`ARM GET Failed: ${e.message}`);
+        }
+    }
+
+    /**
+     * Deletes a Resource via DELETE.
+     */
+    async deleteResource(relativePath: string): Promise<void> {
+        const url = `${this.baseUrl}/${relativePath}?api-version=2022-08-01`;
+        try {
+            await axios.delete(url, { headers: { ...this.headers, 'If-Match': '*' } }); // Force delete even if etag mismatch
+            console.log(`[ARM] DELETE Success for ${relativePath}`);
+        } catch (e: any) {
+            // Ignore 404
+            if (e.response?.status === 404) {
+                console.warn(`[ARM] DELETE Ignored (Not Found) for ${relativePath}`);
+                return;
+            }
+            console.error(`[ARM] DELETE Failed for ${relativePath}:`, e.response?.data || e.message);
+            throw new Error(`ARM DELETE Failed: ${JSON.stringify(e.response?.data?.error || e.message)}`);
+        }
+    }
 }

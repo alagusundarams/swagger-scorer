@@ -6,7 +6,7 @@
  */
 
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
-import { query } from '../services/db.js';
+import { query } from '../services/core/db.js';
 
 export async function validationRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {
 

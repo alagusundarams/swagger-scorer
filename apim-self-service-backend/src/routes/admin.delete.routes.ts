@@ -10,7 +10,7 @@
  */
 
 import { FastifyPluginAsync } from 'fastify';
-import { deleteSaga } from '../services/deleteSaga.js';
+import { deleteSaga } from '../services/workflow/sagas/DeleteSaga.js';
 import { getUserId } from '../middleware/auth.js';
 
 const adminDeleteRoutes: FastifyPluginAsync = async (fastify) => {

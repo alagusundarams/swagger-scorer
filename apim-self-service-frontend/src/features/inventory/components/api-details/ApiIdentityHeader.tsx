@@ -11,9 +11,10 @@ import { getEnvironmentTheme } from '../../../../utils/statusUtils';
 interface ApiIdentityHeaderProps {
     product: Product;
     api: API;
+    canEditPolicies?: boolean;
 }
 
-export function ApiIdentityHeader({ product, api }: ApiIdentityHeaderProps) {
+export function ApiIdentityHeader({ product, api, canEditPolicies = false }: ApiIdentityHeaderProps) {
     const navigate = useNavigate();
 
     const handleAnalyze = () => {
@@ -52,12 +53,14 @@ paths: {}
                             {api.displayName}
                         </h1>
                         <div className="flex gap-3">
-                            <button
-                                onClick={() => navigate(`/products/${product.id}/apis/${api.id}/policy-editor`)}
-                                className="px-6 py-4 bg-purple-600/10 text-purple-600 hover:bg-purple-600 hover:text-white font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all flex items-center gap-2 border border-purple-200 dark:border-purple-800"
-                            >
-                                <span className="text-lg">🛠️</span> Edit Policies
-                            </button>
+                            {canEditPolicies && (
+                                <button
+                                    onClick={() => navigate(`/products/${product.id}/apis/${api.id}/policy-editor`)}
+                                    className="px-6 py-4 bg-purple-600/10 text-purple-600 hover:bg-purple-600 hover:text-white font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all flex items-center gap-2 border border-purple-200 dark:border-purple-800"
+                                >
+                                    <span className="text-lg">🛠️</span> Edit Policies
+                                </button>
+                            )}
                             <button
                                 onClick={handleAnalyze}
                                 className="px-8 py-4 bg-slate-900 dark:bg-slate-800 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-xl hover:scale-105 transition-all flex items-center gap-2 border border-slate-700"

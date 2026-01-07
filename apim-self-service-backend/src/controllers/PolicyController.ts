@@ -1,7 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { XmlService } from '../services/policy/XmlService.js';
 import { GitService } from '../services/git/GitService.js';
-import { getRepoUrlForResource } from '../services/products.service.js';
+import { getRepoUrlForResource } from '../services/inventory/ProductsService.js';
 
 export class PolicyController {
     private xmlService: XmlService;

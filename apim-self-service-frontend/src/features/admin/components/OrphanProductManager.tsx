@@ -214,7 +214,7 @@ export const OrphanProductManager = () => {
             <div className="flex gap-4 items-center bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
                 <div className="flex-1">
                     <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2">🔍</span>
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
                         <input
                             type="text"
                             placeholder="Search by name or ID..."
@@ -224,24 +224,28 @@ export const OrphanProductManager = () => {
                         />
                     </div>
                 </div>
-                <select
-                    value={envFilter}
-                    onChange={(e) => setEnvFilter(e.target.value)}
-                    className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500"
-                >
-                    <option value="ALL">All Environments</option>
-                    <option value="DEV">DEV</option>
-                    <option value="QA">QA</option>
-                    <option value="STAGE">STAGE</option>
-                    <option value="PROD">PROD</option>
-                </select>
-                <div className="text-xs text-slate-500">
+                <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Environment</span>
+                    <select
+                        value={envFilter}
+                        onChange={(e) => setEnvFilter(e.target.value)}
+                        className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-xs font-bold focus:ring-2 focus:ring-blue-500 dark:text-white"
+                    >
+                        <option value="ALL">All Environments</option>
+                        <option value="DEV">DEV</option>
+                        <option value="QA">QA</option>
+                        <option value="STAGE">STAGE</option>
+                        <option value="PROD">PROD</option>
+                    </select>
+                </div>
+                <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
+                <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
                     Showing {orphans.length} of {pagination.total} products (Page {pagination.page}/{pagination.totalPages})
                 </div>
             </div>
 
             {/* Action Bar */}
-            <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row justify-between items-end gap-4">
+            <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h3 className="text-lg font-bold text-slate-800 dark:text-white">Orphaned / Legacy Products</h3>
                     <p className="text-sm text-slate-500 mt-1">Found <span className="font-bold text-red-600 text-base">{orphans.length}</span> unassigned APIs requiring governance.</p>
@@ -251,7 +255,7 @@ export const OrphanProductManager = () => {
                     <div className="flex flex-col gap-2">
                         <div className="w-64">
                             <select
-                                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none dark:text-white"
+                                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none dark:text-white transition-all shadow-sm"
                                 value={targetTeamId}
                                 onChange={(e) => {
                                     setTargetTeamId(e.target.value);
@@ -285,18 +289,18 @@ export const OrphanProductManager = () => {
                     <button
                         onClick={handleAssign}
                         disabled={selectedProductIds.size === 0 || !targetTeamId}
-                        className="px-6 py-2 bg-blue-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-sm transition-all flex items-center gap-2 h-10"
+                        className="px-8 py-2.5 bg-blue-600 disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:cursor-not-allowed hover:bg-blue-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/10 transition-all flex items-center gap-2 h-11"
                     >
                         <span>Assign Selected</span>
                         {selectedProductIds.size > 0 && (
-                            <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">{selectedProductIds.size}</span>
+                            <span className="bg-white/20 px-2 py-0.5 rounded-full text-[10px]">{selectedProductIds.size}</span>
                         )}
                     </button>
 
                     <button
                         onClick={handleDelete}
                         disabled={selectedProductIds.size === 0 || isLoading}
-                        className="px-6 py-2 bg-red-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed hover:bg-red-700 text-white text-sm font-bold rounded-lg shadow-sm transition-all flex items-center gap-2 h-10"
+                        className="px-6 py-2.5 bg-red-600 disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:cursor-not-allowed hover:bg-red-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-red-500/10 transition-all flex items-center gap-2 h-11"
                     >
                         <span>Delete</span>
                         {selectedProductIds.size > 0 && (
@@ -307,59 +311,61 @@ export const OrphanProductManager = () => {
             </div>
 
             {/* Orphan List */}
-            <div className="border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-premium">
                 {isLoading && (
                     <div className="absolute inset-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-10">
                         <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                     </div>
                 )}
-                <table className="w-full text-left text-sm">
-                    <thead className="bg-gray-50 dark:bg-slate-800/80 border-b border-gray-100 dark:border-slate-700">
+                <table className="w-full text-left">
+                    <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
                         <tr>
-                            <th className="p-3 w-12 text-center">
+                            <th className="p-5 w-14 text-center">
                                 <input
                                     type="checkbox"
                                     checked={orphans.length > 0 && selectedProductIds.size === orphans.length}
                                     onChange={handleSelectAll}
-                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                 />
                             </th>
-                            <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-xs uppercase tracking-wider">Product Name</th>
-                            <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-xs uppercase tracking-wider">Version</th>
-                            <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-xs uppercase tracking-wider">Last Updated</th>
-                            <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-xs uppercase tracking-wider">Current Status</th>
+                            <th className="p-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Product Name</th>
+                            <th className="p-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Version</th>
+                            <th className="p-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Last Updated</th>
+                            <th className="p-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Current Status</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                    <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
                         {orphans.length === 0 ? (
                             <tr>
-                                <td colSpan={5} className="p-8 text-center text-slate-500 italic">
+                                <td colSpan={5} className="p-16 text-center text-slate-500 italic">
                                     No orphan products found. Good job! 🎉
                                 </td>
                             </tr>
                         ) : (
                             orphans.map(product => (
-                                <tr key={product.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                    <td className="p-3 text-center">
+                                <tr key={product.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                    <td className="p-5 text-center">
                                         <input
                                             type="checkbox"
                                             checked={selectedProductIds.has(product.id)}
                                             onChange={() => handleSelect(product.id)}
-                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                         />
                                     </td>
-                                    <td className="p-3 font-medium text-slate-900 dark:text-white">
-                                        {product.displayName || product.name}
-                                        <div className="text-xs text-slate-400 font-mono mt-0.5">{product.id}</div>
+                                    <td className="p-5">
+                                        <div className="font-bold text-slate-900 dark:text-white">{product.displayName || product.name}</div>
+                                        <div className="text-[10px] font-mono text-slate-400 mt-0.5">{product.id}</div>
                                     </td>
-                                    <td className="p-3 text-slate-600 dark:text-slate-400">
-                                        <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-xs font-mono">{product.version}</span>
+                                    <td className="p-5">
+                                        <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-mono font-bold text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                            {product.version}
+                                        </span>
                                     </td>
-                                    <td className="p-3 text-slate-500 text-xs">
+                                    <td className="p-5 text-xs text-slate-500 font-medium">
                                         {new Date(product.updatedAt).toLocaleDateString()}
                                     </td>
-                                    <td className="p-3">
-                                        <span className="text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded-full border border-red-200 dark:border-red-800">
+                                    <td className="p-5 text-right">
+                                        <span className="inline-block text-[10px] font-black text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-full border border-red-100 dark:border-red-900/30 uppercase tracking-tighter">
                                             No Owner
                                         </span>
                                     </td>

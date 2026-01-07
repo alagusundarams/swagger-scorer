@@ -221,6 +221,65 @@ export function ProducerHeader({
                     </button>
                 )}
             </div>
+            {/* Technical Metadata Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8 pt-8 border-t border-gray-100 dark:border-slate-800">
+                {/* Identity / App Registration */}
+                <div className="bg-gray-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-gray-100 dark:border-slate-700/50">
+                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Linked Identity</h3>
+                    {product.identity ? (
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-gray-500 font-bold">Client ID</span>
+                                <code className="text-xs font-mono bg-white dark:bg-slate-900 px-2 py-1 rounded border border-gray-200 dark:border-slate-700 select-all">
+                                    {product.identity.clientId}
+                                </code>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-gray-500 font-bold">App ID URI</span>
+                                <code className="text-xs font-mono bg-white dark:bg-slate-900 px-2 py-1 rounded border border-gray-200 dark:border-slate-700 select-all max-w-[150px] truncate" title={product.identity.appIdUri}>
+                                    {product.identity.appIdUri}
+                                </code>
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="text-xs text-gray-400 italic">No App Registration linked.</p>
+                    )}
+                </div>
+
+                {/* Git Synchronization */}
+                <div className="bg-gray-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-gray-100 dark:border-slate-700/50">
+                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Git Synchronization</h3>
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                            <span className="text-xs text-gray-500 font-bold">Repo URL</span>
+                            <a href={product.gitRepoUrl || '#'} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline truncate max-w-[150px]">
+                                {product.gitRepoUrl ? 'View Repository' : 'Not Linked'}
+                            </a>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-xs text-gray-500 font-bold">Last Commit</span>
+                            <code className="text-xs font-mono bg-white dark:bg-slate-900 px-2 py-1 rounded border border-gray-200 dark:border-slate-700">
+                                {product.lastDeployedCommitHash ? product.lastDeployedCommitHash.substring(0, 7) : 'N/A'}
+                            </code>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Management Info */}
+                <div className="bg-gray-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-gray-100 dark:border-slate-700/50">
+                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Governance</h3>
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                            <span className="text-xs text-gray-500 font-bold">Management Mode</span>
+                            <span className="text-xs font-bold text-gray-900 dark:text-gray-300">{product.managementMode?.replace('_', ' ') || 'PORTAL MANAGED'}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-xs text-gray-500 font-bold">Owner Team</span>
+                            <span className="text-xs font-bold text-gray-900 dark:text-gray-300">{product.ownerTeamName || product.ownerTeamId}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }

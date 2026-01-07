@@ -33,11 +33,10 @@ export const GlobalInventory: React.FC<GlobalInventoryProps> = ({ products, embe
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="border-b border-gray-100 dark:border-slate-700/50">
-                                <th className="p-6 text-xs font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest bg-gray-50/50 dark:bg-slate-900/50">Product Name</th>
-                                <th className="p-6 text-xs font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest bg-gray-50/50 dark:bg-slate-900/50">Owner Team</th>
-                                <th className="p-6 text-xs font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest bg-gray-50/50 dark:bg-slate-900/50 text-center">Version</th>
-                                <th className="p-6 text-xs font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest bg-gray-50/50 dark:bg-slate-900/50 text-center">APIs</th>
-                                <th className="p-6 text-xs font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest bg-gray-50/50 dark:bg-slate-900/50 text-right">Action</th>
+                                <th className="p-6 text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest bg-gray-50/50 dark:bg-slate-900/50">Product Name</th>
+                                <th className="p-6 text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest bg-gray-50/50 dark:bg-slate-900/50">Owner Team</th>
+                                <th className="p-6 text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest bg-gray-50/50 dark:bg-slate-900/50 text-center w-32">Version</th>
+                                <th className="p-6 text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest bg-gray-50/50 dark:bg-slate-900/50 text-center w-24">APIs</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-slate-700/50">
@@ -56,34 +55,33 @@ export const GlobalInventory: React.FC<GlobalInventoryProps> = ({ products, embe
                                                 <span className="text-xs text-gray-400 font-mono mt-1">{product.name}</span>
                                             </div>
                                         </td>
-                                        <td className="p-6">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                                        <td className="p-6 h-full">
+                                            <div className="flex items-center gap-2 h-full">
+                                                <div className="w-2 h-2 rounded-full bg-indigo-500 shrink-0"></div>
                                                 <span className="text-sm font-medium text-gray-600 dark:text-slate-300">
                                                     {product.ownerTeamName || product.ownerTeamId}
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="p-6 text-center">
-                                            <span className="inline-flex px-3 py-1 bg-gray-100 dark:bg-slate-700 rounded-full text-xs font-mono font-bold text-gray-500 dark:text-slate-300">
-                                                {product.version}
-                                            </span>
+                                        <td className="p-6">
+                                            <div className="flex justify-center">
+                                                <span className="inline-flex px-3 py-1 bg-gray-100 dark:bg-slate-700 rounded-full text-xs font-mono font-bold text-gray-500 dark:text-slate-300 whitespace-nowrap">
+                                                    {product.version}
+                                                </span>
+                                            </div>
                                         </td>
-                                        <td className="p-6 text-center">
-                                            <span className="text-sm font-bold text-gray-900 dark:text-white">
-                                                {product.apis?.length || 0}
-                                            </span>
-                                        </td>
-                                        <td className="p-6 text-right">
-                                            <span className="text-blue-600 font-bold text-xs uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">
-                                                Manage →
-                                            </span>
+                                        <td className="p-6">
+                                            <div className="flex justify-center">
+                                                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                                                    {product.apis?.length || 0}
+                                                </span>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={5} className="p-12 text-center text-gray-400 dark:text-slate-500 italic">
+                                    <td colSpan={4} className="p-16 text-center text-gray-400 dark:text-slate-500 italic">
                                         No products found in the global registry.
                                     </td>
                                 </tr>

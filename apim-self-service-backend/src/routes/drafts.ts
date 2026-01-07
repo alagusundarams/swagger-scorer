@@ -13,8 +13,8 @@ import {
     downloadDraft,
     deleteDraft,
     cleanupExpiredDrafts
-} from '../services/drafts.service.js';
-import { initBlobStorage } from '../services/blobStorage.service.js';
+} from '../services/inventory/DraftsService.js';
+import { initBlobStorage } from '../services/storage/BlobStorageService.js';
 import { getUserId } from '../middleware/auth.js';
 
 const draftsRoute: FastifyPluginAsync = async (fastify) => {

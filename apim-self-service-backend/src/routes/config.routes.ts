@@ -12,7 +12,7 @@ import {
     deleteNamedValue,
     getOrphanNamedValues,
     assignNamedValue
-} from '../services/named-values.service.js';
+} from '../services/inventory/NamedValuesService.js';
 
 import {
     getBackends,
@@ -21,7 +21,7 @@ import {
     deleteBackend,
     getOrphanBackends,
     assignBackend
-} from '../services/backends.service.js';
+} from '../services/inventory/BackendsService.js';
 import { getAppConfig } from '../config/loader.js';
 
 const configRoutes: FastifyPluginAsync = async (fastify) => {

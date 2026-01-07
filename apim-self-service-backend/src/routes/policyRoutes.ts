@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
-import { generateFlowXml, analyzeXmlToFlow } from '../services/policy-builder.service.js';
-import { query } from '../services/db.js';
+import { generateFlowXml, analyzeXmlToFlow } from '../services/policy/PolicyBuilderService.js';
+import { query } from '../services/core/db.js';
 
 /**
  * Registers policy management routes

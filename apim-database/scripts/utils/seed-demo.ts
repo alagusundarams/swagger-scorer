@@ -202,12 +202,12 @@ async function seedDemoData() {
         `);
         console.log('✅ Named Values Seeded.');
 
-        // 7. Insert Backends with environment and region
+        // 7. Insert Backends with environment
         await pool.query(`
-            INSERT INTO governance_backends (id, title, url, environment, region, product_id)
+            INSERT INTO governance_backends (id, title, url, environment, product_id)
             VALUES 
-                ('be-01', 'Legacy ERP', 'https://erp.internal.com', 'PROD', 'Global', 'prod-legacy'),
-                ('be-02', 'Payment Processor', 'https://api.stripe.com', 'DEV', 'Global', 'prod-payment-v2');
+                ('be-01', 'Legacy ERP', 'https://erp.internal.com', 'PROD', 'prod-legacy'),
+                ('be-02', 'Payment Processor', 'https://api.stripe.com', 'DEV', 'prod-payment-v2');
         `);
         console.log('✅ Backends Seeded.');
 

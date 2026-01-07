@@ -6,8 +6,8 @@
  */
 
 import { FastifyPluginAsync } from 'fastify';
-import { query } from '../services/db.js';
-import { getGatewayService } from '../services/gateway-factory.js';
+import { query } from '../services/core/db.js';
+import { getGatewayService } from '../services/gateway/GatewayFactory.js';
 
 const policyDisplayRoutes: FastifyPluginAsync = async (fastify) => {
     /**

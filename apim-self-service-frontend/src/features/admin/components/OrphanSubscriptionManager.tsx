@@ -192,7 +192,7 @@ export const OrphanSubscriptionManager = () => {
             <div className="flex gap-4 items-center bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
                 <div className="flex-1">
                     <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2">🔍</span>
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
                         <input
                             type="text"
                             placeholder="Search by app name, ID, or product..."
@@ -202,36 +202,40 @@ export const OrphanSubscriptionManager = () => {
                         />
                     </div>
                 </div>
-                <select
-                    value={envFilter}
-                    onChange={(e) => setEnvFilter(e.target.value)}
-                    className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500"
-                >
-                    <option value="ALL">All Environments</option>
-                    <option value="DEV">DEV</option>
-                    <option value="QA">QA</option>
-                    <option value="STAGE">STAGE</option>
-                    <option value="PROD">PROD</option>
-                </select>
-                <div className="text-xs text-slate-500">
+                <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Environment</span>
+                    <select
+                        value={envFilter}
+                        onChange={(e) => setEnvFilter(e.target.value)}
+                        className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-xs font-bold focus:ring-2 focus:ring-blue-500 dark:text-white"
+                    >
+                        <option value="ALL">All Environments</option>
+                        <option value="DEV">DEV</option>
+                        <option value="QA">QA</option>
+                        <option value="STAGE">STAGE</option>
+                        <option value="PROD">PROD</option>
+                    </select>
+                </div>
+                <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
+                <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
                     Showing {filteredOrphans.length} of {orphans.length} orphans
                 </div>
             </div>
 
             {/* Action Bar */}
-            <div className="bg-amber-50 dark:bg-amber-900/10 p-6 rounded-2xl border border-amber-200 dark:border-amber-900/30 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="bg-blue-50 dark:bg-blue-900/10 p-6 rounded-2xl border border-blue-200 dark:border-blue-900/30 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
-                    <h3 className="text-xl font-black text-amber-900 dark:text-amber-500 flex items-center gap-2">
-                        <span className="text-2xl">🍼</span> Orphan Subscription Reclamation
+                    <h3 className="text-xl font-bold text-blue-900 dark:text-blue-400 flex items-center gap-2 tracking-tight">
+                        <span className="text-2xl animate-bounce-slow">🍼</span> Orphan Subscription Reclamation
                     </h3>
-                    <p className="text-sm text-amber-700 dark:text-amber-600/80 font-medium">
-                        Found <span className="font-black underline">{orphans.length}</span> active keys without a registered team owner.
+                    <p className="text-sm text-blue-700 dark:text-blue-500/80 font-medium">
+                        Found <span className="font-bold underline">{orphans.length}</span> active keys without a registered team owner.
                     </p>
                 </div>
 
                 <div className="flex items-center gap-4 w-full md:w-auto">
                     <select
-                        className="w-full md:w-64 bg-white dark:bg-slate-900 border-2 border-amber-200 dark:border-amber-900/50 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none dark:text-white transition-all shadow-sm"
+                        className="w-full md:w-64 bg-white dark:bg-slate-900 border-2 border-blue-200 dark:border-blue-900/50 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none dark:text-white transition-all shadow-sm"
                         value={targetTeamId}
                         onChange={(e) => setTargetTeamId(e.target.value)}
                     >
@@ -244,7 +248,7 @@ export const OrphanSubscriptionManager = () => {
                     <button
                         onClick={handleAdopt}
                         disabled={selectedSubIds.size === 0 || !targetTeamId}
-                        className="px-8 py-2.5 bg-amber-600 disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:cursor-not-allowed hover:bg-amber-700 text-white text-sm font-black rounded-xl shadow-xl shadow-amber-500/20 transition-all flex items-center gap-2 h-11 whitespace-nowrap"
+                        className="px-8 py-2.5 bg-blue-600 disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:cursor-not-allowed hover:bg-blue-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2 h-11 whitespace-nowrap"
                     >
                         <span>Adopt Selected</span>
                         {selectedSubIds.size > 0 && (
@@ -255,7 +259,7 @@ export const OrphanSubscriptionManager = () => {
                     <button
                         onClick={handleDelete}
                         disabled={selectedSubIds.size === 0 || isLoading}
-                        className="px-6 py-2.5 bg-red-600 disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:cursor-not-allowed hover:bg-red-700 text-white text-sm font-black rounded-xl shadow-xl shadow-red-500/20 transition-all flex items-center gap-2 h-11 whitespace-nowrap"
+                        className="px-6 py-2.5 bg-red-600 disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:cursor-not-allowed hover:bg-red-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-red-500/20 transition-all flex items-center gap-2 h-11 whitespace-nowrap"
                     >
                         <span>Delete</span>
                         {selectedSubIds.size > 0 && (
@@ -266,7 +270,7 @@ export const OrphanSubscriptionManager = () => {
             </div>
 
             {/* List Table */}
-            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-premium">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-premium">
                 <table className="w-full text-left">
                     <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
                         <tr>
@@ -275,51 +279,51 @@ export const OrphanSubscriptionManager = () => {
                                     type="checkbox"
                                     checked={filteredOrphans.length > 0 && selectedSubIds.size === filteredOrphans.length}
                                     onChange={handleSelectAll}
-                                    className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                 />
                             </th>
                             <th className="p-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Subscription / App</th>
                             <th className="p-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Target Product</th>
                             <th className="p-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Created</th>
-                            <th className="p-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Action</th>
+                            <th className="p-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Status</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                    <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
                         {filteredOrphans.length === 0 ? (
                             <tr>
                                 <td colSpan={5} className="p-16 text-center">
-                                    <div className="text-4xl mb-4">✨</div>
+                                    <div className="text-4xl mb-4 text-white">✨</div>
                                     <div className="text-slate-900 dark:text-white font-black text-lg mb-1">Zero Orphans Found</div>
-                                    <div className="text-slate-500 text-sm">All active subscriptions are properly mapped to teams.</div>
+                                    <div className="text-slate-500 text-sm font-medium">All active subscriptions are properly mapped to teams.</div>
                                 </td>
                             </tr>
                         ) : (
                             filteredOrphans.map(sub => (
-                                <tr key={sub.id} className={`group hover:bg-amber-50/30 dark:hover:bg-amber-900/5 transition-colors ${selectedSubIds.has(sub.id) ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''}`}>
+                                <tr key={sub.id} className={`group hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors ${selectedSubIds.has(sub.id) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}>
                                     <td className="p-5 text-center">
                                         <input
                                             type="checkbox"
                                             checked={selectedSubIds.has(sub.id)}
                                             onChange={() => handleSelect(sub.id)}
-                                            className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                         />
                                     </td>
                                     <td className="p-5">
                                         <div className="font-bold text-slate-900 dark:text-white">{sub.appDisplayName || 'Legacy App'}</div>
                                         <div className="text-[10px] font-mono text-slate-400 mt-0.5">{sub.id}</div>
                                     </td>
-                                    <td className="p-5">
+                                    <td className="p-5 font-medium text-slate-900 dark:text-white">
                                         <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                                             {sub.productName}
                                         </span>
                                     </td>
-                                    <td className="p-5 text-sm text-slate-500">
+                                    <td className="p-5 text-xs text-slate-500 font-medium">
                                         {new Date(sub.createdAt).toLocaleDateString()}
                                     </td>
                                     <td className="p-5 text-right">
                                         <button
                                             onClick={() => handleSelect(sub.id)}
-                                            className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all ${selectedSubIds.has(sub.id) ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                                            className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-tighter transition-all ${selectedSubIds.has(sub.id) ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                                         >
                                             {selectedSubIds.has(sub.id) ? 'Selected' : 'Mark for Adoption'}
                                         </button>

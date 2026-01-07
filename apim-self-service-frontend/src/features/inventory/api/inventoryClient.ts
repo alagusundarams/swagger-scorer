@@ -150,5 +150,13 @@ export const inventoryApi = {
     ejectProduct: async (productId: string): Promise<Product> => {
         const res = await baseClient.post(`/products/${encodeURIComponent(productId)}/eject`);
         return res.data;
+    },
+    // Request Access (Subscription)
+    requestAccess: async (productId: string, teamId: string, justification: string): Promise<any> => {
+        const res = await baseClient.post(`/products/${encodeURIComponent(productId)}/subscriptions`, {
+            teamId,
+            justification
+        });
+        return res.data;
     }
 };
