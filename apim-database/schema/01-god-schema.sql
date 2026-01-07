@@ -306,10 +306,10 @@ CREATE TABLE IF NOT EXISTS governance_backends (
     title TEXT,
     protocol TEXT,
     
-    -- Scope/Ownership
-    product_id TEXT REFERENCES products(id) ON DELETE SET NULL,
-    api_id TEXT REFERENCES apis(id) ON DELETE SET NULL,
-    scope TEXT CHECK (scope IN ('PRODUCT', 'API', 'GLOBAL')),
+    -- Scope/Ownership (UPDATED: Backends are API-level, not product-level)
+    product_id TEXT REFERENCES products(id) ON DELETE RESTRICT,  -- Changed to RESTRICT for safety
+    api_id TEXT REFERENCES apis(id) ON DELETE RESTRICT,          -- Changed to RESTRICT for safety
+    scope TEXT CHECK (scope IN ('API', 'GLOBAL')),               -- Removed 'PRODUCT'
     
     -- Timestamps
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -320,6 +320,10 @@ CREATE TABLE IF NOT EXISTS governance_backends (
 
     PRIMARY KEY (id, environment)
 );
+
+CREATE INDEX idx_backends_product ON governance_backends(product_id);
+CREATE INDEX idx_backends_api ON governance_backends(api_id);
+CREATE INDEX idx_backends_scope ON governance_backends(scope);
 
 CREATE TABLE IF NOT EXISTS api_backends (
     api_id TEXT, -- Note: can't always guarantee api_id matches our DB id yet
@@ -338,7 +342,7 @@ CREATE TABLE IF NOT EXISTS api_backends (
 CREATE TABLE IF NOT EXISTS named_values (
     id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
     product_id TEXT REFERENCES products(id) ON DELETE CASCADE,
-    scope_id TEXT, -- Null for Product Level, API ID for API Scope
+    scope_id TEXT REFERENCES apis(id) ON DELETE CASCADE, -- FK constraint for API-scoped values
     display_name TEXT NOT NULL,
     system_name TEXT NOT NULL,
     value TEXT NOT NULL,
@@ -354,6 +358,32 @@ CREATE TABLE IF NOT EXISTS named_values (
     
     UNIQUE(system_name, environment, product_id, scope_id)
 );
+
+CREATE INDEX idx_named_values_product ON named_values(product_id);
+CREATE INDEX idx_named_values_scope ON named_values(scope_id);
+CREATE INDEX idx_named_values_environment ON named_values(environment);
+
+-- =============================================================================
+-- PRODUCT NAMED VALUES (Junction Table for Shared Resources)
+-- Many:Many relationship - one named value can be referenced by multiple products
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS product_named_values (
+    product_id TEXT REFERENCES products(id) ON DELETE CASCADE NOT NULL,
+    named_value_id TEXT REFERENCES named_values(id) ON DELETE CASCADE NOT NULL,
+    is_owner BOOLEAN DEFAULT false, -- Who created/owns the value
+    can_modify BOOLEAN DEFAULT false, -- Permission to edit value
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (product_id, named_value_id)
+);
+
+CREATE INDEX idx_pnv_product ON product_named_values(product_id);
+CREATE INDEX idx_pnv_named_value ON product_named_values(named_value_id);
+CREATE INDEX idx_pnv_owner ON product_named_values(is_owner) WHERE is_owner = true;
+
+COMMENT ON TABLE product_named_values IS 'Junction table for named value sharing across products. Supports read-only references and ownership tracking.';
+COMMENT ON COLUMN product_named_values.is_owner IS 'True if this product created the named value (can delete)';
+COMMENT ON COLUMN product_named_values.can_modify IS 'True if this product can edit the value (typically only owner)';
 
 -- =============================================================================
 -- PERMISSION MATRIX (RBAC)
