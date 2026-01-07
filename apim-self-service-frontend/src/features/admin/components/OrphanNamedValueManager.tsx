@@ -31,6 +31,8 @@ export const OrphanNamedValueManager: React.FC = () => {
     const [targetProductId, setTargetProductId] = useState('');
     const [targetScope, setTargetScope] = useState<'PRODUCT' | 'API' | 'GLOBAL'>('PRODUCT');
     const [adopting, setAdopting] = useState(false);
+    const [productSearch, setProductSearch] = useState('');
+    const [showProductDropdown, setShowProductDropdown] = useState(false);
 
     const environments = ['DEV', 'QA', 'STAGE', 'PROD'];
 
@@ -197,21 +199,50 @@ export const OrphanNamedValueManager: React.FC = () => {
                         className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:text-white"
                     >
                         <option value="PRODUCT">Assign to Product</option>
+                        <option value="API">Assign to API (within Product)</option>
                         <option value="GLOBAL">Mark as GLOBAL</option>
                     </select>
 
-                    {targetScope === 'PRODUCT' && (
-                        <select
-                            value={targetProductId}
-                            onChange={(e) => setTargetProductId(e.target.value)}
-                            disabled={adopting}
-                            className="w-full md:w-64 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none dark:text-white transition-all shadow-sm"
-                        >
-                            <option value="">Select Target Product...</option>
-                            {products.map(p => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                            ))}
-                        </select>
+                    {(targetScope === 'PRODUCT' || targetScope === 'API') && (
+                        <div className="relative w-full md:w-64">
+                            <input
+                                type="text"
+                                value={productSearch}
+                                onChange={(e) => {
+                                    setProductSearch(e.target.value);
+                                    setShowProductDropdown(true);
+                                }}
+                                onFocus={() => setShowProductDropdown(true)}
+                                placeholder={targetScope === 'API' ? 'Search product for API...' : 'Search product...'}
+                                disabled={adopting}
+                                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none dark:text-white transition-all shadow-sm"
+                            />
+                            {showProductDropdown && productSearch && (
+                                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                                    {products
+                                        .filter(p =>
+                                            p.name?.toLowerCase().includes(productSearch.toLowerCase()) ||
+                                            p.displayName?.toLowerCase().includes(productSearch.toLowerCase())
+                                        )
+                                        .slice(0, 10)
+                                        .map(p => (
+                                            <div
+                                                key={p.id}
+                                                onClick={() => {
+                                                    setTargetProductId(p.id);
+                                                    setProductSearch(p.displayName || p.name);
+                                                    setShowProductDropdown(false);
+                                                }}
+                                                className="px-4 py-2 hover:bg-blue-50 dark:hover:bg-slate-700 cursor-pointer text-sm"
+                                            >
+                                                <div className="font-bold text-slate-900 dark:text-white">{p.displayName || p.name}</div>
+                                                <div className="text-xs text-slate-500">{p.environment} • {p.ownerTeamName || 'No Team'}</div>
+                                            </div>
+                                        ))
+                                    }
+                                </div>
+                            )}
+                        </div>
                     )}
 
                     <button
@@ -251,8 +282,8 @@ export const OrphanNamedValueManager: React.FC = () => {
                                     className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                 />
                             </th>
-                            <th className="p-5 text-[10px] font-black uppercase tracking-widest text-slate-400">System Name</th>
                             <th className="p-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Display Name</th>
+                            <th className="p-5 text-[10px] font-black uppercase tracking-widest text-slate-400">System Name</th>
                             <th className="p-5 text-[10px] font-black uppercase tracking-widest text-slate-400 w-48 text-center">Value (Preview)</th>
                             <th className="p-5 text-[10px] font-black uppercase tracking-widest text-slate-400 w-24 text-center">Scope</th>
                             <th className="p-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Last Updated</th>
@@ -285,10 +316,12 @@ export const OrphanNamedValueManager: React.FC = () => {
                                             className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                         />
                                     </td>
+                                    <td className="p-5 font-bold text-slate-900 dark:text-white">{nv.displayName || nv.systemName}</td>
                                     <td className="p-5">
-                                        <code className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded font-mono text-blue-600 dark:text-blue-400 uppercase font-black">{nv.systemName}</code>
+                                        <code className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded font-mono text-blue-600 dark:text-blue-400 font-medium" title={nv.systemName}>
+                                            {nv.systemName.length > 30 ? nv.systemName.substring(0, 30) + '...' : nv.systemName}
+                                        </code>
                                     </td>
-                                    <td className="p-5 font-bold text-slate-900 dark:text-white">{nv.displayName || '-'}</td>
                                     <td className="p-5 text-center">
                                         <code className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[200px] inline-block bg-slate-50 dark:bg-slate-900 px-3 py-1 rounded-lg border border-slate-100 dark:border-slate-800" title={nv.value}>
                                             {nv.value.length > 20 ? nv.value.substring(0, 20) + '...' : nv.value}
