@@ -3,10 +3,10 @@
  * Migrated from ProductsService for proper separation of concerns
  */
 
-import { ProductsRepository } from '../../repositories/products.repo.js';
+import { NamedValuesRepository } from '../../repositories/named-values.repo.js';
 import { logAudit } from '../core/AuditService.js';
 
-const repo = new ProductsRepository();
+const repo = new NamedValuesRepository();
 
 // ============================================================================
 // READ Operations
