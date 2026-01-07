@@ -17,7 +17,8 @@ export const NamedValueModal = ({ product, isOpen, onClose, onConfirm }: NamedVa
     const [scopeId, setScopeId] = useState<string>(''); // Empty = Product Level
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [confirmOverwrite, setConfirmOverwrite] = useState(false);
+    const [duplicateDetected, setDuplicateDetected] = useState(false);
+    const [existingNV, setExistingNV] = useState<any>(null);
 
     // Auto-generate system name from display name
     useEffect(() => {
@@ -27,11 +28,32 @@ export const NamedValueModal = ({ product, isOpen, onClose, onConfirm }: NamedVa
     }, [displayName]);
 
     useEffect(() => {
-        setConfirmOverwrite(false);
+        setDuplicateDetected(false);
+        setExistingNV(null);
         setError(null);
     }, [scopeId, systemName]);
 
     if (!isOpen) return null;
+
+    const checkDuplicate = async () => {
+        if (!systemName || !product.environment) return;
+
+        try {
+            const response = await fetch(`/api/v1/products/${product.id}/named-values/check-duplicate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ systemName, environment: product.environment })
+            });
+            const result = await response.json();
+
+            if (result.exists) {
+                setDuplicateDetected(true);
+                setExistingNV(result.existing);
+            }
+        } catch (err) {
+            console.error('Duplicate check failed:', err);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -45,17 +67,11 @@ export const NamedValueModal = ({ product, isOpen, onClose, onConfirm }: NamedVa
                 value,
                 type,
                 isSecret,
-                scopeId: scopeId || null,
-                allowOverwrite: confirmOverwrite
+                scopeId: scopeId || null
             });
             onClose();
         } catch (err: any) {
-            const msg = err.message || '';
-            if (msg.includes('DUPLICATE_CONFIRMATION_REQUIRED')) {
-                setConfirmOverwrite(true);
-            } else {
-                setError(msg || 'Failed to save value.');
-            }
+            setError(err.message || 'Failed to save value.');
         } finally {
             setIsSubmitting(false);
         }
@@ -78,21 +94,41 @@ export const NamedValueModal = ({ product, isOpen, onClose, onConfirm }: NamedVa
                         </div>
                     )}
 
-                    {confirmOverwrite && (
+                    {duplicateDetected && existingNV && (
                         <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg mb-4 animate-fade-in">
                             <h4 className="text-sm font-bold text-amber-800 flex items-center gap-2 mb-1">
-                                <span>⚠️</span> Duplicate Value Detected
+                                <span>⚠️</span> Named Value Already Exists
                             </h4>
-                            <p className="text-xs text-amber-700 mb-3">
-                                A value with the system name <strong>{systemName}</strong> already exists in this scope.
-                                Do you want to update it with the new value? This action will be audited.
+                            <p className="text-xs text-amber-700 mb-2">
+                                A value with the name <strong>{systemName}</strong> already exists.
                             </p>
-                            <button
-                                type="submit"
-                                className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold uppercase rounded shadow-sm transition"
-                            >
-                                Yes, Overwrite Existing Value
-                            </button>
+                            <div className="text-xs text-amber-800 mb-3">
+                                <strong>Currently used by:</strong>
+                                <ul className="mt-1 ml-4 list-disc">
+                                    {existingNV.owners?.map((o: any, i: number) => (
+                                        <li key={i}>{o.productName} ({o.teamName}) {o.isOwner && '👑'}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setDuplicateDetected(false);
+                                        setSystemName('');
+                                    }}
+                                    className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold uppercase rounded shadow-sm transition"
+                                >
+                                    Rename Mine
+                                </button>
+                                <button
+                                    type="button"
+                                    className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white text-xs font-bold uppercase rounded shadow-sm transition"
+                                    disabled
+                                >
+                                    Reference (Coming Soon)
+                                </button>
+                            </div>
                         </div>
                     )}
 
@@ -137,10 +173,12 @@ export const NamedValueModal = ({ product, isOpen, onClose, onConfirm }: NamedVa
                                 type="text"
                                 value={systemName}
                                 onChange={(e) => setSystemName(e.target.value)}
+                                onBlur={checkDuplicate}
                                 className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
                                 placeholder="backend-timeout"
                                 required
                             />
+                            <p className="text-[10px] text-gray-400 mt-1">Auto-checked for duplicates</p>
                         </div>
                     </div>
 
