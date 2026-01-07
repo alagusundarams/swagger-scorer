@@ -8,11 +8,12 @@
 // @ts-ignore
 import SwaggerParser from '@apidevtools/swagger-parser';
 import { auditService, logAudit } from '../core/AuditService.js';
-import { decomposePolicyXml } from '../policy/PolicyBuilderService.js';
+import { decompose PolicyXml } from '../policy/PolicyBuilderService.js';
 import { RepoService } from '../git/ado/RepoService.js';
 import { getAppConfig } from '../../config/loader.js';
 import { ProductsRepository } from '../../repositories/products.repo.js';
 import { fetchSpecForProduct } from '../utils/SpecFetcherService.js';
+import { createNamedValue } from './NamedValuesService.js';
 
 
 const productsRepo = new ProductsRepository();
@@ -851,7 +852,7 @@ export async function ejectProduct(productId: string) {
     // 2c. Save Base Named Values to DB (Source of Truth for Portal)
     for (const v of extractedVars) {
         try {
-            await addNamedValue(productId, {
+            await createNamedValue(productId, {
                 displayName: `Ejected: ${v.name}`,
                 systemName: v.name,
                 value: v.value,
