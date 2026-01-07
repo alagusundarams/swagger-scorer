@@ -15,7 +15,10 @@
 import { apimGateway } from '../gateways/apimGateway.js';
 import { query } from './db.js';
 import { auditService } from './auditService.js';
+import { GitService } from './gitService.js';
 import type { ResourceType } from './auditService.js';
+
+const gitService = new GitService();
 
 interface DeleteContext {
     resourceType: ResourceType;
@@ -203,6 +206,7 @@ export class DeleteSagaOrchestrator {
     ): Promise<any> {
         const tableMap: Record<ResourceType, string> = {
             product: 'products',
+            api: 'apis',
             subscription: 'subscriptions',
             named_value: 'named_values',
             backend: 'governance_backends'
@@ -232,6 +236,7 @@ export class DeleteSagaOrchestrator {
         // Map resource types to APIM API paths
         const pathMap: Record<ResourceType, string> = {
             product: `/products/${resourceId}`,
+            api: `/apis/${resourceId}`,
             subscription: `/subscriptions/${resourceId}`,
             named_value: `/namedValues/${resourceId}`,
             backend: `/backends/${resourceId}`
@@ -255,6 +260,7 @@ export class DeleteSagaOrchestrator {
     ): Promise<void> {
         const tableMap: Record<ResourceType, string> = {
             product: 'products',
+            api: 'apis',
             subscription: 'subscriptions',
             named_value: 'named_values',
             backend: 'governance_backends'
@@ -282,25 +288,50 @@ export class DeleteSagaOrchestrator {
         environment: string,
         userEmail: string
     ): Promise<void> {
-        // TODO: Implement Git deletion
-        // For now, log placeholder
-        console.log(`[Saga][Git] Would delete ${resourceType}/${resourceId} from Git repo`);
+        // Resolve Git repo URL (could be from config, here hardcoded/mocked for POC)
+        const repoUrl = process.env.GIT_REPO_URL || 'https://github.com/myorg/apim-policy-repo.git';
 
-        // Expected implementation:
-        // 1. Checkout repo
-        // 2. Remove config file (e.g., policies/product-x.xml)
-        // 3. Commit with message: "Delete ${resourceName} (${environment})"
-        // 4. Push to remote
+        // Determine file path based on resource type
+        let filePath = '';
+        switch (resourceType) {
+            case 'product':
+                filePath = `policies/products/${resourceId}.xml`;
+                break;
+            case 'api':
+                filePath = `policies/apis/${resourceId}.xml`;
+                break;
+            case 'named_value':
+                filePath = `config/${environment}/named-values.json`; // Simplified assumption
+                break;
+            case 'backend':
+                filePath = `config/${environment}/backends.json`;
+                break;
+            default:
+                console.log(`[Saga][Git] Unknown file mapping for ${resourceType}, skipping Git op.`);
+                return;
+        }
 
-        // Placeholder for Git integration
-        // await gitClient.commitDeletion({
-        //   resourceType,
-        //   resourceId,
-        //   resourceName,
-        //   environment,
-        //   author: userEmail,
-        //   message: `Delete ${resourceType}: ${resourceName} (${environment})`
-        // });
+        console.log(`[Saga] Step 3: Backing up deletion of ${resourceName} to Git (Branching)...`);
+
+        // Use GitService to create a deletion branch (Safe Delete)
+        const result = await gitService.createDeletionBranch(
+            repoUrl,
+            filePath,
+            resourceId,
+            { name: 'APIM Portal Bot', email: userEmail || 'bot@portal.local' }
+        );
+
+        if (!result.success) {
+            // Check if it's just "File not found" - if so, maybe it was already gone? 
+            // We treat "File not found" as success (idempotency) but log it.
+            if (result.error?.includes('File not found')) {
+                console.warn(`[Saga][Git] File not found (${filePath}), treating as success.`);
+                return;
+            }
+            throw new Error(`Git deletion failed: ${result.error}`);
+        }
+
+        console.log(`[Saga] ✅ Git deletion branch created: ${result.branch}`);
     }
 
     /**
@@ -340,6 +371,7 @@ export class DeleteSagaOrchestrator {
     ): Promise<void> {
         const pathMap: Record<ResourceType, string> = {
             product: `/products/${snapshot.id}`,
+            api: `/apis/${snapshot.id}`,
             subscription: `/subscriptions/${snapshot.id}`,
             named_value: `/namedValues/${snapshot.id}`,
             backend: `/backends/${snapshot.id}`
@@ -360,6 +392,7 @@ export class DeleteSagaOrchestrator {
     ): Promise<void> {
         const tableMap: Record<ResourceType, string> = {
             product: 'products',
+            api: 'apis',
             subscription: 'subscriptions',
             named_value: 'named_values',
             backend: 'governance_backends'
@@ -384,7 +417,7 @@ export class DeleteSagaOrchestrator {
      */
     private async restoreToGit(
         context: DeleteContext,
-        snapshot: any
+        _snapshot: any
     ): Promise<void> {
         console.log(`[Saga][Rollback][Git] Would restore ${context.resourceType}/${context.resourceId} to Git`);
         // TODO: Implement Git restoration

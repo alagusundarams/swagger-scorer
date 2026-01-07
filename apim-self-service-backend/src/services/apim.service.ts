@@ -102,3 +102,67 @@ export async function getArmService(environment: string): Promise<ArmService> {
         accessToken: token
     });
 }
+
+/**
+ * Creates a Product in APIM
+ */
+export async function createProduct(name: string, payload: any, environment: string = 'dev'): Promise<any> {
+    const arm = await getArmService(environment);
+    console.log(`[APIM] Create Product: ${name} in ${environment}`);
+    // payload should match ARM Product contract
+    return await arm.putResource(`products/${name}`, payload);
+}
+
+/**
+ * Creates an API in APIM
+ */
+export async function createApi(productId: string, payload: any, environment: string = 'dev'): Promise<any> {
+    const arm = await getArmService(environment);
+    // APIs are top-level resources in APIM, but often linked to products via separate call.
+    // Here we create the API itself.
+    // Assuming payload.name is the API ID (e.g. 'echo-api'), payload.properties is the body.
+    const apiId = payload.name;
+    console.log(`[APIM] Create API: ${apiId} (linked to product ${productId}) in ${environment}`);
+
+    // Create API
+    const result = await arm.putResource(`apis/${apiId}`, payload);
+
+    // Link to Product (Separate ARM call: products/{pid}/apis/{aid})
+    // We treat this as part of "Create API" logic if productId is provided
+    if (productId) {
+        console.log(`[APIM] Linking API ${apiId} to Product ${productId}`);
+        await arm.putResource(`products/${productId}/apiLinks/${uuidv4()}`, {
+            properties: {
+                apiId: `/apis/${apiId}`
+            }
+        });
+    }
+
+    return result;
+}
+
+/**
+ * Creates a Named Value in APIM
+ */
+export async function createNamedValue(_productId: string, payload: any, environment: string = 'dev'): Promise<any> {
+    const arm = await getArmService(environment);
+    const id = payload.name; // ID of the named value
+    console.log(`[APIM] Create Named Value: ${id} in ${environment}`);
+
+    // Named Values are service-level resources
+    // If productId is passed, it might be for internal logic, but APIM Named Values are global.
+    // Unless using "Tags" to scope them? ignoring productId for direct creation.
+    return await arm.putResource(`namedValues/${id}`, payload);
+}
+
+/**
+ * Creates a Backend in APIM
+ */
+export async function createBackend(payload: any, environment: string = 'dev'): Promise<any> {
+    const arm = await getArmService(environment);
+    const id = payload.name;
+    console.log(`[APIM] Create Backend: ${id} in ${environment}`);
+    return await arm.putResource(`backends/${id}`, payload);
+}
+
+import { v4 as uuidv4 } from 'uuid';

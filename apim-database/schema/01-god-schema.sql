@@ -304,9 +304,20 @@ CREATE TABLE IF NOT EXISTS governance_backends (
     url TEXT,
     description TEXT,
     title TEXT,
-    resource_id TEXT,
     protocol TEXT,
+    
+    -- Scope/Ownership
+    product_id TEXT REFERENCES products(id) ON DELETE SET NULL,
+    api_id TEXT REFERENCES apis(id) ON DELETE SET NULL,
+    scope TEXT CHECK (scope IN ('PRODUCT', 'API', 'GLOBAL')),
+    
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- APIM source data
+    apim_raw_data JSONB,
+
     PRIMARY KEY (id, environment)
 );
 
@@ -337,6 +348,10 @@ CREATE TABLE IF NOT EXISTS named_values (
     region TEXT DEFAULT 'Global', -- Standardizing with backends
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- APIM source data
+    apim_raw_data JSONB,
+    
     UNIQUE(system_name, environment, product_id, scope_id)
 );
 

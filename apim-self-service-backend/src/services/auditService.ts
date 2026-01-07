@@ -14,10 +14,13 @@ export type AuditAction =
     | 'READ_SECRET'
     | 'BULK_ASSIGN'
     | 'CREATE'
-    | 'UPDATE';
+    | 'UPDATE'
+    | 'CREATE_SAGA_COMPLETE'
+    | 'CREATE_SAGA_ROLLBACK';
 
 export type ResourceType =
     | 'product'
+    | 'api'
     | 'subscription'
     | 'named_value'
     | 'backend';
@@ -147,3 +150,4 @@ export class AuditService {
 }
 
 export const auditService = new AuditService();
+export const logAudit = (entry: AuditLogEntry) => auditService.log(entry);

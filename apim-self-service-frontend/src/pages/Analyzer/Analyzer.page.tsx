@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { SpecStudio, useSpecStudio } from '../../features/spec-studio';
@@ -14,11 +15,20 @@ import { SpecStudio, useSpecStudio } from '../../features/spec-studio';
  * 📥 DATA FLOW:
  * - Purely volatile state managed within the SpecStudio feature store.
  * - Does not persist to drafts or products (used for "Sanity Checks").
+ * - Can be hydrated via router state (e.g. from API Details "Analyze" button).
  * ------------------------------------------------------------------
  */
 export function AnalyzerPage() {
     const { setPageTitle } = useStore();
     const { spec, setSpec } = useSpecStudio();
+    const location = useLocation();
+
+    // Check for incoming spec from navigation (e.g., "Analyze Spec" button)
+    const incomingSpec = location.state?.startWithSpec;
+
+    // effectiveContent: Prefer incoming navigation state, fallback to existing store state
+    // This fixes the bug where navigating between APIs showed stale data
+    const effectiveContent = incomingSpec || spec;
 
     useEffect(() => {
         setPageTitle('API Analyzer');
@@ -29,7 +39,7 @@ export function AnalyzerPage() {
             <div className="absolute inset-0 flex flex-col overflow-hidden bg-slate-950">
                 <main className="flex-1 flex overflow-hidden relative">
                     <SpecStudio
-                        initialContent={spec}
+                        initialContent={effectiveContent}
                         onContentChange={setSpec}
                     />
                 </main>

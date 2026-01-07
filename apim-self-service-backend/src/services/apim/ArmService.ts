@@ -141,4 +141,19 @@ export class ArmService {
         const initial = await axios.get(url, { headers: this.headers });
         return initial.data.value;
     }
+    /**
+     * Creates or Updates a Resource via PUT.
+     */
+    async putResource(relativePath: string, body: any): Promise<any> {
+        const url = `${this.baseUrl}/${relativePath}?api-version=2022-08-01`;
+        try {
+            const response = await axios.put(url, body, { headers: this.headers });
+            // Extract Etag from header if available, otherwise just return data
+            const etag = response.headers['etag'] || response.data.etag;
+            return { ...response.data, etag };
+        } catch (e: any) {
+            console.error(`[ARM] PUT Failed for ${relativePath}:`, e.response?.data || e.message);
+            throw new Error(`ARM PUT Failed: ${JSON.stringify(e.response?.data?.error || e.message)}`);
+        }
+    }
 }
