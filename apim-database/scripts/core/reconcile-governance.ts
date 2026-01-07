@@ -335,6 +335,7 @@ async function main() {
                 const nvId = `nv-${env}-${nv.name}`;
 
                 try {
+                    // Insert/update named value (product_id stays NULL for now)
                     await pool.query(`
                         INSERT INTO named_values (id, product_id, display_name, system_name, value, type, is_secret, environment, region, updated_at)
                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
@@ -346,6 +347,21 @@ async function main() {
                             is_secret = EXCLUDED.is_secret,
                             updated_at = NOW();
                     `, [nvId, null, nv.displayName, nv.name, val, type, nv.isSecret, env, 'Global']);
+
+                    // NEW: Link to products in this environment via junction table
+                    // Strategy: All products in this env get read-write access (can be refined later)
+                    const envProducts = inventory.filter((p: any) =>
+                        p.environments.map((e: any) => e.toUpperCase()).includes(env.toUpperCase())
+                    );
+
+                    for (const prod of envProducts) {
+                        const uniqueProductId = `${prod.id}:${env}`;
+                        await pool.query(`
+                            INSERT INTO product_named_values (product_id, named_value_id, is_owner, can_modify)
+                            VALUES ($1, $2, true, true)
+                            ON CONFLICT (product_id, named_value_id) DO NOTHING
+                        `, [uniqueProductId, nvId]);
+                    }
                 } catch (err: any) {
                     console.error(`❌ FAILED to sync Named Value: "${nv.name}" (Env: ${env})`);
                     console.error(`   Value: "${val}" (Is Secret: ${nv.isSecret})`);
