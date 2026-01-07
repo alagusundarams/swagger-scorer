@@ -111,4 +111,26 @@ export class ApisRepository {
     async checkApiBelongsToProduct(apiId: string, productId: string) {
         return await query('SELECT EXISTS(SELECT 1 FROM apis WHERE id = $1 AND product_id = $2)', [apiId, productId]);
     }
+    /**
+     * Get global APIs (for admin/governance)
+     */
+    async getGlobalApis() {
+        return await query(`
+            SELECT 
+                a.name, 
+                a.display_name as "displayName", 
+                a.path,
+                json_agg(json_build_object(
+                    'id', a.id,
+                    'productId', a.product_id,
+                    'environment', p.environment,
+                    'qualityScore', a.quality_score,
+                    'originTeamId', a.origin_team_id
+                )) as deployments
+            FROM apis a
+            JOIN products p ON a.product_id = p.id
+            GROUP BY a.name, a.display_name, a.path
+            ORDER BY a.display_name ASC
+        `);
+    }
 }

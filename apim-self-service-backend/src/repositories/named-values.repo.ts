@@ -127,4 +127,26 @@ export class NamedValuesRepository {
             [productId, valueId]
         );
     }
+
+    /**
+     * Get orphaned named values (no product_id)
+     */
+    async getOrphanNamedValues(environment: string) {
+        return await query(`
+            SELECT * FROM named_values 
+            WHERE product_id IS NULL 
+            AND environment = $1
+            ORDER BY system_name ASC
+        `, [environment]);
+    }
+
+    /**
+     * Adopt (Update product_id) an orphaned named value
+     */
+    async adoptNamedValue(id: string, productId: string) {
+        return await query(
+            'UPDATE named_values SET product_id = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+            [productId, id]
+        );
+    }
 }

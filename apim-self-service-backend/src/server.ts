@@ -154,6 +154,9 @@ export async function build() {
     await fastify.register(inventoryRoutes, { prefix: '/api/v1' });
     await fastify.register(authRoutes, { prefix: '/api/v1/auth' });
 
+    const { backendsRoutes } = await import('./routes/backends.routes.js');
+    await fastify.register(backendsRoutes, { prefix: '/api/v1' });
+
     // Admin delete routes (saga-based)
     const adminDeleteRoutes = (await import('./routes/admin.delete.routes.js')).default;
     await fastify.register(adminDeleteRoutes, { prefix: '/api/v1' });

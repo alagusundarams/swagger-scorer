@@ -12,11 +12,19 @@ import { decomposePolicyXml } from '../policy/PolicyBuilderService.js';
 import { RepoService } from '../git/ado/RepoService.js';
 import { getAppConfig } from '../../config/loader.js';
 import { ProductsRepository } from '../../repositories/products.repo.js';
+import { ApisRepository } from '../../repositories/apis.repo.js';
+import { OperationsRepository } from '../../repositories/operations.repo.js';
+import { TeamsRepository } from '../../repositories/teams.repo.js';
+import { NamedValuesRepository } from '../../repositories/named-values.repo.js';
 import { fetchSpecForProduct } from '../utils/SpecFetcherService.js';
 import { createNamedValue } from './NamedValuesService.js';
 
 
 const productsRepo = new ProductsRepository();
+const apisRepo = new ApisRepository();
+const operationsRepo = new OperationsRepository();
+const teamsRepo = new TeamsRepository();
+const namedValuesRepo = new NamedValuesRepository();
 
 /**
  * Helper to get the APIM service (Mocked if requested)
@@ -58,7 +66,7 @@ export async function getAllProducts(
 
         const productRes = paginatedResult;
         const total = paginatedResult.total;
-        const apiRes = await productsRepo.getAllApis();
+        const apiRes = await apisRepo.getAllApis();
 
         // Assemble products with metadata
         const products = await assembleProducts(productRes.rows, apiRes.rows);
@@ -76,7 +84,7 @@ export async function getAllProducts(
 
     // Otherwise, use original non-paginated query (backward compatibility)
     const productRes = await productsRepo.getAllProducts(environment, userRole, teamId, userGroups);
-    const apiRes = await productsRepo.getAllApis();
+    const apiRes = await apisRepo.getAllApis();
 
     const products = await assembleProducts(productRes.rows, apiRes.rows);
 
@@ -227,7 +235,7 @@ export async function calculateAccessLevel(product: any, user: { role?: string, 
             return 'READ';
         } else {
             // Fallback to Owner Team's AD Group if matrix is empty
-            const teamRes = await productsRepo.getTeamById(product.owner_team_id);
+            const teamRes = await teamsRepo.getTeamById(product.owner_team_id);
             if (teamRes.rows.length > 0) {
                 const ownerTeam = teamRes.rows[0];
                 if (ownerTeam.azure_ad_group_id && !groups.includes(ownerTeam.azure_ad_group_id)) {
@@ -254,7 +262,7 @@ export async function getProductById(id: string, environment?: string, userConte
     const repoService = new RepoService();
 
     // Fetch APIs for this product
-    const apiRes = await productsRepo.getAllApisByProductId(id);
+    const apiRes = await apisRepo.getAllApisByProductId(id);
 
     // Map Hashes
     const envHashes = {
@@ -430,7 +438,7 @@ export async function getRepoUrlForResource(resourceId: string): Promise<string 
     }
 
     // 2. Try if resourceId is an API (lookup parent product)
-    const apiRes = await productsRepo.getRepoUrlForApi(resourceId);
+    const apiRes = await apisRepo.getRepoUrlForApi(resourceId);
 
     return apiRes.rows[0]?.git_repo_url || null;
 }
@@ -439,7 +447,7 @@ export async function getRepoUrlForResource(resourceId: string): Promise<string 
  * Fetch all APIs with their parent product display names
  */
 export async function getAllApis() {
-    const res = await productsRepo.getAllApis(); // This query includes operations_json
+    const res = await apisRepo.getAllApis(); // This query includes operations_json
 
     return res.rows.map((a: any) => ({
         ...a,
@@ -452,7 +460,7 @@ export async function getAllApis() {
 }
 
 export async function getApiById(id: string) {
-    const res = await productsRepo.getApiById(id);
+    const res = await apisRepo.getApiById(id);
     if (res.rows.length === 0) return null;
     return res.rows[0];
 }
@@ -461,15 +469,22 @@ export async function getApiById(id: string) {
  * Fetch operations for a specific API
  */
 export async function getOperations(apiId: string) {
-    const res = await productsRepo.getOperations(apiId);
-    return res.rows;
+    const res = await operationsRepo.getOperations(apiId);
+    return res.rows.map((op: any) => ({
+        id: op.id,
+        apiId: op.api_id,
+        method: op.method,
+        urlTemplate: op.url_template,
+        displayName: op.display_name,
+        description: op.description
+    }));
 }
 
 /**
  * Search APIs across all products
  */
 export async function searchApis(queryTerm: string) {
-    const res = await productsRepo.searchApis(queryTerm);
+    const res = await apisRepo.searchApis(queryTerm);
 
     return res.rows.map((a: any) => ({
         ...a,
@@ -526,7 +541,7 @@ export async function addApi(api: {
     gitRepoUrl?: string,
     gitFilePath?: string
 }) {
-    const res = await productsRepo.addApi(api);
+    const res = await apisRepo.addApi(api);
 
     // Log Audit
     await logAudit({
@@ -544,7 +559,7 @@ export async function addApi(api: {
  * Remove an API from a product
  */
 export async function removeApi(apiId: string, productId: string) {
-    const res = await productsRepo.removeApi(apiId, productId);
+    const res = await apisRepo.removeApi(apiId, productId);
 
     if (res.rowCount === 0) {
         throw new Error('API not found or does not belong to this product');
@@ -596,7 +611,7 @@ export async function updateProduct(id: string, data: { ownerTeamId?: string }, 
     // 4. Apply Cascading Rules
     if (data.ownerTeamId) {
         // Fetch team's AD Group ID for ARM Sync
-        const teamRes = await productsRepo.getTeamById(data.ownerTeamId);
+        const teamRes = await teamsRepo.getTeamById(data.ownerTeamId);
         const team = teamRes.rows[0];
 
         // Standard Rule: Update all associated APIs to the same owner team.
@@ -638,7 +653,7 @@ export async function getGlobalInventory() {
     const productRes = await productsRepo.getGlobalProducts();
 
     // 2. Grouped APIs
-    const apiRes = await productsRepo.getGlobalApis();
+    const apiRes = await apisRepo.getGlobalApis();
 
     return {
         products: productRes.rows,
@@ -715,10 +730,11 @@ export async function generateManifest(productId: string, format: 'json' | 'tfva
     if (productRes.rows.length === 0) throw new Error('Product not found');
     const product = productRes.rows[0];
 
-    const apisRes = await productsRepo.getAllApisByProductId(productId);
+    const apisRes = await apisRepo.getAllApisByProductId(productId);
     const apis = apisRes.rows;
 
-    const valuesRes = await productsRepo.getNamedValues(productId);
+    // Use namedValuesRepo instead of productsRepo
+    const valuesRes = await namedValuesRepo.getNamedValues(productId);
     const values = valuesRes.rows;
 
     // 2. Group Values
@@ -980,7 +996,7 @@ export async function syncProductOperations(productId: string) {
         // 3. Get API ID for this product (Assuming 1:1 for MVP, or first API)
         // In full model, we need to know WHICH API this spec belongs to.
         // For now, we look up the API linked to this product.
-        const apisRes = await productsRepo.getAllApisByProductId(productId);
+        const apisRes = await apisRepo.getAllApisByProductId(productId);
         if (apisRes.rows.length === 0) return;
 
         const apiId = apisRes.rows[0].id; // Target first API
@@ -1005,7 +1021,7 @@ export async function syncProductOperations(productId: string) {
         console.log(`[Sync] Found ${operations.length} operations for product ${productId}. Syncing to DB...`);
 
         for (const op of operations) {
-            await productsRepo.upsertOperation(op);
+            await operationsRepo.upsertOperation(op);
         }
 
         return { count: operations.length };
