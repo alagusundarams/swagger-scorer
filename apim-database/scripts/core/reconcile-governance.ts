@@ -388,16 +388,16 @@ async function main() {
         for (const [env, backends] of Object.entries(apimMeta.backends || {})) {
             for (const b of backends) {
                 await pool.query(`
-                    INSERT INTO governance_backends (id, environment, url, description, title, resource_id, protocol, updated_at)
+                    INSERT INTO governance_backends (id, environment, url, description, title, protocol, scope, updated_at)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
                     ON CONFLICT (id, environment) DO UPDATE SET
                         url = EXCLUDED.url,
                         description = EXCLUDED.description,
                         title = EXCLUDED.title,
-                        resource_id = EXCLUDED.resource_id,
                         protocol = EXCLUDED.protocol,
+                        scope = COALESCE(governance_backends.scope, EXCLUDED.scope),
                         updated_at = NOW();
-                `, [b.id, env, b.url, b.description, b.title, b.resourceId, b.protocol]);
+                `, [b.id, env, b.url, b.description, b.title, b.protocol, 'GLOBAL']);
             }
         }
 
