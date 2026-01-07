@@ -8,7 +8,7 @@
 // @ts-ignore
 import SwaggerParser from '@apidevtools/swagger-parser';
 import { auditService, logAudit } from '../core/AuditService.js';
-import { decompose PolicyXml } from '../policy/PolicyBuilderService.js';
+import { decomposePolicyXml } from '../policy/PolicyBuilderService.js';
 import { RepoService } from '../git/ado/RepoService.js';
 import { getAppConfig } from '../../config/loader.js';
 import { ProductsRepository } from '../../repositories/products.repo.js';
