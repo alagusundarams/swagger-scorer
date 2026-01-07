@@ -561,6 +561,19 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
         }
     });
 
+    // POST /api/v1/products/:id/named-values/check-duplicate
+    fastify.post('/products/:id/named-values/check-duplicate', async (request, reply) => {
+        const { systemName, environment } = request.body as any;
+        try {
+            const { checkNamedValueDuplicate } = await import('../services/inventory/NamedValuesService.js');
+            const result = await checkNamedValueDuplicate(systemName, environment);
+            return result;
+        } catch (error: any) {
+            fastify.log.error({ err: error }, 'Error checking duplicate');
+            return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
+        }
+    });
+
     // DELETE /api/v1/products/:id/named-values/:valueId
     fastify.delete('/products/:id/named-values/:valueId', async (request, reply) => {
         const { id, valueId } = request.params as any;
