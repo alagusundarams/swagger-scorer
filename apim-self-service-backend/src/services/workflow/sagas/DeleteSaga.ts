@@ -42,6 +42,8 @@ interface SagaResult {
 }
 
 export class DeleteSagaOrchestrator {
+    constructor(private gitService: GitService) { }
+
     /**
      * Execute delete saga for a single resource
      * 
@@ -319,8 +321,8 @@ export class DeleteSagaOrchestrator {
 
         // Use GitService to create a deletion branch (Safe Delete)
         // Lazy instantiate to ensure config is loaded
-        const gitService = new GitService();
-        const result = await gitService.createDeletionBranch(
+        // const gitService = new GitService(); // Removed for DI
+        const result = await this.gitService.createDeletionBranch(
             repoUrl,
             filePath,
             resourceId,
@@ -474,4 +476,4 @@ export class DeleteSagaOrchestrator {
     }
 }
 
-export const deleteSaga = new DeleteSagaOrchestrator();
+

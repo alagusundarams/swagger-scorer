@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { ScoringConfig } from '../types/index.js';
-import { OnboardingController } from '../controllers/OnboardingController.js';
+
 
 /**
  * Onboarding Routes
@@ -9,8 +9,7 @@ import { OnboardingController } from '../controllers/OnboardingController.js';
  * Uses a "Minimal DB" approach: metadata in Postgres, blobs on CSI-backed file system.
  */
 export default async function onboardingRoutes(fastify: FastifyInstance, config: ScoringConfig) {
-
-    const controller = new OnboardingController();
+    const { onboardingController: controller } = fastify.container;
     controller.setConfig(config);
 
     // POST /api/v1/onboarding/stage

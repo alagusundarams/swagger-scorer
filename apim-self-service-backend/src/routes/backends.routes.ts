@@ -5,11 +5,10 @@
  */
 
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
-import { BackendsController } from '../controllers/BackendsController.js';
-
-const backendsController = new BackendsController();
-
+// Controller retrieved from container
 export async function backendsRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {
+    const { backendsController } = fastify.container;
+
 
     // GET /api/v1/backends
     fastify.get('/backends', backendsController.getBackends);

@@ -4,7 +4,6 @@ import { existsSync } from 'fs';
 import path from 'path';
 import { tmpdir } from 'os';
 import { simpleGit, SimpleGit, SimpleGitOptions } from 'simple-git';
-import { getAppConfig } from '../../config/loader.js';
 
 /**
  * GitService
@@ -15,16 +14,42 @@ import { getAppConfig } from '../../config/loader.js';
  * - Simulation (for demos)
  */
 export class GitService {
-    private git: SimpleGit;
+    private git!: SimpleGit;
     private localRepoPath: string;
-    // private initialized: boolean = false; // Unused
 
-    constructor(repoPath?: string) {
-        // Use provided path or default to a system temp directory for safe isolation
-        // Or check config if available later
-        const config = getAppConfig();
+    constructor(config: { gitLocalPath?: string }, repoPath?: string) {
         this.localRepoPath = repoPath || config.gitLocalPath || path.join(tmpdir(), 'apim-git-ops');
+    }
 
+    // initializeRepo no longer needs to read config lazily
+
+
+    /**
+     * Clones or Opens a repository
+     */
+    async initializeRepo(repoUrl: string, mappedPath?: string): Promise<void> {
+        // 1. Determine Local Path
+        if (mappedPath) {
+            this.localRepoPath = mappedPath;
+        } else {
+            // Config is already used in constructor to set default localRepoPath
+            // So just use this.localRepoPath
+            // If initialized via constructor, it's correct.
+            // But logic was: constructor sets it. initializeRepo might override?
+            // initializeRepo logic was:
+            // if (mappedPath) path = mappedPath
+            // else path is already set.
+        }
+
+        // Simpler:
+        if (mappedPath) this.localRepoPath = mappedPath;
+
+        // 2. Ensure directory exists
+        if (!fs.existsSync(this.localRepoPath)) {
+            fs.mkdirSync(this.localRepoPath, { recursive: true });
+        }
+
+        // 3. Initialize SimpleGit
         const options: Partial<SimpleGitOptions> = {
             baseDir: this.localRepoPath,
             binary: 'git',
@@ -32,26 +57,12 @@ export class GitService {
             trimmed: false,
         };
 
-        // Ensure directory exists if we are going to clone into it
-        if (!fs.existsSync(this.localRepoPath)) {
-            fs.mkdirSync(this.localRepoPath, { recursive: true });
-        }
-
-        this.git = simpleGit(options);
-    }
-
-    /**
-     * Clones or Opens a repository
-     */
-    async initializeRepo(repoUrl: string, mappedPath?: string): Promise<void> {
-        // If mappedPath is provided, use it (assumes persistent volume/local dev)
+        // If mappedPath is provided, verify it's a repo
         if (mappedPath) {
-            this.localRepoPath = mappedPath;
             if (!fs.existsSync(this.localRepoPath)) {
                 throw new Error(`Local repository path not found: ${mappedPath}`);
             }
-            this.git = simpleGit({ baseDir: this.localRepoPath });
-            // Check if it's a git repo
+            this.git = simpleGit(options);
             const isRepo = await this.git.checkIsRepo();
             if (!isRepo) {
                 throw new Error(`Path is not a git repository: ${mappedPath}`);
@@ -59,17 +70,19 @@ export class GitService {
             return;
         }
 
-        // Otherwise, clone into temp (Ephemeral Mode)
-        // Check if already cloned
-        if (fs.existsSync(path.join(this.localRepoPath, '.git'))) {
+        // 4. Clone or Fetch (Ephemeral Mode)
+        this.git = simpleGit(options);
+
+        const gitDir = path.join(this.localRepoPath, '.git');
+        if (fs.existsSync(gitDir)) {
             // Already exists, just fetch
             await this.git.fetch();
         } else {
             // Clone
             await simpleGit().clone(repoUrl, this.localRepoPath);
-            this.git = simpleGit({ baseDir: this.localRepoPath });
+            // Re-init with new dir context (simple-git might need refresh)
+            this.git = simpleGit({ ...options, baseDir: this.localRepoPath }); // Ensure context
         }
-        // this.initialized = true;
     }
 
     /**

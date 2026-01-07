@@ -6,11 +6,10 @@
  */
 
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
-import { ValidationController } from '../controllers/ValidationController.js';
-
-const controller = new ValidationController();
-
+// Controller retrieved from container
 export async function validationRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {
+    const { validationController: controller } = fastify.container;
+
 
     /**
      * POST /api/v1/validate/api-path

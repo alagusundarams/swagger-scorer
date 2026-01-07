@@ -10,12 +10,21 @@
  * OpenTelemetry instrumentation is handled separately (see below)
  */
 
+import './instrumentation.js'; // Must be first!
 import 'dotenv/config';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { resolve } from 'path';
 import { loadConfig, validateConfig, loadAppConfig, setAppConfig } from './config/loader.js';
 import { initDb } from './services/core/db.js';
+import { initializeContainer, Container } from './container.js';
+
+// Extend FastifyInstance to include container
+declare module 'fastify' {
+    interface FastifyInstance {
+        container: Container;
+    }
+}
 import { healthRoutes } from './routes/health.js';
 import { configRoutes } from './routes/config.js';
 import { analyzeRoutes } from './routes/analyze.js';
@@ -52,7 +61,10 @@ export async function build() {
     // Store globally for services
     setAppConfig(appConfig);
 
-    // 2. Initialize Database with URL from config
+    // 2. Initialize Dependency Injection Container
+    const container = await initializeContainer(appConfig);
+
+    // 3. Initialize Database with URL from config
     await initDb(appConfig.database.url);
 
     // Create Fastify instance with logging
@@ -81,6 +93,9 @@ export async function build() {
             }
         },
     });
+
+    // 4. Register Container
+    fastify.decorate('container', container);
 
     // Register CORS plugin
     await fastify.register(cors, {

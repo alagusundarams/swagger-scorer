@@ -5,31 +5,24 @@
  */
 
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
-import { ProductsController } from '../controllers/ProductsController.js';
-import { ApisController } from '../controllers/ApisController.js';
-import { NamedValuesController } from '../controllers/NamedValuesController.js';
-import { AdminController } from '../controllers/AdminController.js';
-import { TeamsController } from '../controllers/TeamsController.js';
-import { ApprovalsController } from '../controllers/ApprovalsController.js';
-import { AppsController } from '../controllers/AppsController.js';
-import { AuditController } from '../controllers/AuditController.js';
-import { SubscriptionsController } from '../controllers/SubscriptionsController.js';
-import { DashboardController } from '../controllers/DashboardController.js';
+
 
 import { getApiById } from '../services/inventory/ProductsService.js';
 
-const productsController = new ProductsController();
-const apisController = new ApisController();
-const namedValuesController = new NamedValuesController();
-const adminController = new AdminController();
-const teamsController = new TeamsController();
-const approvalsController = new ApprovalsController();
-const appsController = new AppsController();
-const auditController = new AuditController();
-const subscriptionsController = new SubscriptionsController();
-const dashboardController = new DashboardController();
-
+// Controllers retrieved from container in route function
 export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {
+    const {
+        productsController,
+        apisController,
+        namedValuesController,
+        adminController,
+        teamsController,
+        approvalsController,
+        appsController,
+        auditController,
+        subscriptionsController,
+        dashboardController
+    } = fastify.container; // Augmentation in server.ts makes this valid
 
     // ==========================================
     // SYSTEM / CONFIG ROUTES

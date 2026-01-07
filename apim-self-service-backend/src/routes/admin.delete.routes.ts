@@ -5,11 +5,10 @@
  */
 
 import { FastifyPluginAsync } from 'fastify';
-import { AdminController } from '../controllers/AdminController.js';
-
-const controller = new AdminController();
-
+// Controller retrieved from container
 const adminDeleteRoutes: FastifyPluginAsync = async (fastify) => {
+    const { adminController: controller } = fastify.container;
+
 
     // PRODUCTS
     fastify.delete('/admin/products/:id', (req, reply) => controller.deleteResource(req, reply, 'product'));

@@ -42,19 +42,26 @@ const sdk = new NodeSDK({
     }),
 
     // Trace exporter
-    // If OTEL_EXPORTER_OTLP_ENDPOINT is set, traces go there
-    // Otherwise, they go to console (development)
     traceExporter: new OTLPTraceExporter({
-        url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || undefined,
+        url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
     }),
 
-    // Auto-instrumentation
-    // This automatically creates spans for HTTP requests, database calls, etc.
+    // Auto-instrumentation with Log Correlation
     instrumentations: [
         getNodeAutoInstrumentations({
+            // HTTP Instrumentation: Ensure W3C headers are propagated
+            '@opentelemetry/instrumentation-http': {
+                ignoreIncomingPaths: ['/health', '/metrics'], // Reduce noise
+            },
+            // Pino Instrumentation: Inject trace/span IDs into logs
+            '@opentelemetry/instrumentation-pino': {
+                logHook: (_span, record) => {
+                    record['resource.service.name'] = process.env.OTEL_SERVICE_NAME || 'swagger-scorer-backend';
+                },
+            },
             // Disable instrumentations we don't need
             '@opentelemetry/instrumentation-fs': {
-                enabled: false, // No need to trace file system for this app
+                enabled: false,
             },
         }),
     ],

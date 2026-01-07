@@ -12,19 +12,10 @@ interface SagaContext {
 }
 
 export class CreateSagaOrchestrator {
-    private gitService: GitService | undefined;
     private repoUrl: string;
 
-    constructor() {
-        // this.gitService = new GitService(); // Removed to prevent early config access
+    constructor(private gitService: GitService) {
         this.repoUrl = process.env.GIT_REPO_URL || 'https://github.com/myorg/apim-policy-repo.git';
-    }
-
-    private getGitService(): GitService {
-        if (!this.gitService) {
-            this.gitService = new GitService();
-        }
-        return this.gitService;
     }
 
     /**
@@ -159,7 +150,7 @@ export class CreateSagaOrchestrator {
                 break;
         }
 
-        return await this.getGitService().commitResource(
+        return await this.gitService.commitResource(
             this.repoUrl,
             filePath,
             content,
