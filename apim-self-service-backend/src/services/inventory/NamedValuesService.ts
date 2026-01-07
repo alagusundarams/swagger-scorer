@@ -4,16 +4,20 @@
  */
 
 import { NamedValuesRepository } from '../../repositories/named-values.repo.js';
+import { ProductsRepository } from '../../repositories/products.repo.js';
+import { ApisRepository } from '../../repositories/apis.repo.js';
 import { logAudit } from '../core/AuditService.js';
 
-const repo = new NamedValuesRepository();
+const namedValuesRepo = new NamedValuesRepository();
+const productsRepo = new ProductsRepository();
+const apisRepo = new ApisRepository();
 
 // ============================================================================
 // READ Operations
 // ============================================================================
 
 export async function getNamedValues(productId: string) {
-    const res = await repo.getNamedValues(productId);
+    const res = await namedValuesRepo.getNamedValues(productId);
 
     return res.rows.map((row: any) => ({
         ...row,
@@ -27,14 +31,14 @@ export async function getNamedValues(productId: string) {
 // ============================================================================
 
 export async function checkNamedValueDuplicate(systemName: string, environment: string) {
-    const existing = await repo.findNamedValueByName(systemName, environment);
+    const existing = await namedValuesRepo.findNamedValueByName(systemName, environment);
 
     if (!existing.rows || existing.rows.length === 0) {
         return { exists: false };
     }
 
     const nv = existing.rows[0];
-    const owners = await repo.getNamedValueProducts(nv.id);
+    const owners = await namedValuesRepo.getNamedValueProducts(nv.id);
 
     return {
         exists: true,
@@ -61,19 +65,19 @@ export async function createNamedValue(productId: string, data: {
     allowOverwrite?: boolean
 }) {
     // 0. Fetch Product for environment context
-    const productsRes = await repo.getProductById(productId);
+    const productsRes = await productsRepo.getProductById(productId);
     if (productsRes.rowCount === 0) throw new Error('Product not found.');
     const product = productsRes.rows[0];
 
     // 1. If scoped to API, verify API belongs to Product
     if (data.scopeId) {
-        const apiCheck = await repo.checkApiBelongsToProduct(data.scopeId, productId);
+        const apiCheck = await apisRepo.checkApiBelongsToProduct(data.scopeId, productId);
         if (apiCheck.rowCount === 0) throw new Error('Invalid Scope: API does not belong to this Product.');
     }
 
     // 2. Value collision check (audit only, non-secret)
     if (!data.isSecret) {
-        const collision = await repo.checkNamedValueCollision(data.value);
+        const collision = await namedValuesRepo.checkNamedValueCollision(data.value);
         if (collision.rowCount > 0) {
             await logAudit({
                 entityType: 'NAMED_VALUE',
@@ -90,7 +94,7 @@ export async function createNamedValue(productId: string, data: {
     }
 
     // 3. Check for duplicates within same product/scope
-    const existing = await repo.getExistingNamedValue(productId, data.systemName, data.scopeId);
+    const existing = await namedValuesRepo.getExistingNamedValue(productId, data.systemName, data.scopeId);
 
     const fullData = {
         ...data,
@@ -105,7 +109,7 @@ export async function createNamedValue(productId: string, data: {
 
         // Overwrite (Update)
         const idToUpdate = existing.rows[0].id;
-        const res = await repo.updateNamedValue(idToUpdate, fullData);
+        const res = await namedValuesRepo.updateNamedValue(idToUpdate, fullData);
 
         await logAudit({
             entityType: 'NAMED_VALUE',
@@ -119,11 +123,11 @@ export async function createNamedValue(productId: string, data: {
     }
 
     // 4. Create new named value
-    const res = await repo.createNamedValue(productId, fullData);
+    const res = await namedValuesRepo.createNamedValue(productId, fullData);
     const nvId = res.rows[0].id;
 
     // 5. CRITICAL: Link to product via junction table
-    await repo.linkProductToNamedValue(productId, nvId, {
+    await namedValuesRepo.linkProductToNamedValue(productId, nvId, {
         isOwner: true,
         canModify: true
     });
@@ -144,12 +148,12 @@ export async function createNamedValue(productId: string, data: {
 // ============================================================================
 
 export async function referenceExistingNamedValue(productId: string, namedValueId: string) {
-    const existing = await repo.getProductNamedValueLink(productId, namedValueId);
+    const existing = await namedValuesRepo.getProductNamedValueLink(productId, namedValueId);
     if (existing.rows.length > 0) {
         throw new Error('Already linked to your product');
     }
 
-    await repo.linkProductToNamedValue(productId, namedValueId, {
+    await namedValuesRepo.linkProductToNamedValue(productId, namedValueId, {
         isOwner: false,
         canModify: false
     });
@@ -171,11 +175,11 @@ export async function referenceExistingNamedValue(productId: string, namedValueI
 
 export async function deleteNamedValue(productId: string, valueId: string) {
     // 1. Check junction table links
-    const allLinks = await repo.getNamedValueProducts(valueId);
+    const allLinks = await namedValuesRepo.getNamedValueProducts(valueId);
 
     if (allLinks.rows.length > 1) {
         // Shared resource - just unlink
-        await repo.unlinkProductFromNamedValue(productId, valueId);
+        await namedValuesRepo.unlinkProductFromNamedValue(productId, valueId);
 
         await logAudit({
             entityType: 'NAMED_VALUE',
@@ -192,7 +196,7 @@ export async function deleteNamedValue(productId: string, valueId: string) {
     }
 
     // 2. Last product - full delete
-    const res = await repo.deleteNamedValue(productId, valueId);
+    const res = await namedValuesRepo.deleteNamedValue(productId, valueId);
 
     if (res.rowCount === 0) throw new Error('Named Value not found.');
 
