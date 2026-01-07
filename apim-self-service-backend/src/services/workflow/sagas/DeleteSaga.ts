@@ -18,7 +18,8 @@ import { auditService } from '../../core/AuditService.js'; // Updated
 import { GitService } from '../../git/GitService.js';
 import type { ResourceType } from '../../core/AuditService.js'; // Updated
 
-const gitService = new GitService();
+// gitService removed from top-level to prevent early config access
+
 
 interface DeleteContext {
     resourceType: ResourceType;
@@ -317,6 +318,8 @@ export class DeleteSagaOrchestrator {
         console.log(`[Saga] Step 3: Backing up deletion of ${resourceName} to Git (Branching)...`);
 
         // Use GitService to create a deletion branch (Safe Delete)
+        // Lazy instantiate to ensure config is loaded
+        const gitService = new GitService();
         const result = await gitService.createDeletionBranch(
             repoUrl,
             filePath,

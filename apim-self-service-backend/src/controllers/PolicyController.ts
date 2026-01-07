@@ -5,11 +5,18 @@ import { getRepoUrlForResource } from '../services/inventory/ProductsService.js'
 
 export class PolicyController {
     private xmlService: XmlService;
-    private gitService: GitService;
+    private gitService: GitService | undefined;
 
     constructor() {
         this.xmlService = new XmlService();
-        this.gitService = new GitService();
+        // this.gitService = new GitService(); // Removed to prevent early config access
+    }
+
+    private getGitService(): GitService {
+        if (!this.gitService) {
+            this.gitService = new GitService();
+        }
+        return this.gitService;
     }
 
     public parsePolicy = async (req: FastifyRequest<{ Body: { xml: string } }>, reply: FastifyReply) => {
@@ -53,7 +60,7 @@ export class PolicyController {
             const repoUrl = await getRepoUrlForResource(resourceId);
 
             // 3. Commit to Git
-            const result = await this.gitService.commitPolicy(resourceId, xml, justification, user, repoUrl || undefined);
+            const result = await this.getGitService().commitPolicy(resourceId, xml, justification, user, repoUrl || undefined);
 
             if (result.error === 'NO_REPO_LINKED') {
                 return reply.status(403).send({
@@ -90,7 +97,7 @@ export class PolicyController {
             }
 
             // 2. Fetch from Git
-            const result = await this.gitService.fetchPolicy(resourceId, repoUrl, level);
+            const result = await this.getGitService().fetchPolicy(resourceId, repoUrl, level);
 
             return reply.send({
                 resourceId,
