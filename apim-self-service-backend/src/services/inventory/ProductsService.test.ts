@@ -148,10 +148,6 @@ describe('Products Service Final Final', () => {
         await productsService.getPermissionMatrix('p1');
         await productsService.updatePermissionMatrix('p1', [{ adGroupId: 'g1', environment: 'DEV', role: 'admin' }]);
 
-        await productsService.getNamedValues('p1');
-        await productsService.addNamedValue('p1', { displayName: 'N1', systemName: 'SY1', value: 'V1', type: 'literal', isSecret: false });
-        await productsService.deleteNamedValue('p1', 'nv1');
-
         await productsService.getProductPolicy('p1');
         await productsService.updateProductPolicy('p1', '<xml/>', mockUserContext);
 
