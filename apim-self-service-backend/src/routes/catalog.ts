@@ -10,10 +10,12 @@ import {
     getAllProducts, getAllApis, updateProduct, getGlobalInventory,
     getPermissionMatrix, updatePermissionMatrix, addProduct, addApi,
     getOperations, searchApis, removeApi, getProductPolicy,
-    updateProductPolicy, ejectProduct, getNamedValues, addNamedValue,
-    deleteNamedValue, syncProductOperations, getProductById, getApiById,
+    updateProductPolicy, ejectProduct, syncProductOperations, getProductById, getApiById,
     getSecureProductSpec
 } from '../services/inventory/ProductsService.js';
+import {
+    getNamedValues, createNamedValue as addNamedValue, deleteNamedValue
+} from '../services/inventory/NamedValuesService.js';
 import {
     updateApproval,
     getAllApprovals
