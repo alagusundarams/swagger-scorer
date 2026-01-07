@@ -438,14 +438,15 @@ export async function getRepoUrlForResource(resourceId: string): Promise<string 
  * Fetch all APIs with their parent product display names
  */
 export async function getAllApis() {
-    const res = await productsRepo.getAllApisDetailed();
+    const res = await productsRepo.getAllApis(); // This query includes operations_json
 
     return res.rows.map((a: any) => ({
         ...a,
         productId: a.product_id,
         displayName: a.display_name,
         productDisplayName: a.product_display_name,
-        qualityScore: a.quality_score
+        qualityScore: a.quality_score,
+        operations: a.operations_json || [] // Include operations!
     }));
 }
 
