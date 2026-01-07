@@ -26,6 +26,7 @@ export const OrphanNamedValueManager: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [env, setEnv] = useState('DEV');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [nameFilter, setNameFilter] = useState('');
 
     // Adoption State
     const [targetProductId, setTargetProductId] = useState('');
@@ -155,6 +156,16 @@ export const OrphanNamedValueManager: React.FC = () => {
         }
     };
 
+    // Filter orphans based on name search
+    const filteredOrphans = orphans.filter(nv => {
+        if (!nameFilter) return true;
+        const searchLower = nameFilter.toLowerCase();
+        return (
+            nv.systemName?.toLowerCase().includes(searchLower) ||
+            nv.displayName?.toLowerCase().includes(searchLower)
+        );
+    });
+
     return (
         <div className="space-y-8">
             {/* Filters Bar - Matching other tabs */}
@@ -164,6 +175,8 @@ export const OrphanNamedValueManager: React.FC = () => {
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
                         <input
                             type="text"
+                            value={nameFilter}
+                            onChange={(e) => setNameFilter(e.target.value)}
                             placeholder="Filter by name..."
                             className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                         />
@@ -181,7 +194,7 @@ export const OrphanNamedValueManager: React.FC = () => {
                 </div>
                 <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
                 <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                    Found {orphans.length} orphans in {env}
+                    Found {filteredOrphans.length} of {orphans.length} orphans in {env}
                 </div>
             </div>
 
@@ -189,7 +202,7 @@ export const OrphanNamedValueManager: React.FC = () => {
             <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h3 className="text-lg font-bold text-slate-800 dark:text-white tracking-tight">Orphaned Named Values</h3>
-                    <p className="text-sm text-slate-500 mt-1">Found <span className="font-bold text-amber-600">{orphans.length}</span> unassigned values requiring action.</p>
+                    <p className="text-sm text-slate-500 mt-1">Found <span className="font-bold text-amber-600">{filteredOrphans.length}</span> unassigned values requiring action.</p>
                 </div>
 
                 <div className="flex items-center gap-3 w-full md:w-auto">
@@ -271,12 +284,12 @@ export const OrphanNamedValueManager: React.FC = () => {
                             <th className="p-5 w-14 text-center">
                                 <input
                                     type="checkbox"
-                                    checked={orphans.length > 0 && selectedIds.length === orphans.length}
+                                    checked={filteredOrphans.length > 0 && selectedIds.length === filteredOrphans.length}
                                     onChange={() => {
-                                        if (selectedIds.length === orphans.length) {
+                                        if (selectedIds.length === filteredOrphans.length) {
                                             setSelectedIds([]);
                                         } else {
-                                            setSelectedIds(orphans.map(nv => nv.id));
+                                            setSelectedIds(filteredOrphans.map(nv => nv.id));
                                         }
                                     }}
                                     className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
@@ -297,16 +310,16 @@ export const OrphanNamedValueManager: React.FC = () => {
                                     <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-4">Hydrating...</p>
                                 </td>
                             </tr>
-                        ) : orphans.length === 0 ? (
+                        ) : filteredOrphans.length === 0 ? (
                             <tr>
                                 <td colSpan={6} className="p-16 text-center">
                                     <div className="text-4xl mb-4 text-white">✨</div>
-                                    <div className="text-slate-900 dark:text-white font-black text-lg mb-1">No Orphans Found</div>
-                                    <div className="text-slate-500 text-sm font-medium">All named values in {env} are properly assigned.</div>
+                                    <div className="text-slate-900 dark:text-white font-black text-lg mb-1">{nameFilter ? 'No Matches Found' : 'No Orphans Found'}</div>
+                                    <div className="text-slate-500 text-sm font-medium">{nameFilter ? `No results for "${nameFilter}" in ${env}` : `All named values in ${env} are properly assigned.`}</div>
                                 </td>
                             </tr>
                         ) : (
-                            orphans.map(nv => (
+                            filteredOrphans.map(nv => (
                                 <tr key={nv.id} className={`group hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors ${selectedIds.includes(nv.id) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}>
                                     <td className="p-5 text-center">
                                         <input
