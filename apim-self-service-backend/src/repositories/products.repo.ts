@@ -424,6 +424,73 @@ export class ProductsRepository {
             [xml, productId]
         );
     }
+
+    // ========================================================================
+    // SHARED RESOURCE MANAGEMENT (Named Values)
+    // ========================================================================
+
+    async findNamedValueByName(systemName: string, environment: string) {
+        return await query(
+            'SELECT * FROM named_values WHERE system_name = $1 AND environment = $2 LIMIT 1',
+            [systemName, environment]
+        );
+    }
+
+    async linkProductToNamedValue(productId: string, namedValueId: string, options: { isOwner: boolean, canModify: boolean }) {
+        return await query(`
+            INSERT INTO product_named_values (product_id, named_value_id, is_owner, can_modify)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (product_id, named_value_id) DO UPDATE
+            SET is_owner = EXCLUDED.is_owner, can_modify = EXCLUDED.can_modify
+            RETURNING *
+        `, [productId, namedValueId, options.isOwner, options.canModify]);
+    }
+
+    async unlinkProductFromNamedValue(productId: string, namedValueId: string) {
+        return await query(
+            'DELETE FROM product_named_values WHERE product_id = $1 AND named_value_id = $2',
+            [productId, namedValueId]
+        );
+    }
+
+    async getProductNamedValueLink(productId: string, namedValueId: string) {
+        return await query(
+            'SELECT * FROM product_named_values WHERE product_id = $1 AND named_value_id = $2',
+            [productId, namedValueId]
+        );
+    }
+
+    async getNamedValueProducts(namedValueId: string) {
+        return await query(`
+            SELECT p.id, p.display_name, p.owner_team_id, t.name as team_name,
+                   pnv.is_owner, pnv.can_modify
+            FROM product_named_values pnv
+            JOIN products p ON pnv.product_id = p.id
+            LEFT JOIN teams t ON p.owner_team_id = t.id
+            WHERE pnv.named_value_id = $1
+        `, [namedValueId]);
+    }
+
+    // ========================================================================
+    // BACKEND MANAGEMENT
+    // ========================================================================
+
+    async findBackendByUrl(url: string, environment: string) {
+        return await query(
+            'SELECT * FROM governance_backends WHERE url = $1 AND environment = $2 LIMIT 1',
+            [url, environment]
+        );
+    }
+
+    async getApisUsingBackend(backendId: string, environment: string) {
+        return await query(`
+            SELECT a.id, a.display_name, a.product_id, p.display_name as product_name
+            FROM api_backends ab
+            JOIN apis a ON ab.api_id = a.id
+            JOIN products p ON a.product_id = p.id
+            WHERE ab.backend_id = $1 AND ab.environment = $2
+        `, [backendId, environment]);
+    }
 }
 
 export interface NamedValue {
