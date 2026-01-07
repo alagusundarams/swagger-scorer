@@ -2,10 +2,9 @@
  * Named Values Service - Shared Resource Management
  */
 
-import { productsRepo } from '../../repositories/products.repo.js';
-import type { ProductsRepository } from '../../repositories/products.repo.js';
+import { ProductsRepository } from '../../repositories/products.repo.js';
 
-const repo: ProductsRepository = (productsRepo as any) || new (await import('../../repositories/products.repo.js')).ProductsRepository();
+const repo = new ProductsRepository();
 
 export async function checkNamedValueDuplicate(systemName: string, environment: string) {
     const existing = await repo.findNamedValueByName(systemName, environment);
