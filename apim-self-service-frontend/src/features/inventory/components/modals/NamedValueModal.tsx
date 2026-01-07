@@ -257,10 +257,10 @@ export const NamedValueModal = ({ product, isOpen, onClose, onConfirm }: NamedVa
                         </button>
                         <button
                             type="submit"
-                            disabled={isSubmitting || confirmOverwrite} // Disable if asking for confirmation
-                            className={`px-6 py-2 font-bold rounded-lg transition disabled:opacity-50 ${confirmOverwrite
-                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                            disabled={isSubmitting || duplicateDetected}
+                            className={`px-6 py-2 font-bold rounded-lg transition disabled:opacity-50 ${duplicateDetected
+                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700'
                                 }`}
                         >
                             {isSubmitting ? 'Saving...' : 'Add Value'}
