@@ -57,7 +57,7 @@ export async function initializeContainer(config: AppConfig): Promise<Container>
     const productsController = new ProductsController();
     const apisController = new ApisController();
     const namedValuesController = new NamedValuesController();
-    const adminController = new AdminController();
+    const adminController = new AdminController(deleteSaga);
     const teamsController = new TeamsController();
     const approvalsController = new ApprovalsController();
     const appsController = new AppsController();

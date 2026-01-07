@@ -1,10 +1,12 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
-import { deleteSaga } from '../services/workflow/sagas/DeleteSaga.js';
+import { DeleteSagaOrchestrator } from '../services/workflow/sagas/DeleteSaga.js';
 import { getUserId } from '../middleware/auth.js';
 import { getAppConfig } from '../config/loader.js';
 import { ResourceType } from '../services/core/AuditService.js';
 
 export class AdminController {
+
+    constructor(private deleteSaga: DeleteSagaOrchestrator) { }
 
     /**
      * Delete a single resource via Saga
@@ -28,7 +30,7 @@ export class AdminController {
             const environment = id.split(':env:')[1] || 'Global';
             const resourceName = id.split(':')[0];
 
-            const result = await deleteSaga.executeDelete({
+            const result = await this.deleteSaga.executeDelete({
                 resourceType,
                 resourceId: id,
                 resourceName,
@@ -92,7 +94,7 @@ export class AdminController {
                     const environment = id.split(':env:')[1] || 'Global';
                     const resourceName = id.split(':')[0];
 
-                    const result = await deleteSaga.executeDelete({
+                    const result = await this.deleteSaga.executeDelete({
                         resourceType,
                         resourceId: id,
                         resourceName,
