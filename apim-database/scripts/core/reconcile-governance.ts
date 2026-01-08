@@ -142,19 +142,21 @@ async function main() {
         console.log('🔒 Transaction started...\n');
 
         // --- INPUT VALIDATION ---
+        console.log(`🔍 Validating ${inventory.length} products...`);
         const validInventory = inventory.filter(p => {
             if (!p.name) {
                 console.warn(`⚠️  Skipping product with missing name: ${JSON.stringify(p)}`);
                 return false;
             }
+            // Relaxed validation: If environments missing, we'll default to ['DEV'] in the loop
             if (!p.environments || p.environments.length === 0) {
-                console.warn(`⚠️  Skipping product "${p.name}" with no environments`);
-                return false;
+                // warning but allow
+                // console.warn(`⚠️  Product "${p.name}" has no environments (will default to DEV)`);
             }
             return true;
         });
 
-        console.log(`✅ Validated ${validInventory.length}/${inventory.length} products\n`);
+        console.log(`✅ Validated ${validInventory.length}/${inventory.length} products to be reconciled.\n`);
 
         // --- A. PRODUCTS RECONCILIATION ---
         console.log(`📋 Reconciling ${validInventory.length} products...`);
