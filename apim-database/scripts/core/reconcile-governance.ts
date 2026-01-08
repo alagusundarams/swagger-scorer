@@ -109,11 +109,12 @@ async function main() {
         process.exit(1);
     }
     const pool = new Pool({ connectionString: dbUrl });
+    const client = await pool.connect();
 
     // 2.1 Fetch inventory from DB if source=db
     if (sourceMode === 'db') {
         try {
-            const res = await pool.query(`
+            const res = await client.query(`
                 SELECT id, name, type, array_agg(DISTINCT environment) as environments 
                 FROM products 
                 GROUP BY id, name, type
@@ -127,13 +128,14 @@ async function main() {
             console.log(`   ✅ Loaded ${inventory.length} logical products from DB.`);
         } catch (err: any) {
             console.error(`❌ DB Connection failed during inventory fetch: ${err.message}`);
+            client.release();
             process.exit(1);
         }
     }
 
     try {
         // BEGIN TRANSACTION
-        await pool.query('BEGIN');
+        await client.query('BEGIN');
         console.log('🔒 Transaction started...\n');
 
         // --- A. PRODUCTS RECONCILIATION ---
@@ -186,7 +188,7 @@ async function main() {
                     const targetId = `${prod.id}:${upperEnv}:Global`;
 
                     if (process.env.DEBUG_SQL) console.log(`[DB] Upserting Product: ${targetId} (Name: ${prod.id}, Display: ${prod.name})`);
-                    await pool.query(`
+                    await client.query(`
                         INSERT INTO products (
                             id, name, display_name, version, state, environment, region,
                             pipeline_url, git_repo_url,
@@ -236,7 +238,7 @@ async function main() {
 
                     try {
                         if (process.env.DEBUG_SQL) console.log(`[DB] Upserting API: ${uniqueApiId} (Parent: ${targetProductId})`);
-                        await pool.query(`
+                        await client.query(`
                                 INSERT INTO apis (id, product_id, name, display_name, path, updated_at)
                                 VALUES ($1, $2, $3, $4, $5, NOW())
                                 ON CONFLICT (id) DO UPDATE SET
@@ -251,7 +253,7 @@ async function main() {
                         if (forensics) {
                             for (const bId of forensics.backends) {
                                 if (process.env.DEBUG_SQL) console.log(`[DB] Linking API ${uniqueApiId} to Backend ${bId} in ${envName}`);
-                                await pool.query(`
+                                await client.query(`
                                         INSERT INTO api_backends (api_id, backend_id, environment)
                                         VALUES ($1, $2, $3)
                                         ON CONFLICT (api_id, backend_id, environment) DO NOTHING;
@@ -273,7 +275,7 @@ async function main() {
                                         const operationName = operation.operationId || `${method}_${pathTemplate.replace(/\//g, '_')}`;
                                         const summary = operation.summary || operation.description || pathTemplate;
                                         if (process.env.DEBUG_SQL) console.log(`[DB] Upserting Operation: ${operationId} (API: ${uniqueApiId})`);
-                                        await pool.query(`
+                                        await client.query(`
                                                 INSERT INTO operations (id, api_id, name, display_name, method, url_template, description)
                                                 VALUES ($1, $2, $3, $4, $5, $6, $7)
                                                 ON CONFLICT (id) DO UPDATE SET
@@ -322,7 +324,7 @@ async function main() {
 
                 try {
                     if (process.env.DEBUG_SQL) console.log(`[DB] Upserting Named Value: ${nvId} (Display: ${nv.displayName}, Env: ${env})`);
-                    await pool.query(`
+                    await client.query(`
                         INSERT INTO named_values (id, product_id, display_name, system_name, value, type, is_secret, environment, region, updated_at)
                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
                         ON CONFLICT (id) DO UPDATE SET
@@ -335,7 +337,7 @@ async function main() {
 
                     if (envProductIds.length > 0) {
                         if (process.env.DEBUG_SQL) console.log(`[DB] Linking Named Value ${nvId} to products: ${envProductIds.join(', ')}`);
-                        await pool.query(`
+                        await client.query(`
                             INSERT INTO product_named_values (product_id, named_value_id, is_owner, can_modify)
                             SELECT unnest($1::text[]), $2, true, true
                             ON CONFLICT (product_id, named_value_id) DO NOTHING
@@ -406,7 +408,7 @@ async function main() {
                     // SAFETY: Verify product exists if we're linking to one
                     if (linkedProductId) {
                         if (process.env.DEBUG_SQL) console.log(`[DB] Checking product existence for ${linkedProductId}`);
-                        const prodCheck = await pool.query('SELECT 1 FROM products WHERE id = $1', [linkedProductId]);
+                        const prodCheck = await client.query('SELECT 1 FROM products WHERE id = $1', [linkedProductId]);
                         if (prodCheck.rows.length === 0) {
                             console.warn(`⚠️  Skipping app reg "${name}" - linked product ${linkedProductId} not found in DB`);
                             continue;
@@ -416,7 +418,7 @@ async function main() {
                     // Similarly check api_id if present
                     if (linkedApiId) {
                         if (process.env.DEBUG_SQL) console.log(`[DB] Checking API existence for ${linkedApiId}`);
-                        const apiCheck = await pool.query('SELECT 1 FROM apis WHERE id = $1', [linkedApiId]);
+                        const apiCheck = await client.query('SELECT 1 FROM apis WHERE id = $1', [linkedApiId]);
                         if (apiCheck.rows.length === 0) {
                             console.warn(`⚠️  Skipping app reg "${name}" - linked API ${linkedApiId} not found in DB`);
                             continue;
@@ -427,7 +429,7 @@ async function main() {
                     // Verify product exists in DB to avoid FK violation
                     if (linkedProductId) {
                         if (process.env.DEBUG_SQL) console.log(`[DB] Checking product existence for ${linkedProductId}`);
-                        const prodCheck = await pool.query('SELECT 1 FROM products WHERE id = $1', [linkedProductId]);
+                        const prodCheck = await client.query('SELECT 1 FROM products WHERE id = $1', [linkedProductId]);
                         if (prodCheck.rows.length === 0) {
                             console.warn(`⚠️  App Registration "${name}" links to missing product ${linkedProductId} - Setting to NULL`);
                             linkedProductId = null;
@@ -437,7 +439,7 @@ async function main() {
                     // Verify API exists in DB
                     if (linkedApiId) {
                         if (process.env.DEBUG_SQL) console.log(`[DB] Checking API existence for ${linkedApiId}`);
-                        const apiCheck = await pool.query('SELECT 1 FROM apis WHERE id = $1', [linkedApiId]);
+                        const apiCheck = await client.query('SELECT 1 FROM apis WHERE id = $1', [linkedApiId]);
                         if (apiCheck.rows.length === 0) {
                             console.warn(`⚠️  App Registration "${name}" links to missing API ${linkedApiId} - Setting to NULL`);
                             linkedApiId = null;
@@ -445,7 +447,7 @@ async function main() {
                     }
 
                     if (process.env.DEBUG_SQL) console.log(`[DB] Upserting App Registration: ${id} (Name: ${name}, Prod: ${linkedProductId}, API: ${linkedApiId})`);
-                    await pool.query(`
+                    await client.query(`
                         INSERT INTO app_registrations (id, client_id, display_name, app_id_uri, environment, product_id, api_id, type, updated_at)
                         VALUES ($1, $1, $2, $3, $4, $5, $6, $7, NOW())
                         ON CONFLICT (id) DO UPDATE SET
@@ -465,7 +467,7 @@ async function main() {
         for (const [env, backends] of Object.entries(apimMeta.backends)) {
             for (const b of backends) {
                 if (process.env.DEBUG_SQL) console.log(`[DB] Upserting Backend: ${b.id} (Env: ${env})`);
-                await pool.query(`
+                await client.query(`
                     INSERT INTO governance_backends (id, environment, url, description, title, protocol, scope, updated_at)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
                     ON CONFLICT (id, environment) DO UPDATE SET
@@ -504,7 +506,7 @@ async function main() {
                 const productId = `${prod.id}:${upperEnv}:Global`;
 
                 // Verify product exists in DB to avoid FK violation
-                const dbProd = await pool.query('SELECT 1 FROM products WHERE id = $1', [productId]);
+                const dbProd = await client.query('SELECT 1 FROM products WHERE id = $1', [productId]);
                 if (dbProd.rows.length === 0) {
                     console.warn(`⚠️  Skipping subscription "${sub.displayName}" - Product DB Record ${productId} not found (Inventory mismatch?)`);
                     continue;
@@ -515,15 +517,15 @@ async function main() {
                 const ownerUserId = ownerMatch ? ownerMatch[1] : null;
 
                 if (sub.displayName?.startsWith('default_')) {
-                    const prodRes = await pool.query('SELECT owner_team_id FROM products WHERE id = $1', [productId]);
+                    const prodRes = await client.query('SELECT owner_team_id FROM products WHERE id = $1', [productId]);
                     subscriberTeamId = prodRes.rows[0]?.owner_team_id || null;
                 } else if (ownerUserId) {
-                    const teamRes = await pool.query('SELECT id FROM teams WHERE id = $1', [ownerUserId]);
+                    const teamRes = await client.query('SELECT id FROM teams WHERE id = $1', [ownerUserId]);
                     if (teamRes.rows.length > 0) subscriberTeamId = ownerUserId;
                 }
 
                 if (process.env.DEBUG_SQL) console.log(`   [DB] Subscription: ${sub.displayName} -> Prod: ${productId}`);
-                await pool.query(`
+                await client.query(`
                     INSERT INTO subscriptions (id, product_id, subscriber_team_id, display_name, state, created_at, expiration_date, updated_at)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
                     ON CONFLICT (id) DO UPDATE SET
@@ -533,18 +535,19 @@ async function main() {
         }
 
         // COMMIT TRANSACTION
-        await pool.query('COMMIT');
+        await client.query('COMMIT');
         console.log(`\n✅ Reconciliation Complete!`);
-        const pCount = await pool.query(`SELECT COUNT(*) FROM products`);
-        const aCount = await pool.query(`SELECT COUNT(*) FROM apis`);
+        const pCount = await client.query(`SELECT COUNT(*) FROM products`);
+        const aCount = await client.query(`SELECT COUNT(*) FROM apis`);
         console.log(`   Products: ${pCount.rows[0].count} | APIs: ${aCount.rows[0].count}`);
 
     } catch (e: any) {
         // ROLLBACK ON ERROR
-        await pool.query('ROLLBACK');
+        await client.query('ROLLBACK');
         console.error(`\n❌ Reconciliation Failed:`, e.message);
         if (e.stack) console.error(e.stack);
     } finally {
+        client.release();
         await pool.end();
     }
 }
