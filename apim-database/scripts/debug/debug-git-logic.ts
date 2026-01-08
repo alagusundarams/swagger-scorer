@@ -293,6 +293,18 @@ async function runDebug() {
                 devops.organization, projectIdentifier, matchedPipeline.id, devops.pat, devops.baseUrl, undefined, pageSize, skip
             );
 
+            console.log(`   📡 [Scan] Page ${Math.floor(skip / pageSize) + 1}: Found ${builds.length} builds for Definition ${matchedPipeline.id}`);
+
+            if (builds.length === 0 && skip === 0) {
+                console.log(`   ⚠️  No builds found for this definition. Trying a broader search across the repo...`);
+                const allRepoBuilds = await AzureService.fetchADOBuilds(devops.organization, projectIdentifier, (matchedPipeline as any).repositoryId || primaryRepoId, devops.pat, devops.baseUrl);
+                console.log(`   📡 [Scan] Broad search found ${allRepoBuilds.length} builds total for this repository.`);
+                if (allRepoBuilds.length > 0) {
+                    // Inject these for scanning
+                    builds.push(...allRepoBuilds.slice(0, 20));
+                }
+            }
+
             if (builds.length === 0) break;
 
             for (const run of builds) {
@@ -308,18 +320,25 @@ async function runDebug() {
 
                     const record = timeline.find((t: any) => {
                         const type = (t.type || '').toLowerCase();
+                        const status = (t.status || '').toLowerCase();
+                        const result = (t.result || '').toLowerCase();
                         const isContainer = ['stage', 'job', 'phase'].includes(type);
                         const cleanTName = sanitize(t.name);
                         const cleanEnvName = sanitize(envName);
                         const nameMatches = cleanTName.includes(cleanEnvName);
-                        const isSuccess = t.result === 'succeeded' || t.result === 'partiallySucceeded';
+                        const isSuccess = result === 'succeeded' || result === 'partiallysucceeded';
+                        const isComplete = status === 'completed';
 
-                        // Debug log for potential matches
-                        if (isContainer && nameMatches && !isSuccess) {
-                            console.log(`      ⚠️  Found ${envName} in Build ${run.id}, but result was '${t.result}' (Skipped)`);
+                        // Verbose diagnostic for potential environment matches
+                        if (nameMatches) {
+                            if (!isContainer) {
+                                // console.log(`      ℹ️  [Scan] Found name match '${t.name}' but type is '${type}' (Skipped)`);
+                            } else if (!isComplete || !isSuccess) {
+                                console.log(`      ⚠️  [Scan] Found '${t.name}' in Build ${run.id}, but Result='${result}', Status='${status}' (Skipped)`);
+                            }
                         }
 
-                        return isContainer && nameMatches && isSuccess;
+                        return isContainer && nameMatches && isSuccess && isComplete;
                     });
 
                     if (record) {

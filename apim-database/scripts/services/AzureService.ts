@@ -137,6 +137,11 @@ export class AzureService {
         }
     }
 
+    static getAuthHeader(pat: string, bearerToken?: string): string {
+        if (bearerToken) return `Bearer ${bearerToken}`;
+        return `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+    }
+
     /**
      * Standardizes the ADO Base URL to handle legacy and modern formats.
      * Always returns the root instance URL (e.g., https://dev.azure.com or https://org.visualstudio.com)
@@ -171,9 +176,6 @@ export class AzureService {
         return `${instance}/${org}`;
     }
 
-    /**
-     * Gets the Search API URL (e.g., https://almsearch.dev.azure.com/org or https://org.almsearch.visualstudio.com)
-     */
     static getAdoSearchUrl(baseUrl: string, org: string): string {
         const cleanBase = baseUrl.replace(/\/+$/, '').toLowerCase();
 
@@ -184,8 +186,89 @@ export class AzureService {
             return `https://${searchOrg}.almsearch.visualstudio.com/_apis/search/codesearchresults?api-version=7.1-preview.1`;
         }
 
-        // Handle Modern: https://dev.azure.com -> https://almsearch.dev.azure.com/org
+        // Handle Modern: https://dev.azure.com/org -> https://almsearch.dev.azure.com/org
         return `https://almsearch.dev.azure.com/${org}/_apis/search/codesearchresults?api-version=7.1-preview.1`;
+    }
+
+    /**
+     * Gets the Release API URL (vrm)
+     */
+    static getAdoReleaseUrl(baseUrl: string, org: string, project: string): string {
+        const cleanBase = baseUrl.replace(/\/+$/, '').toLowerCase();
+
+        // Handle Legacy: https://org.visualstudio.com -> https://org.vsrm.visualstudio.com
+        if (cleanBase.includes('visualstudio.com')) {
+            const subdomainMatch = cleanBase.match(/https?:\/\/([^.]+)\.visualstudio\.com/);
+            const releaseOrg = subdomainMatch ? subdomainMatch[1] : org;
+            return `https://${releaseOrg}.vsrm.visualstudio.com/${encodeURIComponent(project)}`;
+        }
+
+        // Handle Modern: https://dev.azure.com/org -> https://vsrm.dev.azure.com/org
+        return `https://vsrm.dev.azure.com/${org}/${encodeURIComponent(project)}`;
+    }
+
+    /**
+     * Fetch Items (Files/Folders) from a Repository
+     * Used for "File Crawler" to find OpenAPI specs
+     */
+    static async fetchRepoItems(
+        org: string,
+        project: string,
+        repoId: string,
+        pat: string,
+        scopePath: string = '/',
+        recursionLevel: 'OneLevel' | 'Full' = 'Full',
+        baseUrl: string = 'https://dev.azure.com',
+        bearerToken?: string
+    ): Promise<any[]> {
+        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
+        const authHeader = this.getAuthHeader(pat, bearerToken);
+        const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
+
+        const url = `${urlBase}/_apis/git/repositories/${repoId}/items?scopePath=${scopePath}&recursionLevel=${recursionLevel}&includeContentMetadata=true&api-version=7.1-preview.1`;
+
+        console.log(`📡 [ADO Request] GET ${url}`);
+        try {
+            const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            if (response.ok) {
+                const data = await response.json() as { count: number, value: any[] };
+                return data.value || [];
+            } else {
+                console.warn(`      ⚠️  [Repo Items] Failed ${response.status}: ${response.statusText}`);
+            }
+        } catch (err) {
+            console.error(`      ❌ [Repo Items] Network Error:`, err);
+        }
+        return [];
+    }
+
+    /**
+     * Fetch File Content from a Repository
+     */
+    static async fetchFileContent(org: string, repoId: string, scopePath: string, pat: string, recursionLevel: string = 'None', baseUrl: string = 'https://dev.azure.com'): Promise<any> {
+        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
+        const authHeader = this.getAuthHeader(pat);
+        const url = `${orgUrl}/_apis/git/repositories/${repoId}/items?scopePath=${scopePath}&recursionLevel=${recursionLevel}&includeContentMetadata=true&api-version=7.1-preview.1`;
+
+        console.log(`📡 [ADO Request] GET ${url}`);
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': authHeader,
+                    'Accept': 'application/json'
+                }
+            });
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            if (response.ok) {
+                return await response.text(); // Return raw text content
+            } else {
+                console.warn(`      ⚠️  [File Content] Failed ${response.status}: ${response.statusText}`);
+            }
+        } catch (err) {
+            console.error(`      ❌ [File Content] Network Error:`, err);
+        }
+        return null;
     }
 
     /**
@@ -193,7 +276,7 @@ export class AzureService {
      */
     static async verifyAdoConnection(org: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<any> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
-        const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const authHeader = this.getAuthHeader(pat);
         const url = `${orgUrl}/_apis/connectionData?api-version=7.1-preview.1`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
@@ -298,7 +381,7 @@ export class AzureService {
      */
     static async fetchADOProjects(org: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADOProject[]> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
-        const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const authHeader = this.getAuthHeader(pat);
         const url = `${orgUrl}/_apis/projects?api-version=7.1-preview.4`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
@@ -324,7 +407,7 @@ export class AzureService {
     static async fetchRepoById(org: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<ADORepo> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const url = `${orgUrl}/_apis/git/repositories/${repoId}?api-version=7.1-preview.1`;
-        const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const authHeader = this.getAuthHeader(pat, bearerToken);
 
         console.log(`📡 [ADO Request] GET ${url}`);
         const response = await fetch(url, { headers: { 'Authorization': authHeader } });
@@ -372,7 +455,7 @@ export class AzureService {
      */
     static async fetchADOPipelines(org: string, project: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<ADOPipeline[]> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
-        const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
         let url = `${urlBase}/_apis/pipelines?api-version=7.1-preview.1`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=azureRepo`;
@@ -413,15 +496,9 @@ export class AzureService {
      * Fetch Release Definitions (Classic Pipelines)
      */
     static async fetchADOReleaseDefinitions(org: string, project: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADOPipeline[]> {
-        const orgUrl = this.getAdoInstanceUrl(baseUrl, org);
-        const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-
-        // Classic Release API is in vsrm.dev.azure.com
-        const vsrmUrl = orgUrl.includes('visualstudio.com')
-            ? orgUrl.replace('.visualstudio.com', '.vsrm.visualstudio.com')
-            : orgUrl.replace('dev.azure.com', 'vsrm.dev.azure.com');
-
-        const url = `${vsrmUrl}/${org}/${encodeURIComponent(project)}/_apis/release/definitions?api-version=7.1-preview.1&$top=100`;
+        const authHeader = this.getAuthHeader(pat);
+        const releaseBase = this.getAdoReleaseUrl(baseUrl, org, project);
+        const url = `${releaseBase}/_apis/release/definitions?api-version=7.1-preview.1&$top=100`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
@@ -453,14 +530,9 @@ export class AzureService {
      * Fetch Latest Releases for a definition
      */
     static async fetchADOReleases(org: string, project: string, definitionId: number, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADORelease[]> {
-        const orgUrl = this.getAdoInstanceUrl(baseUrl, org);
-        const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-
-        const vsrmUrl = orgUrl.includes('visualstudio.com')
-            ? orgUrl.replace('.visualstudio.com', '.vsrm.visualstudio.com')
-            : orgUrl.replace('dev.azure.com', 'vsrm.dev.azure.com');
-
-        const url = `${vsrmUrl}/${org}/${encodeURIComponent(project)}/_apis/release/releases?definitionId=${definitionId}&api-version=7.1-preview.1&$top=20`;
+        const authHeader = this.getAuthHeader(pat);
+        const releaseBase = this.getAdoReleaseUrl(baseUrl, org, project);
+        const url = `${releaseBase}/_apis/release/releases?definitionId=${definitionId}&api-version=7.1-preview.1&$top=20`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
@@ -485,7 +557,7 @@ export class AzureService {
      */
     static async fetchADOBuildDefinitions(org: string, project: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<ADOPipeline[]> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
-        const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
         let url = `${urlBase}/_apis/build/definitions?api-version=7.1-preview.1`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
@@ -517,11 +589,11 @@ export class AzureService {
      */
     static async fetchADOBuilds(org: string, project: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<any[]> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
-        const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
 
-        // Broaden search to include partially succeeded builds
-        let url = `${urlBase}/_apis/build/builds?api-version=7.1-preview.1&$top=20&resultFilter=succeeded,partiallySucceeded`;
+        // Remove strict filter to see if we get ANY results
+        let url = `${urlBase}/_apis/build/builds?api-version=7.1-preview.1&$top=50&queryOrder=finishTimeDescending`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
@@ -559,11 +631,11 @@ export class AzureService {
         skip: number = 0
     ): Promise<any[]> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
-        const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
 
-        // resultFilter=succeeded,partiallySucceeded
-        const url = `${urlBase}/_apis/build/builds?api-version=7.1-preview.1&definitions=${definitionId}&resultFilter=succeeded,partiallySucceeded&$top=${top}&$skip=${skip}`;
+        // Remove strict filter to see if we get ANY results
+        const url = `${urlBase}/_apis/build/builds?api-version=7.1-preview.1&definitions=${definitionId}&$top=${top}&$skip=${skip}&queryOrder=finishTimeDescending`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
@@ -595,7 +667,7 @@ export class AzureService {
         bearerToken?: string
     ): Promise<any | null> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
-        const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
 
         // 1. Find the Environment ID for the given name (Surgical Step 1)
@@ -693,6 +765,7 @@ export class AzureService {
     ): Promise<Record<string, { hash: string; date: string }>> {
         const results: Record<string, { hash: string; date: string }> = {};
         const remainingStages = new Set(stageNames.map(s => s.toLowerCase()));
+        const authHeader = this.getAuthHeader(pat);
 
         console.log(`      🔎 [Deep Scan] Searching for stages: [${stageNames.join(', ')}] in Pipeline ${definitionId}...`);
 
@@ -929,41 +1002,6 @@ export class AzureService {
             return { count: 0, results: [] };
         }
         return await response.json();
-    }
-    /**
-     * Fetch Items (Files/Folders) from a Repository
-     * Used for "File Crawler" to find OpenAPI specs
-     */
-    static async fetchRepoItems(
-        org: string,
-        project: string,
-        repoId: string,
-        pat: string,
-        scopePath: string = '/',
-        recursionLevel: 'OneLevel' | 'Full' = 'Full',
-        baseUrl: string = 'https://dev.azure.com',
-        bearerToken?: string
-    ): Promise<any[]> {
-        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
-        const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-        const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
-
-        const url = `${urlBase}/_apis/git/repositories/${repoId}/items?scopePath=${scopePath}&recursionLevel=${recursionLevel}&includeContentMetadata=true&api-version=7.1-preview.1`;
-
-        console.log(`📡 [ADO Request] GET ${url}`);
-        try {
-            const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
-            if (response.ok) {
-                const data = await response.json() as { count: number, value: any[] };
-                return data.value || [];
-            } else {
-                console.warn(`      ⚠️  [Repo Items] Failed ${response.status}: ${response.statusText}`);
-            }
-        } catch (err) {
-            console.error(`      ❌ [Repo Items] Network Error:`, err);
-        }
-        return [];
     }
 }
 
