@@ -161,7 +161,7 @@ async function runDebug() {
 
     let cliToken = "";
     try {
-        cliToken = await AzureService.getAzureAccessToken("499b84ee-1328-4417-95a1-8288018c668b");
+        cliToken = await AzureService.getAzureAccessToken({ resource: "499b84ee-1328-4417-95a1-8288018c668b", silent: true });
     } catch (e) { }
 
     const runDiscovery = async (tokenOverride?: string) => {
