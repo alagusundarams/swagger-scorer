@@ -164,7 +164,7 @@ export class AzureService {
     static async verifyAdoConnection(org: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<any> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-        const url = `${orgUrl}/_apis/connectionData?api-version=7.0`;
+        const url = `${orgUrl}/_apis/connectionData?api-version=7.1-preview.1`;
 
         console.log(`📡 [ADO] Verifying Connection: ${url}`);
         const response = await fetch(url, { headers: { 'Authorization': authHeader } });
@@ -355,7 +355,7 @@ export class AzureService {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
-        let url = `${urlBase}/_apis/build/definitions?api-version=7.0`;
+        let url = `${urlBase}/_apis/build/definitions?api-version=7.1-preview.1`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
 
         console.log(`      🌐 [Request] ${url}`);
@@ -387,7 +387,7 @@ export class AzureService {
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
 
-        let url = `${urlBase}/_apis/build/builds?api-version=7.0&$top=10`;
+        let url = `${urlBase}/_apis/build/builds?api-version=7.1-preview.1&$top=10`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
 
         console.log(`      🌐 [Request] ${url}`);
@@ -421,7 +421,7 @@ export class AzureService {
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
 
-        const url = `${urlBase}/_apis/build/builds?api-version=7.0&definitions=${definitionId}&resultFilter=succeeded&$top=${top}&$skip=${skip}`;
+        const url = `${urlBase}/_apis/build/builds?api-version=7.1-preview.1&definitions=${definitionId}&resultFilter=succeeded&$top=${top}&$skip=${skip}`;
 
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
