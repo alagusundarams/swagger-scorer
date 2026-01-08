@@ -58,13 +58,15 @@ export async function loadAppConfig(configPath: string): Promise<AppConfig> {
         fileConfig = JSON.parse(fileContent);
     } catch (error) {
         // Silently ignore if file is missing; we might have ENV vars
-        // console.log(`ℹ️ No config.json found at ${configPath}, relying on Environment Variables.`);
     }
 
     // 2. Build the final config with JSON Priority (Primary: config.json, Secondary: Env)
+    // We treat ENV vars as the "Platform" truth.
     const config: AppConfig = {
         azure: {
             environments: fileConfig.azure?.environments || [],
+            tenantId: process.env.AZURE_TENANT_ID || fileConfig.azure?.tenantId || '',
+            clientId: process.env.AZURE_CLIENT_ID || fileConfig.azure?.clientId || '',
         },
         database: {
             url: fileConfig.database?.url || process.env.DATABASE_URL || '',
@@ -72,6 +74,17 @@ export async function loadAppConfig(configPath: string): Promise<AppConfig> {
         devops: {
             pat: fileConfig.devops?.pat || process.env.ADO_PAT || 'your-read-only-pat',
             organization: fileConfig.devops?.organization || process.env.ADO_ORG || 'your-org',
+        },
+        externalLinks: {
+            serviceNow: process.env.LINK_SERVICENOW || fileConfig.externalLinks?.serviceNow || 'https://service-now.com',
+            portIo: process.env.LINK_PORT_IO || fileConfig.externalLinks?.portIo || 'https://getport.io',
+        },
+        apim: {
+            gatewayUrlData: process.env.APIM_GATEWAY_DOMAIN || fileConfig.apim?.gatewayUrlData || 'api.ionosphere.io',
+            portalUrl: process.env.APIM_PORTAL_URL || fileConfig.apim?.portalUrl || 'https://portal.ionosphere.io',
+        },
+        identity: {
+            defaultAdGroup: process.env.DEFAULT_AD_GROUP || fileConfig.identity?.defaultAdGroup || 'API-Governance-Team',
         },
         server: {
             port: parseInt(String(fileConfig.server?.port || process.env.PORT || 3001), 10),
@@ -85,9 +98,15 @@ export async function loadAppConfig(configPath: string): Promise<AppConfig> {
     };
 
     // 3. FAIL-FAST: Validate critical configuration
-    if (!config.database.url) {
-        console.error('❌ FATAL: DATABASE_URL is not set via environment or config.json');
-        throw new Error('Missing critical configuration: database.url');
+    const errors: string[] = [];
+
+    if (!config.database.url) errors.push('Missing database.url');
+    // We allow defaults for others to support "Safe Mode" or "Mock Mode"
+    // But in a real strict mode, we would validate tenantId etc.
+
+    if (errors.length > 0) {
+        console.error('❌ FATAL: Invalid Configuration', errors);
+        throw new Error(`Missing critical configuration: ${errors.join(', ')}`);
     }
 
     return config;

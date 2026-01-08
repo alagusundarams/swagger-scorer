@@ -27,6 +27,7 @@ interface MetadataStore {
     apiContracts: Record<string, any>;
     backends: Record<string, any[]>;
     apiForensics: Record<string, Record<string, { guids: string[], backends: string[] }>>;
+    productForensics: Record<string, Record<string, { guids: string[], nvs: string[] }>>;
     productApiLinks: Record<string, Record<string, Array<{ name: string, path: string }>>>; // Updated to match extract-apim-inventory
     subscriptions: Record<string, any[]>;
 }
@@ -71,6 +72,7 @@ async function main() {
         apiContracts: {},
         backends: {},
         apiForensics: {},
+        productForensics: {},
         productApiLinks: {},
         subscriptions: {}
     };
@@ -115,6 +117,9 @@ async function main() {
         const forensicsKey = Object.keys(apimMeta.apiForensics).find(k => k.toUpperCase() === targetEnv);
         apimMeta.apiForensics = forensicsKey ? { [forensicsKey]: apimMeta.apiForensics[forensicsKey] } : {};
 
+        const prodForensicsKey = Object.keys(apimMeta.productForensics).find(k => k.toUpperCase() === targetEnv);
+        apimMeta.productForensics = prodForensicsKey ? { [prodForensicsKey]: apimMeta.productForensics[prodForensicsKey] } : {};
+
         const linksKey = Object.keys(apimMeta.productApiLinks).find(k => k.toUpperCase() === targetEnv);
         apimMeta.productApiLinks = linksKey ? { [linksKey]: apimMeta.productApiLinks[linksKey] } : {};
 
@@ -135,13 +140,14 @@ async function main() {
     if (sourceMode === 'db') {
         try {
             const res = await pool.query(`
-                SELECT id, name, array_agg(DISTINCT environment) as environments 
+                SELECT id, name, type, array_agg(DISTINCT environment) as environments 
                 FROM products 
-                GROUP BY id, name
+                GROUP BY id, name, type
             `);
             inventory = res.rows.map(row => ({
                 id: row.id,
                 name: row.name,
+                type: row.type,
                 environments: row.environments
             }));
             console.log(`   ✅ Loaded ${inventory.length} logical products from DB.`);
@@ -379,19 +385,96 @@ async function main() {
 
         if (allAppIds.size > 0) {
             const resolved = await AzureService.fetchAppRegistrations(Array.from(allAppIds));
-            const appMap = new Map<string, string>(resolved.map(r => [r.appId, r.displayName]));
+            const appMap = new Map<string, { name: string, uri?: string }>(resolved.map(r => [r.appId, { name: r.displayName, uri: r.appIdUri }]));
             console.log(`   ✅ Resolved ${appMap.size} App Registrations via Microsoft Graph`);
 
             for (const [env, ids] of Object.entries(apimMeta.appIds)) {
                 for (const id of ids) {
-                    const name = appMap.get(id) || 'Unknown Application';
-                    await pool.query(`
-                        INSERT INTO app_registrations (id, client_id, display_name, environment, updated_at)
-                        VALUES ($1, $1, $2, $3, NOW())
+                    const resolvedApp = appMap.get(id);
+                    const name = resolvedApp?.name || 'Unknown Application';
+                    const appIdUri = resolvedApp?.uri || null;
+
+                    // HEURISTIC: Find linkages in Forensics
+                    let linkedProductId: string | null = null;
+                    let linkedApiId: string | null = null;
+                    let identityType = 'PRODUCT'; // Default
+
+                    // 1. Check Products (Priority)
+                    if (apimMeta.productForensics[env]) {
+                        for (const [prodName, forensics] of Object.entries(apimMeta.productForensics[env])) {
+                            if (forensics.guids.includes(id)) {
+                                // Found usage in this product
+                                // Need to resolve Product ID. We have inventory.
+                                const p = inventory.find(i => i.name === prodName);
+                                if (p) {
+                                    // Construct the unique product ID used in DB
+                                    linkedProductId = `${p.id}:${env}:Global`;
+                                    identityType = 'PRODUCT';
+                                    break; // Assume 1:1 for now
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. Check APIs (Secondary)
+                    if (!linkedProductId && apimMeta.apiForensics[env]) {
+                        for (const [apiName, forensics] of Object.entries(apimMeta.apiForensics[env])) {
+                            if (forensics.guids.includes(id)) {
+                                // Found usage in this API
+                                // Need to find which Product it belongs to -> then construct API ID?
+                                // Actually, we just need API ID: `productId:env:Global:apiName`
+                                // We can search `apimMeta.productApiLinks` to find the parent product
+                                if (apimMeta.productApiLinks[env]) {
+                                    for (const [prodName, apis] of Object.entries(apimMeta.productApiLinks[env])) {
+                                        if (apis.some(a => a.name === apiName)) {
+                                            const p = inventory.find(i => i.name === prodName);
+                                            if (p) {
+                                                const uniqueProductId = `${p.id}:${env}:Global`;
+                                                linkedApiId = `${uniqueProductId}:${apiName}`;
+                                                identityType = 'API';
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                if (linkedApiId) break;
+                            }
+                        }
+                    }
+
+                    const res = await pool.query(`
+                        INSERT INTO app_registrations (id, client_id, display_name, app_id_uri, environment, product_id, api_id, type, updated_at)
+                        VALUES ($1, $1, $2, $3, $4, $5, $6, $7, NOW())
                         ON CONFLICT (id) DO UPDATE SET
                             display_name = EXCLUDED.display_name,
-                            updated_at = NOW();
-                    `, [id, name, env]);
+                            app_id_uri = EXCLUDED.app_id_uri,
+                            product_id = COALESCE(EXCLUDED.product_id, app_registrations.product_id),
+                            api_id = COALESCE(EXCLUDED.api_id, app_registrations.api_id),
+                            type = EXCLUDED.type,
+                            updated_at = NOW()
+                        RETURNING *;
+                    `, [id, name, appIdUri, env, linkedProductId, linkedApiId, identityType]);
+
+                    // Update parent table (Products or APIs) to link the identity back
+                    if (linkedProductId) {
+                        await pool.query(`
+                            UPDATE products 
+                            SET identity_client_id = $1, 
+                                identity_display_name = $2, 
+                                identity_app_id_uri = $3,
+                                updated_at = NOW()
+                            WHERE id = $4
+                        `, [id, name, appIdUri, linkedProductId]);
+                    } else if (linkedApiId) {
+                        await pool.query(`
+                            UPDATE apis 
+                            SET identity_client_id = $1, 
+                                identity_display_name = $2, 
+                                identity_app_id_uri = $3,
+                                updated_at = NOW()
+                            WHERE id = $4
+                        `, [id, name, appIdUri, linkedApiId]);
+                    }
 
                     if (verbose) {
                         console.log(`      🔑 ${id.substring(0, 8)}... -> "${name}" (${env})`);

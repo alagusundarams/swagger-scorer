@@ -8,8 +8,12 @@ import { addProduct, addApi } from '../services/inventory/ProductsService.js';
 import { logAudit } from '../services/core/AuditService.js';
 import { v4 as uuidv4 } from 'uuid';
 import { ScoringConfig } from '../types/index.js';
+import { AppRegistrationsRepository } from '../repositories/app-registrations.repo.js';
+import { ProductsRepository } from '../repositories/products.repo.js';
 
 export class OnboardingController {
+    private appRegRepo = new AppRegistrationsRepository();
+    private productsRepo = new ProductsRepository();
 
     // Config should be passed in constructor? 
     // Or passed to methods? The route handler was receiving config.
@@ -127,7 +131,19 @@ export class OnboardingController {
      */
     async fulfillApi(request: FastifyRequest, reply: FastifyReply) {
         const { id } = request.params as { id: string };
-        const body = request.body as { environment: string, ownerTeamId: string, displayName?: string };
+        const body = request.body as {
+            environment: string,
+            ownerTeamId: string,
+            displayName?: string,
+            productMode: 'new' | 'existing',
+            existingProductId?: string,
+            appIdentity?: {
+                clientId: string;
+                appIdUri: string;
+                displayName?: string;
+                type: 'PRODUCT' | 'API'; // User declared intent
+            }
+        };
 
         try {
             // 1. Get staged data
@@ -141,21 +157,109 @@ export class OnboardingController {
                 return reply.status(400).send({ error: 'API must be analyzed before fulfillment' });
             }
 
-            // 2. Create Product (Authoritative record)
-            const productId = `prod-${staging.api_name.toLowerCase()}-${body.environment.toLowerCase()}`;
-            const productName = staging.api_name.toLowerCase();
-            const productDisplayName = body.displayName || staging.api_name;
+            let productId: string;
+            let productDisplayName: string;
+            let appRegistrationId: string | null = null; // To link to Product or API
 
-            await addProduct({
-                id: productId,
-                name: productName,
-                displayName: productDisplayName,
-                description: `Onboarded API: ${productDisplayName}`,
-                state: 'published',
-                ownerTeamId: body.ownerTeamId,
-                environment: body.environment,
-                managementMode: 'UNTRACKED'
-            });
+            // --- IDENTITY ENFORCEMENT LOGIC ---
+
+            // Check One-Time Binding (Uniqueness) if identity is provided
+            if (body.appIdentity) {
+                const existing = await this.appRegRepo.getAppRegistrationByClientId(body.appIdentity.clientId);
+                if (existing.rows.length > 0) {
+                    return reply.status(409).send({
+                        error: 'Identity Conflict',
+                        message: `The Client ID ${body.appIdentity.clientId} is already in use by ${existing.rows[0].type} identity ${existing.rows[0].display_name}. Reuse is not permitted.`
+                    });
+                }
+            }
+
+            if (body.productMode === 'new') {
+                // RULE: New Product MUST have an identity
+                if (!body.appIdentity) {
+                    return reply.status(400).send({ error: 'Missing Identity', message: 'New Products require a linked App Registration.' });
+                }
+
+                productId = `prod-${staging.api_name.toLowerCase()}-${body.environment.toLowerCase()}`;
+                const apiId = `api-${staging.api_name.toLowerCase()}-${body.environment.toLowerCase()}`;
+                productDisplayName = body.displayName || staging.api_name;
+
+                const identityType = body.appIdentity.type || 'PRODUCT';
+
+                // Create App Registration
+                const appRegResult = await this.appRegRepo.createAppRegistration({
+                    id: uuidv4(),
+                    clientId: body.appIdentity.clientId,
+                    appIdUri: body.appIdentity.appIdUri,
+                    displayName: body.appIdentity.displayName || `${productDisplayName}-Identity`,
+                    environment: body.environment,
+                    ownerTeamId: body.ownerTeamId,
+                    productId: identityType === 'PRODUCT' ? productId : undefined,
+                    apiId: identityType === 'API' ? apiId : undefined,
+                    type: identityType
+                });
+                appRegistrationId = appRegResult.rows[0].id;
+
+                // Create Product
+                await addProduct({
+                    id: productId,
+                    name: staging.api_name.toLowerCase(),
+                    displayName: productDisplayName,
+                    description: `Onboarded API: ${productDisplayName}`,
+                    state: 'published',
+                    ownerTeamId: body.ownerTeamId,
+                    environment: body.environment,
+                    managementMode: 'UNTRACKED'
+                });
+
+            } else {
+                // Mode: Existing Product
+                if (!body.existingProductId) {
+                    return reply.status(400).send({ error: 'Missing Product ID', message: 'Existing Product ID is required.' });
+                }
+
+                // Fetch Parent Product
+                const parentResult = await this.productsRepo.getProductById(body.existingProductId);
+                if (parentResult.rows.length === 0) return reply.status(404).send({ error: 'Parent Product not found' });
+                const parent = parentResult.rows[0];
+                productId = parent.id;
+                productDisplayName = parent.display_name;
+
+                // Check Parent Identity
+                if (parent.identity_client_id) {
+                    // RULE: Inherit Parent Identity (Strict)
+                    if (body.appIdentity) {
+                        // Ideally we block this in UI, but backend must enforce too.
+                        // Actually, if they send it, maybe we just ignore it? 
+                        // No, user said "Strictly Forbidden".
+                        return reply.status(400).send({ error: 'Identity Override Forbidden', message: 'This Product already has an identity. You must inherit it.' });
+                    }
+                    // Inherited. We don't create a new App Reg. Code continues.
+                } else {
+                    // RULE: Parent has NO identity -> API MUST provide one (API-Level)
+                    if (!body.appIdentity) {
+                        return reply.status(400).send({ error: 'Missing Identity', message: 'Parent Product is isolated (No Identity). You must provide an API-Level Identity.' });
+                    }
+
+                    // Create App Registration (API Level)
+                    // We need API ID first? Or we use a UUID?
+                    const apiId = `api-${staging.api_name.toLowerCase()}-${body.environment.toLowerCase()}`;
+
+                    const appRegResult = await this.appRegRepo.createAppRegistration({
+                        id: uuidv4(),
+                        clientId: body.appIdentity.clientId,
+                        appIdUri: body.appIdentity.appIdUri,
+                        displayName: body.appIdentity.displayName || `${staging.api_name}-Identity`,
+                        environment: body.environment,
+                        ownerTeamId: body.ownerTeamId,
+                        apiId: apiId, // Link to API (We will create API shortly with this ID)
+                        // product_id is null for API-level? or we link both?
+                        // Schema: api_id references apis(id).
+                        type: 'API'
+                    });
+                    appRegistrationId = appRegResult.rows[0].id;
+                }
+            }
 
             // 3. Create API (Attached to Product)
             const apiId = `api-${staging.api_name.toLowerCase()}-${body.environment.toLowerCase()}`;
@@ -163,7 +267,7 @@ export class OnboardingController {
                 id: apiId,
                 productId: productId,
                 name: staging.api_name,
-                displayName: productDisplayName,
+                displayName: productDisplayName, // Wait, API display name? Usually same as Product if 1:1, or distinctive.
                 description: `Implementation for ${productDisplayName}`,
                 path: `/api/v1/${staging.api_name.toLowerCase()}`,
                 originTeamId: body.ownerTeamId
@@ -178,7 +282,7 @@ export class OnboardingController {
                 entityId: id,
                 action: 'FULFILL_ONBOARDING',
                 userId: staging.user_id,
-                changes: { productId, apiId, status: 'FULFILLED' }
+                changes: { productId, apiId, status: 'FULFILLED', appRegistrationId }
             });
 
             return {
@@ -186,9 +290,9 @@ export class OnboardingController {
                 productId,
                 apiId
             };
-        } catch (error) {
+        } catch (error: any) {
             request.log.error(error);
-            return reply.status(500).send({ error: 'Failed to fulfill onboarding' });
+            return reply.status(500).send({ error: 'Failed to fulfill onboarding', details: error.message });
         }
     }
 

@@ -1,8 +1,10 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { NamedValuesRepository } from '../repositories/named-values.repo.js';
+import { AppRegistrationsRepository } from '../repositories/app-registrations.repo.js';
 import { getOrphanBackends, assignBackend } from '../services/inventory/BackendsService.js';
 
 const namedValuesRepo = new NamedValuesRepository();
+const appRegRepo = new AppRegistrationsRepository();
 
 export class OrphansController {
 
@@ -65,6 +67,43 @@ export class OrphansController {
     }
 
     // ==========================================
+    // APP REGISTRATION ORPHANS
+    // ==========================================
+
+    async getOrphanAppRegistrations(request: FastifyRequest, reply: FastifyReply) {
+        const { environment } = request.query as { environment: string };
+        if (!environment) {
+            return reply.status(400).send({ error: 'environment query param required' });
+        }
+
+        try {
+            const result = await appRegRepo.getOrphanAppRegistrations(environment);
+            return { orphans: result.rows };
+        } catch (error: any) {
+            request.log.error({ err: error }, 'Error fetching orphan app registrations');
+            return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
+        }
+    }
+
+    async adoptAppRegistration(request: FastifyRequest, reply: FastifyReply) {
+        const { id, productId, apiId } = request.body as any;
+        if (!id || (!productId && !apiId)) {
+            return reply.status(400).send({ error: 'id and at least one of productId or apiId are required' });
+        }
+
+        try {
+            const result = await appRegRepo.adoptAppRegistration(id, productId, apiId);
+            if (result.rowCount === 0) {
+                return reply.status(404).send({ error: 'App Registration not found' });
+            }
+            return { appRegistration: result.rows[0] };
+        } catch (error: any) {
+            request.log.error({ err: error }, 'Error adopting app registration');
+            return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
+        }
+    }
+
+    // ==========================================
     // BACKENDS ORPHANS
     // ==========================================
 
@@ -99,3 +138,4 @@ export class OrphansController {
         }
     }
 }
+

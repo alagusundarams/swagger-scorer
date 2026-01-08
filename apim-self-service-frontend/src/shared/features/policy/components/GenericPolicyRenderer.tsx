@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { type PolicyStep } from '../types';
 import { PolicyTemplate, getPolicyFields } from '../../../../features/provisioning/components/policyTemplates';
 import { PolicyCard } from './PolicyCard';
 
 const SnippetButton = ({ onSelect, disabled }: { onSelect: (val: string) => void, disabled?: boolean }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const buttonRef = useRef<HTMLButtonElement>(null);
+    const [coords, setCoords] = useState({ top: 0, left: 0 });
+
     const snippets = [
         { label: 'Backend URL', value: '{{BACKEND_URL}}', icon: '🔗' },
         { label: 'App Client ID', value: '{{IDENTITY_CLIENT_ID}}', icon: '🆔' },
@@ -14,11 +18,33 @@ const SnippetButton = ({ onSelect, disabled }: { onSelect: (val: string) => void
         { label: 'Timeout', value: '{{GLOBAL_TIMEOUT}}', icon: '⏱️' }
     ];
 
+    // Calculate position when opening
+    useEffect(() => {
+        if (isOpen && buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect();
+            setCoords({
+                top: rect.bottom + window.scrollY + 8,
+                left: rect.left + window.scrollX
+            });
+        }
+    }, [isOpen]);
+
+    // Close on resize only (scrolling is handled by absolute positioning now)
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleResize = () => setIsOpen(false);
+        window.addEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+        };
+    }, [isOpen]);
+
     if (disabled) return null;
 
     return (
         <div className="relative inline-block ml-2">
             <button
+                ref={buttonRef}
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
                 className="text-[9px] font-black text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 px-2 py-0.5 rounded-full border border-purple-100 dark:border-purple-800 hover:bg-purple-100 transition-all flex items-center gap-1"
@@ -26,10 +52,16 @@ const SnippetButton = ({ onSelect, disabled }: { onSelect: (val: string) => void
             >
                 <span>⚡ Snippets</span>
             </button>
-            {isOpen && (
+            {isOpen && createPortal(
                 <>
-                    <div className="fixed inset-0 z-[60]" onClick={() => setIsOpen(false)} />
-                    <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl shadow-2xl z-[70] p-2 animate-in fade-in zoom-in-95 duration-200">
+                    {/* Fixed Overlay - Now actually covers the screen because it's in Body */}
+                    <div className="fixed inset-0 z-[9998]" onClick={() => setIsOpen(false)} />
+
+                    {/* Dropdown Menu - Positioned ABSOLUTELY to scroll WITH the page */}
+                    <div
+                        className="absolute z-[9999] w-72 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl shadow-2xl p-2 animate-in fade-in zoom-in-95 duration-200"
+                        style={{ top: coords.top, left: coords.left }}
+                    >
                         <div className="p-2 border-b border-gray-50 dark:border-slate-700 mb-1">
                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Policy Variables</p>
                         </div>
@@ -41,15 +73,16 @@ const SnippetButton = ({ onSelect, disabled }: { onSelect: (val: string) => void
                                     onSelect(s.value);
                                     setIsOpen(false);
                                 }}
-                                className="w-full text-left px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-600 rounded-lg transition-colors flex items-center gap-3"
+                                className="w-full text-left px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-600 rounded-lg transition-colors flex items-center gap-3 group"
                             >
                                 <span className="text-sm">{s.icon}</span>
-                                <span className="flex-1">{s.label}</span>
-                                <code className="text-[9px] font-mono text-slate-400 opacity-60 bg-gray-50 dark:bg-black/20 px-1 rounded">{s.value}</code>
+                                <span className="flex-1 whitespace-nowrap">{s.label}</span>
+                                <code className="text-[10px] font-mono text-slate-500 group-hover:text-purple-600 bg-gray-100 dark:bg-black/40 px-1.5 py-0.5 rounded whitespace-nowrap">{s.value}</code>
                             </button>
                         ))}
                     </div>
-                </>
+                </>,
+                document.body
             )}
         </div>
     );

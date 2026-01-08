@@ -130,6 +130,8 @@ export interface ErrorResponse {
 export interface AppConfig {
     azure: {
         environments: AzureEnvironment[];
+        tenantId: string;
+        clientId: string;
     };
     database: {
         url: string;
@@ -143,6 +145,19 @@ export interface AppConfig {
         logLevel: string;
         host?: string;
     };
+    // New Configuration Sections
+    externalLinks: {
+        serviceNow: string;
+        portIo: string;
+    };
+    apim: {
+        gatewayUrlData: string; // e.g. "api.ionosphere.io"
+        portalUrl: string;
+    };
+    identity: {
+        defaultAdGroup: string;
+    };
+    // Feature Flags & Dev Validations
     storagePath?: string;
     gitLocalOnly?: boolean;
     gitLocalPath?: string;

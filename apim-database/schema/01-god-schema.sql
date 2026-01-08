@@ -183,12 +183,14 @@ CREATE INDEX idx_operations_method ON operations(method);
 
 CREATE TABLE IF NOT EXISTS app_registrations (
     id TEXT PRIMARY KEY,
-    client_id TEXT NOT NULL,
+    client_id TEXT NOT NULL UNIQUE,
     display_name TEXT NOT NULL, -- Resolved from Graph or 'KeyVault:...'
+    app_id_uri TEXT,
     environment TEXT NOT NULL,
     product_id TEXT REFERENCES products(id),
     api_id TEXT REFERENCES apis(id),
     owner_team_id TEXT REFERENCES teams(id),
+    type TEXT CHECK (type IN ('PRODUCT', 'API')) DEFAULT 'PRODUCT', -- Intent: Shared (PRODUCT) or Isolated (API)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

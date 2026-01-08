@@ -6,6 +6,21 @@
 
 import { query } from '../core/db.js';
 import { logAudit } from '../core/AuditService.js';
+import { AppRegistrationsRepository } from '../../repositories/app-registrations.repo.js';
+
+const appsRepo = new AppRegistrationsRepository();
+
+/**
+ * Search all available app registrations
+ */
+export async function searchApps(query: string) {
+    const res = await appsRepo.searchAppRegistrations(query);
+    return res.rows.map((row: any) => ({
+        clientId: row.client_id,
+        displayName: row.display_name,
+        appIdUri: row.app_id_uri
+    }));
+}
 
 /**
  * Fetch all app registrations for a team

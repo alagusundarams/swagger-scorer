@@ -40,6 +40,7 @@ import policyTemplatesRoutes from './routes/policy-templates.routes.js';
 import policyDisplayRoutes from './routes/policy-display.routes.js';
 import inventoryRoutes from './routes/inventory.routes.js';
 import { authRoutes } from './routes/auth.routes.js';
+import { orphansRoutes } from './routes/orphans.routes.js';
 import multipart from '@fastify/multipart';
 import { AppConfig } from './types/index.js';
 
@@ -166,6 +167,7 @@ export async function build() {
     await fastify.register(policyDisplayRoutes, { prefix: '/api/v1' });
     await fastify.register(inventoryRoutes, { prefix: '/api/v1' });
     await fastify.register(authRoutes, { prefix: '/api/v1/auth' });
+    await fastify.register(orphansRoutes, { prefix: '/api/v1/admin/orphans' });
 
     const { backendsRoutes } = await import('./routes/backends.routes.js');
     await fastify.register(backendsRoutes, { prefix: '/api/v1' });

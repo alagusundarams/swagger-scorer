@@ -143,7 +143,8 @@ async function assembleProducts(productRows: any[], apiRows: any[]) {
             identity: p.identity_client_id ? {
                 clientId: p.identity_client_id,
                 displayName: p.identity_display_name,
-                appIdUri: p.identity_app_id_uri
+                appIdUri: p.identity_app_id_uri,
+                type: (p.identity_type as 'PRODUCT' | 'API') || 'PRODUCT'
             } : undefined,
 
             // Timestamps
@@ -179,7 +180,13 @@ async function assembleProducts(productRows: any[], apiRows: any[]) {
                         gitRepoUrl: a.git_repo_url,
                         gitFilePath: a.git_file_path,
                         operations: a.operations_json || [],
-                        computedStatus: statusDetails
+                        computedStatus: statusDetails,
+                        identity: a.identity_client_id ? {
+                            clientId: a.identity_client_id,
+                            displayName: a.identity_display_name,
+                            appIdUri: a.identity_app_id_uri,
+                            type: (a.identity_type as 'PRODUCT' | 'API') || 'PRODUCT'
+                        } : undefined
                     };
                 }))
         };
@@ -335,7 +342,8 @@ export async function getProductById(id: string, environment?: string, userConte
         identity: p.identity_client_id ? {
             clientId: p.identity_client_id,
             displayName: p.identity_display_name,
-            appIdUri: p.identity_app_id_uri
+            appIdUri: p.identity_app_id_uri,
+            type: (p.identity_type as 'PRODUCT' | 'API') || 'PRODUCT'
         } : undefined,
 
         // Timestamps
@@ -367,7 +375,13 @@ export async function getProductById(id: string, environment?: string, userConte
                 gitRepoUrl: a.git_repo_url,
                 gitFilePath: a.git_file_path,
                 operations: a.operations_json || [],
-                computedStatus: statusDetails
+                computedStatus: statusDetails,
+                identity: a.identity_client_id ? {
+                    clientId: a.identity_client_id,
+                    displayName: a.identity_display_name,
+                    appIdUri: a.identity_app_id_uri,
+                    type: (a.identity_type as 'PRODUCT' | 'API') || 'PRODUCT'
+                } : undefined
             };
         }))
     };

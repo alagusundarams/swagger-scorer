@@ -1,12 +1,12 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { API_CONFIG } from '../config/env';
+import { APP_CONFIG } from '../config/appConfig';
 
 /**
  * Base API instance for the shell and all features.
  */
 export const api = axios.create({
-    baseURL: API_CONFIG.BASE_URL,
+    baseURL: APP_CONFIG.api.baseUrl,
     headers: { 'Content-Type': 'application/json' },
 });
 
@@ -47,6 +47,6 @@ api.interceptors.response.use(
  * Shared instance for Workflow/Drafts (if separate).
  */
 export const workflowApi = axios.create({
-    baseURL: API_CONFIG.WORKFLOW_URL,
+    baseURL: APP_CONFIG.api.workflowUrl,
     headers: { 'Content-Type': 'application/json' },
 });

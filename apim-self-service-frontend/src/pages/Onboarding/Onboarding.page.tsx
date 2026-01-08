@@ -3,19 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { useStore } from '../../store/useStore';
 import { useTeamsStore } from '../../features/teams';
-import { OnboardingProgressBar, OnboardingIdentityStep, OnboardingFulfillmentStep, OnboardingSpecStep, OnboardingApiPolicyStep, OnboardingIntentModal, OnboardingResolutionStep, saveDraft, loadDraft } from '../../features/provisioning';
+import { OnboardingProgressBar, OnboardingIdentityStep, OnboardingFulfillmentStep, OnboardingSpecStep, OnboardingApiPolicyStep, OnboardingIntentModal, OnboardingResolutionStep, OnboardingPrerequisitesStep, AppRegistrationGuide, saveDraft, loadDraft } from '../../features/provisioning';
 import { useInventoryStore, type Product } from '../../features/inventory';
 
 /**
  * OnboardingPage Controller (Visual Wizard v2)
  * 
  * Flow:
- * 0. Intent (New vs Existing)
- * 1. Identity (Skipped if Existing)
- * 2. Contract (Spec)
- * 3. Product Policy (Skipped if Existing)
- * 4. API Policy
- * 5. Fulfillment
+ * 0. Prerequisites (Enlightenment/Ready Check)
+ * 1. Intent (New vs Existing)
+ * 2. Identity (Skipped if Existing)
+ * 3. Contract (Spec)
+ * 4. Product Policy (Internal logic)
+ * 5. API Policy (Studio)
+ * 6. Resolution
+ * 7. Fulfillment
  */
 interface OnboardingWizardProps {
     validateProductName: (name: string) => boolean;
@@ -56,6 +58,7 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
     });
 
     const [draftId, setDraftId] = useState<string | null>(null);
+    const [showGuide, setShowGuide] = useState(false);
 
     // --- Draft Logic: Auto-save at each step ---
     useEffect(() => {
@@ -65,7 +68,7 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
 
             const timer = setTimeout(() => {
                 saveDraft(currentDraftId, step, formData)
-                    .catch(err => console.error("Auto-save failed", err));
+                    .catch((err: Error) => console.error("Auto-save failed", err));
             }, 2000); // Debounce saves
 
             return () => clearTimeout(timer);
@@ -77,7 +80,7 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
         const searchParams = new URLSearchParams(window.location.search);
         const resumeId = searchParams.get('resume');
         if (resumeId) {
-            loadDraft(resumeId).then(draft => {
+            loadDraft(resumeId).then((draft: any) => {
                 if (draft) {
                     setFormData(draft.formData);
                     setStep(draft.step);
@@ -96,34 +99,28 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
 
     // Dynamic Step Management
     const stepsConf = intent === 'new'
-        ? ['Identity', 'Contract', 'Security', 'Fine-Grained', 'Configuration', 'Review']
-        : ['Contract', 'Fine-Grained', 'Configuration', 'Review']; // Existing skips Identity/Security
+        ? ['Prep', 'Intent', 'Identity', 'Spec', 'Policies', 'Review']
+        : ['Prep', 'Intent', 'Spec', 'Policies', 'Review'];
 
-    // Adjust current visual step index (0-based) for progress bar
-    // If intent=new, step 1 is index 0. If intent=existing, step 1 (Contract) is index 0.
-    // Our internal 'step' state:
-    // 0: Intent
-    // 1: Identity (New Only)
-    // 2: Contract
-    // 3: Security (New Only)
-    // 4: Fine-Grained
-    // 5: Fulfillment
-
+    /**
+     * Internal vs Visual Navigation Map:
+     * Logic: Shifts internal step indices to zero-indexed visual progress bars.
+     */
     const getVisualStep = () => {
-        if (step === 0) return 0;
+        if (step <= 1) return step; // Prep and Intent
         if (intent === 'new') {
-            return step;
+            // New Flow: 2(Identity)->2, 3(Spec)->3, 5(Policy)->4, 6(Res)->4, 7(Full)->5
+            if (step === 2) return 2;
+            if (step === 3) return 3;
+            if (step >= 5 && step <= 6) return 4; // Policies + Resolution group
+            if (step === 7) return 5;
+            return 2;
         } else {
-            // Existing Flow Mappings:
-            // Internal 2 (Contract) -> Visual 1
-            // Internal 4 (Fine) -> Visual 2
-            // Internal 5 (Resolution) -> Visual 3
-            // Internal 6 (Fulfill) -> Visual 4
-            if (step === 2) return 1;
-            if (step === 4) return 2;
-            if (step === 5) return 3;
-            if (step === 6) return 4;
-            return 1;
+            // Existing Flow: 3(Spec)->2, 5(Policy)->3, 6(Res)->3, 7(Full)->4
+            if (step === 3) return 2;
+            if (step >= 5 && step <= 6) return 3;
+            if (step === 7) return 4;
+            return 2;
         }
     };
 
@@ -138,25 +135,25 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
                 ownerTeamId: product.ownerTeamId // Inherit
             }));
             fetchConfiguration(product.id);
-            setStep(2); // Jump to Contract
+            setStep(3); // Jump to Contract (shifted)
         } else {
-            setStep(1); // Go to Identity
+            setStep(2); // Go to Identity (shifted)
         }
     };
 
     const handleNext = () => {
-        if (step === 1 && isNameDuplicate) return;
+        if (step === 2 && isNameDuplicate) return;
 
         let nextStep = step + 1;
 
-        // MERGE STEP 3 & 4: Skip standalone Product Policy step
-        if (step === 2) {
-            nextStep = 4; // Jump straight to Unified Policy Studio
+        // MERGE STEP 4 & 5: Skip standalone Product Policy step
+        if (step === 3) {
+            nextStep = 5; // Jump straight to Unified Policy Studio (shifted)
         }
 
         // Skip logic for Existing flow (Already handled by above but good to keep explicit)
         if (intent === 'existing') {
-            if (step === 2) nextStep = 4;
+            if (step === 3) nextStep = 5;
         }
         setStep(nextStep);
     };
@@ -164,14 +161,14 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
     const handleBack = () => {
         let prevStep = step - 1;
 
-        // MERGE STEP 3 & 4: Back from Unified Studio goes to Spec
-        if (step === 4) {
-            prevStep = 2;
+        // MERGE STEP 4 & 5: Back from Unified Studio goes to Spec
+        if (step === 5) {
+            prevStep = 3;
         }
 
         if (intent === 'existing') {
-            if (step === 4) prevStep = 2; // Skip back to Contract
-            if (step === 2) prevStep = 0; // Back to Intent
+            if (step === 5) prevStep = 3; // Skip back to Contract
+            if (step === 3) prevStep = 1; // Back to Intent
         }
         setStep(prevStep);
     };
@@ -193,36 +190,44 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
     return (
         <MainLayout>
             <div className="py-16">
-                <div className={`${step === 2 || step === 3 || step === 4 ? 'max-w-[1400px]' : 'max-w-3xl'} mx-auto px-6 transition-all duration-500 ease-in-out`}>
+                <div className={`${(step >= 3 && step <= 6) ? 'max-w-[1400px]' : 'max-w-5xl'} mx-auto px-6 transition-all duration-500 ease-in-out`}>
 
-                    {step > 0 && (
+                    {step >= 0 && ( // Progress bar visible from step 0
                         <OnboardingProgressBar currentStep={getVisualStep()} totalSteps={stepsConf.length} />
                     )}
 
                     <div className="bg-white dark:bg-slate-800 rounded-[3rem] shadow-premium border border-gray-100 dark:border-slate-700/40 relative overflow-hidden min-h-[850px] flex flex-col">
 
-                        {/* Step 0: Intent (Modal embedded) */}
+                        {/* Step 0: Prerequisites */}
                         {step === 0 && (
+                            <OnboardingPrerequisitesStep onNext={() => setStep(1)} />
+                        )}
+
+                        {/* Step 1: Intent (Modal embedded) */}
+                        {step === 1 && (
                             <OnboardingIntentModal
                                 onSelectIntent={handleIntentSelect}
                                 userTeams={userTeams}
                             />
                         )}
 
-                        {/* Step 1: Identity (New Only) */}
-                        {step === 1 && intent === 'new' && (
+                        {/* Step 2: Identity (New Only) */}
+                        {step === 2 && (
                             <OnboardingIdentityStep
                                 onNext={handleNext}
                                 isNameDuplicate={isNameDuplicate}
                                 formData={formData}
+                                intent={intent}
+                                selectedProduct={existingProduct}
                                 onChange={setFormData}
                                 userTeams={userTeams}
                                 environment="DEV"
+                                onShowGuide={() => setShowGuide(true)}
                             />
                         )}
 
-                        {/* Step 2: Contract Definition */}
-                        {step === 2 && (
+                        {/* Step 3: Contract Definition */}
+                        {step === 3 && (
                             <OnboardingSpecStep
                                 onBack={handleBack}
                                 onNext={(spec, apiName, apiSuffix) => {
@@ -235,10 +240,10 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
                             />
                         )}
 
-                        {/* Step 3: Skipped (Merged into Step 4) */}
+                        {/* Step 4: Skipped (Merged into Step 5) */}
 
-                        {/* Step 4: Unified Policy Studio */}
-                        {step === 4 && (
+                        {/* Step 5: Unified Policy Studio */}
+                        {step === 5 && (
                             <OnboardingApiPolicyStep
                                 onBack={handleBack}
                                 onNext={(apiPolicies, productPolicyXml) => {
@@ -301,6 +306,9 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
                     </div>
                 </div>
             </div>
+
+            {/* Guide Slide-over */}
+            {showGuide && <AppRegistrationGuide onClose={() => setShowGuide(false)} />}
         </MainLayout>
     );
 };

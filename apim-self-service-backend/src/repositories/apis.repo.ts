@@ -11,8 +11,19 @@ export class ApisRepository {
      */
     async getAllApis() {
         return await query(`
-            SELECT a.*, o.json_data as operations_json
+            SELECT a.*, o.json_data as operations_json,
+                   COALESCE(ar_api.client_id, ar_prod.client_id) as identity_client_id,
+                   COALESCE(ar_api.display_name, ar_prod.display_name) as identity_display_name,
+                   COALESCE(ar_api.app_id_uri, ar_prod.app_id_uri) as identity_app_id_uri,
+                   CASE 
+                     WHEN ar_api.id IS NOT NULL THEN 'API'
+                     WHEN ar_prod.id IS NOT NULL THEN 'PRODUCT'
+                     ELSE NULL
+                   END as identity_type
             FROM apis a
+            LEFT JOIN products p ON a.product_id = p.id
+            LEFT JOIN app_registrations ar_api ON ar_api.api_id = a.id
+            LEFT JOIN app_registrations ar_prod ON ar_prod.product_id = p.id AND ar_prod.api_id IS NULL
             LEFT JOIN LATERAL (
                 SELECT json_agg(op.*) as json_data
                 FROM operations op
@@ -54,9 +65,19 @@ export class ApisRepository {
      */
     async getApiById(id: string) {
         return await query(`
-            SELECT a.*, p.display_name as product_display_name
+            SELECT a.*, p.display_name as product_display_name,
+                   COALESCE(ar_api.client_id, ar_prod.client_id) as identity_client_id,
+                   COALESCE(ar_api.display_name, ar_prod.display_name) as identity_display_name,
+                   COALESCE(ar_api.app_id_uri, ar_prod.app_id_uri) as identity_app_id_uri,
+                   CASE 
+                     WHEN ar_api.id IS NOT NULL THEN 'API'
+                     WHEN ar_prod.id IS NOT NULL THEN 'PRODUCT'
+                     ELSE NULL
+                   END as identity_type
             FROM apis a
             JOIN products p ON a.product_id = p.id
+            LEFT JOIN app_registrations ar_api ON ar_api.api_id = a.id
+            LEFT JOIN app_registrations ar_prod ON ar_prod.product_id = p.id AND ar_prod.api_id IS NULL
             WHERE a.id = $1
         `, [id]);
     }
@@ -65,7 +86,22 @@ export class ApisRepository {
      * Get all APIs for a specific product
      */
     async getAllApisByProductId(productId: string) {
-        return await query('SELECT * FROM apis WHERE product_id = $1', [productId]);
+        return await query(`
+            SELECT a.*,
+                   COALESCE(ar_api.client_id, ar_prod.client_id) as identity_client_id,
+                   COALESCE(ar_api.display_name, ar_prod.display_name) as identity_display_name,
+                   COALESCE(ar_api.app_id_uri, ar_prod.app_id_uri) as identity_app_id_uri,
+                   CASE 
+                     WHEN ar_api.id IS NOT NULL THEN 'API'
+                     WHEN ar_prod.id IS NOT NULL THEN 'PRODUCT'
+                     ELSE NULL
+                   END as identity_type
+            FROM apis a
+            LEFT JOIN app_registrations ar_api ON ar_api.api_id = a.id
+            LEFT JOIN products p ON a.product_id = p.id
+            LEFT JOIN app_registrations ar_prod ON ar_prod.product_id = p.id AND ar_prod.api_id IS NULL
+            WHERE a.product_id = $1
+        `, [productId]);
     }
 
     /**

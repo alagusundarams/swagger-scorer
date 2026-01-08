@@ -214,6 +214,35 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
                 onDeprecateClick={handleDeprecate}
             />
 
+            {/* Product Identity Block */}
+            {product.identity && (
+                <div className="mb-8 p-6 bg-slate-50 dark:bg-slate-900/20 border border-slate-100 dark:border-slate-800 rounded-3xl flex items-center justify-between animate-fade-in">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-600">
+                            🛡️
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest">Linked Identity</h3>
+                                <span className="text-[8px] font-black px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 rounded-full uppercase tracking-tighter">
+                                    Product Level (Shared)
+                                </span>
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                                {product.identity.displayName} • <code className="text-[10px] font-mono">{product.identity.clientId}</code>
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => navigator.clipboard.writeText(product.identity!.clientId)}
+                        className="p-3 hover:bg-white dark:hover:bg-slate-800 rounded-xl transition-all text-gray-400 hover:text-blue-600"
+                        title="Copy Client ID"
+                    >
+                        📋
+                    </button>
+                </div>
+            )}
+
             {/* GRP Policy Action Block */}
             {product.type === 'grp' && (
                 <div className="mb-8 p-6 bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-800 rounded-3xl flex justify-between items-center animate-fade-in shadow-premium">

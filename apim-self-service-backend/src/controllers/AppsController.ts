@@ -1,7 +1,19 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
-import { getAppRegistrations, addAppRegistration } from '../services/identity/AppsService.js';
+import { getAppRegistrations, addAppRegistration, searchApps } from '../services/identity/AppsService.js';
 
 export class AppsController {
+
+    async searchApps(request: FastifyRequest, reply: FastifyReply) {
+        const { q } = request.query as any;
+        if (!q || q.length < 2) return [];
+        try {
+            const apps = await searchApps(q);
+            return apps;
+        } catch (error) {
+            request.log.error({ err: error }, 'Error searching app registrations');
+            return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to search apps' });
+        }
+    }
 
     async getApps(request: FastifyRequest, reply: FastifyReply) {
         const { teamId } = request.query as any;

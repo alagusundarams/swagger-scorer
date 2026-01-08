@@ -158,5 +158,10 @@ export const inventoryApi = {
             justification
         });
         return res.data;
+    },
+    // App Registration Search
+    searchAppRegistrations: async (q: string) => {
+        const res = await baseClient.get(`/apps/search?q=${encodeURIComponent(q)}`);
+        return res.data;
     }
 };

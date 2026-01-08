@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { type Product, type Subscription } from '../../../../shared/types/domain';
 import { maskKey } from '../../../../utils/securityUtils';
+import { APP_CONFIG, getGatewayUrl } from '../../../../config/appConfig';
 
 interface ProductGettingStartedProps {
     product: Product;
@@ -27,10 +28,10 @@ export function ProductGettingStarted({ product, subscription }: ProductGettingS
                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Gateway Endpoint ({selectedEnv})</p>
                             <div className="flex bg-black/40 p-4 rounded-xl border border-white/5 font-mono text-sm text-emerald-400 group">
                                 <code className="truncate">
-                                    https://api.{selectedEnv.toLowerCase() === 'prod' ? 'ionosphere' : selectedEnv.toLowerCase() + '.ionosphere'}.io/v{product.version}
+                                    {getGatewayUrl(selectedEnv, product.version)}
                                 </code>
                                 <button
-                                    onClick={() => navigator.clipboard.writeText(`https://api.${selectedEnv.toLowerCase() === 'prod' ? 'ionosphere' : selectedEnv.toLowerCase() + '.ionosphere'}.io/v${product.version}`)}
+                                    onClick={() => navigator.clipboard.writeText(getGatewayUrl(selectedEnv, product.version))}
                                     className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-white"
                                     title="Copy URL"
                                 >
@@ -42,12 +43,12 @@ export function ProductGettingStarted({ product, subscription }: ProductGettingS
                         <div className="p-6 bg-black/20 rounded-2xl border border-white/5 relative group/code">
                             <p className="text-xs font-bold text-slate-400 mb-4">Sample CURL Request</p>
                             <pre className="text-[11px] font-mono text-slate-300 overflow-x-auto">
-                                {`curl -X GET "https://api.ionosphere.io/v${product.version}/metadata" \\
+                                {`curl -X GET "${getGatewayUrl('PROD', product.version)}/metadata" \\
   -H "Ocp-Apim-Subscription-Key: ${maskKey(subscription.primaryKey.value)}" \\
   -H "Content-Type: application/json"`}
                             </pre>
                             <button
-                                onClick={() => navigator.clipboard.writeText(`curl -X GET "https://api.ionosphere.io/v${product.version}/metadata" -H "Ocp-Apim-Subscription-Key: ${subscription.primaryKey.value}" -H "Content-Type: application/json"`)}
+                                onClick={() => navigator.clipboard.writeText(`curl -X GET "${getGatewayUrl('PROD', product.version)}/metadata" -H "Ocp-Apim-Subscription-Key: ${subscription.primaryKey.value}" -H "Content-Type: application/json"`)}
                                 className="absolute top-4 right-4 p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-all opacity-0 group-hover/code:opacity-100 text-slate-400 hover:text-white"
                                 title="Copy CURL"
                             >

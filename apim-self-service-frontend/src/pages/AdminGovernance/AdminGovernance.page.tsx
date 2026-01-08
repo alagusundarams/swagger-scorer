@@ -6,6 +6,7 @@ import {
     TeamManager,
     OrphanProductManager,
     OrphanSubscriptionManager,
+    OrphanAppRegistrationManager,
     OrphanNamedValueManager,
     OrphanBackendManager
 } from '../../features/admin';
@@ -34,7 +35,7 @@ export const AdminGovernancePage = () => {
     const { user, setPageTitle } = useStore();
     const { approvalRequests: _approvalRequests } = useGovernanceStore();
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState<'teams' | 'orphans' | 'subscriptions' | 'named-values' | 'backends'>('teams');
+    const [activeTab, setActiveTab] = useState<'teams' | 'orphans' | 'subscriptions' | 'app-regs' | 'named-values' | 'backends'>('teams');
 
     useEffect(() => {
         setPageTitle('');
@@ -89,6 +90,15 @@ export const AdminGovernancePage = () => {
                         Subscription Reclamation
                     </button>
                     <button
+                        onClick={() => setActiveTab('app-regs')}
+                        className={`pb-4 text-sm font-bold tracking-wide uppercase transition-all duration-200 border-b-2 ${activeTab === 'app-regs'
+                            ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
+                            : 'text-gray-500 hover:text-gray-800 dark:text-slate-500 dark:hover:text-slate-200 border-transparent'
+                            }`}
+                    >
+                        App Identity Reclamation
+                    </button>
+                    <button
                         onClick={() => setActiveTab('named-values')}
                         className={`pb-4 text-sm font-bold tracking-wide uppercase transition-all duration-200 border-b-2 ${activeTab === 'named-values'
                             ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
@@ -113,6 +123,7 @@ export const AdminGovernancePage = () => {
                     {activeTab === 'teams' && <TeamManager />}
                     {activeTab === 'orphans' && <OrphanProductManager />}
                     {activeTab === 'subscriptions' && <OrphanSubscriptionManager />}
+                    {activeTab === 'app-regs' && <OrphanAppRegistrationManager />}
                     {activeTab === 'named-values' && <OrphanNamedValueManager />}
                     {activeTab === 'backends' && <OrphanBackendManager />}
                 </div>

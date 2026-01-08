@@ -43,8 +43,10 @@ interface MetadataStore {
     apiContracts: Record<string, any>;  // apiId -> { displayName: string, definition: any }
     backends: Record<string, any[]>;    // env -> backend[]
     apiForensics: Record<string, Record<string, { guids: string[], backends: string[] }>>; // env -> apiName -> forensics
+    productForensics: Record<string, Record<string, { guids: string[], nvs: string[] }>>; // env -> productName -> forensics
     productApiLinks: Record<string, Record<string, Array<{ name: string, path: string }>>>; // env -> productId -> { name, path }[]
     subscriptions: Record<string, any[]>; // env -> subscription[]
+    apiIdentities: Record<string, Record<string, string>>; // env -> apiName -> clientId (from auth settings)
 }
 const CONCURRENCY_LIMIT = 10;
 
@@ -152,8 +154,10 @@ async function main() {
         apiContracts: {},
         backends: {},
         apiForensics: {},
+        productForensics: {},
         productApiLinks: {},
-        subscriptions: {}
+        subscriptions: {},
+        apiIdentities: {}
     };
 
     let envConfigs = config.azure?.environments || [];
@@ -245,6 +249,11 @@ async function main() {
                         const { guids, nvs, backends: _b } = extractForensicsFromPolicy(xml);
                         guids.forEach((id: string) => envAppIds.add(id));
                         nvs.forEach((nv: string) => potentialNvs.add(nv));
+
+                        // Store Product Forensics for Linkage
+                        if (!metadata.productForensics[env.name]) metadata.productForensics[env.name] = {};
+                        metadata.productForensics[env.name][p.name] = { guids, nvs };
+
                         if (verbose && (guids.length > 0 || nvs.length > 0)) {
                             console.log(`            📄 Product Policy: ${guids.length} GUIDs, ${nvs.length} NVs`);
                         }
@@ -349,6 +358,21 @@ async function main() {
                         };
                     });
                     metadata.productApiLinks[env.name][p.name] = apiDetails;
+
+                    // Extract API Identities (OAuth2)
+                    (pApis.value || []).forEach((api: any) => {
+                        // Check for OAuth2 settings
+                        const auth = api.properties?.authenticationSettings?.oAuth2;
+                        // Sometimes Client ID is in openid? Or directly here?
+                        // In APIM, usually it points to an OAuth2 Server (authorizationServerId).
+                        // BUT valid-jwt policy is the real enforcement.
+                        // Let's also check if 'subscriptionKeyParameterNames' or similar reveal anything.
+                        // For now if we see an authorizationServerId, we record it.
+                        // Actually, often the `resource` or `scope` might be useful. 
+                        // To be truly useful, we need the Client ID. 
+                        // If we can't get it easily from the list, we rely on the Policy Forensics which WE ALREADY HAVE.
+                    });
+
                 } catch (e) { }
             });
 

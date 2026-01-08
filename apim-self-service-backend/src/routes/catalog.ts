@@ -185,6 +185,7 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     // APP REGISTRATION ROUTES
     // ==========================================
 
+    fastify.get('/apps/search', appsController.searchApps);
     fastify.get('/apps', appsController.getApps);
 
     fastify.post('/apps', appsController.addApp);
@@ -207,7 +208,14 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
 
     fastify.get('/subscriptions', subscriptionsController.getAllSubscriptions);
 
+    fastify.get('/subscriptions/:id/secrets', subscriptionsController.getSecrets);
+
+    fastify.post('/subscriptions', subscriptionsController.createSubscription);
+
     fastify.post('/subscriptions/:id/adopt', subscriptionsController.adoptSubscription);
+
+    // Alias for legacy assign route
+    fastify.put('/subscriptions/:id/assign', subscriptionsController.adoptSubscription);
 
     // ==========================================
     // SCORING ROUTES (Admin)

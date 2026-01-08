@@ -49,9 +49,24 @@ paths: {}
                         </span>
                     </div>
                     <div className="flex justify-between items-end mb-6">
-                        <h1 className="text-5xl font-black text-gray-900 dark:text-white tracking-tighter leading-none">
-                            {api.displayName}
-                        </h1>
+                        <div className="flex flex-col gap-2">
+                            <h1 className="text-5xl font-black text-gray-900 dark:text-white tracking-tighter leading-none">
+                                {api.displayName}
+                            </h1>
+                            {api.identity && (
+                                <div className="flex items-center gap-3 mt-2">
+                                    <span className={`text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest border ${api.identity.type === 'PRODUCT'
+                                            ? 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-800'
+                                            : 'bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/20 dark:border-blue-800'
+                                        }`}>
+                                        {api.identity.type === 'PRODUCT' ? '🛡️ Shared Identity' : '🔐 Isolated Identity'}
+                                    </span>
+                                    <code className="text-xs font-mono text-gray-400 dark:text-slate-500 bg-gray-50 dark:bg-slate-800/50 px-2 py-0.5 rounded border border-gray-100 dark:border-slate-700">
+                                        {api.identity.clientId}
+                                    </code>
+                                </div>
+                            )}
+                        </div>
                         <div className="flex gap-3">
                             {canEditPolicies && (
                                 <button

@@ -10,7 +10,7 @@
 import { api } from '../../../api/baseClient';
 import type { Team, Product } from '../../../shared/types/domain';
 import { eventBus } from '../../../shared/events/eventBus';
-
+import { APP_CONFIG } from '../../../config/appConfig';
 /**
  * Get admin dashboard data
  */
@@ -37,7 +37,7 @@ export async function getGlobalInventory() {
  * @todo Implement actual API endpoint
  */
 export async function updateTeam(teamId: string, updates: Partial<Team>): Promise<Team> {
-    const response = await fetch(`/api/v1/teams/${teamId}`, {
+    const response = await fetch(`${APP_CONFIG.api.baseUrl}/teams/${teamId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates)
@@ -85,7 +85,7 @@ export async function getOrphanProducts(): Promise<Product[]> {
 export async function updateProduct(productId: string, updates: Partial<Product>): Promise<Product> {
     console.log(`[adminClient] updateProduct called for ${productId}`, updates);
     try {
-        const response = await fetch(`/api/v1/products/${productId}`, {
+        const response = await fetch(`${APP_CONFIG.api.baseUrl}/products/${productId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updates)
@@ -118,7 +118,7 @@ export async function updateProduct(productId: string, updates: Partial<Product>
  * Get all subscriptions (Admin view)
  */
 export async function getSubscriptions(): Promise<any[]> {
-    const response = await fetch('/api/v1/subscriptions'); // Admin sees all by default on backend if no teamId passed
+    const response = await fetch(`${APP_CONFIG.api.baseUrl}/subscriptions`); // Admin sees all by default on backend if no teamId passed
     if (!response.ok) throw new Error('Failed to fetch subscriptions');
     return await response.json();
 }
@@ -127,7 +127,7 @@ export async function getSubscriptions(): Promise<any[]> {
  * Adopt an orphaned subscription
  */
 export async function adoptSubscription(subscriptionId: string, teamId: string): Promise<any> {
-    const response = await fetch(`/api/v1/subscriptions/${subscriptionId}/adopt`, {
+    const response = await fetch(`${APP_CONFIG.api.baseUrl}/subscriptions/${subscriptionId}/adopt`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ teamId })
@@ -143,14 +143,14 @@ export async function adoptSubscription(subscriptionId: string, teamId: string):
 }
 
 export const getOrphanNamedValues = async (environment: string) => {
-    const response = await fetch(`/api/v1/config/named-values/orphans?environment=${environment}`);
+    const response = await fetch(`${APP_CONFIG.api.baseUrl}/admin/orphans/named-values?environment=${environment}`);
     if (!response.ok) throw new Error('Failed to fetch orphaned named values');
     const data = await response.json();
     return data.orphans;
 };
 
 export const adoptNamedValue = async (id: string, environment: string, data: { productId?: string, scopeId?: string, scope: 'PRODUCT' | 'API' | 'GLOBAL' }) => {
-    const response = await fetch('/api/v1/config/named-values/adopt', {
+    const response = await fetch(`${APP_CONFIG.api.baseUrl}/admin/orphans/named-values/adopt`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, environment, ...data })
@@ -160,15 +160,33 @@ export const adoptNamedValue = async (id: string, environment: string, data: { p
     return result.value;
 };
 
+export const getOrphanAppRegistrations = async (environment: string) => {
+    const response = await fetch(`${APP_CONFIG.api.baseUrl}/admin/orphans/app-registrations?environment=${environment}`);
+    if (!response.ok) throw new Error('Failed to fetch orphaned app registrations');
+    const data = await response.json();
+    return data.orphans;
+};
+
+export const adoptAppRegistration = async (id: string, data: { productId?: string, apiId?: string }) => {
+    const response = await fetch(`${APP_CONFIG.api.baseUrl}/admin/orphans/app-registrations/adopt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...data })
+    });
+    if (!response.ok) throw new Error('Failed to adopt app registration');
+    const result = await response.json();
+    return result.appRegistration;
+};
+
 export const getOrphanBackends = async (environment: string) => {
-    const response = await fetch(`/api/v1/config/backends/orphans?environment=${environment}`);
+    const response = await fetch(`${APP_CONFIG.api.baseUrl}/admin/orphans/backends?environment=${environment}`);
     if (!response.ok) throw new Error('Failed to fetch orphaned backends');
     const data = await response.json();
     return data.orphans;
 };
 
 export const adoptBackend = async (id: string, environment: string, data: { productId?: string, apiId?: string, scope: 'PRODUCT' | 'API' | 'GLOBAL' }) => {
-    const response = await fetch('/api/v1/config/backends/adopt', {
+    const response = await fetch(`${APP_CONFIG.api.baseUrl}/admin/orphans/backends/adopt`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, environment, ...data })
@@ -177,3 +195,4 @@ export const adoptBackend = async (id: string, environment: string, data: { prod
     const result = await response.json();
     return result.backend;
 };
+

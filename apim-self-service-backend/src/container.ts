@@ -17,6 +17,7 @@ import { DashboardController } from './controllers/DashboardController.js';
 import { OnboardingController } from './controllers/OnboardingController.js';
 import { ValidationController } from './controllers/ValidationController.js';
 import { BackendsController } from './controllers/BackendsController.js';
+import { OrphansController } from './controllers/OrphansController.js';
 
 export interface Container {
     gitService: GitService;
@@ -37,6 +38,7 @@ export interface Container {
     onboardingController: OnboardingController;
     validationController: ValidationController;
     backendsController: BackendsController;
+    orphansController: OrphansController;
 }
 
 /**
@@ -67,6 +69,7 @@ export async function initializeContainer(config: AppConfig): Promise<Container>
     const onboardingController = new OnboardingController();
     const validationController = new ValidationController();
     const backendsController = new BackendsController();
+    const orphansController = new OrphansController();
 
     return {
         gitService,
@@ -86,7 +89,8 @@ export async function initializeContainer(config: AppConfig): Promise<Container>
         dashboardController,
         onboardingController,
         validationController,
-        backendsController
+        backendsController,
+        orphansController
     };
 }
 

@@ -534,7 +534,7 @@ export class AzureService {
                 // Skip if not a GUID (e.g. keyVault URL)
                 if (!/^[0-9a-f]{8}-[0-9a-f]{4}/i.test(appId)) continue;
 
-                const response = await fetch(`https://graph.microsoft.com/v1.0/applications?$filter=appId eq '${appId}'&$select=appId,displayName`, {
+                const response = await fetch(`https://graph.microsoft.com/v1.0/applications?$filter=appId eq '${appId}'&$select=appId,displayName,identifierUris`, {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
@@ -544,9 +544,11 @@ export class AzureService {
                 if (response.ok) {
                     const data = await response.json() as { value: any[] };
                     if (data.value && data.value.length > 0) {
+                        const app = data.value[0];
                         results.push({
-                            appId: data.value[0].appId,
-                            displayName: data.value[0].displayName
+                            appId: app.appId,
+                            displayName: app.displayName,
+                            appIdUri: app.identifierUris && app.identifierUris.length > 0 ? app.identifierUris[0] : undefined
                         });
                     }
                 }
@@ -647,4 +649,5 @@ export interface AzureADGroup {
 export interface AppRegistration {
     appId: string;
     displayName: string;
+    appIdUri?: string;
 }

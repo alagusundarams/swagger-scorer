@@ -5,6 +5,7 @@
  * Supports multiple languages and authentication methods.
  */
 import { type Operation, type API, type Product } from '../../types/inventoryTypes';
+import { APP_CONFIG, getGatewayUrl } from '../../../../config/appConfig';
 
 interface EndpointImplementationGuideProps {
     product: Product;
@@ -25,7 +26,7 @@ export function EndpointImplementationGuide({ product, api, operation }: Endpoin
   }`;
         } else if (operation.method === 'PATCH' && operation.urlTemplate.includes('customer')) {
             return `{
-    "email": "customer@example.com",
+    "email": "customer${APP_CONFIG.brand.emailSuffix}",
     "preferences": {
       "newsletter": true
     }
@@ -38,7 +39,7 @@ export function EndpointImplementationGuide({ product, api, operation }: Endpoin
 
     const copySnippet = () => {
         const payload = getPayload();
-        const snippet = `curl -X ${operation.method} "https://api.ionosphere.io${api.path}${operation.urlTemplate}" \\
+        const snippet = `curl -X ${operation.method} "${getGatewayUrl('PROD')}${api.path}${operation.urlTemplate}" \\
   -H "Authorization: Bearer <YOUR_TOKEN>" \\
   -H "Accept: application/json"${payload ? ` \\
   -H "Content-Type: application/json" \\
@@ -66,7 +67,7 @@ export function EndpointImplementationGuide({ product, api, operation }: Endpoin
                     <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">cURL Example</span>
                 </div>
                 <pre className="font-mono text-xs leading-relaxed text-slate-300">
-                    <span className="text-purple-400">curl</span> -X {operation.method} "https://api.ionosphere.io{api.path}{operation.urlTemplate}" \<br />
+                    <span className="text-purple-400">curl</span> -X {operation.method} "{getGatewayUrl('PROD')}{api.path}{operation.urlTemplate}" \<br />
                     &nbsp;&nbsp;-H "Authorization: Bearer &lt;YOUR_TOKEN&gt;" \<br />
                     &nbsp;&nbsp;-H "Accept: application/json"
                     {['POST', 'PUT', 'PATCH'].includes(operation.method) && (
@@ -97,9 +98,9 @@ export function EndpointImplementationGuide({ product, api, operation }: Endpoin
             <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800">
                 <div>
                     <p className="text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-1">Owner Contact</p>
-                    <p className="text-xs font-bold text-gray-900 dark:text-white">{product.ownerTeamId}@company.com</p>
+                    <p className="text-xs font-bold text-gray-900 dark:text-white">{product.ownerTeamId}{APP_CONFIG.brand.emailSuffix}</p>
                 </div>
-                <a href={`mailto:${product.ownerTeamId}@company.com`} className="text-xs font-bold text-blue-600 hover:underline">
+                <a href={`mailto:${product.ownerTeamId}${APP_CONFIG.brand.emailSuffix}`} className="text-xs font-bold text-blue-600 hover:underline">
                     Request Support
                 </a>
             </div>

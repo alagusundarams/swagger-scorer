@@ -47,6 +47,12 @@ export interface API {
     gitRepoUrl?: string;
     gitFilePath?: string;
     computedStatus?: string;
+    identity?: {
+        clientId: string;
+        displayName: string;
+        appIdUri: string;
+        type: 'PRODUCT' | 'API';
+    };
     gitInfo?: {
         managedByTfvars?: boolean;
         contractPath?: string;
@@ -96,6 +102,7 @@ export interface Product {
         clientId: string;
         displayName: string;
         appIdUri: string;
+        type: 'PRODUCT' | 'API';
     };
     managementMode?: 'TERRAFORM_MANAGED' | 'HYBRID' | 'UNTRACKED';
     terraformPipelineUrl?: string;

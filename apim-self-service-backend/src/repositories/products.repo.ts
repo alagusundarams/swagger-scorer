@@ -155,7 +155,9 @@ export class ProductsRepository {
             SELECT p.*, 
                    p.production_hash as prod_hash,
                    ar.client_id as identity_client_id,
-                   ar.display_name as identity_display_name
+                   ar.display_name as identity_display_name,
+                   ar.app_id_uri as identity_app_id_uri,
+                   ar.type as identity_type
             FROM products p
             LEFT JOIN app_registrations ar ON ar.product_id = p.id AND ar.api_id IS NULL
             WHERE p.id = $1
