@@ -196,23 +196,102 @@ async function main() {
             console.log(`   ✅ Pipeline: ${matchedPipeline.name}`);
 
             const envsToSync = targetEnv ? [targetEnv] : prod.environments;
-            try {
-                const batchResults = await AzureService.fetchLatestStageResults(
-                    devops.organization, projectId || project, matchedPipeline.id, envsToSync, devops.pat, devops.baseUrl
-                );
 
-                for (const envName of envsToSync) {
-                    const deploy = batchResults[envName.toUpperCase()];
+            // --- HYBRID SURGICAL STRATEGY ---
+            const deployments: Record<string, { hash: string; date: string }> = {};
+            const timelineCache = new Map<number, any[]>();
+
+            console.log(`      🏥 [Surgical] Checking ADO Environments API...`);
+
+            // 1. Surgical Lookup
+            for (const envName of envsToSync) {
+                try {
+                    const deploy = await AzureService.fetchLatestEnvironmentDeployment(
+                        devops.organization, projectId || project, matchedPipeline.id, envName, devops.pat, devops.baseUrl
+                    );
+
                     if (deploy) {
-                        meta.deployments[envName] = { hash: deploy.hash, date: deploy.date };
-                        console.log(`      🎯 [HIT] ${envName.padEnd(5)}: Captured ${deploy.hash.substring(0, 7)}`);
-                    } else {
-                        console.log(`      ⚠️  [MISS] ${envName.padEnd(5)}: Not found in deep scan (100 builds).`);
+                        const commitHash = deploy.build?.sourceVersion || 'unknown';
+                        deployments[envName] = {
+                            hash: commitHash,
+                            date: deploy.finishTime || deploy.startTime || new Date().toISOString()
+                        };
+                        console.log(`      🎯 [HIT] ${envName.padEnd(5)}: Surgical Hit! Captured ${commitHash.substring(0, 7)} (Deployment ${deploy.id})`);
+                        // Update the meta object directly
+                        meta.deployments[envName] = deployments[envName];
                     }
+                } catch (err) {
+                    // Ignore surgical failures, fallback covers it
                 }
-            } catch (err: any) {
-                console.error(`      ❌ [Error] Batch sync failed: ${err.message}`);
             }
+
+            // 2. Deep Scan Fallback
+            const missingEnvs = envsToSync.filter(e => !deployments[e]);
+            if (missingEnvs.length > 0) {
+                console.log(`      🔍 [Deep Scan] Missed ${missingEnvs.length} envs. Scanning timeline (Depth: 100)...`);
+
+                let skip = 0;
+                const pageSize = 20;
+                const maxDepth = 100;
+                const remainingEnvs = new Set(missingEnvs);
+
+                try {
+                    while (remainingEnvs.size > 0 && skip < maxDepth) {
+                        const builds = await AzureService.fetchBuildsByDefinition(
+                            devops.organization, projectId || project, matchedPipeline.id, devops.pat, devops.baseUrl, undefined, pageSize, skip
+                        );
+
+                        if (builds.length === 0) break;
+
+                        for (const run of builds) {
+                            if (remainingEnvs.size === 0) break;
+
+                            let timeline = timelineCache.get(run.id);
+                            if (!timeline) {
+                                timeline = await AzureService.fetchPipelineRunTimeline(
+                                    devops.organization, projectId || project, run.id, devops.pat, devops.baseUrl
+                                );
+                                timelineCache.set(run.id, timeline || []);
+                            }
+
+                            if (!timeline || timeline.length === 0) continue;
+
+                            for (const envName of Array.from(remainingEnvs)) {
+                                // Match stage/phase names
+                                const record = timeline.find((t: any) => {
+                                    const type = (t.type || '').toLowerCase();
+                                    const isContainer = ['stage', 'job', 'phase'].includes(type);
+                                    const nameMatches = t.name?.toLowerCase().includes(envName.toLowerCase());
+                                    const isSuccess = t.result === 'succeeded' || t.result === 'partiallySucceeded';
+                                    return isContainer && nameMatches && isSuccess;
+                                });
+
+                                if (record) {
+                                    const commitHash = (run as any).sourceVersion || 'unknown';
+                                    meta.deployments[envName] = {
+                                        hash: commitHash,
+                                        date: record.finishTime || run.finishedDate
+                                    };
+                                    console.log(`      📍 [HIT] ${envName.padEnd(5)}: Scanner Hit! Captured ${commitHash.substring(0, 7)} (Build ${run.id} via ${record.name})`);
+                                    remainingEnvs.delete(envName);
+                                    deployments[envName] = meta.deployments[envName]; // Update verify map
+                                }
+                            }
+                        }
+                        skip += pageSize;
+                    }
+                } catch (e: any) {
+                    console.error(`      ❌ [Deep Scan] Error: ${e.message}`);
+                }
+            }
+
+            // Log misses
+            envsToSync.forEach(env => {
+                if (!meta.deployments[env]) {
+                    console.log(`      ⚠️  [MISS] ${env.padEnd(5)}: Not found in surgical or deep scan.`);
+                }
+            });
+
             results.push(meta);
         } catch (e: any) {
             console.error(`   ❌ Error: ${e.message}`);
