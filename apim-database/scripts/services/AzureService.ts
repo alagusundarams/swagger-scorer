@@ -87,18 +87,14 @@ export interface CodeSearchResponse {
 }
 
 export class AzureService {
-    static async getAzureAccessToken(resourceOrOptions: string | { resource?: string; silent?: boolean } = 'https://management.azure.com'): Promise<string> {
-        const options = typeof resourceOrOptions === 'string'
-            ? { resource: resourceOrOptions, silent: false }
-            : { resource: 'https://management.azure.com', silent: false, ...resourceOrOptions };
-
+    static async getAzureAccessToken(resource: string = 'https://management.azure.com'): Promise<string> {
         try {
             // On Windows, inherit full environment to ensure 'az' is in PATH
-            const token = execSync(`az account get-access-token --resource ${options.resource} --query accessToken -o tsv`, {
+            const token = execSync(`az account get-access-token --resource ${resource} --query accessToken -o tsv`, {
                 encoding: 'utf-8',
                 env: { ...process.env },
                 shell: process.platform === 'win32' ? 'cmd.exe' : undefined,
-                stdio: ['ignore', 'pipe', 'pipe'] // Capture stderr to avoid leaking to console
+                stdio: ['ignore', 'pipe', 'pipe']
             }).trim();
 
             if (!token || token.length < 10) {
@@ -107,11 +103,28 @@ export class AzureService {
             return token;
         } catch (error: any) {
             const errorMsg = error.stderr?.toString() || error.stdout?.toString() || error.message || 'Unknown error';
-            if (!options.silent) {
-                console.error(`❌ [Auth] Failed to get Azure access token: ${errorMsg}`);
-            }
-            throw new Error(`Failed to get Azure access token. ${errorMsg}. Ensure 'az login' was successful.`);
+            throw new Error(`Failed to get Azure access token for ${resource}. ${errorMsg}. Ensure 'az login' was successful.`);
         }
+    }
+
+    /**
+     * Verifies the ADO connection and retrieves identity information.
+     * Uses the connectionData endpoint which is the standard way to verify a PAT/Token.
+     */
+    static async verifyAdoConnection(org: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<any> {
+        const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
+        const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const isLegacy = cleanBaseUrl.includes('visualstudio.com');
+        const url = isLegacy
+            ? `${cleanBaseUrl}/_apis/connectionData?api-version=7.0`
+            : `${cleanBaseUrl}/${org}/_apis/connectionData?api-version=7.0`;
+
+        const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+        if (!response.ok) {
+            throw new Error(`ADO Authentication failed: ${response.status} ${response.statusText}`);
+        }
+        const data = await response.json();
+        return data;
     }
 
     /**

@@ -59,16 +59,6 @@ async function main() {
         process.exit(1);
     }
 
-    // Try to get CLI token like the debug script did
-    let cliToken: string | undefined = undefined;
-    try {
-        if (verbose) console.log("   🔑 Attempting to fetch Azure CLI token for fallback auth...");
-        cliToken = await AzureService.getAzureAccessToken({ resource: "499b84ee-1328-4417-95a1-8288018c668b", silent: true }); // Visual Studio ID
-        if (cliToken && verbose) console.log("   ✅ CLI Token acquired.");
-    } catch (e) {
-        // Ignore, fallback to PAT only
-    }
-
     let inventory: ProductIdentity[] = [];
 
     // 1. Load Discovery Source
@@ -122,7 +112,14 @@ async function main() {
     }
 
     // 2. Setup Auth
-    console.log(`🔐 [AUTH] Using PAT for ADO operations...`);
+    console.log(`🔐 [AUTH] Verifying PAT for ${devops.organization}...`);
+    try {
+        const connection = await AzureService.verifyAdoConnection(devops.organization, devops.pat, devops.baseUrl);
+        console.log(`   ✅ Connection Verified: ${connection.authenticatedUser?.customDisplayName || connection.authenticatedUser?.id}`);
+    } catch (err: any) {
+        console.error(`❌ [AUTH] PAT Verification failed: ${err.message}`);
+        process.exit(1);
+    }
 
     // 3. Discovery Loop
     const results: ADOMetadata[] = [];
@@ -139,7 +136,7 @@ async function main() {
             const cleanProd = sanitize(prod.name);
             const quotedName = prod.name.includes(' ') ? `"${prod.name}"` : prod.name;
             const searchTerm = `${quotedName} (ext:tf OR ext:tfvars)`;
-            const searchResp = await AzureService.searchCode(devops.organization, searchTerm, devops.pat, devops.baseUrl, cliToken);
+            const searchResp = await AzureService.searchCode(devops.organization, searchTerm, devops.pat, devops.baseUrl);
 
             if (!searchResp || searchResp.count === 0) {
                 console.log(`   ⚠️  REPO_MISSING: No TF matches for "${prod.name}"`);
@@ -174,7 +171,7 @@ async function main() {
 
             if (project === "Unknown" || !projectId) {
                 try {
-                    const repoDetails = await AzureService.fetchRepoById(devops.organization, repoId, devops.pat, devops.baseUrl, cliToken);
+                    const repoDetails = await AzureService.fetchRepoById(devops.organization, repoId, devops.pat, devops.baseUrl);
                     project = repoDetails.project.name;
                     projectId = repoDetails.project.id;
                 } catch (e: any) {
@@ -217,7 +214,7 @@ async function main() {
             await Promise.all(envsToSync.map(async (envName) => {
                 try {
                     const deploy = await AzureService.fetchLatestEnvironmentDeployment(
-                        devops.organization, projectId || project, matchedPipeline.id, envName, devops.pat, devops.baseUrl, cliToken
+                        devops.organization, projectId || project, matchedPipeline.id, envName, devops.pat, devops.baseUrl
                     );
 
                     if (deploy) {
@@ -248,7 +245,7 @@ async function main() {
                 try {
                     while (remainingEnvs.size > 0 && skip < maxDepth) {
                         const builds = await AzureService.fetchBuildsByDefinition(
-                            devops.organization, projectId || project, matchedPipeline.id, devops.pat, devops.baseUrl, cliToken, pageSize, skip
+                            devops.organization, projectId || project, matchedPipeline.id, devops.pat, devops.baseUrl, undefined, pageSize, skip
                         );
 
                         if (builds.length === 0) break;
@@ -259,7 +256,7 @@ async function main() {
                             let timeline = timelineCache.get(run.id);
                             if (!timeline) {
                                 timeline = await AzureService.fetchPipelineRunTimeline(
-                                    devops.organization, projectId || project, run.id, devops.pat, devops.baseUrl, cliToken
+                                    devops.organization, projectId || project, run.id, devops.pat, devops.baseUrl
                                 );
                                 timelineCache.set(run.id, timeline || []);
                             }

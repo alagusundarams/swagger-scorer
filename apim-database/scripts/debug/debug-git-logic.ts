@@ -156,24 +156,27 @@ async function runDebug() {
     const projectIdentifier = projectId || project;
 
     // --- STEP 2: PIPELINE DISCOVERY ---
-    console.log(`\n➡️  Step 2: Pipeline Discovery (with CLI Token fallback)...`);
+    console.log(`\n➡️  Step 2: Pipeline Discovery...`);
+
+    // Verify PAT connection first
+    try {
+        await AzureService.verifyAdoConnection(devops.organization, devops.pat, devops.baseUrl);
+    } catch (err: any) {
+        console.error(`❌ [AUTH] PAT Verification failed: ${err.message}`);
+        process.exit(1);
+    }
+
     let pipelines: any[] = [];
 
-    let cliToken = "";
-    try {
-        cliToken = await AzureService.getAzureAccessToken({ resource: "499b84ee-1328-4417-95a1-8288018c668b", silent: true });
-    } catch (e) { }
-
-    const runDiscovery = async (tokenOverride?: string) => {
-        let results = await AzureService.fetchADOPipelines(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl, tokenOverride);
+    const runDiscovery = async () => {
+        let results = await AzureService.fetchADOPipelines(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl);
         if (results.length === 0) {
-            results = await AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl, tokenOverride);
+            results = await AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl);
         }
         return results;
     };
 
     pipelines = await runDiscovery();
-    if (pipelines.length === 0 && cliToken) pipelines = await runDiscovery(cliToken);
 
     if (pipelines.length === 0) {
         console.log(`   ❌ No pipelines found for this repository.`);
@@ -215,7 +218,7 @@ async function runDebug() {
     for (const envName of envsToSync) {
         // High Speed Try: Use the Environments API directly (no scanning)
         const deploy = await AzureService.fetchLatestEnvironmentDeployment(
-            devops.organization, projectIdent, matchedPipeline.id, envName, devops.pat, devops.baseUrl, cliToken
+            devops.organization, projectIdent, matchedPipeline.id, envName, devops.pat, devops.baseUrl
         );
 
         if (deploy) {
@@ -239,7 +242,7 @@ async function runDebug() {
 
         while (Object.keys(deployments).length < envsToSync.length && skip < maxDepth) {
             const builds = await AzureService.fetchBuildsByDefinition(
-                devops.organization, projectIdent, matchedPipeline.id, devops.pat, devops.baseUrl, cliToken, pageSize, skip
+                devops.organization, projectIdent, matchedPipeline.id, devops.pat, devops.baseUrl, undefined, pageSize, skip
             );
 
             if (builds.length === 0) break;
@@ -248,7 +251,7 @@ async function runDebug() {
                 if (Object.keys(deployments).length === envsToSync.length) break;
 
                 if (!timelineCache.has(run.id)) {
-                    timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdent, run.id, devops.pat, devops.baseUrl, cliToken));
+                    timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdent, run.id, devops.pat, devops.baseUrl));
                 }
 
                 const timeline = timelineCache.get(run.id)!;
