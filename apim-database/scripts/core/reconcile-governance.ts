@@ -374,14 +374,11 @@ async function main() {
                     // Product usage?
                     const prodForensics = apimMeta.productForensics[env];
                     if (prodForensics) {
-                        for (const [prodId, forensics] of Object.entries(prodForensics)) {
+                        for (const [prodName, forensics] of Object.entries(prodForensics)) {
                             if (forensics.guids.includes(id)) {
-                                // FIXED: Find product name and convert to environment-specific ID
-                                const prod = validInventory.find(p => p.id === prodId);
-                                if (prod) {
-                                    linkedProductId = `${prod.name}:${env.toUpperCase()}:Global`;
-                                    break;
-                                }
+                                // FIXED: prodName is already the product name from forensics
+                                linkedProductId = `${prodName}:${env.toUpperCase()}:Global`;
+                                break;
                             }
                         }
                     }
@@ -393,15 +390,12 @@ async function main() {
                             for (const [apiName, forensics] of Object.entries(apiForensics)) {
                                 if (forensics.guids.includes(id)) {
                                     // Found API usage, now find the parent product
-                                    for (const [prodId, apis] of Object.entries(apimMeta.productApiLinks[env] || {})) {
+                                    for (const [prodName, apis] of Object.entries(apimMeta.productApiLinks[env] || {})) {
                                         if (apis.some(a => (typeof a === 'string' ? a === apiName : a.name === apiName))) {
-                                            // FIXED: Find product name and build environment-specific IDs
-                                            const prod = validInventory.find(p => p.id === prodId);
-                                            if (prod) {
-                                                linkedProductId = `${prod.name}:${env.toUpperCase()}:Global`;
-                                                linkedApiId = `${prod.name}:${env.toUpperCase()}:${apiName}`;
-                                                break;
-                                            }
+                                            // FIXED: prodName is already the product name from productApiLinks
+                                            linkedProductId = `${prodName}:${env.toUpperCase()}:Global`;
+                                            linkedApiId = `${prodName}:${env.toUpperCase()}:${apiName}`;
+                                            break;
                                         }
                                     }
                                     if (linkedApiId) break;
