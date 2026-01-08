@@ -119,28 +119,27 @@ async function runDebug() {
         // --- RANKING LOGIC ---
         const candidates = res.results.map((r: any) => {
             const rName = r.repository?.name;
-            if (!rName) return { score: -1 };
+            if (!rName) return { score: -1000 };
 
             const cleanRepo = sanitize(rName);
-            let score = 0;
+            let score = 20; // Base score for appearing in search results
 
             if (cleanRepo === cleanProd) score += 100;
             else if (cleanRepo.includes(cleanProd)) score += 50;
             else if (cleanProd.includes(cleanRepo)) score += 30; // Inverse match
 
-            // Penalty for GRP (unless it's an exact match)
-            if (cleanRepo.includes('grp') && cleanRepo !== cleanProd) score -= 40;
-            if ((cleanRepo.includes('shared') || cleanRepo.includes('common')) && cleanRepo !== cleanProd) score -= 50;
+            // Penalty for GRP/shared/common (softened)
+            if (cleanRepo.includes('grp') && cleanRepo !== cleanProd) score -= 20;
+            if ((cleanRepo.includes('shared') || cleanRepo.includes('common')) && cleanRepo !== cleanProd) score -= 30;
 
             // Give a small boost if the file path contains terraform/tf
             if (r.path?.toLowerCase().includes('terraform') || r.path?.toLowerCase().includes('.tf')) score += 10;
 
             return { repo: r.repository, score, name: rName, path: r.path };
-        }).filter((c: any) => c.score > 0).sort((a: any, b: any) => b.score - a.score);
+        }).sort((a: any, b: any) => b.score - a.score);
 
         if (candidates.length === 0) {
-            console.log(`   ⚠️  No strong matches found. Top candidates:`);
-            res.results.slice(0, 5).forEach((r: any) => console.log(`      - ${r.repository?.name}`));
+            console.log(`   ⚠️  No candidates found in search results.`);
             return;
         }
 
