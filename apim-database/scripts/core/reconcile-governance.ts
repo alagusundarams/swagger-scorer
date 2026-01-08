@@ -486,9 +486,16 @@ async function main() {
                 const subId = `${env}:${sub.id}`;
 
                 // FIXED: Convert logical productId to environment-specific
-                const prod = validInventory.find(p => p.id === sub.productId);
+                // Robust lookup: Case-insensitive match & trim
+                const subProdIdSafe = (sub.productId || '').trim().toLowerCase();
+                const prod = validInventory.find(p => p.id.trim().toLowerCase() === subProdIdSafe);
+
                 if (!prod) {
-                    console.warn(`⚠️  Skipping subscription "${sub.displayName}" - product ${sub.productId} not found`);
+                    console.warn(`⚠️  Skipping subscription "${sub.displayName}" - product ${sub.productId} not found in inventory.`);
+                    // Debug: list first 5 inventory IDs to verify format
+                    if (apimMeta.subscriptions[env].indexOf(sub) === 0) {
+                        console.warn(`      (Debug) Available Inventory IDs: ${validInventory.slice(0, 5).map(p => p.id).join(', ')}`);
+                    }
                     continue;
                 }
                 const productId = `${prod.id}:${upperEnv}:Global`;
