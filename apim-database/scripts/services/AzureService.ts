@@ -408,6 +408,9 @@ export class AzureService {
         let envId: number | null = null;
         let envUrl = `${urlBase}/_apis/distributedtask/environments?name=${encodeURIComponent(environmentName)}&api-version=7.1-preview.1`;
 
+        console.log(`      🌐 [Surgical DEBUG] Fetching: ${envUrl}`);
+        console.log(`      🔑 [Surgical DEBUG] Auth: ${bearerToken ? 'Bearer (CLI)' : 'Basic (PAT)'} | Project: ${project}`);
+
         try {
             let envResp = await fetch(envUrl, { headers: { 'Authorization': authHeader } });
 
