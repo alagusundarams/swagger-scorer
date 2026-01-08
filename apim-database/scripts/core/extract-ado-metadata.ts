@@ -204,7 +204,7 @@ async function main() {
             console.log(`      🏥 [Surgical] Checking ADO Environments API...`);
 
             // 1. Surgical Lookup
-            for (const envName of envsToSync) {
+            await Promise.all(envsToSync.map(async (envName) => {
                 try {
                     const deploy = await AzureService.fetchLatestEnvironmentDeployment(
                         devops.organization, projectId || project, matchedPipeline.id, envName, devops.pat, devops.baseUrl
@@ -223,7 +223,7 @@ async function main() {
                 } catch (err) {
                     // Ignore surgical failures, fallback covers it
                 }
-            }
+            }));
 
             // 2. Deep Scan Fallback
             const missingEnvs = envsToSync.filter(e => !deployments[e]);
