@@ -108,47 +108,64 @@ export class AzureService {
     }
 
     /**
-     * Verifies the ADO connection and retrieves identity information.
-     * Uses the connectionData endpoint which is the standard way to verify a PAT/Token.
+     * Standardizes the ADO Base URL to handle legacy and modern formats.
+     * Always returns the root instance URL (e.g., https://dev.azure.com or https://org.visualstudio.com)
      */
-    static async verifyAdoConnection(org: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<any> {
-        const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
-        const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-        const isLegacy = cleanBaseUrl.includes('visualstudio.com');
-        const url = isLegacy
-            ? `${cleanBaseUrl}/_apis/connectionData?api-version=7.0`
-            : `${cleanBaseUrl}/${org}/_apis/connectionData?api-version=7.0`;
+    static getAdoInstanceUrl(baseUrl: string, org: string): string {
+        let cleanBase = baseUrl.replace(/\/+$/, '');
+        const cleanOrg = org.replace(/\/+$/, '');
 
-        const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-        if (!response.ok) {
-            throw new Error(`ADO Authentication failed: ${response.status} ${response.statusText}`);
+        // If it's a visualstudio.com URL, we assume it's already Correct (e.g. https://org.visualstudio.com)
+        if (cleanBase.toLowerCase().includes('visualstudio.com')) {
+            return cleanBase;
         }
-        const data = await response.json();
-        return data;
+
+        // For dev.azure.com, we return the base instance https://dev.azure.com
+        // We will append the org in sub-methods as needed.
+        if (cleanBase.toLowerCase().includes('dev.azure.com')) {
+            const match = cleanBase.match(/https?:\/\/dev\.azure\.com/i);
+            if (match) return match[0];
+        }
+
+        return cleanBase;
     }
 
     /**
-     * Correctly joins ADO URL segments based on host type (dev.azure.com vs visualstudio.com).
-     * Prevents double slashes and missing organization segments.
+     * Gets the full Organization URL (e.g., https://dev.azure.com/org or https://org.visualstudio.com)
+     */
+    static getAdoOrgUrl(baseUrl: string, org: string): string {
+        const instance = this.getAdoInstanceUrl(baseUrl, org);
+        if (instance.toLowerCase().includes('visualstudio.com')) {
+            return instance; // already has org in subdomainUsually
+        }
+        return `${instance}/${org}`;
+    }
+
+    /**
+     * Verifies the ADO connection and retrieves identity information.
+     */
+    static async verifyAdoConnection(org: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<any> {
+        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
+        const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const url = `${orgUrl}/_apis/connectionData?api-version=7.0`;
+
+        console.log(`📡 [ADO] Verifying Connection: ${url}`);
+        const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+        if (!response.ok) {
+            const txt = await response.text();
+            console.error(`❌ [ADO] Auth Failed (${response.status}):`, txt.substring(0, 200));
+            throw new Error(`ADO Authentication failed (${response.status}): ${txt.substring(0, 100)}`);
+        }
+        return await response.json();
+    }
+
+    /**
+     * Joins ADO URL segments safely.
      */
     static getVstsUrl(baseUrl: string, org: string, project: string, subPath: string): string {
-        const cleanBase = baseUrl.replace(/\/+$/, '');
-        const cleanOrg = org.replace(/\/+$/, '');
-        const cleanProject = project.replace(/\/+$/, '');
+        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const cleanPath = subPath.replace(/^\/+/, '');
-
-        if (cleanBase.includes('visualstudio.com')) {
-            // Handle: https://org.visualstudio.com/Project/_git/Repo
-            // Often org is already in the subdomain
-            const subdomainMatch = cleanBase.match(/https?:\/\/([^.]+)\.visualstudio\.com/);
-            if (subdomainMatch && subdomainMatch[1].toLowerCase() === cleanOrg.toLowerCase()) {
-                return `${cleanBase}/${encodeURIComponent(cleanProject)}/${cleanPath}`;
-            }
-            return `${cleanBase}/${encodeURIComponent(cleanOrg)}/${encodeURIComponent(cleanProject)}/${cleanPath}`;
-        }
-
-        // Handle: https://dev.azure.com/org/Project/_git/Repo
-        return `${cleanBase}/${encodeURIComponent(cleanOrg)}/${encodeURIComponent(cleanProject)}/${cleanPath}`;
+        return `${orgUrl}/${encodeURIComponent(project)}/${cleanPath}`;
     }
 
     /**
@@ -217,22 +234,19 @@ export class AzureService {
      * Fetch All Projects from Azure DevOps Organization
      */
     static async fetchADOProjects(org: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADOProject[]> {
-        console.log(`📡 [ADO] Fetching all projects...`);
+        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-        // Remove trailing slash if present
-        const cleanBaseUrl = baseUrl.replace(/\/$/, '');
-        let url = `${cleanBaseUrl}/${org}/_apis/projects?api-version=7.1-preview.4`;
+        const url = `${orgUrl}/_apis/projects?api-version=7.1-preview.4`;
 
-        // Handle Legacy visualstudio.com
-        if (cleanBaseUrl.includes('visualstudio.com')) {
-            url = `${cleanBaseUrl}/_apis/projects?api-version=7.1-preview.4`;
-        }
-
+        console.log(`📡 [ADO] Fetching Projects: ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
             if (response.ok) {
                 const data = await response.json() as { value: ADOProject[] };
                 return data.value;
+            } else {
+                const txt = await response.text();
+                console.error(`❌ [ADO] Project Fetch Failed (${response.status}):`, txt.substring(0, 100));
             }
         } catch (err) {
             console.error('❌ [ADO] Failed to fetch projects:', err);
@@ -244,15 +258,16 @@ export class AzureService {
      * Fetch Repository by ID (Global Org Scope)
      */
     static async fetchRepoById(org: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<ADORepo> {
-        const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
-        const isLegacy = cleanBaseUrl.includes('visualstudio.com');
-        const url = isLegacy
-            ? `${cleanBaseUrl}/_apis/git/repositories/${repoId}?api-version=7.1-preview.1`
-            : `${cleanBaseUrl}/${org}/_apis/git/repositories/${repoId}?api-version=7.1-preview.1`;
+        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
+        const url = `${orgUrl}/_apis/git/repositories/${repoId}?api-version=7.1-preview.1`;
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
 
+        console.log(`📡 [ADO] Fetching Repo Details: ${url}`);
         const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-        if (!response.ok) throw new Error(`Failed to fetch repo ${repoId}: ${response.statusText}`);
+        if (!response.ok) {
+            const txt = await response.text();
+            throw new Error(`Failed to fetch repo ${repoId} (${response.status}): ${txt.substring(0, 100)}`);
+        }
         return await response.json() as ADORepo;
     }
 
@@ -266,12 +281,10 @@ export class AzureService {
         console.log(`🔍 [ADO] Starting organization-wide repository crawl across ${projects.length} projects...`);
 
         // Fetch in parallel for speed
+        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const projectResults = await Promise.all(projects.map(async (project) => {
             try {
-                let url = `${cleanBaseUrl}/${org}/${project.name}/_apis/git/repositories?api-version=7.1-preview.1`;
-                if (cleanBaseUrl.includes('visualstudio.com')) {
-                    url = `${cleanBaseUrl}/${project.name}/_apis/git/repositories?api-version=7.1-preview.1`;
-                }
+                const url = `${orgUrl}/${encodeURIComponent(project.name)}/_apis/git/repositories?api-version=7.1-preview.1`;
                 const response = await fetch(url, { headers: { 'Authorization': authHeader } });
 
                 if (response.ok) {
@@ -291,10 +304,9 @@ export class AzureService {
      * Fetch Pipelines for a specific repository
      */
     static async fetchADOPipelines(org: string, project: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<ADOPipeline[]> {
-        const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
+        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-        const isLegacy = cleanBaseUrl.includes('visualstudio.com');
-        const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
+        const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
         let url = `${urlBase}/_apis/pipelines?api-version=7.1-preview.1`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=azureRepo`;
 
@@ -323,10 +335,9 @@ export class AzureService {
      * Fetch Build Definitions (Fallback for Pipelines API)
      */
     static async fetchADOBuildDefinitions(org: string, project: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<ADOPipeline[]> {
-        const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
+        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-        const isLegacy = cleanBaseUrl.includes('visualstudio.com');
-        const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
+        const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
         let url = `${urlBase}/_apis/build/definitions?api-version=7.0`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
 
@@ -355,10 +366,9 @@ export class AzureService {
      * Fetch Recent Builds (Discovery Fallback 3)
      */
     static async fetchADOBuilds(org: string, project: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<any[]> {
-        const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
+        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-        const isLegacy = cleanBaseUrl.includes('visualstudio.com');
-        const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
+        const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
 
         let url = `${urlBase}/_apis/build/builds?api-version=7.0&$top=10`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
@@ -390,10 +400,9 @@ export class AzureService {
         top: number = 20,
         skip: number = 0
     ): Promise<any[]> {
-        const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
+        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-        const isLegacy = cleanBaseUrl.includes('visualstudio.com');
-        const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
+        const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
 
         const url = `${urlBase}/_apis/build/builds?api-version=7.0&definitions=${definitionId}&resultFilter=succeeded&$top=${top}&$skip=${skip}`;
 
@@ -418,20 +427,9 @@ export class AzureService {
         baseUrl: string = 'https://dev.azure.com',
         bearerToken?: string
     ): Promise<any | null> {
-        let cleanBaseUrl = baseUrl.replace(/\/+$/, '');
+        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-        // Case-insensitive check for legacy domain
-        const isLegacy = cleanBaseUrl.toLowerCase().includes('visualstudio.com');
-
-        // Handle if baseUrl already has org (e.g. https://dev.azure.com/Org) to prevent double-org
-        if (!isLegacy && cleanBaseUrl.toLowerCase().endsWith(`/${org.toLowerCase()}`)) {
-            cleanBaseUrl = cleanBaseUrl.substring(0, cleanBaseUrl.length - (org.length + 1));
-        }
-
-        // Apply encoding to project/org segments
-        const urlBase = isLegacy
-            ? `${cleanBaseUrl}/${encodeURIComponent(project)}`
-            : `${cleanBaseUrl}/${encodeURIComponent(org)}/${encodeURIComponent(project)}`;
+        const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
 
         // 1. Find the Environment ID for the given name (Surgical Step 1)
         // Attempt exact/API-native match first
@@ -572,11 +570,9 @@ export class AzureService {
         return results[stageName.toUpperCase()] || null;
     }
     static async fetchPipelineRuns(org: string, project: string, pipelineId: number, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<PipelineRun[]> {
-        const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
+        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-        const isLegacy = cleanBaseUrl.includes('visualstudio.com');
-
-        const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
+        const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
         const url = `${urlBase}/_apis/pipelines/${pipelineId}/runs?api-version=7.1-preview.1`;
 
         try {
@@ -595,11 +591,9 @@ export class AzureService {
      * Fetch Timeline for a specific Pipeline Run
      */
     static async fetchPipelineRunTimeline(org: string, project: string, runId: number, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<TimelineRecord[]> {
-        const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
+        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-        const isLegacy = cleanBaseUrl.includes('visualstudio.com');
-
-        const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
+        const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
         // Standard ADO builds/timeline endpoint
         const url = `${urlBase}/_apis/build/builds/${runId}/timeline?api-version=7.1-preview.2`;
 
@@ -727,45 +721,25 @@ export class AzureService {
     /**
      * Search for Code in ADO (TF match strategy)
      */
-    static async searchCode(org: string, searchTerm: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<CodeSearchResponse> {
-        const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+    static async searchCode(org: string, query: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<any> {
+        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
+        const url = `${orgUrl}/_apis/search/codesearchresults?api-version=7.0`;
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
 
-        // Determine Search URL
-        // DEV.AZURE.COM & VISUALSTUDIO.COM -> Use almsearch sub-domain for REST API
-        let searchOrg = org;
-        if (cleanBaseUrl.includes('visualstudio.com')) {
-            const match = cleanBaseUrl.match(/https?:\/\/([^.]+)\.visualstudio\.com/);
-            if (match) searchOrg = match[1];
+        console.log(`📡 [ADO Request] POST ${url}`);
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ searchText: query, $top: 50 })
+        });
+
+        console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+        if (!response.ok) {
+            const txt = await response.text();
+            console.error(`❌ [ADO] Search Failed: ${txt.substring(0, 100)}`);
+            return { count: 0, results: [] };
         }
-
-        const searchUrl = `https://almsearch.dev.azure.com/${searchOrg}/_apis/search/codesearchresults?api-version=7.1-preview.1`;
-
-        const body: any = {
-            searchText: searchTerm,
-            $top: 20
-        };
-
-        try {
-            const response = await fetch(searchUrl, {
-                method: 'POST',
-                headers: {
-                    'Authorization': authHeader,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(body)
-            });
-
-            if (response.ok) {
-                return await response.json() as CodeSearchResponse;
-            } else {
-                const txt = await response.text();
-                console.warn(`⚠️ [ADO Search] Failed: ${response.status} ${response.statusText}`, txt);
-            }
-        } catch (err) {
-            console.error('❌ [ADO Search] Network Warning:', err);
-        }
-        return { count: 0, results: [] };
+        return await response.json();
     }
     /**
      * Fetch Items (Files/Folders) from a Repository
@@ -781,15 +755,16 @@ export class AzureService {
         baseUrl: string = 'https://dev.azure.com',
         bearerToken?: string
     ): Promise<any[]> {
-        const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
+        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-        const isLegacy = cleanBaseUrl.includes('visualstudio.com');
-        const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
+        const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
 
         const url = `${urlBase}/_apis/git/repositories/${repoId}/items?scopePath=${scopePath}&recursionLevel=${recursionLevel}&includeContentMetadata=true&api-version=7.1-preview.1`;
 
+        console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { count: number, value: any[] };
                 return data.value || [];

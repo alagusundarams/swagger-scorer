@@ -84,6 +84,7 @@ async function runDebug() {
     console.log(`\n➡️  Step 1: Repository Ranking & Selection...`);
 
     let finalRepo: any = null;
+    const cleanProd = sanitize(productNameArg!);
 
     if (repoOverride) {
         console.log(`   ⚙️ Using override repository: "${repoOverride}"...`);
@@ -95,39 +96,57 @@ async function runDebug() {
         }
     } else {
         const quotedName = productNameArg!.includes(' ') ? `"${productNameArg}"` : productNameArg;
-        const searchTerm = `${quotedName} (ext:tf OR ext:tfvars)`;
-        console.log(`   📡 Searching for: ${searchTerm}`);
-        const res = await AzureService.searchCode(devops.organization, searchTerm, devops.pat, devops.baseUrl);
+        // Search without extension filter first as it's more reliable for discovery
+        console.log(`   📡 Searching for: ${quotedName}`);
+        const res = await AzureService.searchCode(devops.organization, quotedName!, devops.pat, devops.baseUrl);
 
         if (res.count === 0) {
-            console.log(`   ❌ No repositories found containing product name in TF files.`);
-            // Fallback: try without extension filter
-            console.log(`   🔎 Trying fallback (no extension filter)...`);
-            const fallback = await AzureService.searchCode(devops.organization, quotedName!, devops.pat, devops.baseUrl);
-            if (fallback.count === 0) return;
-            res.results = fallback.results;
+            console.log(`   ❌ No repositories found for "${productNameArg}".`);
+            // Fallback: try sanitized name
+            console.log(`   🔎 Trying fallback (sanitized name)...`);
+            const fallback = await AzureService.searchCode(devops.organization, cleanProd, devops.pat, devops.baseUrl);
+            if (fallback.count > 0) {
+                res.results = fallback.results;
+                res.count = fallback.count;
+            }
+        }
+
+        if (!res.results || res.results.length === 0) {
+            console.log(`   ❌ Discovery failed to find any candidate repositories.`);
+            return;
         }
 
         // --- RANKING LOGIC ---
-        const cleanProd = sanitize(productNameArg!);
         const candidates = res.results.map((r: any) => {
-            const rName = r.repository.name;
+            const rName = r.repository?.name;
+            if (!rName) return { score: -1 };
+
             const cleanRepo = sanitize(rName);
             let score = 0;
 
             if (cleanRepo === cleanProd) score += 100;
             else if (cleanRepo.includes(cleanProd)) score += 50;
+            else if (cleanProd.includes(cleanRepo)) score += 30; // Inverse match
 
-            // Penalty for GRP
-            if (cleanRepo.includes('grp')) score -= 20;
-            if (cleanRepo.includes('shared') || cleanRepo.includes('common')) score -= 30;
+            // Penalty for GRP (unless it's an exact match)
+            if (cleanRepo.includes('grp') && cleanRepo !== cleanProd) score -= 40;
+            if ((cleanRepo.includes('shared') || cleanRepo.includes('common')) && cleanRepo !== cleanProd) score -= 50;
 
-            return { repo: r.repository, score, name: rName, isGrp: cleanRepo.includes('grp') };
-        }).sort((a: any, b: any) => b.score - a.score);
+            // Give a small boost if the file path contains terraform/tf
+            if (r.path?.toLowerCase().includes('terraform') || r.path?.toLowerCase().includes('.tf')) score += 10;
+
+            return { repo: r.repository, score, name: rName, path: r.path };
+        }).filter((c: any) => c.score > 0).sort((a: any, b: any) => b.score - a.score);
+
+        if (candidates.length === 0) {
+            console.log(`   ⚠️  No strong matches found. Top candidates:`);
+            res.results.slice(0, 5).forEach((r: any) => console.log(`      - ${r.repository?.name}`));
+            return;
+        }
 
         if (verbose) {
             console.log(`\n   📊 Candidate Ranking:`);
-            candidates.slice(0, 10).forEach((c: any) => console.log(`      - [${c.score.toString().padStart(3)}] ${c.name} ${c.isGrp ? '(GRP)' : ''}`));
+            candidates.slice(0, 5).forEach((c: any) => console.log(`      - [${c.score.toString().padStart(3)}] ${c.name} (${c.path})`));
         }
 
         finalRepo = candidates[0].repo;
@@ -142,18 +161,22 @@ async function runDebug() {
     const primaryRepoName = finalRepo.name;
     const primaryRepoId = finalRepo.id;
     let project = finalRepo.project?.name || "Unknown";
-    let projectId = finalRepo.project?.id || "";
+    let projectIdent = finalRepo.project?.id || project;
 
-    if (project === "Unknown" || !projectId) {
+    // Recover missing project info if the search result was generic
+    if (project === "Unknown" || project.toLowerCase() === 'devops') {
         try {
-            const repoDetails = await AzureService.fetchRepoById(devops.organization, primaryRepoId, devops.pat, devops.baseUrl);
-            project = repoDetails.project.name;
-            projectId = repoDetails.project.id;
-            console.log(`      ✅ Recovered Project: ${project}`);
-        } catch (e) { }
+            console.log(`   🔎 Recovering full metadata for Repo: ${primaryRepoName}...`);
+            const details = await AzureService.fetchRepoById(devops.organization, primaryRepoId || primaryRepoName, devops.pat, devops.baseUrl);
+            project = details.project.name;
+            projectIdent = details.project.id;
+            console.log(`   ✅ Metadata Recovered: Project=${project}`);
+        } catch (e: any) {
+            console.warn(`   ⚠️  Failed to recover project name: ${e.message}`);
+        }
     }
 
-    const projectIdentifier = projectId || project;
+    const projectIdentifier = projectIdent || project;
 
     // --- STEP 2: PIPELINE DISCOVERY ---
     console.log(`\n➡️  Step 2: Pipeline Discovery...`);
@@ -211,14 +234,13 @@ async function runDebug() {
     const envsToSync = ['DEV', 'QA', 'STAGE', 'PROD'];
     const deployments: Record<string, { hash: string; date: string }> = {};
     const timelineCache = new Map<number, any[]>();
-    const projectIdent = projectIdentifier;
 
     console.log(`   ⏳ Attempting surgical strikes (Environments API)...`);
 
     for (const envName of envsToSync) {
         // High Speed Try: Use the Environments API directly (no scanning)
         const deploy = await AzureService.fetchLatestEnvironmentDeployment(
-            devops.organization, projectIdent, matchedPipeline.id, envName, devops.pat, devops.baseUrl
+            devops.organization, projectIdentifier, matchedPipeline.id, envName, devops.pat, devops.baseUrl
         );
 
         if (deploy) {
