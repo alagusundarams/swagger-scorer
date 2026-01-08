@@ -29,6 +29,7 @@ const config = loadConfig();
 // --- ARGS ---
 const args = process.argv.slice(2);
 const targetEnv = args.find(a => a.startsWith('--env='))?.split('=')[1]?.toUpperCase();
+const productNameArg = args.find(a => a.startsWith('--product='))?.split('=')[1];
 const sourceMode = args.find(a => a.startsWith('--source='))?.split('=')[1] || 'inventory'; // 'inventory' or 'db'
 const verbose = !args.includes('--quiet');
 const limit = parseInt(args.find(a => a.startsWith('--limit='))?.split('=')[1] || '0', 10);
@@ -96,6 +97,12 @@ async function main() {
             process.exit(1);
         }
         inventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
+    }
+
+    // Filter by product name if flag is provided
+    if (productNameArg) {
+        inventory = inventory.filter((p: ProductIdentity) => p.name.toLowerCase() === productNameArg.toLowerCase() || p.id.toLowerCase() === productNameArg.toLowerCase());
+        console.log(`🎯 Filtered to product: ${productNameArg}.\n`);
     }
 
     // Filter by environment if flag is provided
