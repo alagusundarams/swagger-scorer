@@ -136,9 +136,26 @@ export class AzureService {
     static getAdoOrgUrl(baseUrl: string, org: string): string {
         const instance = this.getAdoInstanceUrl(baseUrl, org);
         if (instance.toLowerCase().includes('visualstudio.com')) {
-            return instance; // already has org in subdomainUsually
+            return instance; // already has org in subdomain USUALLY
         }
         return `${instance}/${org}`;
+    }
+
+    /**
+     * Gets the Search API URL (e.g., https://almsearch.dev.azure.com/org or https://org.almsearch.visualstudio.com)
+     */
+    static getAdoSearchUrl(baseUrl: string, org: string): string {
+        const cleanBase = baseUrl.replace(/\/+$/, '').toLowerCase();
+
+        // Handle Legacy: https://org.visualstudio.com -> https://org.almsearch.visualstudio.com
+        if (cleanBase.includes('visualstudio.com')) {
+            const subdomainMatch = cleanBase.match(/https?:\/\/([^.]+)\.visualstudio\.com/);
+            const searchOrg = subdomainMatch ? subdomainMatch[1] : org;
+            return `https://${searchOrg}.almsearch.visualstudio.com/_apis/search/codesearchresults?api-version=7.1-preview.1`;
+        }
+
+        // Handle Modern: https://dev.azure.com -> https://almsearch.dev.azure.com/org
+        return `https://almsearch.dev.azure.com/${org}/_apis/search/codesearchresults?api-version=7.1-preview.1`;
     }
 
     /**
@@ -722,8 +739,7 @@ export class AzureService {
      * Search for Code in ADO (TF match strategy)
      */
     static async searchCode(org: string, query: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<any> {
-        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
-        const url = `${orgUrl}/_apis/search/codesearchresults?api-version=7.0`;
+        const url = this.getAdoSearchUrl(baseUrl, org);
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
 
         console.log(`📡 [ADO Request] POST ${url}`);
