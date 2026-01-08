@@ -137,9 +137,28 @@ async function main() {
     }
 
     try {
+        // BEGIN TRANSACTION
+        await pool.query('BEGIN');
+        console.log('🔒 Transaction started...\n');
+
+        // --- INPUT VALIDATION ---
+        const validInventory = inventory.filter(p => {
+            if (!p.name) {
+                console.warn(`⚠️  Skipping product with missing name: ${JSON.stringify(p)}`);
+                return false;
+            }
+            if (!p.environments || p.environments.length === 0) {
+                console.warn(`⚠️  Skipping product "${p.name}" with no environments`);
+                return false;
+            }
+            return true;
+        });
+
+        console.log(`✅ Validated ${validInventory.length}/${inventory.length} products\n`);
+
         // --- A. PRODUCTS RECONCILIATION ---
-        console.log(`📋 Reconciling ${inventory.length} products...`);
-        for (const prod of inventory) {
+        console.log(`📋 Reconciling ${validInventory.length} products...`);
+        for (const prod of validInventory) {
             const ado = adoMap.get(prod.id) || {
                 productId: prod.id,
                 productName: prod.name,
@@ -288,14 +307,20 @@ async function main() {
         // --- B. ACCESS CONTROL (NAMED VALUES) ---
         console.log(`🌍 Reconciling Named Values...`);
         for (const [env, nvs] of Object.entries(apimMeta.namedValues)) {
-            // Find products in this environment - use prod.id as target now
-            const envProductIds = inventory
-                .filter((p: any) => p.environments.map((e: any) => e.toUpperCase()).includes(env.toUpperCase()))
-                .map(p => p.id);
+            const upperEnv = env.toUpperCase();
+            // FIXED: Map to environment-specific product IDs
+            const envProductIds = validInventory
+                .filter((p: any) => p.environments.map((e: any) => e.toUpperCase()).includes(upperEnv))
+                .map(p => `${p.name}:${upperEnv}:Global`);
 
             console.log(`   [${env}] Processing ${nvs.length} Named Values...`);
 
             for (const nv of nvs) {
+                // Validation
+                if (!nv.name) {
+                    console.warn(`⚠️  Skipping named value with missing name in ${env}`);
+                    continue;
+                }
                 const val = nv.keyVaultUrl ? nv.keyVaultUrl : (nv.value || '');
                 const type = nv.keyVaultUrl ? 'key_vault' : 'literal';
                 const nvId = `nv-${env}-${nv.name}`;
@@ -351,8 +376,12 @@ async function main() {
                     if (prodForensics) {
                         for (const [prodId, forensics] of Object.entries(prodForensics)) {
                             if (forensics.guids.includes(id)) {
-                                linkedProductId = prodId;
-                                break;
+                                // FIXED: Find product name and convert to environment-specific ID
+                                const prod = validInventory.find(p => p.id === prodId);
+                                if (prod) {
+                                    linkedProductId = `${prod.name}:${env.toUpperCase()}:Global`;
+                                    break;
+                                }
                             }
                         }
                     }
@@ -366,9 +395,13 @@ async function main() {
                                     // Found API usage, now find the parent product
                                     for (const [prodId, apis] of Object.entries(apimMeta.productApiLinks[env] || {})) {
                                         if (apis.some(a => (typeof a === 'string' ? a === apiName : a.name === apiName))) {
-                                            linkedProductId = prodId;
-                                            linkedApiId = `${prodId}:${env}:${apiName}`;
-                                            break;
+                                            // FIXED: Find product name and build environment-specific IDs
+                                            const prod = validInventory.find(p => p.id === prodId);
+                                            if (prod) {
+                                                linkedProductId = `${prod.name}:${env.toUpperCase()}:Global`;
+                                                linkedApiId = `${prod.name}:${env.toUpperCase()}:${apiName}`;
+                                                break;
+                                            }
                                         }
                                     }
                                     if (linkedApiId) break;
@@ -409,9 +442,23 @@ async function main() {
         // --- E. SUBSCRIPTIONS ---
         console.log(`🔑 Reconciling Subscriptions...`);
         for (const [env, subs] of Object.entries(apimMeta.subscriptions)) {
+            const upperEnv = env.toUpperCase();
             for (const sub of subs) {
+                // Validation
+                if (!sub.id) {
+                    console.warn(`⚠️  Skipping subscription with missing id in ${env}`);
+                    continue;
+                }
+
                 const subId = `${env}:${sub.id}`;
-                const productId = sub.productId;
+
+                // FIXED: Convert logical productId to environment-specific
+                const prod = validInventory.find(p => p.id === sub.productId);
+                if (!prod) {
+                    console.warn(`⚠️  Skipping subscription "${sub.displayName}" - product ${sub.productId} not found`);
+                    continue;
+                }
+                const productId = `${prod.name}:${upperEnv}:Global`;
 
                 let subscriberTeamId: string | null = null;
                 const ownerMatch = sub.ownerId?.match(/\/users\/(.+)/);
@@ -434,13 +481,18 @@ async function main() {
             }
         }
 
+        // COMMIT TRANSACTION
+        await pool.query('COMMIT');
         console.log(`\n✅ Reconciliation Complete!`);
         const pCount = await pool.query(`SELECT COUNT(*) FROM products`);
         const aCount = await pool.query(`SELECT COUNT(*) FROM apis`);
         console.log(`   Products: ${pCount.rows[0].count} | APIs: ${aCount.rows[0].count}`);
 
     } catch (e: any) {
+        // ROLLBACK ON ERROR
+        await pool.query('ROLLBACK');
         console.error(`\n❌ Reconciliation Failed:`, e.message);
+        if (e.stack) console.error(e.stack);
     } finally {
         await pool.end();
     }
