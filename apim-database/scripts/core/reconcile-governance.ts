@@ -91,11 +91,18 @@ async function main() {
         inventory = JSON.parse(content);
         const allEnvNames = config.azure?.environments?.map((e: any) => e.name) || ['DEV'];
 
+        console.log(`\n🔍 [DIAGNOSTIC] Configured Environments (from config.json): ${JSON.stringify(allEnvNames)}`);
+
         inventory.forEach((p: any) => {
             if (!p.environments || p.environments.length === 0) {
                 p.environments = allEnvNames;
             }
         });
+
+        console.log(`🔍 [DIAGNOSTIC] Inventory Loaded: ${inventory.length} items.`);
+        if (inventory.length > 0) {
+            console.log(`🔍 [DIAGNOSTIC] First Product Sample Env: ${JSON.stringify(inventory[0].environments)}`);
+        }
     }
 
     let adoList: ADOMetadata[] = [];
