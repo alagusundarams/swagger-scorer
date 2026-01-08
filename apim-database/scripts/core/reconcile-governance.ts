@@ -196,6 +196,7 @@ async function main() {
                     const deployment = (ado.deployments as any)[upperEnv] || {};
                     const targetId = `${prod.id}:${upperEnv}:Global`;
 
+                    if (process.env.DEBUG_SQL) console.log(`[DB] Upserting Product: ${targetId} (Name: ${prod.id}, Display: ${prod.name})`);
                     await pool.query(`
                         INSERT INTO products (
                             id, name, display_name, version, state, environment, region,
@@ -245,6 +246,7 @@ async function main() {
                     const uniqueApiId = `${prod.id}:${envName}:${apiName}`;
 
                     try {
+                        if (process.env.DEBUG_SQL) console.log(`[DB] Upserting API: ${uniqueApiId} (Parent: ${targetProductId})`);
                         await pool.query(`
                                 INSERT INTO apis (id, product_id, name, display_name, path, updated_at)
                                 VALUES ($1, $2, $3, $4, $5, NOW())
@@ -259,6 +261,7 @@ async function main() {
                         const forensics = apimMeta.apiForensics[envName]?.[apiName];
                         if (forensics) {
                             for (const bId of forensics.backends) {
+                                if (process.env.DEBUG_SQL) console.log(`[DB] Linking API ${uniqueApiId} to Backend ${bId} in ${envName}`);
                                 await pool.query(`
                                         INSERT INTO api_backends (api_id, backend_id, environment)
                                         VALUES ($1, $2, $3)
@@ -280,6 +283,7 @@ async function main() {
                                         const operationId = `${uniqueApiId}:${method}:${pathTemplate.replace(/\//g, '_')}`;
                                         const operationName = operation.operationId || `${method}_${pathTemplate.replace(/\//g, '_')}`;
                                         const summary = operation.summary || operation.description || pathTemplate;
+                                        if (process.env.DEBUG_SQL) console.log(`[DB] Upserting Operation: ${operationId} (API: ${uniqueApiId})`);
                                         await pool.query(`
                                                 INSERT INTO operations (id, api_id, name, display_name, method, url_template, description)
                                                 VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -328,6 +332,7 @@ async function main() {
                 const nvId = `nv-${env}-${nv.name}`;
 
                 try {
+                    if (process.env.DEBUG_SQL) console.log(`[DB] Upserting Named Value: ${nvId} (Display: ${nv.displayName}, Env: ${env})`);
                     await pool.query(`
                         INSERT INTO named_values (id, product_id, display_name, system_name, value, type, is_secret, environment, region, updated_at)
                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
@@ -340,6 +345,7 @@ async function main() {
                     `, [nvId, null, nv.displayName, nv.name, val, type, nv.isSecret, env, 'Global']);
 
                     if (envProductIds.length > 0) {
+                        if (process.env.DEBUG_SQL) console.log(`[DB] Linking Named Value ${nvId} to products: ${envProductIds.join(', ')}`);
                         await pool.query(`
                             INSERT INTO product_named_values (product_id, named_value_id, is_owner, can_modify)
                             SELECT unnest($1::text[]), $2, true, true
@@ -410,6 +416,7 @@ async function main() {
 
                     // SAFETY: Verify product exists if we're linking to one
                     if (linkedProductId) {
+                        if (process.env.DEBUG_SQL) console.log(`[DB] Checking product existence for ${linkedProductId}`);
                         const prodCheck = await pool.query('SELECT 1 FROM products WHERE id = $1', [linkedProductId]);
                         if (prodCheck.rows.length === 0) {
                             console.warn(`⚠️  Skipping app reg "${name}" - linked product ${linkedProductId} not found in DB`);
@@ -419,6 +426,7 @@ async function main() {
 
                     // Similarly check api_id if present
                     if (linkedApiId) {
+                        if (process.env.DEBUG_SQL) console.log(`[DB] Checking API existence for ${linkedApiId}`);
                         const apiCheck = await pool.query('SELECT 1 FROM apis WHERE id = $1', [linkedApiId]);
                         if (apiCheck.rows.length === 0) {
                             console.warn(`⚠️  Skipping app reg "${name}" - linked API ${linkedApiId} not found in DB`);
@@ -429,6 +437,7 @@ async function main() {
 
                     // Verify product exists in DB to avoid FK violation
                     if (linkedProductId) {
+                        if (process.env.DEBUG_SQL) console.log(`[DB] Checking product existence for ${linkedProductId}`);
                         const prodCheck = await pool.query('SELECT 1 FROM products WHERE id = $1', [linkedProductId]);
                         if (prodCheck.rows.length === 0) {
                             console.warn(`⚠️  App Registration "${name}" links to missing product ${linkedProductId} - Setting to NULL`);
@@ -438,6 +447,7 @@ async function main() {
 
                     // Verify API exists in DB
                     if (linkedApiId) {
+                        if (process.env.DEBUG_SQL) console.log(`[DB] Checking API existence for ${linkedApiId}`);
                         const apiCheck = await pool.query('SELECT 1 FROM apis WHERE id = $1', [linkedApiId]);
                         if (apiCheck.rows.length === 0) {
                             console.warn(`⚠️  App Registration "${name}" links to missing API ${linkedApiId} - Setting to NULL`);
@@ -445,6 +455,7 @@ async function main() {
                         }
                     }
 
+                    if (process.env.DEBUG_SQL) console.log(`[DB] Upserting App Registration: ${id} (Name: ${name}, Prod: ${linkedProductId}, API: ${linkedApiId})`);
                     await pool.query(`
                         INSERT INTO app_registrations (id, client_id, display_name, app_id_uri, environment, product_id, api_id, type, updated_at)
                         VALUES ($1, $1, $2, $3, $4, $5, $6, $7, NOW())
@@ -464,6 +475,7 @@ async function main() {
         console.log(`🔌 Reconciling Backend inventory...`);
         for (const [env, backends] of Object.entries(apimMeta.backends)) {
             for (const b of backends) {
+                if (process.env.DEBUG_SQL) console.log(`[DB] Upserting Backend: ${b.id} (Env: ${env})`);
                 await pool.query(`
                     INSERT INTO governance_backends (id, environment, url, description, title, protocol, scope, updated_at)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
@@ -521,6 +533,7 @@ async function main() {
                     if (teamRes.rows.length > 0) subscriberTeamId = ownerUserId;
                 }
 
+                if (process.env.DEBUG_SQL) console.log(`   [DB] Subscription: ${sub.displayName} -> Prod: ${productId}`);
                 await pool.query(`
                     INSERT INTO subscriptions (id, product_id, subscriber_team_id, display_name, state, created_at, expiration_date, updated_at)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
