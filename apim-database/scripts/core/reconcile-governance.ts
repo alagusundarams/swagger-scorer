@@ -192,7 +192,7 @@ async function main() {
                 for (const env of envs) {
                     const upperEnv = env.toUpperCase();
                     const deployment = (ado.deployments as any)[upperEnv] || {};
-                    const targetId = `${prod.name}:${upperEnv}:Global`;
+                    const targetId = `${prod.id}:${upperEnv}:Global`;
 
                     await pool.query(`
                         INSERT INTO products (
@@ -210,7 +210,7 @@ async function main() {
                             management_mode = EXCLUDED.management_mode,
                             updated_at = NOW();
                     `, [
-                        targetId, prod.name, prod.name, null, 'published', upperEnv, 'Global',
+                        targetId, prod.id, prod.name, null, 'published', upperEnv, 'Global',
                         pipelineUrl, gitRepoUrl,
                         deployment.hash || null, deployment.date || null,
                         ado.status === 'MATCHED' ? 'TERRAFORM_MANAGED' : 'UNTRACKED'
@@ -231,7 +231,7 @@ async function main() {
             // --- A.2 APIS RECONCILIATION ---
             for (const envName of prod.environments) {
                 const upperEnv = envName.toUpperCase();
-                const targetProductId = `${prod.name}:${upperEnv}:Global`;
+                const targetProductId = `${prod.id}:${upperEnv}:Global`;
                 const apiDetails = apimMeta.productApiLinks[envName]?.[prod.id] || [];
                 if (verbose && apiDetails.length > 0) {
                     console.log(`      🔌 [${envName}] APIs: ${apiDetails.length} linked to product`);
@@ -311,7 +311,7 @@ async function main() {
             // FIXED: Map to environment-specific product IDs
             const envProductIds = validInventory
                 .filter((p: any) => p.environments.map((e: any) => e.toUpperCase()).includes(upperEnv))
-                .map(p => `${p.name}:${upperEnv}:Global`);
+                .map(p => `${p.id}:${upperEnv}:Global`);
 
             console.log(`   [${env}] Processing ${nvs.length} Named Values...`);
 
@@ -377,6 +377,7 @@ async function main() {
                         for (const [prodName, forensics] of Object.entries(prodForensics)) {
                             if (forensics.guids.includes(id)) {
                                 // FIXED: prodName is already the product name from forensics
+                                // prodName from forensics IS the APIM product ID (p.name from APIM)
                                 linkedProductId = `${prodName}:${env.toUpperCase()}:Global`;
                                 break;
                             }
@@ -393,6 +394,7 @@ async function main() {
                                     for (const [prodName, apis] of Object.entries(apimMeta.productApiLinks[env] || {})) {
                                         if (apis.some(a => (typeof a === 'string' ? a === apiName : a.name === apiName))) {
                                             // FIXED: prodName is already the product name from productApiLinks
+                                            // prodName from productApiLinks IS the APIM product ID (p.name from APIM)
                                             linkedProductId = `${prodName}:${env.toUpperCase()}:Global`;
                                             linkedApiId = `${prodName}:${env.toUpperCase()}:${apiName}`;
                                             break;
@@ -470,7 +472,7 @@ async function main() {
                     console.warn(`⚠️  Skipping subscription "${sub.displayName}" - product ${sub.productId} not found`);
                     continue;
                 }
-                const productId = `${prod.name}:${upperEnv}:Global`;
+                const productId = `${prod.id}:${upperEnv}:Global`;
 
                 let subscriberTeamId: string | null = null;
                 const ownerMatch = sub.ownerId?.match(/\/users\/(.+)/);
