@@ -413,14 +413,23 @@ async function main() {
                         }
                     }
 
+                    // Similarly check api_id if present
+                    if (linkedApiId) {
+                        const apiCheck = await pool.query('SELECT 1 FROM apis WHERE id = $1', [linkedApiId]);
+                        if (apiCheck.rows.length === 0) {
+                            console.warn(`⚠️  Skipping app reg "${name}" - linked API ${linkedApiId} not found in DB`);
+                            continue;
+                        }
+                    }
+
                     await pool.query(`
                         INSERT INTO app_registrations (id, client_id, display_name, app_id_uri, environment, product_id, api_id, type, updated_at)
                         VALUES ($1, $1, $2, $3, $4, $5, $6, $7, NOW())
                         ON CONFLICT (id) DO UPDATE SET
                             display_name = EXCLUDED.display_name,
                             app_id_uri = EXCLUDED.app_id_uri,
-                            product_id = EXCLUDED.product_id,
-                            api_id = EXCLUDED.api_id,
+                            product_id = CASE WHEN EXCLUDED.product_id IS NULL THEN app_registrations.product_id ELSE EXCLUDED.product_id END,
+                            api_id = CASE WHEN EXCLUDED.api_id IS NULL THEN app_registrations.api_id ELSE EXCLUDED.api_id END,
                             type = EXCLUDED.type,
                             updated_at = NOW();
                     `, [id, name, appIdUri, env, linkedProductId, linkedApiId, linkedProductId ? 'PRODUCT' : (linkedApiId ? 'API' : 'UNKNOWN')]);
