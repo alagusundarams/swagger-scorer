@@ -6,7 +6,7 @@
  */
 import { useState } from 'react';
 import { OnboardingSpecStep } from '../../../../features/provisioning/components/OnboardingSpecStep';
-import { useInventoryStore } from '../../hooks/useInventoryStore';
+import { inventoryApi } from '../../api/inventoryClient';
 import { useStore } from '../../../../store/useStore';
 
 interface AddApiModalProps {
@@ -16,7 +16,7 @@ interface AddApiModalProps {
 }
 
 export const AddApiModal = ({ productId, isOpen, onClose }: AddApiModalProps) => {
-    const { addApiToProduct } = useInventoryStore();
+    // const { addApiToProduct } = useInventoryStore(); // REMOVED
     const { addNotification } = useStore();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -35,7 +35,7 @@ export const AddApiModal = ({ productId, isOpen, onClose }: AddApiModalProps) =>
 
             const name = title.toLowerCase().replace(/[^a-z0-9]/g, '-');
 
-            await addApiToProduct(productId, {
+            await inventoryApi.addApi(productId, {
                 name,
                 displayName: title,
                 description: 'Imported via Product Dashboard',

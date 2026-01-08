@@ -33,7 +33,9 @@ export interface PaginatedResponse<T> {
  * @param page - Page number (1-indexed), omit for all products
  * @param limit - Items per page, omit for all products
  */
-export const getProducts = async (page?: number, limit?: number): Promise<Product[] | PaginatedResponse<Product>> => {
+export async function getProducts(): Promise<Product[]>;
+export async function getProducts(page: number, limit: number): Promise<PaginatedResponse<Product>>;
+export async function getProducts(page?: number, limit?: number): Promise<Product[] | PaginatedResponse<Product>> {
     const params = new URLSearchParams();
     if (page !== undefined) params.append('page', String(page));
     if (limit !== undefined) params.append('limit', String(limit));

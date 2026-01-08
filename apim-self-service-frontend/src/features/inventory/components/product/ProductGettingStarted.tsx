@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { type Product, type Subscription } from '../../../../shared/types/domain';
 import { maskKey } from '../../../../utils/securityUtils';
-import { APP_CONFIG, getGatewayUrl } from '../../../../config/appConfig';
+import { getGatewayUrl } from '../../../../config/appConfig';
 
 interface ProductGettingStartedProps {
     product: Product;

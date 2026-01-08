@@ -1,54 +1,55 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { Product, Environment } from '../../features/inventory';
-import type { Subscription } from '../../features/consumer';
+import type { Subscription, ApprovalRequest } from '../../shared/types/domain';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { useStore } from '../../store/useStore';
-import { useInventoryStore, DashboardPagination, DashboardHero, DashboardFilters, DashboardStatsGrid, DashboardTabs, DashboardContent, getAccessibleEnvironments } from '../../features/inventory';
-import { useTeamsStore } from '../../features/teams';
-import { useConsumerStore } from '../../features/consumer';
-import { useGovernanceStore } from '../../features/governance';
+import { DashboardPagination, DashboardHero, DashboardFilters, DashboardStatsGrid, DashboardTabs, DashboardContent, getAccessibleEnvironments } from '../../features/inventory';
 import { GlobalInventory } from '../../features/admin';
 import { filterProducts, matchesSearchQuery } from '../../utils/filterUtils';
 
+// Query Hooks
+import { useProductsQuery } from '../../features/inventory/api/inventoryQueries';
+import { useMySubscriptionsQuery, useMyTeamsQuery, useMyApprovalsQuery } from '../../features/provisioning/api/userQueries';
 
+/**
+ * DashboardPage - Main Landing Page
+ * 
+ * Refactored to use TanStack Query for data fetching.
+ */
 export const DashboardPage = () => {
     const navigate = useNavigate();
     const { setPageTitle, user, activeTeamId, setActiveTeamId } = useStore();
 
-    const {
-        products: allProducts,
-        isLoading: invLoading,
-        fetchInventory
-    } = useInventoryStore();
+    // --- Data Fetching (TanStack Query) ---
 
+    // 1. Inventory (Products)
     const {
-        subscriptions: allSubscriptions,
-        isLoading: subLoading,
-        fetchSubscriptions
-    } = useConsumerStore();
+        data: allProducts = [],
+        isLoading: invLoading
+    } = useProductsQuery();
 
+    // 2. Subscriptions (My Subscriptions)
     const {
-        teams: allTeams,
-        isLoading: teamsLoading,
-        fetchTeams
-    } = useTeamsStore();
+        data: allSubscriptions = [],
+        isLoading: subLoading
+    } = useMySubscriptionsQuery();
 
+    // 3. Teams (My Teams)
     const {
-        approvalRequests: enhancedApprovals,
-        isLoading: govLoading,
-        fetchApprovals
-    } = useGovernanceStore();
+        data: allTeams = [],
+        isLoading: teamsLoading
+    } = useMyTeamsQuery();
+
+    // 4. Approvals (My Approvals)
+    const {
+        data: enhancedApprovals = [],
+        isLoading: govLoading
+    } = useMyApprovalsQuery();
 
     const isLoading = invLoading || subLoading || teamsLoading || govLoading;
 
-    useEffect(() => {
-        fetchInventory();
-        fetchSubscriptions();
-        fetchTeams();
-        fetchApprovals();
-    }, [fetchInventory, fetchSubscriptions, fetchTeams, fetchApprovals]);
-
+    // Set Page Title
     useEffect(() => {
         setPageTitle('Dashboard');
     }, [setPageTitle]);
@@ -94,13 +95,13 @@ export const DashboardPage = () => {
     const consumerProducts = useMemo(() => {
         const subsList = Array.isArray(allSubscriptions) ? allSubscriptions : [];
         let baseProducts = subsList
-            .filter(s => {
+            .filter((s: Subscription) => {
                 const isSubscribed = activeTeamId === 'all'
                     ? user?.teams.includes(s.subscriberTeamId)
                     : s.subscriberTeamId === activeTeamId;
                 return isSubscribed && (s.state === 'active' || s.state === 'pending');
             })
-            .map(s => {
+            .map((s: Subscription) => {
                 const product = allProducts.find(p => p.id === s.productId);
                 if (!product) return null;
                 return {
@@ -118,7 +119,7 @@ export const DashboardPage = () => {
     }, [allSubscriptions, allProducts, activeTeamId, user, activeEnv, activeRegion, searchQuery]);
 
     const approvalRequests = useMemo(() => {
-        let result = enhancedApprovals;
+        let result = enhancedApprovals as ApprovalRequest[]; // Type assertion if needed
 
         if (activeTeamId !== 'all') {
             result = result.filter(r => r.approverTeamId === activeTeamId);

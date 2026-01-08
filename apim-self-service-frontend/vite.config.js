@@ -21,7 +21,9 @@ export default defineConfig(({ mode }) => {
                     './DashboardPage': './src/pages/Dashboard/Dashboard.page.tsx',
                     './GlobalInventoryPage': './src/pages/GlobalInventory/GlobalInventory.page.tsx',
                     './OnboardingPage': './src/pages/Onboarding/Onboarding.page.tsx',
-                    './AdminGovernancePage': './src/pages/AdminGovernance/AdminGovernance.page.tsx'
+                    './AdminGovernancePage': './src/pages/AdminGovernance/AdminGovernance.page.tsx',
+                    './SpecStudio': './src/features/spec-studio/index.ts',
+                    './PromotionWizard': './src/features/inventory/components/product/PromotionWizard.tsx'
                 },
                 shared: ['react', 'react-dom', 'react-router-dom', 'zustand']
             })

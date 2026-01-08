@@ -220,6 +220,7 @@ async function main() {
                 } catch (err: any) {
                     console.error(`❌ FAILED to sync Product: "${prod.name}" (${envName})`);
                     console.error(`   Details: ${err.message}`);
+                    if (err.detail) console.error(`   DB Detail: ${err.detail}`);
                     throw err;
                 }
 
@@ -252,6 +253,7 @@ async function main() {
                     } catch (err: any) {
                         console.error(`❌ FAILED to sync API: "${apiName}" in Product "${prod.name}"`);
                         console.error(`   Details: ${err.message}`);
+                        if (err.detail) console.error(`   DB Detail: ${err.detail}`);
                         throw err;
                     }
 
@@ -361,7 +363,7 @@ async function main() {
                     );
 
                     for (const prod of envProducts) {
-                        const uniqueProductId = `${prod.id}:${env}`;
+                        const uniqueProductId = `${prod.id}:${env}:Global`;
                         await pool.query(`
                             INSERT INTO product_named_values (product_id, named_value_id, is_owner, can_modify)
                             VALUES ($1, $2, true, true)
@@ -372,6 +374,7 @@ async function main() {
                     console.error(`❌ FAILED to sync Named Value: "${nv.name}" (Env: ${env})`);
                     console.error(`   Value: "${val}" (Is Secret: ${nv.isSecret})`);
                     console.error(`   Details: ${err.message}`);
+                    if (err.detail) console.error(`   DB Detail: ${err.detail}`);
                     throw err;
                 }
             }

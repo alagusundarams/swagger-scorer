@@ -4,9 +4,10 @@
  * Manages the configuration settings for a product or API.
  * Includes Named Values and other environment-specific properties.
  */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { Product, NamedValue } from '../../types/inventoryTypes';
-import { useInventoryStore } from '../../hooks/useInventoryStore';
+import { useNamedValuesQuery } from '../../api/inventoryQueries';
+import { inventoryApi } from '../../api/inventoryClient'; // Direct API call for mutation (temporary until mutation hooks created)
 import { NamedValueModal } from '../modals/NamedValueModal';
 import { ConfigurationManifestModal } from '../modals/ConfigurationManifestModal';
 
@@ -15,24 +16,25 @@ interface ConfigurationTabProps {
 }
 
 export const ConfigurationTab = ({ product }: ConfigurationTabProps) => {
-    const { fetchConfiguration, addNamedValue, deleteNamedValue, products } = useInventoryStore();
-    const storeProduct = products.find((p: Product) => p.id === product.id) || product;
+    // 1. Fetch Data via Query
+    const { data: namedValues = [], refetch } = useNamedValuesQuery(product.id);
+
+    // Merge fetched named values into product object for display consistency
+    const storeProduct = { ...product, namedValues };
+
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [showManifest, setShowManifest] = useState(false);
 
-    useEffect(() => {
-        if (product.id) {
-            fetchConfiguration(product.id);
-        }
-    }, [product.id, fetchConfiguration]);
-
+    // Actions (Direct API for now, TODO: Create Mutation Hooks)
     const handleAddValue = async (data: Partial<NamedValue>) => {
-        await addNamedValue(product.id, data);
+        await inventoryApi.addNamedValue(product.id, data);
+        refetch();
     };
 
     const handleDelete = async (valueId: string) => {
         if (!confirm('Are you sure you want to delete this configuration value?')) return;
-        await deleteNamedValue(product.id, valueId);
+        await inventoryApi.deleteNamedValue(product.id, valueId);
+        refetch();
     };
 
     // GRP Read-Only Mode Check

@@ -2,9 +2,13 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { useStore } from '../../store/useStore';
-import { useTeamsStore } from '../../features/teams';
 import { OnboardingProgressBar, OnboardingIdentityStep, OnboardingFulfillmentStep, OnboardingSpecStep, OnboardingApiPolicyStep, OnboardingIntentModal, OnboardingResolutionStep, OnboardingPrerequisitesStep, AppRegistrationGuide, saveDraft, loadDraft } from '../../features/provisioning';
-import { useInventoryStore, type Product } from '../../features/inventory';
+import type { Product } from '../../features/inventory';
+import type { NamedValue } from '../../shared/types/domain';
+
+// Query Hooks
+import { useMyTeamsQuery } from '../../features/provisioning/api/userQueries';
+import { useNamedValuesQuery } from '../../features/inventory/api/inventoryQueries';
 
 /**
  * OnboardingPage Controller (Visual Wizard v2)
@@ -28,8 +32,9 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
 
     // --- Store Integration ---
     const { user, setPageTitle } = useStore();
-    const { teams: allTeams } = useTeamsStore();
-    const { fetchConfiguration, products } = useInventoryStore();
+
+    // Replace Stores with Queries
+    const { data: allTeams = [] } = useMyTeamsQuery();
 
     useEffect(() => {
         setPageTitle('Onboard Product');
@@ -39,6 +44,9 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
     const [step, setStep] = useState(0); // 0 = Intent Modal
     const [intent, setIntent] = useState<'new' | 'existing'>('new');
     const [existingProduct, setExistingProduct] = useState<Product | undefined>(undefined);
+
+    // Fetch configuration (Named Values) for existing product
+    const { data: existingNamedValuesData = [] } = useNamedValuesQuery(existingProduct?.id || '');
 
     const [formData, setFormData] = useState({
         name: '',
@@ -134,7 +142,7 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
                 name: product.name, // Inherit
                 ownerTeamId: product.ownerTeamId // Inherit
             }));
-            fetchConfiguration(product.id);
+            // Query hook automatically fetches when existingProduct is set
             setStep(3); // Jump to Contract (shifted)
         } else {
             setStep(2); // Go to Identity (shifted)
@@ -267,7 +275,7 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
                             <OnboardingResolutionStep
                                 productPolicyXml={formData.productPolicy?.xml || ''} // Handle complex object structure from Step 3
                                 apiPolicies={formData.apiPolicies || {}}
-                                existingNamedValues={(products.find(p => p.id === existingProduct?.id)?.namedValues || []).map(nv => ({
+                                existingNamedValues={existingNamedValuesData.map((nv: NamedValue) => ({
                                     name: nv.systemName,
                                     value: nv.value
                                 }))}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { SpecStudio, useSpecStudio } from '../../spec-studio';
-import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
+import { useApisQuery } from '../../inventory/api/inventoryQueries'; // Import useApisQuery
 
 /**
  * ------------------------------------------------------------------
@@ -32,8 +32,8 @@ export const OnboardingSpecStep = ({ onBack, onNext, initialSpec = '', initialAp
     const [apiSuffix, setApiSuffix] = useState(initialApiSuffix);
     const [parsedOperations, setParsedOperations] = useState<{ method: string; path: string; summary: string }[]>([]);
 
-    // === STORE INTEGRATION ===
-    const { apis } = useInventoryStore();
+    // === QUERY INTEGRATION ===
+    const { data: apis = [] } = useApisQuery();
     const {
         spec,
         setSpec,
@@ -56,7 +56,7 @@ export const OnboardingSpecStep = ({ onBack, onNext, initialSpec = '', initialAp
 
     // === VALIDATION ===
     const fullPath = `/v1/${apiSuffix}`.replace(/\/+/g, '/');
-    const isDuplicatePath = apis.some(api => api.path === fullPath);
+    const isDuplicatePath = apis.some((api: any) => api.path === fullPath); // Explicit typing
     const apiNameError = !apiName ? 'API Name is required.' : (!/^[a-zA-Z0-9-_]+$/.test(apiName) ? 'Alphanumeric, dashes, underscores only.' : null);
     const apiSuffixError = !apiSuffix ? 'URL Suffix is required.' : (!/^[a-zA-Z0-9-_\/]+$/.test(apiSuffix) ? 'Invalid path format.' : (isDuplicatePath ? `Duplicate Path: ${fullPath} is already in use.` : null));
     const isStepValid = !apiNameError && !apiSuffixError && spec.trim().length > 0;

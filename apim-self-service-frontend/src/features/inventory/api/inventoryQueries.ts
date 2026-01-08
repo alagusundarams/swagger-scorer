@@ -28,18 +28,17 @@ export function useGlobalInventoryQuery() {
     });
 }
 
-/**
- * Hook to fetch all products
- */
+import { type Product } from '../../../shared/types/domain';
+
 /**
  * Hook to fetch ALL products (Simple Array)
  */
 export function useProductsQuery() {
-    return useQuery({
+    return useQuery<Product[]>({
         queryKey: inventoryKeys.products,
         queryFn: async () => {
             const res = await inventoryApi.getProducts();
-            return Array.isArray(res) ? res : res.products;
+            return res;
         }
     });
 }

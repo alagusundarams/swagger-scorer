@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect } from 'react';
-import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
+import { useState, useMemo } from 'react';
 import { type Product } from '../../inventory/types/inventoryTypes';
+import { useProductsQuery } from '../../inventory/api/inventoryQueries';
 
 /**
  * ------------------------------------------------------------------
@@ -18,15 +18,10 @@ interface OnboardingIntentModalProps {
 }
 
 export const OnboardingIntentModal = ({ onSelectIntent, userTeams }: OnboardingIntentModalProps) => {
-    const { products, fetchInventory, isLoading } = useInventoryStore();
+    const { data: products = [], isLoading } = useProductsQuery();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [mode, setMode] = useState<'selection' | 'picking'>('selection');
-
-    // Fetch products on mount to populate existing list
-    useEffect(() => {
-        fetchInventory();
-    }, [fetchInventory]);
 
     // Filter products: Must be owned by one of the user's teams to add an API to it (usually)
     // Or at least they must have write access. For now, we filter by ownerTeamId match.
