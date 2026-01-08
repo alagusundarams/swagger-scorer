@@ -159,6 +159,7 @@ async function runDebug() {
 
     const primaryRepoName = finalRepo.name;
     const primaryRepoId = finalRepo.id;
+    const primaryRepoUrl = finalRepo.webUrl || finalRepo.url || finalRepo._links?.web?.href;
     let project = finalRepo.project?.name || "Unknown";
     let projectIdent = finalRepo.project?.id || project;
 
@@ -169,6 +170,7 @@ async function runDebug() {
             const details = await AzureService.fetchRepoById(devops.organization, primaryRepoId || primaryRepoName, devops.pat, devops.baseUrl);
             project = details.project.name;
             projectIdent = details.project.id;
+            (finalRepo as any).webUrl = details.webUrl;
             console.log(`   ✅ Metadata Recovered: Project=${project}`);
         } catch (e: any) {
             console.warn(`   ⚠️  Failed to recover project name: ${e.message}`);
@@ -176,6 +178,8 @@ async function runDebug() {
     }
 
     const projectIdentifier = projectIdent || project;
+    const repoWebUrl = (finalRepo as any).webUrl || `${devops.baseUrl}/${devops.organization}/${project}/_git/${primaryRepoName}`;
+    console.log(`   🔗 Repo URL: ${repoWebUrl}`);
 
     // --- STEP 2: PIPELINE DISCOVERY ---
     console.log(`\n➡️  Step 2: Pipeline Discovery...`);
@@ -199,11 +203,22 @@ async function runDebug() {
             AzureService.fetchADOReleaseDefinitions(devops.organization, projectIdentifier, devops.pat, devops.baseUrl)
         ]);
 
-        const combined = [
+        let combined = [
             ...yamlPipes.map(p => ({ ...p, type: 'YAML' })),
             ...buildDefs.map(p => ({ ...p, type: 'Classic Build' })),
             ...releaseDefs.map(r => ({ ...r, type: 'Classic Release', isRelease: true }))
         ];
+
+        // Widest Net Fallback: If repo-specific didn't find much, fetch ALL in project
+        if (combined.length < 5) {
+            console.log(`   🔍 Not many repo-specific pipelines. Fetching project-wide definitions as fallback...`);
+            const [projPipes, projBuilds] = await Promise.all([
+                AzureService.fetchADOPipelines(devops.organization, projectIdentifier, '', devops.pat, devops.baseUrl),
+                AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, '', devops.pat, devops.baseUrl)
+            ]);
+            combined.push(...projPipes.map(p => ({ ...p, type: 'YAML (Proj)' })));
+            combined.push(...projBuilds.map(p => ({ ...p, type: 'Classic Build (Proj)' })));
+        }
 
         // De-duplicate by ID (Pipelines and Build Definitions often share IDs or overlap)
         const seen = new Set();
@@ -252,8 +267,8 @@ async function runDebug() {
     }).sort((a, b) => b.score - a.score);
 
     console.log(`   🔎 Found ${pipelineCandidates.length} candidates. Top Picks:`);
-    pipelineCandidates.slice(0, 5).forEach((c, i) => {
-        console.log(`      ${i + 1}. [${c.type}] ${c.name} (ID: ${c.id}) - Score: ${c.score}`);
+    pipelineCandidates.slice(0, 10).forEach((c, i) => {
+        console.log(`      ${(i + 1).toString().padStart(2)}. [${c.type.padEnd(15)}] ${c.name.padEnd(40)} (Score: ${c.score.toString().padStart(3)}, ID: ${c.id})`);
     });
 
     const matchedPipeline = pipelineCandidates[0].pipe;
