@@ -424,6 +424,25 @@ async function main() {
                         }
                     }
 
+
+                    // Verify product exists in DB to avoid FK violation
+                    if (linkedProductId) {
+                        const prodCheck = await pool.query('SELECT 1 FROM products WHERE id = $1', [linkedProductId]);
+                        if (prodCheck.rows.length === 0) {
+                            console.warn(`⚠️  App Registration "${name}" links to missing product ${linkedProductId} - Setting to NULL`);
+                            linkedProductId = null;
+                        }
+                    }
+
+                    // Verify API exists in DB
+                    if (linkedApiId) {
+                        const apiCheck = await pool.query('SELECT 1 FROM apis WHERE id = $1', [linkedApiId]);
+                        if (apiCheck.rows.length === 0) {
+                            console.warn(`⚠️  App Registration "${name}" links to missing API ${linkedApiId} - Setting to NULL`);
+                            linkedApiId = null;
+                        }
+                    }
+
                     await pool.query(`
                         INSERT INTO app_registrations (id, client_id, display_name, app_id_uri, environment, product_id, api_id, type, updated_at)
                         VALUES ($1, $1, $2, $3, $4, $5, $6, $7, NOW())
@@ -473,6 +492,13 @@ async function main() {
                     continue;
                 }
                 const productId = `${prod.id}:${upperEnv}:Global`;
+
+                // Verify product exists in DB to avoid FK violation
+                const dbProd = await pool.query('SELECT 1 FROM products WHERE id = $1', [productId]);
+                if (dbProd.rows.length === 0) {
+                    console.warn(`⚠️  Skipping subscription "${sub.displayName}" - Product DB Record ${productId} not found (Inventory mismatch?)`);
+                    continue;
+                }
 
                 let subscriberTeamId: string | null = null;
                 const ownerMatch = sub.ownerId?.match(/\/users\/(.+)/);
