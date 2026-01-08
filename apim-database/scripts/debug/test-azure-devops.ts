@@ -75,7 +75,11 @@ function extractOrgName(input: string): string {
  * Test Azure DevOps API connection
  */
 async function testAzureDevOpsAPI(config: AzureDevOpsConfig) {
-    const baseUrl = `https://dev.azure.com/${config.organization}`;
+    const isLegacy = config.organization.includes('.visualstudio.com') || config.organization.includes('visualstudio.com');
+    const cleanRepoOrg = extractOrgName(config.organization);
+    const baseUrl = isLegacy
+        ? `https://${cleanRepoOrg}.visualstudio.com`
+        : `https://dev.azure.com/${cleanRepoOrg}`;
 
     // Basic auth with PAT (format: username:PAT in base64)
     const auth = Buffer.from(`:${config.pat}`).toString('base64');
@@ -110,9 +114,11 @@ async function testAzureDevOpsAPI(config: AzureDevOpsConfig) {
         if (reposData.value.length > 0) {
             const firstRepo = reposData.value[0];
             console.log(`\n📄 Test 2: Searching for .yaml files in ${firstRepo.name}...`);
+            const projectEncoded = encodeURIComponent(firstRepo.project.name);
+            const searchUrl = `${baseUrl}/${projectEncoded}/_apis/search/codesearchresults?api-version=${config.apiVersion}`;
 
             const searchResponse = await fetch(
-                `${baseUrl}/${firstRepo.project.name}/_apis/search/codesearchresults?api-version=${config.apiVersion}`,
+                searchUrl,
                 {
                     method: 'POST',
                     headers,
