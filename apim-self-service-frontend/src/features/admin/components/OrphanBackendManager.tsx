@@ -5,6 +5,16 @@ import { useProductsQuery } from '../../inventory/api/inventoryQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 
+interface Backend {
+    id: string;
+    environment: string;
+    url: string;
+    title?: string;
+    productId?: string;
+    scope?: 'PRODUCT' | 'API' | 'GLOBAL' | null;
+    updatedAt?: string;
+}
+
 
 
 export const OrphanBackendManager: React.FC = () => {
@@ -127,7 +137,7 @@ export const OrphanBackendManager: React.FC = () => {
     };
 
     // Filter backends based on search
-    const filteredOrphans = orphans.filter(b => {
+    const filteredOrphans = orphans.filter((b: Backend) => {
         if (!searchFilter) return true;
         const searchLower = searchFilter.toLowerCase();
         return (
@@ -231,7 +241,7 @@ export const OrphanBackendManager: React.FC = () => {
                                         if (selectedIds.length === filteredOrphans.length) {
                                             setSelectedIds([]);
                                         } else {
-                                            setSelectedIds(filteredOrphans.map(b => b.id));
+                                            setSelectedIds(filteredOrphans.map((b: Backend) => b.id));
                                         }
                                     }}
                                     className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
@@ -260,7 +270,7 @@ export const OrphanBackendManager: React.FC = () => {
                                 </td>
                             </tr>
                         ) : (
-                            filteredOrphans.map(b => (
+                            filteredOrphans.map((b: Backend) => (
                                 <tr key={b.id} className={`group hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors ${selectedIds.includes(b.id) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}>
                                     <td className="p-5 text-center">
                                         <input

@@ -6,6 +6,18 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import './OrphanManager.css'; // Assume shared styles
 
+interface OrphanNamedValue {
+    id: string;
+    systemName: string;
+    displayName?: string;
+    environment: string;
+    value: string;
+    productId?: string;
+    scopeId?: string;
+    scope?: 'PRODUCT' | 'API' | 'GLOBAL' | null;
+    updatedAt?: string;
+}
+
 
 
 export const OrphanNamedValueManager: React.FC = () => {
@@ -131,7 +143,7 @@ export const OrphanNamedValueManager: React.FC = () => {
     };
 
     // Filter orphans based on name search
-    const filteredOrphans = orphans.filter(nv => {
+    const filteredOrphans = orphans.filter((nv: OrphanNamedValue) => {
         if (!nameFilter) return true;
         const searchLower = nameFilter.toLowerCase();
         return (
@@ -263,7 +275,7 @@ export const OrphanNamedValueManager: React.FC = () => {
                                         if (selectedIds.length === filteredOrphans.length) {
                                             setSelectedIds([]);
                                         } else {
-                                            setSelectedIds(filteredOrphans.map(nv => nv.id));
+                                            setSelectedIds(filteredOrphans.map((nv: OrphanNamedValue) => nv.id));
                                         }
                                     }}
                                     className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
@@ -293,7 +305,7 @@ export const OrphanNamedValueManager: React.FC = () => {
                                 </td>
                             </tr>
                         ) : (
-                            filteredOrphans.map(nv => (
+                            filteredOrphans.map((nv: OrphanNamedValue) => (
                                 <tr key={nv.id} className={`group hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors ${selectedIds.includes(nv.id) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}>
                                     <td className="p-5 text-center">
                                         <input
