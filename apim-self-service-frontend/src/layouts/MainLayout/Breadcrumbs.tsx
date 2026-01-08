@@ -11,28 +11,29 @@ import { useStore } from '../../store/useStore';
  * 3. Resolves Product/API entities if IDs are in the URL.
  * 4. Falls back to the global pageTitle.
  */
-import { useInventoryStore } from '../../features/inventory/hooks/useInventoryStore';
+import { useProductQuery } from '../../features/inventory/api/inventoryQueries';
 
 export const Breadcrumbs: React.FC = () => {
     const location = useLocation();
     const { productId, apiId, operationId } = useParams<{ productId: string; apiId: string; operationId: string }>();
     const { pageTitle } = useStore();
-    const { products } = useInventoryStore();
+    // We fetch the product needed for the breadcrumb context. 
+    // If we are deep in a product route, we need that product's details.
+    const { data: product } = useProductQuery(productId || '', undefined);
 
     const breadcrumbs = useMemo(() => {
         const items = [
             { label: 'Home', href: '/', current: location.pathname === '/' }
         ];
 
-        // 1. Check for manual context (passed via navigate(..., { state: { breadcrumbs: [...] } }))
+        // 1. Check for manual context
         const state = location.state as { breadcrumbContext?: Array<{ label: string; href: string }> } | null;
         if (state?.breadcrumbContext) {
             items.push(...state.breadcrumbContext.map(b => ({ ...b, current: false })));
         }
 
-        // 2. Resolve Core Entities (Domain Knowledge is okay in Shell for primary entities)
+        // 2. Resolve Core Entities
         if (productId) {
-            const product = products.find(p => p.id === productId);
             items.push({
                 label: product?.name || 'Product',
                 href: `/products/${productId}`,
@@ -58,9 +59,7 @@ export const Breadcrumbs: React.FC = () => {
             }
         }
 
-        // 3. Fallback to Page Title:
-        // If the last item is NOT current (meaning we have context or are just at root but not home),
-        // we should append the generic Page Title to show where we are.
+        // 3. Fallback to Page Title
         const lastItem = items[items.length - 1];
         if (!lastItem.current && location.pathname !== '/') {
             items.push({
@@ -71,7 +70,7 @@ export const Breadcrumbs: React.FC = () => {
         }
 
         return items;
-    }, [location.pathname, location.state, productId, apiId, operationId, products, pageTitle]);
+    }, [location.pathname, location.state, productId, apiId, operationId, product, pageTitle]);
 
     if (breadcrumbs.length <= 1) return null;
 

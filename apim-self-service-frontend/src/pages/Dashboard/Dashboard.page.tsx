@@ -83,6 +83,11 @@ export const DashboardPage = () => {
     }, [activeEnv, allowedEnvironments, setSearchParams]);
 
     // --- Data Derivation & Filtering ---
+
+    /**
+     * Filter Products where the current team is the OWNER (Provider View).
+     * Applies Search, Environment, and Region filters.
+     */
     const producerProducts = useMemo(() => {
         return filterProducts(allProducts, {
             ownerTeamId: activeTeamId,
@@ -92,6 +97,12 @@ export const DashboardPage = () => {
         });
     }, [allProducts, activeTeamId, activeEnv, activeRegion, searchQuery]);
 
+    /**
+     * Filter Products where the current team is a SUBSCRIBER (Consumer View).
+     * 1. Finds relevant subscriptions.
+     * 2. Maps them to Product objects.
+     * 3. Applies standard filters.
+     */
     const consumerProducts = useMemo(() => {
         const subsList = Array.isArray(allSubscriptions) ? allSubscriptions : [];
         let baseProducts = subsList
@@ -118,6 +129,11 @@ export const DashboardPage = () => {
         });
     }, [allSubscriptions, allProducts, activeTeamId, user, activeEnv, activeRegion, searchQuery]);
 
+    /**
+     * Filter Approvals relevant to the current context.
+     * - As Admin/Lead: Show requests waiting for MY approval.
+     * - Scope: Filter by Team and Environment.
+     */
     const approvalRequests = useMemo(() => {
         let result = enhancedApprovals as ApprovalRequest[]; // Type assertion if needed
 

@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import type { Subscription } from '../../../shared/types/domain';
-import { useConsumerStore } from '../store/consumerStore';
+import { useQueryClient } from '@tanstack/react-query';
+import { consumerKeys } from '../../consumer/api/consumerQueries';
+import { consumerApi } from '../../consumer/api/consumerClient';
 
 interface CredentialsTabProps {
     subscriptions: Subscription[];
 }
 
 export function CredentialsTab({ subscriptions }: CredentialsTabProps) {
-    const { fetchSubscriptionSecrets } = useConsumerStore();
+    const queryClient = useQueryClient();
     const [visibleKeys, setVisibleKeys] = useState<Record<string, { primary: string; secondary: string }>>({});
     const [loadingSubId, setLoadingSubId] = useState<string | null>(null);
 
@@ -23,7 +25,12 @@ export function CredentialsTab({ subscriptions }: CredentialsTabProps) {
         // Fetch and show
         setLoadingSubId(subId);
         try {
-            const secrets = await fetchSubscriptionSecrets(subId);
+            const secrets = await queryClient.fetchQuery({
+                queryKey: consumerKeys.secrets(subId),
+                queryFn: () => consumerApi.getSubscriptionSecrets(subId),
+                staleTime: 1000 * 60 * 5,
+            });
+
             if (secrets) {
                 setVisibleKeys({
                     ...visibleKeys,

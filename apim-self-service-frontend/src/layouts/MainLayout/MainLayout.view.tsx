@@ -10,6 +10,20 @@ interface MainLayoutProps {
     children: React.ReactNode;
 }
 
+/**
+ * MainLayout
+ * 
+ * ------------------------------------------------------------------
+ * 📍 Purpose:
+ * The primary shell for Authenticated Pages.
+ * Wraps content with the standard Header, Footer, and Breadcrumb navigation.
+ * 
+ * 🔄 Responsibilities:
+ * 1. Visual Shell (Header/Footer).
+ * 2. Auth State Synchronization (Syncs `useAuth` provided user to `useStore`).
+ * 3. Context Initialization (Sets default Active Team ID).
+ * ------------------------------------------------------------------
+ */
 export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     const { user: authUser, isAuthenticated } = useAuth();
     const { setUser } = useStore();

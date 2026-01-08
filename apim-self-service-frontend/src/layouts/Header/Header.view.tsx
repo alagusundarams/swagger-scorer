@@ -4,6 +4,19 @@ import { useAuth } from '../../features/auth/hooks/useAuth';
 import { useStore } from '../../store/useStore';
 import './Header.css';
 
+/**
+ * Global Header Component
+ * 
+ * ------------------------------------------------------------------
+ * 📍 Purpose:
+ * Top-level navigation and identity bar.
+ * Contains: Branding, Env Status, User Profile Menu.
+ * 
+ * 🧩 Interaction:
+ * - User Menu checks outside clicks to close.
+ * - Displays live page title from Store.
+ * ------------------------------------------------------------------
+ */
 export const Header = () => {
     const navigate = useNavigate();
     const { logout: authLogout } = useAuth();

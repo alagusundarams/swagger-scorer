@@ -4,7 +4,7 @@ import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { useAuth } from '../../features/auth';
 import { useProductQuery, useNamedValuesQuery } from '../../features/inventory/api/inventoryQueries';
 import { getUserRoleForProduct, canAccessProduct, ProductDetailProducer, ProductDetailConsumer, RequestAccessModal } from '../../features/inventory';
-import { useConsumerStore } from '../../features/consumer';
+import { useSubscriptionsQuery } from '../../features/consumer';
 
 /**
  * ProductDetailPage Controller
@@ -46,24 +46,17 @@ export const ProductDetailPage = () => {
     useNamedValuesQuery(productId || '');
 
     const {
-        subscriptions: allSubscriptions,
+        data: allSubscriptions = [],
         isLoading: subLoading,
         error: subError
-    } = useConsumerStore();
+    } = useSubscriptionsQuery();
 
-    const {
-        isLoading: appLoading
-    } = useConsumerStore();
-
-    const isLoading = productLoading || subLoading || appLoading;
-    const error = (productError as Error)?.message || subError;
+    const isLoading = productLoading || subLoading;
+    const error = (productError as Error)?.message || (subError as Error)?.message;
 
     // --- State ---
     const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
     const [requestTeamId, setRequestTeamId] = useState(user?.defaultTeamId || (user?.teams ? user.teams[0] : ''));
-    // Removed unused request access state variables
-    const [isPending, _setIsPending] = useState(false);
-    const [toast, _setToast] = useState<{ message: string; show: boolean }>({ message: '', show: false });
 
     // --- Effects ---
     // Update requestTeamId when user is loaded
@@ -83,7 +76,7 @@ export const ProductDetailPage = () => {
         return allSubscriptions.find(s => s.productId === product.id && user.teams.includes(s.subscriberTeamId));
     }, [user, product, allSubscriptions]);
 
-    const hasPendingRequest = subscription?.state === 'pending' || isPending;
+    const hasPendingRequest = subscription?.state === 'pending';
 
     // --- Role Detection ---
     // Prioritize backend accessLevel if available, otherwise fallback to local logic
@@ -199,12 +192,6 @@ export const ProductDetailPage = () => {
     // 3. Consumer View (Default for everyone else)
     return (
         <MainLayout>
-            {/* Feedback Notification */}
-            {toast.show && (
-                <div className="fixed top-24 right-8 bg-slate-900 text-white px-8 py-4 rounded-2xl shadow-2xl z-50 animate-fade-in font-bold text-sm tracking-widest border border-white/10 backdrop-blur-md">
-                    ✨ {toast.message}
-                </div>
-            )}
 
             <ProductDetailConsumer
                 product={product}

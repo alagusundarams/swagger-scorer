@@ -30,16 +30,33 @@ const LoadingFallback = () => (
   </div>
 );
 
-import { useInventoryStore } from './features/inventory/hooks/useInventoryStore';
+import { useProductsQuery } from './features/inventory/api/inventoryQueries';
 
 function OnboardingWrapper() {
-  const { products } = useInventoryStore();
+  const { data: products = [] } = useProductsQuery();
   const validateName = (name: string) =>
     products.some(p => p.name.toLowerCase() === name.toLowerCase() || p.displayName.toLowerCase() === name.toLowerCase());
 
   return <OnboardingWizard validateProductName={validateName} />;
 }
 
+/**
+ * Root Application Component
+ * 
+ * ------------------------------------------------------------------
+ * 📍 Purpose:
+ * Top-level React Container.
+ * Manages:
+ * 1. Routing Context (React Router)
+ * 2. Toast Notifications (Toaster)
+ * 3. Lazy Loading Suspense Fallbacks
+ * 4. Protected Route Wrappers
+ * 
+ * 🧩 Structure:
+ * - Public Routes: Login
+ * - Protected Routes: Everything else (wrapped in `<ProtectedRoute>`)
+ * ------------------------------------------------------------------
+ */
 function App() {
   return (
     <Router>

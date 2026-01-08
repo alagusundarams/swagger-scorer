@@ -36,6 +36,14 @@ export const MarketplacePage = () => {
     }, [setPageTitle]);
 
     // --- Entitlement Logic ---
+    /**
+     * Determines which products are visible to the current user.
+     * 
+     * Security Rules:
+     * 1. Ownership: Users always see products they own.
+     * 2. Public: Visible to everyone.
+     * 3. Private: Only visible if the user's team is explicitly in `authorizedTeams`.
+     */
     const accessibleProducts = useMemo(() => {
         if (!user) return [];
         return products.filter(product => {

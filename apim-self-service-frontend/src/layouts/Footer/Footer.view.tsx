@@ -1,5 +1,14 @@
 import './Footer.css';
 
+/**
+ * Global Footer Component
+ * 
+ * ------------------------------------------------------------------
+ * 📍 Purpose:
+ * Static branding and support contact info.
+ * Displayed at the very bottom of the MainLayout shell.
+ * ------------------------------------------------------------------
+ */
 export const Footer = () => {
     return (
         <footer className="app-footer">

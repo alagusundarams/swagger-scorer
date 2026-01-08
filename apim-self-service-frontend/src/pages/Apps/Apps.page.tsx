@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { useStore } from '../../store/useStore';
-import { useConsumerStore } from '../../features/consumer';
-import { toast } from 'react-hot-toast';
+import { useAppRegistrationsQuery, useAddAppRegistrationMutation } from '../../features/consumer';
 
 /**
  * AppsPage Controller
@@ -24,7 +23,12 @@ import { toast } from 'react-hot-toast';
  */
 export const AppsPage = () => {
     const { user, setPageTitle } = useStore();
-    const { appRegistrations, fetchAppRegistrations, registerApp: addAppRegistration } = useConsumerStore();
+
+    // TanStack Query Hooks
+    const teamId = user?.teams[0];
+    const { data: appRegistrations = [] } = useAppRegistrationsQuery(teamId);
+    const addAppMutation = useAddAppRegistrationMutation();
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({
         displayName: '',
@@ -35,23 +39,21 @@ export const AppsPage = () => {
 
     useEffect(() => {
         setPageTitle('My Applications');
-        if (user) {
-            fetchAppRegistrations(user.teams[0]); // Assuming first team for now
-        }
-    }, [user, fetchAppRegistrations, setPageTitle]);
+    }, [setPageTitle]);
 
     const handleAddApp = async (e: React.FormEvent) => {
         e.preventDefault();
+
         try {
-            await addAppRegistration({
+            await addAppMutation.mutateAsync({
                 ...formData,
                 ownerTeamId: user?.teams[0] || 'unknown'
             });
             setIsModalOpen(false);
             setFormData({ displayName: '', clientId: '', environment: 'DEV', appIdUri: '' });
-            toast.success('Application linked successfully!');
+            // Notification handled by mutation side-effect
         } catch (error) {
-            toast.error('Failed to link application');
+            // Notification handled by mutation side-effect
         }
     };
 

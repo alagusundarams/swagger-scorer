@@ -4,7 +4,8 @@ import { type Product, type API, type Subscription, type ApprovalRequest } from 
 import { type User } from '../../../core/types/commonTypes';
 import { getNextEnvironment } from '../../../utils/statusUtils';
 import { useStore } from '../../../store/useStore';
-import { useInventoryStore } from '../../inventory/hooks/useInventoryStore';
+import { useQueryClient } from '@tanstack/react-query';
+import { inventoryKeys } from '../../inventory/api/inventoryQueries';
 import { useAppData } from '../../../shared/context/AppDataContext';
 import { ManageProductModal }
     from '../components/product/ManageProductModal';
@@ -44,7 +45,18 @@ interface ProductDetailProducerProps {
  */
 export const ProductDetailProducer = ({ product, user }: ProductDetailProducerProps) => {
     const { addNotification } = useStore();
-    const { updateProduct, removeApiFromProduct } = useInventoryStore();
+    const queryClient = useQueryClient();
+
+    // Replaced store actions with direct API calls + Invalidation
+    const updateProduct = async (id: string, data: Partial<Product>) => {
+        await inventoryApi.updateProduct(id, data);
+        queryClient.invalidateQueries({ queryKey: inventoryKeys.all });
+    };
+
+    const removeApiFromProduct = async (prodId: string, apiId: string) => {
+        await inventoryApi.removeApi(prodId, apiId);
+        queryClient.invalidateQueries({ queryKey: inventoryKeys.all });
+    };
 
     /**
      * MFE-Compliant: Using local state instead of cross-feature store access

@@ -4,8 +4,8 @@ import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { useStore } from '../../store/useStore';
 import { useAuth } from '../../features/auth';
 import { useProductsQuery } from '../../features/inventory/api/inventoryQueries';
-import { useConsumerStore } from '../../features/consumer';
-import { useTeamsStore } from '../../features/teams';
+import { useSubscriptionsQuery, useRequestAccessMutation } from '../../features/consumer';
+import { useTeamsQuery } from '../../features/teams';
 import { DiscoveryHero, DiscoveryProductCard, SubscriptionConfirmModal } from '../../features/discovery';
 import { filterProducts } from '../../utils/filterUtils';
 
@@ -38,15 +38,13 @@ export const BrowsePage = () => {
         setPageTitle('Browse APIs');
     }, [setPageTitle]);
 
-    // --- Store Integration ---
+    // --- Store Integration (TanStack Query) ---
     const { data: allProducts = [] } = useProductsQuery();
-    const { subscriptions: allSubscriptions, fetchSubscriptions, requestAccess } = useConsumerStore();
-    const { teams: allTeams, fetchTeams } = useTeamsStore();
+    const { data: allSubscriptions = [] } = useSubscriptionsQuery();
+    const { data: allTeams = [] } = useTeamsQuery();
 
-    useEffect(() => {
-        fetchSubscriptions();
-        fetchTeams();
-    }, [fetchSubscriptions, fetchTeams]);
+    // Mutations
+    const requestAccessMutation = useRequestAccessMutation();
 
     // --- UI State ---
     const [selectedTeamId, setSelectedTeamId] = useState<string>(user?.teams[0] || '');
@@ -82,7 +80,7 @@ export const BrowsePage = () => {
     const handleConfirmSubscription = () => {
         if (!selectedProductId || !selectedTeamId) return;
 
-        requestAccess(selectedProductId, selectedTeamId);
+        requestAccessMutation.mutate({ productId: selectedProductId, teamId: selectedTeamId });
         setShowSubscribeModal(false);
 
         // Navigation gives feedback of progress

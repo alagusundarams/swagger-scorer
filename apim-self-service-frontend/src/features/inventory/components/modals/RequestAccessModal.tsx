@@ -2,8 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { type Product } from '../../../../shared/types/domain';
 import { useAppData } from '../../../../shared/context/AppDataContext';
 // import { useAuth } from '../../../../features/auth';
-import { useStore } from '../../../../store/useStore';
-import { inventoryApi } from '../../../inventory/api/inventoryClient';
+import { useRequestAccessMutation } from '../../../../features/consumer';
 
 interface RequestAccessModalProps {
     isOpen: boolean;
@@ -20,7 +19,7 @@ export const RequestAccessModal = ({
 }: RequestAccessModalProps) => {
     const { teams } = useAppData();
     // const { user } = useAuth();
-    const { addNotification } = useStore();
+    const requestAccessMutation = useRequestAccessMutation();
 
     const [selectedTeamId, setSelectedTeamId] = useState<string>('');
     const [justification, setJustification] = useState('');
@@ -49,23 +48,16 @@ export const RequestAccessModal = ({
 
         setIsSubmitting(true);
         try {
-            await inventoryApi.requestAccess(product.id, selectedTeamId, justification);
-
-            addNotification({
-                type: 'success',
-                title: 'Access Request Submitted',
-                message: `Your request for ${product.displayName} is pending approval from the product owner.`,
+            await requestAccessMutation.mutateAsync({
+                productId: product.id,
+                teamId: selectedTeamId
             });
 
             if (onSuccess) onSuccess();
             onClose();
         } catch (error: any) {
             console.error('Subscription failed:', error);
-            addNotification({
-                type: 'error',
-                title: 'Submission Failed',
-                message: error.message || 'Could not submit access request.'
-            });
+            // Notification handled by mutation side-effect
         } finally {
             setIsSubmitting(false);
         }

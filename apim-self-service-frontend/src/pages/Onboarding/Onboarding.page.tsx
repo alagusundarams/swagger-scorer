@@ -40,14 +40,15 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
         setPageTitle('Onboard Product');
     }, [setPageTitle]);
 
-    // --- Wizard State ---
-    const [step, setStep] = useState(0); // 0 = Intent Modal
-    const [intent, setIntent] = useState<'new' | 'existing'>('new');
+    // --- Wizard State Management ---
+    const [step, setStep] = useState(0); // Internal step index (starts at 0: Intent Modal)
+    const [intent, setIntent] = useState<'new' | 'existing'>('new'); // User intent: Create New vs Update Existing
     const [existingProduct, setExistingProduct] = useState<Product | undefined>(undefined);
 
-    // Fetch configuration (Named Values) for existing product
+    // Fetch configuration (Named Values) for existing product if applicable
     const { data: existingNamedValuesData = [] } = useNamedValuesQuery(existingProduct?.id || '');
 
+    // Form Data State - Aggregates data across all wizard steps
     const [formData, setFormData] = useState({
         name: '',
         version: '',
@@ -68,7 +69,11 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
     const [draftId, setDraftId] = useState<string | null>(null);
     const [showGuide, setShowGuide] = useState(false);
 
-    // --- Draft Logic: Auto-save at each step ---
+    /**
+     * --- Draft Persistence Logic ---
+     * Automatically saves progress to local storage (or backend) every 2 seconds
+     * to prevent data loss on browser refresh.
+     */
     useEffect(() => {
         if (step > 0 && formData.name) {
             const currentDraftId = draftId || formData.name.toLowerCase().replace(/\s+/g, '-');
@@ -83,7 +88,7 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
         }
     }, [step, formData, draftId]);
 
-    // Load Draft on Mount if name exists (simple lookup)
+    // Load Draft on Mount if name exists (simple lookup via URL params)
     useEffect(() => {
         const searchParams = new URLSearchParams(window.location.search);
         const resumeId = searchParams.get('resume');
@@ -98,21 +103,25 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
         }
     }, []);
 
-    // Derived teams for the current user
+    // Derived teams for the current user (filtered from all teams)
     const userTeams = allTeams.filter((t: any) => user?.teams.includes(t.id));
 
-    // Validations
+    // Validations: Check for duplicate product names
     const isNameDuplicate = validateProductName(formData.name);
     const [submissionError, setSubmissionError] = useState<string | null>(null);
 
-    // Dynamic Step Management
+    // Dynamic Step Configuration based on Intent
     const stepsConf = intent === 'new'
         ? ['Prep', 'Intent', 'Identity', 'Spec', 'Policies', 'Review']
         : ['Prep', 'Intent', 'Spec', 'Policies', 'Review'];
 
     /**
-     * Internal vs Visual Navigation Map:
-     * Logic: Shifts internal step indices to zero-indexed visual progress bars.
+     * Helper: Map Internal Step Index to Visual Progress Bar Index
+     * 
+     * RATIONALE:
+     * The internal `step` state tracks the strict logical flow (including modals).
+     * The visual progress bar `getVisualStep()` normalizes this for the user,
+     * merging related steps (e.g., Policy & Resolution) or skipping hidden ones.
      */
     const getVisualStep = () => {
         if (step <= 1) return step; // Prep and Intent
@@ -133,6 +142,12 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
     };
 
     // --- Navigation Handlers ---
+
+    /**
+     * Handler for Intent Selection (New vs Existing)
+     * Sets up the wizard based on whether we are onboarding a fresh product
+     * or modifying an existing one (which prefills data).
+     */
     const handleIntentSelect = (selectedIntent: 'new' | 'existing', product?: Product) => {
         setIntent(selectedIntent);
         if (selectedIntent === 'existing' && product) {
@@ -149,6 +164,10 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
         }
     };
 
+    /**
+     * Advancement Logic
+     * Handles step increments and conditional jumps (e.g., skipping Step 4).
+     */
     const handleNext = () => {
         if (step === 2 && isNameDuplicate) return;
 
@@ -166,6 +185,10 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
         setStep(nextStep);
     };
 
+    /**
+     * Regression Logic
+     * Handles step decrements and conditional jumps (reverse of handleNext).
+     */
     const handleBack = () => {
         let prevStep = step - 1;
 

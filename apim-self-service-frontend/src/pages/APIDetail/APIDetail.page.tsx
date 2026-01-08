@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { SecurityTab, ApiIdentityHeader, OperationCatalog } from '../../features/inventory';
-import { CredentialsTab, useConsumerStore } from '../../features/consumer';
+import { CredentialsTab, useSubscriptionsQuery } from '../../features/consumer';
 
 /**
  * APIDetailPage: Provides a localized view of a specific API Resource.
@@ -25,10 +25,9 @@ export const APIDetailPage = () => {
     const { data: product } = useProductQuery(productId || '');
     const { data: operations } = useOperationsQuery(productId || '', apiId || '');
 
-    // --- Store Integration ---
+    // --- Store Integration (TanStack Query) ---
     const { user } = useAuth();
-    // Replaced useInventoryStore with TanStack Query
-    const { subscriptions, fetchSubscriptions } = useConsumerStore();
+    const { data: allSubscriptions = [] } = useSubscriptionsQuery();
 
     // --- Data Selectors ---
 
@@ -42,10 +41,20 @@ export const APIDetailPage = () => {
 
     // Filtered Subscriptions for this product
     const productSubscriptions = useMemo(() =>
-        subscriptions.filter((s: any) => s.productId === productId),
-        [subscriptions, productId]);
+        allSubscriptions.filter(s => s.productId === productId),
+        [allSubscriptions, productId]);
 
     // --- Permission Logic ---
+    /**
+     * Policy Editing Gate Check:
+     * Determines if the current user has rights to modify policies for this API.
+     * 
+     * Rules:
+     * 1. Admins: Always allowed.
+     * 2. GRP Products: Restricted. Only the API Owner team can edit API policies.
+     *    (Product Owner of GRP cannot edit individual API policies unless they also own the API).
+     * 3. Standard Products: Either Product Owner OR API Owner can edit.
+     */
     const canEditPolicies = useMemo(() => {
         if (!user || !product || !api) return false;
         if (user.role === 'admin') return true;
@@ -66,11 +75,6 @@ export const APIDetailPage = () => {
     // Operations are now fetched automatically via useOperationsQuery hook.
 
     // Fetch subscriptions if missing
-    useEffect(() => {
-        if (subscriptions.length === 0) {
-            fetchSubscriptions();
-        }
-    }, [subscriptions.length, fetchSubscriptions]);
 
     // Handle missing data gracefully
     if (!product || !api) {

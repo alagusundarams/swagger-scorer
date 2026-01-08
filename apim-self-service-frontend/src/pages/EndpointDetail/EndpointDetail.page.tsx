@@ -1,27 +1,37 @@
 import { useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
-import { useInventoryStore, EndpointHeader, RequestDefinitionCard, ResponseStatesCard, EndpointImplementationGuide } from '../../features/inventory';
+import { useProductQuery } from '../../features/inventory/api/inventoryQueries';
+import { EndpointHeader, RequestDefinitionCard, ResponseStatesCard, EndpointImplementationGuide } from '../../features/inventory';
 
 /**
- * EndpointDetailPage: Deep-dive into a specific API Operation.
+ * EndpointDetailPage Controller
  * 
- * CAPABILITIES:
- * - Technical details (Request/Response schemas)
- * - Method-specific visual cues
- * - Sandbox integration (Planned)
- * - store-isolated data hierarchy resolution
+ * ------------------------------------------------------------------
+ * 📍 Purpose:
+ * Route Entry Point for `/products/:productId/apis/:apiId/operations/:operationId`
+ * Provides a deep-dive view into a specific API Operation (Method + Path).
+ * 
+ * 🔄 Data Flow:
+ * 1. URL Params -> IDs
+ * 2. `useProductQuery` -> Fetches hierarchical data.
+ * 3. `useMemo` -> Drills down to find the specific API and Operation object.
+ * 
+ * 🧩 MFE Boundaries:
+ * - Uses `MainLayout`.
+ * - Visualizes technical specs (Request/Response) using Inventory components.
+ * ------------------------------------------------------------------
  */
 
 export const EndpointDetailPage = () => {
     const { productId, apiId, operationId } = useParams<{ productId: string; apiId: string; operationId: string }>();
     const navigate = useNavigate();
 
-    // --- Store Integration ---
-    const { products } = useInventoryStore();
+    // --- Store Integration (TanStack Query) ---
+    const { data: product } = useProductQuery(productId || '');
+    // Note: useProductQuery now returns the full structure including APIs for a specific product
 
     // --- Data Selectors (Hierarchical Resolution) ---
-    const product = useMemo(() => products.find(p => p.id === productId), [products, productId]);
     const api = useMemo(() => product?.apis.find(a => a.id === apiId), [product, apiId]);
     const operation = useMemo(() => api?.operations.find(o => o.id === operationId), [api, operationId]);
 

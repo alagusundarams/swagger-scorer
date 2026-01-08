@@ -335,6 +335,14 @@ async function main() {
         // --- B. ACCESS CONTROL (NAMED VALUES) ---
         console.log(`🌍 Reconciling Named Values...`);
         for (const [env, nvs] of Object.entries(apimMeta.namedValues)) {
+            // Optimization: Filter products for this environment ONCE to avoid O(N*M) lookups
+            const envProducts = inventory.filter((p: any) =>
+                p.environments.map((e: any) => e.toUpperCase()).includes(env.toUpperCase())
+            );
+            const envProductIds = envProducts.map(p => `${p.id}:${env}:Global`);
+
+            console.log(`   [${env}] Processing ${nvs.length} Named Values (Linking to ${envProductIds.length} products each)...`);
+
             for (const nv of nvs) {
                 const val = nv.keyVaultUrl ? nv.keyVaultUrl : (nv.value || '');
                 const type = nv.keyVaultUrl ? 'key_vault' : 'literal';
@@ -356,26 +364,25 @@ async function main() {
                             updated_at = NOW();
                     `, [nvId, null, nv.displayName, nv.name, val, type, nv.isSecret, env, 'Global']);
 
-                    // NEW: Link to products in this environment via junction table
-                    // Strategy: All products in this env get read-write access (can be refined later)
-                    const envProducts = inventory.filter((p: any) =>
-                        p.environments.map((e: any) => e.toUpperCase()).includes(env.toUpperCase())
-                    );
-
-                    for (const prod of envProducts) {
-                        const uniqueProductId = `${prod.id}:${env}:Global`;
+                    // NEW: Bulk Link to products in this environment via unnest
+                    // This replaces the inner loop that caused the 15-minute hang
+                    if (envProductIds.length > 0) {
                         await pool.query(`
                             INSERT INTO product_named_values (product_id, named_value_id, is_owner, can_modify)
-                            VALUES ($1, $2, true, true)
+                            SELECT unnest($1::text[]), $2, true, true
                             ON CONFLICT (product_id, named_value_id) DO NOTHING
-                        `, [uniqueProductId, nvId]);
+                        `, [envProductIds, nvId]);
                     }
+
+                    // Granular logging as explicitly requested: "tell what fails what works one by one"
+                    console.log(`      ✅ Synced Named Value: "${nv.name}"`);
+
                 } catch (err: any) {
                     console.error(`❌ FAILED to sync Named Value: "${nv.name}" (Env: ${env})`);
                     console.error(`   Value: "${val}" (Is Secret: ${nv.isSecret})`);
                     console.error(`   Details: ${err.message}`);
                     if (err.detail) console.error(`   DB Detail: ${err.detail}`);
-                    throw err;
+                    // Continue to next NV so we see what else works/fails
                 }
             }
         }

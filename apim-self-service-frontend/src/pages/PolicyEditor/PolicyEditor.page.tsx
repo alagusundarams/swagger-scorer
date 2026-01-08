@@ -1,20 +1,41 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useInventoryStore, inventoryApi, getUserRoleForProduct } from '../../features/inventory';
+import { useQueryClient } from '@tanstack/react-query';
+import { inventoryApi, getUserRoleForProduct } from '../../features/inventory';
+import { useProductQuery, inventoryKeys } from '../../features/inventory/api/inventoryQueries';
 import { useAuth } from '../../features/auth';
 import { Environment } from '../../core/types/commonTypes';
 import { OnboardingApiPolicyStep } from '../../features/provisioning';
 import { ApiOperation } from '../../utils/swaggerParser';
 import toast from 'react-hot-toast';
 
+/**
+ * Policy Editor Page
+ * 
+ * ------------------------------------------------------------------
+ * 📍 Purpose:
+ * specialized Full-Screen Environment for editing Policy XML.
+ * Bypasses the standard layout to provide maximum screen real estate.
+ * 
+ * 🔒 Security:
+ * - Enforces "Producer" role check (Consumers cannot edit).
+ * - Checks "Terraform Managed" state (ReadOnly mode).
+ * 
+ * 🧩 MFE Boundaries:
+ * - Wraps `OnboardingApiPolicyStep` (reused from Onboarding Wizard)
+ * - Directly interacts with `inventoryApi` for atomic policy updates.
+ * ------------------------------------------------------------------
+ */
 export const PolicyEditorPage = () => {
+    const queryClient = useQueryClient();
     const { productId, apiId } = useParams<{ productId: string; apiId: string }>();
     const navigate = useNavigate();
-    const { products, loadProducts } = useInventoryStore();
+
+    // TanStack Query
+    const { data: product } = useProductQuery(productId || '');
     const { user } = useAuth();
 
     // Data Selectors
-    const product = useMemo(() => products.find((p: any) => p.id === productId), [products, productId]);
     const api = useMemo(() => product?.apis.find((a: any) => a.id === apiId), [product, apiId]);
 
     // Check Governance Mode
@@ -97,7 +118,7 @@ export const PolicyEditorPage = () => {
             toast.success("Product ejected to Self-Service!");
 
             // Reload inventory to reflect new state
-            await loadProducts();
+            await queryClient.invalidateQueries({ queryKey: inventoryKeys.all });
         } catch (error: any) {
             toast.error("Failed to eject product: " + error.message);
         }

@@ -8,6 +8,8 @@ import { getEnvironmentTheme, getStatusTheme } from '../../utils/statusUtils';
  * Global Inventory View
  * 
  * Shows cross-origin products and shared APIs for Admin users.
+ * 
+ * @param embedded - If true, renders without the full page header (for dashboard integration).
  */
 export const GlobalInventory = ({ embedded = false }: { embedded?: boolean }) => {
     const navigate = useNavigate();
@@ -20,11 +22,22 @@ export const GlobalInventory = ({ embedded = false }: { embedded?: boolean }) =>
     const itemsPerPage = 25;
 
     // Derived State: Filtering
+
+    /**
+     * Filter Products based on:
+     * 1. Search Term (Name, ID)
+     * 2. Environment Status
+     */
     const filteredProducts = useMemo(() => {
         if (!inventory) return [];
         return filterGlobalProducts(inventory.products, searchTerm, selectedEnv);
     }, [inventory, searchTerm, selectedEnv]);
 
+    /**
+     * Filter APIs based on:
+     * 1. Search Term (Path, Name)
+     * 2. Environment Availability
+     */
     const filteredApis = useMemo(() => {
         if (!inventory) return [];
         return filterGlobalApis(inventory.apis, searchTerm, selectedEnv);
