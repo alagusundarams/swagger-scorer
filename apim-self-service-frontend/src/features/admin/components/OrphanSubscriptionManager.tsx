@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useAppData } from '../../../shared/context/AppDataContext';
-import { eventBus } from '../../../shared/events/eventBus';
-import { getSubscriptions, adoptSubscription } from '../api/adminClient';
 import { bulkDeleteOrphans } from '../api/adminDeleteClient';
+import { useAdminSubscriptionsQuery, useAdoptSubscriptionMutation } from '../api/adminQueries';
+import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 
 /**
@@ -13,34 +13,14 @@ import toast from 'react-hot-toast';
  * (those without a valid team owner) and assign them to active teams.
  */
 export const OrphanSubscriptionManager = () => {
+    const queryClient = useQueryClient();
     const { teams } = useAppData();
-    const [subscriptions, setSubscriptions] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
 
-    const fetchSubscriptions = async () => {
-        setIsLoading(true);
-        try {
-            const data = await getSubscriptions();
-            setSubscriptions(data);
-        } catch (err) {
-            console.error('Failed to fetch subscriptions', err);
-            toast.error('Failed to load subscriptions');
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    // Query
+    const { data: subscriptions = [], isLoading } = useAdminSubscriptionsQuery();
 
-    useEffect(() => {
-        fetchSubscriptions();
-
-        const unsubscribe = eventBus.on('data:refresh', (payload) => {
-            if (payload.dataType === 'subscriptions' || payload.dataType === 'all') {
-                fetchSubscriptions();
-            }
-        });
-
-        return () => unsubscribe();
-    }, []);
+    // Mutations
+    const adoptMutation = useAdoptSubscriptionMutation();
 
     const [selectedSubIds, setSelectedSubIds] = useState<Set<string>>(new Set());
     const [targetTeamId, setTargetTeamId] = useState<string>('');
@@ -101,15 +81,16 @@ export const OrphanSubscriptionManager = () => {
 
         try {
             await Promise.all(
-                Array.from(selectedSubIds).map(id => adoptSubscription(id, targetTeamId))
+                Array.from(selectedSubIds).map(id => adoptMutation.mutateAsync({
+                    subscriptionId: id,
+                    teamId: targetTeamId
+                }))
             );
             toast.success(`${count} subscriptions adopted successfully`, { id: toastId });
             setSelectedSubIds(new Set());
             setTargetTeamId('');
-            fetchSubscriptions();
         } catch (error) {
             toast.error('Failed to adopt subscriptions', { id: toastId });
-            console.error(error);
         }
     };
 
@@ -146,16 +127,6 @@ export const OrphanSubscriptionManager = () => {
         const toastId = toast.loading(`Deleting ${count} subscriptions...`);
 
         try {
-            // Subscriptions in this view might not have the :env: suffix if they rely on envFilter
-            // But checking the API client, getSubscriptions returns what backend gives.
-            // We'll pass the IDs as is. The backend saga expects "subscription" resource type.
-
-            // Note: The backend saga splits ID by :env: to find environment. 
-            // If these IDs don't have it, we might need to rely on the backend to handle it or the UI to append it?
-            // Existing subscription IDs usually are GUIDs or names. 
-            // In OrphanProductManager, we used the ID directly. 
-            // Let's assume the ID format is compatible or handled by the backend logic.
-
             const result = await bulkDeleteOrphans(
                 'subscription',
                 Array.from(selectedSubIds),
@@ -174,7 +145,8 @@ export const OrphanSubscriptionManager = () => {
 
             setSelectedSubIds(new Set());
             setTargetTeamId('');
-            fetchSubscriptions();
+            // Invalidate
+            queryClient.invalidateQueries({ queryKey: ['admin', 'subscriptions'] });
 
         } catch (error: any) {
             toast.error(`Delete failed: ${error.message || 'Unknown error'}`, { id: toastId });

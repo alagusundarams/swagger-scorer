@@ -1,58 +1,32 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useAppData } from '../../../shared/context/AppDataContext';
-import { eventBus } from '../../../shared/events/eventBus';
-import type { Product } from '../../../shared/types/domain';
-import { updateProduct } from '../api/adminClient';
-import { getProducts, type PaginatedResponse } from '../../../features/inventory/api/inventoryClient';
+
+import { useUpdateProductMutation } from '../api/adminQueries';
+import { usePaginatedProductsQuery, inventoryKeys } from '../../../features/inventory/api/inventoryQueries';
+import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 
 export const OrphanProductManager = () => {
-    /**
-     * MFE-Compliant Data Access:
-     * Using shared AppDataContext for read-only team data.
-     * For product operations, we'll use the admin feature's own API client.
-     */
+    // MFE Access
+    const queryClient = useQueryClient();
     const { teams } = useAppData();
-    const [products, _setProducts] = useState<Product[]>([]);
-    const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
+    const [page, setPage] = useState(1);
+    const limit = 20;
+
+    // Query Hook
+    const { data: queryData, isLoading: isQueryLoading } = usePaginatedProductsQuery(page, limit);
+    const products = queryData?.products || [];
+    const pagination = queryData?.pagination || { page: 1, limit: 20, total: 0, totalPages: 0 };
+
+    // Local loading state for manual actions (like bulk delete)
+    const [isActionLoading, setIsActionLoading] = useState(false);
+    const isLoading = isQueryLoading || isActionLoading;
+
+    // Mutation
+    const updateProductMutation = useUpdateProductMutation();
+
     const [searchQuery, setSearchQuery] = useState('');
     const [envFilter, setEnvFilter] = useState<string>('ALL');
-    const [isLoading, setIsLoading] = useState(false);
-
-    useEffect(() => {
-        // Fetch products with pagination
-        const controller = new AbortController();
-        const fetchOrphans = async () => {
-            setIsLoading(true);
-            try {
-                const response = await getProducts(pagination.page, pagination.limit) as PaginatedResponse<Product>;
-                _setProducts(response.products);
-                if (response.pagination) {
-                    setPagination(response.pagination);
-                }
-            } catch (err: any) {
-                if (err.name !== 'AbortError') {
-                    console.error('Failed to fetch products for orphan check', err);
-                    toast.error('Failed to load products');
-                }
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchOrphans();
-
-        // Listen for refresh events
-        const unsubscribe = eventBus.on('data:refresh', (payload) => {
-            if (payload.dataType === 'products' || payload.dataType === 'all') {
-                fetchOrphans();
-            }
-        });
-
-        return () => {
-            controller.abort();
-            unsubscribe();
-        };
-    }, [pagination.page, pagination.limit]);
     const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
     const [targetTeamId, setTargetTeamId] = useState<string>('');
     const [targetAdGroupId, setTargetAdGroupId] = useState<string>('');
@@ -123,9 +97,12 @@ export const OrphanProductManager = () => {
         const toastId = toast.loading(`Assigning ${selectedProductIds.size} products...`);
         try {
             await Promise.all(
-                Array.from(selectedProductIds).map(id => updateProduct(id, {
-                    ownerTeamId: targetTeamId,
-                    ownerAdGroupId: targetAdGroupId || (targetTeam?.azureAdGroupId) // Default to primary if not selected
+                Array.from(selectedProductIds).map(id => updateProductMutation.mutateAsync({
+                    productId: id,
+                    updates: {
+                        ownerTeamId: targetTeamId,
+                        ownerAdGroupId: targetAdGroupId || (targetTeam?.azureAdGroupId)
+                    }
                 }))
             );
             toast.success('Products assigned successfully', { id: toastId });
@@ -169,7 +146,7 @@ export const OrphanProductManager = () => {
         }
 
         // Call API
-        setIsLoading(true);
+        setIsActionLoading(true);
         try {
             const { bulkDeleteOrphans } = await import('../api/adminDeleteClient');
 
@@ -193,19 +170,19 @@ export const OrphanProductManager = () => {
             }
 
             setSelectedProductIds(new Set());
-            // Trigger refetch by resetting to page 1
-            setPagination(prev => ({ ...prev, page: prev.page })); // Force update
+            // Invalidate query to refresh list
+            queryClient.invalidateQueries({ queryKey: inventoryKeys.products });
 
         } catch (err: any) {
             toast.error(`Delete failed: ${err.response?.data?.error || err.message}`);
             console.error('[Delete] Error:', err);
         } finally {
-            setIsLoading(false);
+            setIsActionLoading(false);
         }
     };
 
     const handlePageChange = (newPage: number) => {
-        setPagination(prev => ({ ...prev, page: newPage }));
+        setPage(newPage);
     };
 
     return (

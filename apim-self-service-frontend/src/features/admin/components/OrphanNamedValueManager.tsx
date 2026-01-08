@@ -1,32 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import {
-    getOrphanNamedValues,
-    adoptNamedValue
-} from '../api/adminClient';
+import { useState } from 'react';
 import { bulkDeleteOrphans } from '../api/adminDeleteClient';
-import { getProducts } from '../../inventory/api/inventoryClient';
+import { useOrphanNamedValuesQuery, useAdoptNamedValueMutation } from '../api/adminQueries';
+import { useProductsQuery } from '../../inventory/api/inventoryQueries';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import './OrphanManager.css'; // Assume shared styles
 
-interface NamedValue {
-    id: string;
-    systemName: string;
-    displayName?: string;
-    environment: string;
-    value: string;
-    productId?: string;
-    scopeId?: string;
-    scope?: 'PRODUCT' | 'API' | 'GLOBAL' | null;
-    updatedAt?: string;
-}
+
 
 export const OrphanNamedValueManager: React.FC = () => {
-    const [orphans, setOrphans] = useState<NamedValue[]>([]);
-    const [products, setProducts] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
     const [env, setEnv] = useState('DEV');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [nameFilter, setNameFilter] = useState('');
+
+    // Queries
+    const { data: orphans = [], isLoading: isOrphansLoading } = useOrphanNamedValuesQuery(env);
+    const { data: products = [] } = useProductsQuery();
+
+    const [isActionLoading, setIsActionLoading] = useState(false);
+    const loading = isOrphansLoading || isActionLoading;
 
     // Adoption State
     const [targetProductId, setTargetProductId] = useState('');
@@ -35,35 +28,9 @@ export const OrphanNamedValueManager: React.FC = () => {
     const [productSearch, setProductSearch] = useState('');
     const [showProductDropdown, setShowProductDropdown] = useState(false);
 
+    const adoptMutation = useAdoptNamedValueMutation();
+
     const environments = ['DEV', 'QA', 'STAGE', 'PROD'];
-
-    useEffect(() => {
-        loadData();
-        loadProducts();
-    }, [env]);
-
-    const loadData = async () => {
-        setLoading(true);
-        try {
-            const data = await getOrphanNamedValues(env);
-            setOrphans(data || []);
-        } catch (err) {
-            toast.error('Failed to load orphaned named values');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const loadProducts = async () => {
-        try {
-            const data = await getProducts();
-            // Handle both paginated and non-paginated responses
-            const productsList = Array.isArray(data) ? data : data.products;
-            setProducts(productsList || []);
-        } catch (err) {
-            console.error('Failed to load products', err);
-        }
-    };
 
     const handleSelect = (id: string) => {
         setSelectedIds(prev =>
@@ -79,18 +46,23 @@ export const OrphanNamedValueManager: React.FC = () => {
         }
 
         setAdopting(true);
+        const toastId = toast.loading(`Reclaiming ${selectedIds.length} named values...`);
         try {
-            for (const id of selectedIds) {
-                await adoptNamedValue(id, env, {
-                    productId: targetScope === 'GLOBAL' ? undefined : targetProductId,
-                    scope: targetScope
-                });
-            }
-            toast.success(`Successfully reclaimed ${selectedIds.length} named values`);
+            await Promise.all(
+                selectedIds.map(id => adoptMutation.mutateAsync({
+                    id,
+                    environment: env,
+                    data: {
+                        productId: targetScope === 'GLOBAL' ? undefined : targetProductId,
+                        scopeId: undefined, // Add scopeId if handled by backend, assumed undefined for now or part of logic
+                        scope: targetScope
+                    }
+                }))
+            );
+            toast.success(`Successfully reclaimed ${selectedIds.length} named values`, { id: toastId });
             setSelectedIds([]);
-            loadData();
         } catch (err) {
-            toast.error('Reclamation failed');
+            toast.error('Reclamation failed', { id: toastId });
         } finally {
             setAdopting(false);
         }
@@ -125,7 +97,7 @@ export const OrphanNamedValueManager: React.FC = () => {
             return;
         }
 
-        setAdopting(true);
+        setIsActionLoading(true);
         const toastId = toast.loading(`Deleting ${selectedIds.length} named values...`);
 
         try {
@@ -146,13 +118,15 @@ export const OrphanNamedValueManager: React.FC = () => {
             }
 
             setSelectedIds([]);
-            loadData();
+            setSelectedIds([]);
+            // Invalidate
+            queryClient.invalidateQueries({ queryKey: ['admin', 'orphans', 'named_values', env] });
 
         } catch (err: any) {
             toast.error(`Delete failed: ${err.message || 'Unknown error'}`, { id: toastId });
             console.error(err);
         } finally {
-            setAdopting(false);
+            setIsActionLoading(false);
         }
     };
 

@@ -2,7 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { useAuth } from '../../features/auth';
-import { useInventoryStore, getUserRoleForProduct, canAccessProduct, ProductDetailProducer, ProductDetailConsumer, RequestAccessModal } from '../../features/inventory';
+import { useProductQuery, useNamedValuesQuery } from '../../features/inventory/api/inventoryQueries';
+import { getUserRoleForProduct, canAccessProduct, ProductDetailProducer, ProductDetailConsumer, RequestAccessModal } from '../../features/inventory';
 import { useConsumerStore } from '../../features/consumer';
 
 /**
@@ -34,15 +35,15 @@ export const ProductDetailPage = () => {
     // --- Store Integration ---
     const { user } = useAuth();
 
+    // Replaced useInventoryStore with TanStack Query
     const {
-        products: allProducts,
-        currentProduct,
-        isLoading: invLoading,
-        error: invError,
-        fetchInventory,
-        fetchProduct,
-        fetchConfiguration
-    } = useInventoryStore();
+        data: product,
+        isLoading: productLoading,
+        error: productError
+    } = useProductQuery(productId || '', environmentParam || undefined);
+
+    // Fetch Named Values (Configuration)
+    useNamedValuesQuery(productId || '');
 
     const {
         subscriptions: allSubscriptions,
@@ -54,8 +55,8 @@ export const ProductDetailPage = () => {
         isLoading: appLoading
     } = useConsumerStore();
 
-    const isLoading = invLoading || subLoading || appLoading;
-    const error = invError || subError;
+    const isLoading = productLoading || subLoading || appLoading;
+    const error = (productError as Error)?.message || subError;
 
     // --- State ---
     const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
@@ -72,31 +73,10 @@ export const ProductDetailPage = () => {
         }
     }, [user, requestTeamId]);
 
-    // Ensure inventory is loaded (critical for direct page loads)
-    useEffect(() => {
-        if (allProducts.length === 0) {
-            fetchInventory();
-        }
-    }, [allProducts.length, fetchInventory]);
-
-    // Fetch Configuration if missing (populates Named Values)
-    useEffect(() => {
-        if (productId) {
-            fetchConfiguration(productId);
-        }
-    }, [productId, fetchConfiguration]);
-
-    // Fetch specific product based on productId and environment
-    useEffect(() => {
-        if (productId) {
-            // If environment param is present, fetch that specific version
-            // Otherwise default to store logic (usually DEV or last viewed)
-            fetchProduct(productId, environmentParam || undefined);
-        }
-    }, [productId, environmentParam, fetchProduct]);
+    // FETCHING EFFECTS REMOVED: Managed by TanStack Query now.
 
     // --- Data Selectors ---
-    const product = currentProduct || allProducts.find(p => p.id === productId);
+    // Product is now derived directly from the query hook above
 
     const subscription = useMemo(() => {
         if (!user || !product) return null;

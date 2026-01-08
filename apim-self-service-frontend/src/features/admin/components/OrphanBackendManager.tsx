@@ -1,64 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import {
-    getOrphanBackends,
-    adoptBackend
-} from '../api/adminClient';
+import { useState } from 'react';
 import { bulkDeleteOrphans } from '../api/adminDeleteClient';
-import { getProducts } from '../../inventory/api/inventoryClient';
+import { useOrphanBackendsQuery, useAdoptBackendMutation } from '../api/adminQueries';
+import { useProductsQuery } from '../../inventory/api/inventoryQueries';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 
-interface Backend {
-    id: string;
-    environment: string;
-    url: string;
-    title?: string;
-    productId?: string;
-    scope?: 'PRODUCT' | 'API' | 'GLOBAL' | null;
-    updatedAt?: string;
-}
+
 
 export const OrphanBackendManager: React.FC = () => {
-    const [orphans, setOrphans] = useState<Backend[]>([]);
-    const [products, setProducts] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
     const [env, setEnv] = useState('DEV');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [searchFilter, setSearchFilter] = useState('');
 
+    // Queries
+    const { data: orphans = [], isLoading: isOrphansLoading } = useOrphanBackendsQuery(env);
+    const { data: products = [] } = useProductsQuery(); // Non-paginated for dropdowns
+
+    // Manual loading state for delete action
+    const [isActionLoading, setIsActionLoading] = useState(false);
+    const loading = isOrphansLoading || isActionLoading;
+
     // Adoption State
     const [targetProductId, setTargetProductId] = useState('');
     const [targetScope, setTargetScope] = useState<'PRODUCT' | 'API' | 'GLOBAL'>('PRODUCT');
-    const [adopting, setAdopting] = useState(false);
+    const [adopting, setAdopting] = useState(false); // Can be replaced by mutation.isPending
+
+    const adoptMutation = useAdoptBackendMutation();
 
     const environments = ['DEV', 'QA', 'STAGE', 'PROD'];
-
-    useEffect(() => {
-        loadData();
-        loadProducts();
-    }, [env]);
-
-    const loadData = async () => {
-        setLoading(true);
-        try {
-            const data = await getOrphanBackends(env);
-            setOrphans(data || []);
-        } catch (err) {
-            toast.error('Failed to load orphaned backends');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const loadProducts = async () => {
-        try {
-            const data = await getProducts();
-            // Handle both paginated and non-paginated responses
-            const productsList = Array.isArray(data) ? data : data.products;
-            setProducts(productsList || []);
-        } catch (err) {
-            console.error('Failed to load products', err);
-        }
-    };
 
     const handleSelect = (id: string) => {
         setSelectedIds(prev =>
@@ -74,18 +44,22 @@ export const OrphanBackendManager: React.FC = () => {
         }
 
         setAdopting(true);
+        const toastId = toast.loading(`Reclaiming ${selectedIds.length} backends...`);
         try {
-            for (const id of selectedIds) {
-                await adoptBackend(id, env, {
-                    productId: targetScope === 'GLOBAL' ? undefined : targetProductId,
-                    scope: targetScope
-                });
-            }
-            toast.success(`Successfully reclaimed ${selectedIds.length} backends`);
+            await Promise.all(
+                selectedIds.map(id => adoptMutation.mutateAsync({
+                    id,
+                    environment: env,
+                    data: {
+                        productId: targetScope === 'GLOBAL' ? undefined : targetProductId,
+                        scope: targetScope
+                    }
+                }))
+            );
+            toast.success(`Successfully reclaimed ${selectedIds.length} backends`, { id: toastId });
             setSelectedIds([]);
-            loadData();
         } catch (err) {
-            toast.error('Reclamation failed');
+            toast.error('Reclamation failed', { id: toastId });
         } finally {
             setAdopting(false);
         }
@@ -120,7 +94,7 @@ export const OrphanBackendManager: React.FC = () => {
             return;
         }
 
-        setAdopting(true);
+        setIsActionLoading(true);
         const toastId = toast.loading(`Deleting ${selectedIds.length} backends...`);
 
         try {
@@ -141,13 +115,14 @@ export const OrphanBackendManager: React.FC = () => {
             }
 
             setSelectedIds([]);
-            loadData();
+            // Invalidate
+            queryClient.invalidateQueries({ queryKey: ['admin', 'orphans', 'backends', env] });
 
         } catch (err: any) {
             toast.error(`Delete failed: ${err.message || 'Unknown error'}`, { id: toastId });
             console.error(err);
         } finally {
-            setAdopting(false);
+            setIsActionLoading(false);
         }
     };
 

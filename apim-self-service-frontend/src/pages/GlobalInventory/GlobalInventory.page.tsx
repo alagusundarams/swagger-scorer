@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../../api/baseClient';
+import { useGlobalInventoryQuery } from '../../features/inventory/api/inventoryQueries';
 import { filterGlobalProducts, filterGlobalApis } from '../../utils/filterUtils';
 import { getEnvironmentTheme, getStatusTheme } from '../../utils/statusUtils';
 
@@ -11,28 +11,13 @@ import { getEnvironmentTheme, getStatusTheme } from '../../utils/statusUtils';
  */
 export const GlobalInventory = ({ embedded = false }: { embedded?: boolean }) => {
     const navigate = useNavigate();
-    const [inventory, setInventory] = useState<{ products: any[], apis: any[] } | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const { data: inventory, isLoading } = useGlobalInventoryQuery();
 
     // Filter & Pagination State
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedEnv, setSelectedEnv] = useState('ALL');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 25;
-
-    useEffect(() => {
-        const fetchInventory = async () => {
-            try {
-                const res = await api.get('/admin/global-inventory');
-                setInventory(res.data);
-            } catch (err) {
-                console.error('Failed to fetch global inventory:', err);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchInventory();
-    }, []);
 
     // Derived State: Filtering
     const filteredProducts = useMemo(() => {

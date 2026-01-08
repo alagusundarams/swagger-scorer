@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
-import { inventoryApi } from '../../../features/inventory/api/inventoryClient';
-import { getOrphanAppRegistrations, adoptAppRegistration } from '../api/adminClient';
+import { useState, useMemo } from 'react';
+import { useOrphanAppRegistrationsQuery, useAdoptAppRegistrationMutation } from '../api/adminQueries';
+import { usePaginatedProductsQuery } from '../../../features/inventory/api/inventoryQueries';
 import type { Product } from '../../../shared/types/domain';
 import toast from 'react-hot-toast';
 
@@ -12,9 +12,7 @@ import toast from 'react-hot-toast';
  * but not linked to any Product or API in our database) and map them.
  */
 export const OrphanAppRegistrationManager = () => {
-    const [products, setProducts] = useState<Product[]>([]);
-    const [orphans, setOrphans] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    // Queries handle loading state now
     const [envFilter, setEnvFilter] = useState<string>('DEV');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -22,30 +20,14 @@ export const OrphanAppRegistrationManager = () => {
     const [targetApiId, setTargetApiId] = useState<string>('');
     const [linkType, setLinkType] = useState<'PRODUCT' | 'API'>('PRODUCT');
 
-    const fetchData = async () => {
-        setIsLoading(true);
-        try {
-            const [orphanData, productData] = await Promise.all([
-                getOrphanAppRegistrations(envFilter),
-                inventoryApi.getProducts(1, 1000) // Fetch large batch for selection
-            ]);
-            setOrphans(orphanData);
-            if ('products' in productData) {
-                setProducts(productData.products);
-            } else {
-                setProducts(productData as any);
-            }
-        } catch (err) {
-            console.error('Failed to fetch data', err);
-            toast.error('Failed to load orphans or products');
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    const { data: orphans = [], isLoading: orphansLoading } = useOrphanAppRegistrationsQuery(envFilter);
+    // Fetch products for dropdown (large batch)
+    const { data: productData, isLoading: productsLoading } = usePaginatedProductsQuery(1, 1000);
+    const products = productData?.products || [];
+    const isLoading = orphansLoading || productsLoading;
 
-    useEffect(() => {
-        fetchData();
-    }, [envFilter]);
+    // Mutation
+    const adoptMutation = useAdoptAppRegistrationMutation();
 
 
     const filteredOrphans = useMemo(() => {
@@ -69,19 +51,23 @@ export const OrphanAppRegistrationManager = () => {
         }
 
         const toastId = toast.loading('Adopting App Registration...');
-        try {
-            await adoptAppRegistration(selectedId, {
+        adoptMutation.mutate({
+            id: selectedId,
+            data: {
                 productId: linkType === 'PRODUCT' ? targetProductId : undefined,
                 apiId: linkType === 'API' ? targetApiId : undefined
-            });
-            toast.success('App Registration adopted!', { id: toastId });
-            setSelectedId(null);
-            setTargetProductId('');
-            setTargetApiId('');
-            fetchData();
-        } catch (err) {
-            toast.error('Adoption failed', { id: toastId });
-        }
+            }
+        }, {
+            onSuccess: () => {
+                toast.success('App Registration adopted!', { id: toastId });
+                setSelectedId(null);
+                setTargetProductId('');
+                setTargetApiId('');
+            },
+            onError: () => {
+                toast.error('Adoption failed', { id: toastId });
+            }
+        });
     };
 
     const targetProduct = products.find((p: Product) => p.id === targetProductId);

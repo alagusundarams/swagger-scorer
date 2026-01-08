@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
-import { SecurityTab, ApiIdentityHeader, OperationCatalog, useInventoryStore } from '../../features/inventory';
+import { SecurityTab, ApiIdentityHeader, OperationCatalog } from '../../features/inventory';
 import { CredentialsTab, useConsumerStore } from '../../features/consumer';
 
 /**
@@ -14,20 +14,31 @@ import { CredentialsTab, useConsumerStore } from '../../features/consumer';
  */
 
 import { useAuth } from '../../features/auth';
+import { useProductQuery, useOperationsQuery } from '../../features/inventory/api/inventoryQueries';
 
 export const APIDetailPage = () => {
     const { productId, apiId } = useParams<{ productId: string; apiId: string }>();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'overview' | 'security' | 'credentials'>('overview');
 
+    // --- Data Fetching ---
+    const { data: product } = useProductQuery(productId || '');
+    const { data: operations } = useOperationsQuery(productId || '', apiId || '');
+
     // --- Store Integration ---
     const { user } = useAuth();
-    const { products, fetchOperations } = useInventoryStore();
+    // Replaced useInventoryStore with TanStack Query
     const { subscriptions, fetchSubscriptions } = useConsumerStore();
 
     // --- Data Selectors ---
-    const product = useMemo(() => products.find(p => p.id === productId), [products, productId]);
-    const api = useMemo(() => product?.apis.find(a => a.id === apiId), [product, apiId]);
+
+    // Derive API and attach operations if loaded
+    const api = useMemo(() => {
+        const foundApi = product?.apis.find(a => a.id === apiId);
+        if (!foundApi) return null;
+        if (operations) return { ...foundApi, operations };
+        return foundApi;
+    }, [product, apiId, operations]);
 
     // Filtered Subscriptions for this product
     const productSubscriptions = useMemo(() =>
@@ -51,12 +62,8 @@ export const APIDetailPage = () => {
         return !!(isProductOwner || isApiOwner);
     }, [user, product, api]);
 
-    // Fetch operations if missing
-    useEffect(() => {
-        if (productId && apiId && api && !api.operations) {
-            fetchOperations(productId, apiId);
-        }
-    }, [productId, apiId, api?.operations, fetchOperations]);
+    // --- Effects ---
+    // Operations are now fetched automatically via useOperationsQuery hook.
 
     // Fetch subscriptions if missing
     useEffect(() => {

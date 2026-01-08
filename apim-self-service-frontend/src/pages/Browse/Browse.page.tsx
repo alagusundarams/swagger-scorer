@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { useStore } from '../../store/useStore';
 import { useAuth } from '../../features/auth';
-import { useInventoryStore } from '../../features/inventory';
+import { useProductsQuery } from '../../features/inventory/api/inventoryQueries';
 import { useConsumerStore } from '../../features/consumer';
 import { useTeamsStore } from '../../features/teams';
 import { DiscoveryHero, DiscoveryProductCard, SubscriptionConfirmModal } from '../../features/discovery';
@@ -39,15 +39,14 @@ export const BrowsePage = () => {
     }, [setPageTitle]);
 
     // --- Store Integration ---
-    const { products: allProducts, fetchInventory } = useInventoryStore();
+    const { data: allProducts = [] } = useProductsQuery();
     const { subscriptions: allSubscriptions, fetchSubscriptions, requestAccess } = useConsumerStore();
     const { teams: allTeams, fetchTeams } = useTeamsStore();
 
     useEffect(() => {
-        fetchInventory();
         fetchSubscriptions();
         fetchTeams();
-    }, [fetchInventory, fetchSubscriptions, fetchTeams]);
+    }, [fetchSubscriptions, fetchTeams]);
 
     // --- UI State ---
     const [selectedTeamId, setSelectedTeamId] = useState<string>(user?.teams[0] || '');

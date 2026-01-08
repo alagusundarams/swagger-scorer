@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAppData } from '../../../shared/context/AppDataContext';
 import type { Team } from '../../../shared/types/domain';
-import { updateTeam } from '../api/adminClient';
+import { useUpdateTeamMutation } from '../api/adminQueries';
 import { Input } from '../../../core/ui/Input';
 import toast from 'react-hot-toast';
 
@@ -13,6 +13,8 @@ export const TeamManager = () => {
     const { teams } = useAppData();
     const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState<Partial<Team>>({});
+
+    const updateTeamMutation = useUpdateTeamMutation();
 
     // Filter teams if needed, or show all
     // Admins see all teams.
@@ -31,12 +33,11 @@ export const TeamManager = () => {
         if (!editingTeamId) return;
 
         try {
-            await updateTeam(editingTeamId, editForm);
+            await updateTeamMutation.mutateAsync({ teamId: editingTeamId, updates: editForm });
             toast.success('Team updated successfully');
             setEditingTeamId(null);
         } catch (error) {
             toast.error('Failed to update team');
-            console.error(error);
         }
     };
 

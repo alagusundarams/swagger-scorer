@@ -18,14 +18,11 @@
  * - Controls the "Section-Specific" (Inbound/Outbound) editing context.
  * ------------------------------------------------------------------
  */
-import { useState, useEffect } from 'react';
 import {
-    getPolicyDisplay,
-    getPolicyTemplatesBySection,
-    generatePolicyXml,
-    type PolicyDisplayStructure,
-    type PolicyTemplate
-} from '../api/policyClient';
+    usePolicyDisplayQuery,
+    usePolicyTemplatesQuery,
+    useGeneratePolicyMutation
+} from '../api/policyQueries';
 
 /**
  * Hook to fetch and manage policy display structure
@@ -34,36 +31,13 @@ import {
  * @returns Display structure, loading state, and error
  */
 export function usePolicyDisplay(productId: string) {
-    const [displayStructure, setDisplayStructure] = useState<PolicyDisplayStructure | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const { data, isLoading, error } = usePolicyDisplayQuery(productId);
 
-    useEffect(() => {
-        let mounted = true;
-
-        getPolicyDisplay(productId)
-            .then((response) => {
-                if (mounted && response.data.success) {
-                    setDisplayStructure(response.data.displayStructure);
-                }
-            })
-            .catch((err: Error) => {
-                if (mounted) {
-                    setError(err.message || 'Failed to load policy');
-                }
-            })
-            .finally(() => {
-                if (mounted) {
-                    setLoading(false);
-                }
-            });
-
-        return () => {
-            mounted = false;
-        };
-    }, [productId]);
-
-    return { displayStructure, loading, error };
+    return {
+        displayStructure: data || null,
+        loading: isLoading,
+        error: error ? (error as Error).message : null
+    };
 }
 
 /**
@@ -73,36 +47,13 @@ export function usePolicyDisplay(productId: string) {
  * @returns Templates array, loading state, and error
  */
 export function usePolicyTemplates(section: string) {
-    const [templates, setTemplates] = useState<PolicyTemplate[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const { data, isLoading, error } = usePolicyTemplatesQuery(section);
 
-    useEffect(() => {
-        let mounted = true;
-
-        getPolicyTemplatesBySection(section)
-            .then((response) => {
-                if (mounted && response.data.success) {
-                    setTemplates(response.data.templates);
-                }
-            })
-            .catch((err: Error) => {
-                if (mounted) {
-                    setError(err.message || 'Failed to load templates');
-                }
-            })
-            .finally(() => {
-                if (mounted) {
-                    setLoading(false);
-                }
-            });
-
-        return () => {
-            mounted = false;
-        };
-    }, [section]);
-
-    return { templates, loading, error };
+    return {
+        templates: data || [],
+        loading: isLoading,
+        error: error ? (error as Error).message : null
+    };
 }
 
 /**
@@ -111,27 +62,20 @@ export function usePolicyTemplates(section: string) {
  * @returns Generate function, loading state, and error
  */
 export function useGeneratePolicyXml() {
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const mutation = useGeneratePolicyMutation();
 
     const generate = async (templateId: string, values: Record<string, unknown>): Promise<string | null> => {
-        setLoading(true);
-        setError(null);
-
         try {
-            const response = await generatePolicyXml(templateId, values);
-            if (response.data.success) {
-                return response.data.xml;
-            }
+            const result = await mutation.mutateAsync({ templateId, values });
+            return result;
+        } catch (e) {
             return null;
-        } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Failed to generate XML';
-            setError(errorMessage);
-            return null;
-        } finally {
-            setLoading(false);
         }
     };
 
-    return { generate, loading, error };
+    return {
+        generate,
+        loading: mutation.isPending,
+        error: mutation.error ? (mutation.error as Error).message : null
+    };
 }

@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { useStore } from '../../store/useStore';
-import { useInventoryStore } from '../../features/inventory';
+import { useProductsQuery } from '../../features/inventory/api/inventoryQueries';
 
 /**
  * MarketplacePage Controller
@@ -26,7 +26,7 @@ import { useInventoryStore } from '../../features/inventory';
 export const MarketplacePage = () => {
     const navigate = useNavigate();
     const { user, setPageTitle } = useStore();
-    const { products } = useInventoryStore();
+    const { data: products = [] } = useProductsQuery();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedType, setSelectedType] = useState<string>('ALL');
     const [selectedEnv, setSelectedEnv] = useState<string>('ALL');
