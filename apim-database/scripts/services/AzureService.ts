@@ -404,18 +404,36 @@ export class AzureService {
         const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
 
         // 1. Find the Environment ID for the given name (Surgical Step 1)
-        const envUrl = `${urlBase}/_apis/distributedtask/environments?name=${environmentName}&api-version=7.1-preview.1`;
+        // Attempt exact/API-native match first
+        let envId: number | null = null;
+        let envUrl = `${urlBase}/_apis/distributedtask/environments?name=${encodeURIComponent(environmentName)}&api-version=7.1-preview.1`;
 
         try {
-            const envResp = await fetch(envUrl, { headers: { 'Authorization': authHeader } });
-            if (!envResp.ok) {
-                console.warn(`      ⚠️ [ADO] Env lookup failed for ${environmentName} (${envResp.status})`);
+            let envResp = await fetch(envUrl, { headers: { 'Authorization': authHeader } });
+            let envData = await envResp.json() as { count: number; value: any[] };
+
+            if (envResp.ok && envData.count > 0) {
+                envId = envData.value[0].id;
+            } else {
+                // FALLBACK: Fetch all and match case-insensitive
+                console.warn(`      ⚠️ [ADO] Exact env lookup failed for '${environmentName}'. Trying case-insensitive scan...`);
+                envUrl = `${urlBase}/_apis/distributedtask/environments?api-version=7.1-preview.1`;
+                envResp = await fetch(envUrl, { headers: { 'Authorization': authHeader } });
+
+                if (envResp.ok) {
+                    envData = await envResp.json() as { count: number; value: any[] };
+                    const targetLower = environmentName.toLowerCase().trim();
+                    const match = envData.value.find((e: any) => e.name.toLowerCase().trim() === targetLower);
+                    if (match) {
+                        envId = match.id;
+                        console.log(`      ✅ [ADO] Found case-insensitive match: '${match.name}' (ID: ${envId}) for '${environmentName}'`);
+                    }
+                }
+            }
+
+            if (!envId) {
                 return null;
             }
-            const envData = await envResp.json() as { count: number; value: any[] };
-            if (envData.count === 0) return null;
-
-            const envId = envData.value[0].id;
 
             // 2. Query Deployments for this specific definition and environment (Surgical Step 2)
             const deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/deployments?definitionId=${definitionId}&latestState=succeeded&$top=1&api-version=7.1-preview.1`;

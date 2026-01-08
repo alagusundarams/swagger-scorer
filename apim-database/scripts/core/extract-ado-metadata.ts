@@ -261,7 +261,7 @@ async function main() {
                                 const record = timeline.find((t: any) => {
                                     const type = (t.type || '').toLowerCase();
                                     const isContainer = ['stage', 'job', 'phase'].includes(type);
-                                    const nameMatches = t.name?.toLowerCase().includes(envName.toLowerCase());
+                                    const nameMatches = t.name?.toLowerCase().includes(envName.toLowerCase().trim());
                                     const isSuccess = t.result === 'succeeded' || t.result === 'partiallySucceeded';
                                     return isContainer && nameMatches && isSuccess;
                                 });
