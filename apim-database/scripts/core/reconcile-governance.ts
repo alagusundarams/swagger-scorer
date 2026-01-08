@@ -211,6 +211,8 @@ async function main() {
 
             // --- A.2 APIS RECONCILIATION ---
             for (const envName of prod.environments) {
+                const upperEnv = envName.toUpperCase();
+                const targetProductId = `${prod.name}:${upperEnv}:Global`;
                 const apiDetails = apimMeta.productApiLinks[envName]?.[prod.id] || [];
                 if (verbose && apiDetails.length > 0) {
                     console.log(`      🔌 [${envName}] APIs: ${apiDetails.length} linked to product`);
@@ -230,7 +232,7 @@ async function main() {
                                     display_name = EXCLUDED.display_name,
                                     path = EXCLUDED.path,
                                     updated_at = NOW();
-                            `, [uniqueApiId, prod.id, apiName, apiName, apiPath]);
+                            `, [uniqueApiId, targetProductId, apiName, apiName, apiPath]);
 
                         // Link to Backends
                         const forensics = apimMeta.apiForensics[envName]?.[apiName];
