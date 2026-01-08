@@ -195,30 +195,23 @@ async function runDebug() {
     let pipelines: any[] = [];
 
     const runDiscovery = async () => {
-        console.log(`   ⏳ Fetching all pipeline types (YAML, Classic, Release)...`);
+        console.log(`   ⏳ Fetching all pipeline types (YAML, Classic, Release) for Repo and Project...`);
 
-        const [yamlPipes, buildDefs, releaseDefs] = await Promise.all([
+        const [yamlPipes, buildDefs, releaseDefs, projPipes, projBuilds] = await Promise.all([
             AzureService.fetchADOPipelines(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl),
             AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl),
-            AzureService.fetchADOReleaseDefinitions(devops.organization, projectIdentifier, devops.pat, devops.baseUrl)
+            AzureService.fetchADOReleaseDefinitions(devops.organization, projectIdentifier, devops.pat, devops.baseUrl),
+            AzureService.fetchADOPipelines(devops.organization, projectIdentifier, '', devops.pat, devops.baseUrl),
+            AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, '', devops.pat, devops.baseUrl)
         ]);
 
         let combined = [
             ...yamlPipes.map(p => ({ ...p, type: 'YAML' })),
             ...buildDefs.map(p => ({ ...p, type: 'Classic Build' })),
-            ...releaseDefs.map(r => ({ ...r, type: 'Classic Release', isRelease: true }))
+            ...releaseDefs.map(r => ({ ...r, type: 'Classic Release', isRelease: true })),
+            ...projPipes.map(p => ({ ...p, type: 'YAML (Proj)' })),
+            ...projBuilds.map(p => ({ ...p, type: 'Classic Build (Proj)' }))
         ];
-
-        // Widest Net Fallback: If repo-specific didn't find much, fetch ALL in project
-        if (combined.length < 5) {
-            console.log(`   🔍 Not many repo-specific pipelines. Fetching project-wide definitions as fallback...`);
-            const [projPipes, projBuilds] = await Promise.all([
-                AzureService.fetchADOPipelines(devops.organization, projectIdentifier, '', devops.pat, devops.baseUrl),
-                AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, '', devops.pat, devops.baseUrl)
-            ]);
-            combined.push(...projPipes.map(p => ({ ...p, type: 'YAML (Proj)' })));
-            combined.push(...projBuilds.map(p => ({ ...p, type: 'Classic Build (Proj)' })));
-        }
 
         // De-duplicate by ID (Pipelines and Build Definitions often share IDs or overlap)
         const seen = new Set();
