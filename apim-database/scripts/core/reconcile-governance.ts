@@ -189,7 +189,8 @@ async function main() {
                     : null;
 
                 // Iterate through environments for this product (Tall Model)
-                const envs = prod.environments || ['DEV'];
+                // Robust fallback: If array is empty or null, default to ['DEV']
+                const envs = (prod.environments && prod.environments.length > 0) ? prod.environments : ['DEV'];
 
                 for (const env of envs) {
                     const upperEnv = env.toUpperCase();
