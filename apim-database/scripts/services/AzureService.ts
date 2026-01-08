@@ -87,13 +87,18 @@ export interface CodeSearchResponse {
 }
 
 export class AzureService {
-    static async getAzureAccessToken(resource: string = 'https://management.azure.com'): Promise<string> {
+    static async getAzureAccessToken(resourceOrOptions: string | { resource?: string; silent?: boolean } = 'https://management.azure.com'): Promise<string> {
+        const options = typeof resourceOrOptions === 'string'
+            ? { resource: resourceOrOptions, silent: false }
+            : { resource: 'https://management.azure.com', silent: false, ...resourceOrOptions };
+
         try {
             // On Windows, inherit full environment to ensure 'az' is in PATH
-            const token = execSync(`az account get-access-token --resource ${resource} --query accessToken -o tsv`, {
+            const token = execSync(`az account get-access-token --resource ${options.resource} --query accessToken -o tsv`, {
                 encoding: 'utf-8',
                 env: { ...process.env },
-                shell: process.platform === 'win32' ? 'cmd.exe' : undefined
+                shell: process.platform === 'win32' ? 'cmd.exe' : undefined,
+                stdio: ['ignore', 'pipe', 'pipe'] // Capture stderr to avoid leaking to console
             }).trim();
 
             if (!token || token.length < 10) {
@@ -102,7 +107,9 @@ export class AzureService {
             return token;
         } catch (error: any) {
             const errorMsg = error.stderr?.toString() || error.stdout?.toString() || error.message || 'Unknown error';
-            console.error(`❌ [Auth] Failed to get Azure access token: ${errorMsg}`);
+            if (!options.silent) {
+                console.error(`❌ [Auth] Failed to get Azure access token: ${errorMsg}`);
+            }
             throw new Error(`Failed to get Azure access token. ${errorMsg}. Ensure 'az login' was successful.`);
         }
     }

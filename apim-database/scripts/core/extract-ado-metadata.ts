@@ -63,7 +63,7 @@ async function main() {
     let cliToken: string | undefined = undefined;
     try {
         if (verbose) console.log("   🔑 Attempting to fetch Azure CLI token for fallback auth...");
-        cliToken = await AzureService.getAzureAccessToken("499b84ee-1328-4417-95a1-8288018c668b"); // Visual Studio ID
+        cliToken = await AzureService.getAzureAccessToken({ resource: "499b84ee-1328-4417-95a1-8288018c668b", silent: true }); // Visual Studio ID
         if (cliToken && verbose) console.log("   ✅ CLI Token acquired.");
     } catch (e) {
         // Ignore, fallback to PAT only
