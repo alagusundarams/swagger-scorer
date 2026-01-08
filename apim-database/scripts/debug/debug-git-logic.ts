@@ -157,24 +157,27 @@ async function runDebug() {
         return;
     }
 
+    // --- MANDATORY METADATA RECOVERY ---
+    // Search results often have incomplete or stale project metadata (project ID).
+    // We always call the direct repository API to get the authoritative project name and ID.
+    let project = "Unknown";
+    let projectIdent = "Unknown";
     const primaryRepoName = finalRepo.name;
     const primaryRepoId = finalRepo.id;
-    const primaryRepoUrl = finalRepo.webUrl || finalRepo.url || finalRepo._links?.web?.href;
-    let project = finalRepo.project?.name || "Unknown";
-    let projectIdent = finalRepo.project?.id || project;
 
-    // Recover missing project info if the search result was generic
-    if (project === "Unknown" || project.toLowerCase() === 'devops') {
-        try {
-            console.log(`   🔎 Recovering full metadata for Repo: ${primaryRepoName}...`);
-            const details = await AzureService.fetchRepoById(devops.organization, primaryRepoId || primaryRepoName, devops.pat, devops.baseUrl);
-            project = details.project.name;
-            projectIdent = details.project.id;
-            (finalRepo as any).webUrl = details.webUrl;
-            console.log(`   ✅ Metadata Recovered: Project=${project}`);
-        } catch (e: any) {
-            console.warn(`   ⚠️  Failed to recover project name: ${e.message}`);
-        }
+    try {
+        console.log(`\n🔎 Authorizing Repository Metadata: ${primaryRepoName}...`);
+        const details = await AzureService.fetchRepoById(devops.organization, primaryRepoId || primaryRepoName, devops.pat, devops.baseUrl);
+        project = details.project.name;
+        projectIdent = details.project.id;
+        (finalRepo as any).webUrl = details.webUrl;
+        console.log(`   ✅ Authorized: Project="${project}"`);
+        console.log(`   📇 Project ID: ${projectIdent}`);
+    } catch (e: any) {
+        console.warn(`   ⚠️  Failed to recover project metadata: ${e.message}`);
+        // Fallback to what we have if recovery fails
+        project = finalRepo.project?.name || project;
+        projectIdent = finalRepo.project?.id || project;
     }
 
     const projectIdentifier = projectIdent || project;
