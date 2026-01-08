@@ -109,11 +109,7 @@ async function main() {
         apimMeta = JSON.parse(readFileSync(apimMetaPath, 'utf8'));
     }
 
-    // Filter by environment if flag is provided
-    if (targetEnv) {
-        inventory = inventory.filter((p: any) => p.environments.map((e: any) => e.toUpperCase()).includes(targetEnv));
-        console.log(`📊 Filtered to ${inventory.length} products associated with ${targetEnv}.`);
-    }
+    // 2. DB Connection
 
     const adoMap = new Map<string, ADOMetadata>(adoList.map(m => [m.productId, m]));
 
@@ -204,6 +200,12 @@ async function main() {
 
                 for (const env of envs) {
                     const upperEnv = env.toUpperCase();
+
+                    // strict filtering: if targetEnv is set, skip non-matching envs
+                    if (targetEnv && upperEnv !== targetEnv) {
+                        continue;
+                    }
+
                     const deployment = (ado.deployments as any)[upperEnv] || {};
                     const targetId = `${prod.id}:${upperEnv}:Global`;
 
