@@ -398,9 +398,15 @@ export class AzureService {
         baseUrl: string = 'https://dev.azure.com',
         bearerToken?: string
     ): Promise<any | null> {
-        const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
+        let cleanBaseUrl = baseUrl.replace(/\/+$/, '');
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
         const isLegacy = cleanBaseUrl.includes('visualstudio.com');
+
+        // Robust URL Construction: Handle if baseUrl already has org
+        if (!isLegacy && cleanBaseUrl.toLowerCase().endsWith(`/${org.toLowerCase()}`)) {
+            cleanBaseUrl = cleanBaseUrl.substring(0, cleanBaseUrl.length - (org.length + 1));
+        }
+
         const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
 
         // 1. Find the Environment ID for the given name (Surgical Step 1)

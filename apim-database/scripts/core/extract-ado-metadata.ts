@@ -230,8 +230,8 @@ async function main() {
                         // Update the meta object directly
                         meta.deployments[envName] = deployments[envName];
                     }
-                } catch (err) {
-                    // Ignore surgical failures, fallback covers it
+                } catch (err: any) {
+                    console.warn(`      ⚠️ [Surgical Fail] ${envName}: ${err.message}`);
                 }
             }));
 
