@@ -166,14 +166,25 @@ export class AzureService {
         const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
         const url = `${orgUrl}/_apis/connectionData?api-version=7.1-preview.1`;
 
-        console.log(`📡 [ADO] Verifying Connection: ${url}`);
-        const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-        if (!response.ok) {
-            const txt = await response.text();
-            console.error(`❌ [ADO] Auth Failed (${response.status}):`, txt.substring(0, 200));
-            throw new Error(`ADO Authentication failed (${response.status}): ${txt.substring(0, 100)}`);
+        console.log(`📡 [ADO Request] GET ${url}`);
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': authHeader,
+                    'X-TFS-FedAuthRedirect': 'Suppress'
+                }
+            });
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            if (!response.ok) {
+                const txt = await response.text();
+                console.error(`❌ [ADO] Auth Failed (${response.status}):`, txt.substring(0, 200));
+                throw new Error(`ADO Authentication failed (${response.status}): ${txt.substring(0, 100)}`);
+            }
+            return await response.json();
+        } catch (err: any) {
+            console.error(`❌ [ADO] Connection failed: ${err.message}`);
+            throw err; // Re-throw the error as the original method did
         }
-        return await response.json();
     }
 
     /**
@@ -194,12 +205,14 @@ export class AzureService {
         let nextLink: string | null = `${baseUrl}${path}?api-version=2022-08-01`;
 
         while (nextLink) {
+            console.log(`📡 [APIM Request] GET ${nextLink}`);
             const response = await fetch(nextLink, {
                 headers: {
                     'Authorization': `Bearer ${config.accessToken}`,
                     'Content-Type': 'application/json'
                 }
             });
+            console.log(`📡 [APIM Response] ${response.status} ${response.statusText}`);
 
             if (!response.ok) {
                 const error = await response.text();
@@ -220,12 +233,15 @@ export class AzureService {
     static async fetchTagsForProduct(config: APIMConfig, productId: string): Promise<Record<string, string>> {
         try {
             // productId is the full resource ID. We need to append /tags
-            const response = await fetch(`https://management.azure.com${productId}/tags?api-version=2022-08-01`, {
+            const url = `https://management.azure.com${productId}/tags?api-version=2022-08-01`;
+            console.log(`📡 [APIM Request] GET ${url}`);
+            const response = await fetch(url, {
                 headers: {
                     'Authorization': `Bearer ${config.accessToken}`,
                     'Content-Type': 'application/json'
                 }
             });
+            console.log(`📡 [APIM Response] ${response.status} ${response.statusText}`);
 
             if (response.ok) {
                 const data = await response.json() as { value: Array<{ name: string, properties: { displayName: string } }> };
@@ -255,9 +271,10 @@ export class AzureService {
         const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
         const url = `${orgUrl}/_apis/projects?api-version=7.1-preview.4`;
 
-        console.log(`📡 [ADO] Fetching Projects: ${url}`);
+        console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { value: ADOProject[] };
                 return data.value;
@@ -279,8 +296,9 @@ export class AzureService {
         const url = `${orgUrl}/_apis/git/repositories/${repoId}?api-version=7.1-preview.1`;
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
 
-        console.log(`📡 [ADO] Fetching Repo Details: ${url}`);
+        console.log(`📡 [ADO Request] GET ${url}`);
         const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+        console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
         if (!response.ok) {
             const txt = await response.text();
             throw new Error(`Failed to fetch repo ${repoId} (${response.status}): ${txt.substring(0, 100)}`);
@@ -302,7 +320,9 @@ export class AzureService {
         const projectResults = await Promise.all(projects.map(async (project) => {
             try {
                 const url = `${orgUrl}/${encodeURIComponent(project.name)}/_apis/git/repositories?api-version=7.1-preview.1`;
+                console.log(`📡 [ADO Request] GET ${url}`);
                 const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+                console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
 
                 if (response.ok) {
                     const data = await response.json() as { value: ADORepo[] };
@@ -327,9 +347,10 @@ export class AzureService {
         let url = `${urlBase}/_apis/pipelines?api-version=7.1-preview.1`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=azureRepo`;
 
-        console.log(`      🌐 [Request] ${url}`);
+        console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             const text = await response.text();
 
             if (response.ok) {
@@ -358,9 +379,10 @@ export class AzureService {
         let url = `${urlBase}/_apis/build/definitions?api-version=7.1-preview.1`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
 
-        console.log(`      🌐 [Request] ${url}`);
+        console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             const text = await response.text();
 
             if (response.ok) {
@@ -390,9 +412,10 @@ export class AzureService {
         let url = `${urlBase}/_apis/build/builds?api-version=7.1-preview.1&$top=10`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
 
-        console.log(`      🌐 [Request] ${url}`);
+        console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { value: any[] };
                 return data.value || [];
@@ -423,8 +446,10 @@ export class AzureService {
 
         const url = `${urlBase}/_apis/build/builds?api-version=7.1-preview.1&definitions=${definitionId}&resultFilter=succeeded&$top=${top}&$skip=${skip}`;
 
+        console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { value: any[] };
                 return data.value || [];
@@ -449,19 +474,23 @@ export class AzureService {
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
 
         // 1. Find the Environment ID for the given name (Surgical Step 1)
-        // Attempt exact/API-native match first
         let envId: number | null = null;
         let envUrl = `${urlBase}/_apis/distributedtask/environments?name=${encodeURIComponent(environmentName)}&api-version=7.1-preview.1`;
 
-        console.log(`      🌐 [Surgical DEBUG] Fetching: ${envUrl}`);
-        console.log(`      🔑 [Surgical DEBUG] Auth: ${bearerToken ? 'Bearer (CLI)' : 'Basic (PAT)'} | Project: ${project}`);
+        console.log(`📡 [ADO Request] GET ${envUrl}`);
 
         try {
-            let envResp = await fetch(envUrl, { headers: { 'Authorization': authHeader } });
+            let envResp = await fetch(envUrl, {
+                headers: {
+                    'Authorization': authHeader,
+                    'X-TFS-FedAuthRedirect': 'Suppress'
+                }
+            });
+            console.log(`📡 [ADO Response] ${envResp.status} ${envResp.statusText}`);
 
             // Safety check for 401/404 empty bodies
             if (!envResp.ok && (envResp.status === 401 || envResp.status === 403)) {
-                console.warn(`      ⚠️ [ADO] Auth failed (${envResp.status}) for ${environmentName}. Surgical skipped.`);
+                console.warn(`      ⚠️ [ADO] Auth failed (${envResp.status}) for ${environmentName}. Surgical lookup skipped.`);
                 return null;
             }
 
@@ -476,9 +505,11 @@ export class AzureService {
                 envId = envData.value[0].id;
             } else {
                 // FALLBACK: Fetch all and match case-insensitive
-                console.warn(`      ⚠️ [ADO] Exact env lookup failed for '${environmentName}'. Trying case-insensitive scan...`);
+                console.warn(`      ⚠️ [ADO] Exact env lookup failed. Trying case-insensitive scan...`);
                 envUrl = `${urlBase}/_apis/distributedtask/environments?api-version=7.1-preview.1`;
+                console.log(`📡 [ADO Request] GET ${envUrl} (Fallback)`);
                 envResp = await fetch(envUrl, { headers: { 'Authorization': authHeader } });
+                console.log(`📡 [ADO Response] ${envResp.status} ${envResp.statusText}`);
 
                 if (envResp.ok) {
                     envData = await envResp.json() as { count: number; value: any[] };
@@ -486,24 +517,25 @@ export class AzureService {
                     const match = envData.value.find((e: any) => e.name.toLowerCase().trim() === targetLower);
                     if (match) {
                         envId = match.id;
-                        console.log(`      ✅ [ADO] Found case-insensitive match: '${match.name}' (ID: ${envId}) for '${environmentName}'`);
+                        console.log(`      ✅ Found match: '${match.name}' (ID: ${envId})`);
                     }
                 }
             }
 
-            if (!envId) {
-                return null;
-            }
+            if (!envId) return null;
 
             // 2. Query Deployments for this specific definition and environment (Surgical Step 2)
             const deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/deployments?definitionId=${definitionId}&latestState=succeeded&$top=1&api-version=7.1-preview.1`;
+            console.log(`📡 [ADO Request] GET ${deployUrl}`);
             const deployResp = await fetch(deployUrl, { headers: { 'Authorization': authHeader } });
+            console.log(`📡 [ADO Response] ${deployResp.status} ${deployResp.statusText}`);
+
             if (!deployResp.ok) return null;
             const deployData = await deployResp.json() as { count: number; value: any[] };
 
             return deployData.count > 0 ? deployData.value[0] : null;
         } catch (err: any) {
-            console.warn(`      ⚠️ [ADO] Surgical environment lookup failed for ${environmentName}: ${err.message}`);
+            console.warn(`      ⚠️ [ADO] Surgical environment lookup failed: ${err.message}`);
         }
         return null;
     }
@@ -592,8 +624,10 @@ export class AzureService {
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
         const url = `${urlBase}/_apis/pipelines/${pipelineId}/runs?api-version=7.1-preview.1`;
 
+        console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { value: PipelineRun[] };
                 return data.value;
