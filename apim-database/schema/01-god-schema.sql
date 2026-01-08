@@ -151,6 +151,11 @@ CREATE TABLE IF NOT EXISTS apis (
     git_repo_url TEXT,
     git_file_path TEXT,
 
+    -- Linked identity (App Registration)
+    identity_client_id TEXT,
+    identity_display_name TEXT,
+    identity_app_id_uri TEXT,
+
     -- APIM source data
     apim_raw_data JSONB
 );
