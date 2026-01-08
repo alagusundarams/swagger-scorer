@@ -592,8 +592,8 @@ export class AzureService {
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
 
-        // Remove strict filter to see if we get ANY results
-        let url = `${urlBase}/_apis/build/builds?api-version=7.1-preview.1&$top=50&queryOrder=finishTimeDescending`;
+        // Use the rawest possible URL to match user's successful browser tests
+        let url = `${urlBase}/_apis/build/builds?api-version=7.1-preview.1&$top=50`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
 
         console.log(`📡 [ADO Request] GET ${url}`);

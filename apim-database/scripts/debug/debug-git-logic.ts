@@ -335,12 +335,20 @@ async function runDebug() {
             console.log(`   📡 [Scan] Page ${Math.floor(skip / pageSize) + 1}: Found ${builds.length} builds for Definition ${matchedPipeline.id}`);
 
             if (builds.length === 0 && skip === 0) {
-                console.log(`   ⚠️  No builds found for this definition. Trying a broader search across the repo...`);
-                const allRepoBuilds = await AzureService.fetchADOBuilds(devops.organization, projectIdentifier, (matchedPipeline as any).repositoryId || primaryRepoId, devops.pat, devops.baseUrl);
-                console.log(`   📡 [Scan] Broad search found ${allRepoBuilds.length} builds total for this repository.`);
-                if (allRepoBuilds.length > 0) {
-                    // Inject these for scanning
-                    builds.push(...allRepoBuilds.slice(0, 20));
+                console.log(`   ⚠️  No builds found for this definition. Trying a broader search...`);
+
+                // 1. Try Repo-specific (Standard Fallback)
+                let broadBuilds = await AzureService.fetchADOBuilds(devops.organization, projectIdentifier, (matchedPipeline as any).repositoryId || primaryRepoId, devops.pat, devops.baseUrl);
+
+                // 2. Try Project-wide (Widest Net Fallback)
+                if (broadBuilds.length === 0) {
+                    console.log(`   � Repo search empty. Trying Project-wide search (Widest Net)...`);
+                    broadBuilds = await AzureService.fetchADOBuilds(devops.organization, projectIdentifier, '', devops.pat, devops.baseUrl);
+                }
+
+                if (broadBuilds.length > 0) {
+                    console.log(`   📡 [Scan] Broad search found ${broadBuilds.length} builds total.`);
+                    builds.push(...broadBuilds.slice(0, 20));
                 }
             }
 
