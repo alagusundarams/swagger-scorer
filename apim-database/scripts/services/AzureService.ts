@@ -223,13 +223,13 @@ export class AzureService {
     /**
      * Fetch Repository by ID (Global Org Scope)
      */
-    static async fetchRepoById(org: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADORepo> {
+    static async fetchRepoById(org: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<ADORepo> {
         const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
         const isLegacy = cleanBaseUrl.includes('visualstudio.com');
         const url = isLegacy
             ? `${cleanBaseUrl}/_apis/git/repositories/${repoId}?api-version=7.1-preview.1`
             : `${cleanBaseUrl}/${org}/_apis/git/repositories/${repoId}?api-version=7.1-preview.1`;
-        const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
 
         const response = await fetch(url, { headers: { 'Authorization': authHeader } });
         if (!response.ok) throw new Error(`Failed to fetch repo ${repoId}: ${response.statusText}`);
