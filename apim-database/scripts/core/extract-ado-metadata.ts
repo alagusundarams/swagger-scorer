@@ -304,9 +304,29 @@ async function main() {
         : join(process.cwd(), 'apim-database', 'scripts', 'data');
     if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true });
 
+    // --- GENERATE MISSING REPORT ---
+    const missingStats = {
+        repoMissing: results.filter(r => r.status === 'REPO_MISSING').map(r => r.productName),
+        pipelineMissing: results.filter(r => r.status === 'PIPELINE_MISSING').map(r => r.productName),
+        noDeployments: results.filter(r => r.status === 'MATCHED' && Object.keys(r.deployments).length === 0).map(r => r.productName),
+        stats: {
+            totalProcessed: results.length,
+            matchedAndSynced: results.filter(r => r.status === 'MATCHED' && Object.keys(r.deployments).length > 0).length
+        }
+    };
+
+    const reportPath = join(dataDir, 'ado-missing-report.json');
+    writeFileSync(reportPath, JSON.stringify(missingStats, null, 2));
+
     const outputPath = join(dataDir, 'ado-metadata.json');
     writeFileSync(outputPath, JSON.stringify(results, null, 2));
+
     console.log(`\n✅ ADO Metadata Extraction Complete! Saved to: ${outputPath}`);
+    console.log(`\n📋 Missing Report Generated:`);
+    if (missingStats.repoMissing.length > 0) console.log(`   ❌ Repo Missing: ${missingStats.repoMissing.length}`);
+    if (missingStats.pipelineMissing.length > 0) console.log(`   ❌ Pipeline Missing: ${missingStats.pipelineMissing.length}`);
+    if (missingStats.noDeployments.length > 0) console.log(`   ❌ No Deployments Found: ${missingStats.noDeployments.length}`);
+    console.log(`   📄 Saved to: ${reportPath}`);
 }
 
 main().catch(err => {
