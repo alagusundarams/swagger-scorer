@@ -85,24 +85,8 @@ async function main() {
     }
 
     if (existsSync(inventoryPath)) {
-        // Patch inventory: Ensure environments array exists
-        // If missing, assume product exists in ALL configured environments (Smart Default)
-        const content = readFileSync(inventoryPath, 'utf8');
-        inventory = JSON.parse(content);
-        const allEnvNames = config.azure?.environments?.map((e: any) => e.name) || ['DEV'];
-
-        console.log(`\n🔍 [DIAGNOSTIC] Configured Environments (from config.json): ${JSON.stringify(allEnvNames)}`);
-
-        inventory.forEach((p: any) => {
-            if (!p.environments || p.environments.length === 0) {
-                p.environments = allEnvNames;
-            }
-        });
-
-        console.log(`🔍 [DIAGNOSTIC] Inventory Loaded: ${inventory.length} items.`);
-        if (inventory.length > 0) {
-            console.log(`🔍 [DIAGNOSTIC] First Product Sample Env: ${JSON.stringify(inventory[0].environments)}`);
-        }
+        inventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
+        console.log(`\n� Loaded ${inventory.length} products from inventory.`);
     }
 
     let adoList: ADOMetadata[] = [];
@@ -115,8 +99,6 @@ async function main() {
     if (existsSync(apimMetaPath)) {
         apimMeta = JSON.parse(readFileSync(apimMetaPath, 'utf8'));
     }
-
-    // 2. DB Connection
 
     const adoMap = new Map<string, ADOMetadata>(adoList.map(m => [m.productId, m]));
 
@@ -154,26 +136,15 @@ async function main() {
         await pool.query('BEGIN');
         console.log('🔒 Transaction started...\n');
 
-        // --- INPUT VALIDATION ---
-        console.log(`🔍 Validating ${inventory.length} products...`);
-        const validInventory = inventory.filter(p => {
-            if (!p.name) {
-                console.warn(`⚠️  Skipping product with missing name: ${JSON.stringify(p)}`);
-                return false;
-            }
-            // Relaxed validation: If environments missing, we'll default to ['DEV'] in the loop
-            if (!p.environments || p.environments.length === 0) {
-                // warning but allow
-                // console.warn(`⚠️  Product "${p.name}" has no environments (will default to DEV)`);
-            }
-            return true;
-        });
-
-        console.log(`✅ Validated ${validInventory.length}/${inventory.length} products to be reconciled.\n`);
-
         // --- A. PRODUCTS RECONCILIATION ---
-        console.log(`📋 Reconciling ${validInventory.length} products...`);
-        for (const prod of validInventory) {
+        console.log(`� Reconciling ${inventory.length} products...`);
+        for (const prod of inventory) {
+            // Safety Check: Name is required
+            if (!prod.name) {
+                console.warn(`⚠️  Skipping product with missing name: ${JSON.stringify(prod)}`);
+                continue;
+            }
+
             const ado = adoMap.get(prod.id) || {
                 productId: prod.id,
                 productName: prod.name,
@@ -208,10 +179,8 @@ async function main() {
                 for (const env of envs) {
                     const upperEnv = env.toUpperCase();
 
-                    // strict filtering: if targetEnv is set, skip non-matching envs
-                    if (targetEnv && upperEnv !== targetEnv) {
-                        continue;
-                    }
+                    // NOTE: Removed strict targetEnv filtering inside loop to ensure data integrity across regions.
+                    // If you strictly need filtering, rely on the upstream extraction process.
 
                     const deployment = (ado.deployments as any)[upperEnv] || {};
                     const targetId = `${prod.id}:${upperEnv}:Global`;
@@ -335,9 +304,9 @@ async function main() {
         for (const [env, nvs] of Object.entries(apimMeta.namedValues)) {
             const upperEnv = env.toUpperCase();
             // FIXED: Map to environment-specific product IDs
-            const envProductIds = validInventory
+            const envProductIds = inventory
                 .filter((p: any) => p.environments.map((e: any) => e.toUpperCase()).includes(upperEnv))
-                .map(p => `${p.id}:${upperEnv}:Global`);
+                .map((p: any) => `${p.id}:${upperEnv}:Global`);
 
             console.log(`   [${env}] Processing ${nvs.length} Named Values...`);
 
@@ -522,13 +491,13 @@ async function main() {
                 // FIXED: Convert logical productId to environment-specific
                 // Robust lookup: Case-insensitive match & trim
                 const subProdIdSafe = (sub.productId || '').trim().toLowerCase();
-                const prod = validInventory.find(p => p.id.trim().toLowerCase() === subProdIdSafe);
+                const prod = inventory.find((p: any) => p.id.trim().toLowerCase() === subProdIdSafe);
 
                 if (!prod) {
                     console.warn(`⚠️  Skipping subscription "${sub.displayName}" - product ${sub.productId} not found in inventory.`);
                     // Debug: list first 5 inventory IDs to verify format
                     if (apimMeta.subscriptions[env].indexOf(sub) === 0) {
-                        console.warn(`      (Debug) Available Inventory IDs: ${validInventory.slice(0, 5).map(p => p.id).join(', ')}`);
+                        console.warn(`      (Debug) Available Inventory IDs: ${inventory.slice(0, 5).map((p: any) => p.id).join(', ')}`);
                     }
                     continue;
                 }
