@@ -400,14 +400,18 @@ export class AzureService {
     ): Promise<any | null> {
         let cleanBaseUrl = baseUrl.replace(/\/+$/, '');
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
-        const isLegacy = cleanBaseUrl.includes('visualstudio.com');
+        // Case-insensitive check for legacy domain
+        const isLegacy = cleanBaseUrl.toLowerCase().includes('visualstudio.com');
 
-        // Robust URL Construction: Handle if baseUrl already has org
+        // Handle if baseUrl already has org (e.g. https://dev.azure.com/Org) to prevent double-org
         if (!isLegacy && cleanBaseUrl.toLowerCase().endsWith(`/${org.toLowerCase()}`)) {
             cleanBaseUrl = cleanBaseUrl.substring(0, cleanBaseUrl.length - (org.length + 1));
         }
 
-        const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
+        // Apply encoding to project/org segments
+        const urlBase = isLegacy
+            ? `${cleanBaseUrl}/${encodeURIComponent(project)}`
+            : `${cleanBaseUrl}/${encodeURIComponent(org)}/${encodeURIComponent(project)}`;
 
         // 1. Find the Environment ID for the given name (Surgical Step 1)
         // Attempt exact/API-native match first
