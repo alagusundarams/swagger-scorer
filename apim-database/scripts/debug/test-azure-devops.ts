@@ -20,6 +20,9 @@
  * AZURE_DEVOPS_ORG=https://org.visualstudio.com AZURE_DEVOPS_PAT=your-pat npx tsx scripts/test-azure-devops.ts
  */
 
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
+
 interface AzureDevOpsConfig {
     organization: string;
     pat: string;
@@ -176,11 +179,26 @@ async function testAzureDevOpsAPI(config: AzureDevOpsConfig) {
     }
 }
 
+function loadConfig() {
+    const rootConfig = join(process.cwd(), 'apim-database', 'config.json');
+    const localConfig = join(process.cwd(), 'config.json');
+    const relativeConfig = join(process.cwd(), 'scripts', 'config.json');
+
+    if (existsSync(localConfig)) return JSON.parse(readFileSync(localConfig, 'utf8'));
+    if (existsSync(rootConfig)) return JSON.parse(readFileSync(rootConfig, 'utf8'));
+    if (existsSync(relativeConfig)) return JSON.parse(readFileSync(relativeConfig, 'utf8'));
+
+    return null;
+}
+
 // Main execution
-const orgInput = process.env.AZURE_DEVOPS_ORG || '';
+const fileConfig = loadConfig();
+const devops = fileConfig?.devops || {};
+
+const orgInput = process.env.AZURE_DEVOPS_ORG || devops.organization || devops.baseUrl || '';
 const config: AzureDevOpsConfig = {
     organization: extractOrgName(orgInput),
-    pat: process.env.AZURE_DEVOPS_PAT || '',
+    pat: process.env.AZURE_DEVOPS_PAT || devops.pat || '',
     apiVersion: '7.0'
 };
 
