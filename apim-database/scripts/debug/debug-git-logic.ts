@@ -235,6 +235,7 @@ async function runDebug() {
     const timelineCache = new Map<number, any[]>();
 
     console.log(`   ⏳ Attempting surgical strikes (Environments API)...`);
+    console.log(`   📂 Project Context: ${projectIdentifier}`);
 
     for (const envName of envsToSync) {
         // High Speed Try: Use the Environments API directly (no scanning)
