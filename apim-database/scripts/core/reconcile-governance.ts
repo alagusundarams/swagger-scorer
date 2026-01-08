@@ -86,6 +86,12 @@ async function main() {
 
     if (existsSync(inventoryPath)) {
         inventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
+        // Patch inventory: Ensure environments array exists
+        inventory.forEach((p: any) => {
+            if (!p.environments || p.environments.length === 0) {
+                p.environments = ['DEV'];
+            }
+        });
     }
 
     let adoList: ADOMetadata[] = [];
