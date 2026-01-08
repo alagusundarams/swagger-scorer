@@ -191,18 +191,28 @@ async function runDebug() {
     let pipelines: any[] = [];
 
     const runDiscovery = async () => {
-        let results = await AzureService.fetchADOPipelines(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl);
-        if (results.length === 0) {
-            console.log(`   ⏳ No YAML pipelines found. Trying Build Definitions...`);
-            results = await AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl);
-        }
-        if (results.length === 0) {
-            console.log(`   ⏳ No build definitions found. Trying Classic Releases...`);
-            results = await AzureService.fetchADOReleaseDefinitions(devops.organization, projectIdentifier, devops.pat, devops.baseUrl);
-            // Mark these as releases for special handling later
-            results = results.map(r => ({ ...r, isRelease: true }));
-        }
-        return results;
+        console.log(`   ⏳ Fetching all pipeline types (YAML, Classic, Release)...`);
+
+        const [yamlPipes, buildDefs, releaseDefs] = await Promise.all([
+            AzureService.fetchADOPipelines(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl),
+            AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl),
+            AzureService.fetchADOReleaseDefinitions(devops.organization, projectIdentifier, devops.pat, devops.baseUrl)
+        ]);
+
+        const combined = [
+            ...yamlPipes.map(p => ({ ...p, type: 'YAML' })),
+            ...buildDefs.map(p => ({ ...p, type: 'Classic Build' })),
+            ...releaseDefs.map(r => ({ ...r, type: 'Classic Release', isRelease: true }))
+        ];
+
+        // De-duplicate by ID (Pipelines and Build Definitions often share IDs or overlap)
+        const seen = new Set();
+        return combined.filter(p => {
+            const key = `${p.type}-${p.id}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
     };
 
     pipelines = await runDiscovery();
@@ -219,21 +229,39 @@ async function runDebug() {
     const pipelineCandidates = pipelines.map(p => {
         const pName = p.name;
         const cleanPipe = sanitize(pName);
+        const folder = sanitize(p.folder || '');
         let score = 0;
 
+        // Exact match bonus
+        if (cleanPipe === cleanProduct) score += 100;
+
+        // Product name match
         if (cleanPipe.includes(cleanProduct)) score += 50;
+
+        // Folder match bonus
+        if (folder.includes(cleanProduct)) score += 20;
+
+        // Common deployment keywords
         if (cleanPipe.includes('deploy') || cleanPipe.includes('iac')) score += 10;
         if (cleanPipe.includes('apim')) score += 5;
 
-        return { pipe: p, score, name: pName };
+        // Penalty for generic names or non-product names
+        if (cleanPipe === 'main' || cleanPipe === 'ci') score -= 20;
+
+        return { pipe: p, score, name: pName, id: p.id, type: (p as any).type };
     }).sort((a, b) => b.score - a.score);
+
+    console.log(`   🔎 Found ${pipelineCandidates.length} candidates. Top Picks:`);
+    pipelineCandidates.slice(0, 5).forEach((c, i) => {
+        console.log(`      ${i + 1}. [${c.type}] ${c.name} (ID: ${c.id}) - Score: ${c.score}`);
+    });
 
     const matchedPipeline = pipelineCandidates[0].pipe;
     if (pipelineCandidates[0].score < 10) {
         console.log(`   ⚠️  LOW CONFIDENCE MATCH: ${matchedPipeline.name}.`);
     } else {
-        const typeStr = (matchedPipeline as any).isRelease ? 'Classic Release' : 'Build/YAML';
-        console.log(`   ✅ Best Match (${typeStr}): ${matchedPipeline.name} (ID: ${matchedPipeline.id})`);
+        const typeStr = (matchedPipeline as any).type || 'Pipeline';
+        console.log(`   ✅ Best Match: ${matchedPipeline.name} (ID: ${matchedPipeline.id}, Type: ${typeStr})`);
         console.log(`      🔗 URL: ${matchedPipeline._links?.web?.href || 'N/A'}`);
     }
 
