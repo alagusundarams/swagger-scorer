@@ -380,6 +380,12 @@ async function runDebug() {
                         return isContainer && nameMatches && isSuccess && isComplete;
                     });
 
+                    if (!record && timeline.length > 0 && run === builds[0]) {
+                        // Diagnostic sampling: If the FIRST scanned build has no match, show what it DOES have
+                        console.log(`      ⚠️  [Scan] No match for '${envName}' in Build ${run.id}. Sample of records:`);
+                        timeline.slice(0, 10).forEach(t => console.log(`         - [${t.type}] ${t.name} (Result=${t.result}, Status=${t.status})`));
+                    }
+
                     if (record) {
                         const commitHash = (run as any).sourceVersion || 'unknown';
                         deployments[envName] = {

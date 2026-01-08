@@ -634,8 +634,8 @@ export class AzureService {
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
 
-        // Remove strict filter to see if we get ANY results
-        const url = `${urlBase}/_apis/build/builds?api-version=7.1-preview.1&definitions=${definitionId}&$top=${top}&$skip=${skip}&queryOrder=finishTimeDescending`;
+        // Synchronize versions and ensure no strict result filter (the caller filters locally)
+        const url = `${urlBase}/_apis/build/builds?api-version=7.1-preview.1&definitions=${definitionId}&$top=${top}&$skip=${skip}`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
@@ -672,7 +672,7 @@ export class AzureService {
 
         // 1. Find the Environment ID for the given name (Surgical Step 1)
         let envId: number | null = null;
-        let envUrl = `${urlBase}/_apis/distributedtask/environments?name=${encodeURIComponent(environmentName)}&api-version=7.0-preview.1`;
+        let envUrl = `${urlBase}/_apis/distributedtask/environments?name=${encodeURIComponent(environmentName)}&api-version=7.1-preview.1`;
 
         console.log(`📡 [ADO Request] GET ${envUrl}`);
 
@@ -705,7 +705,7 @@ export class AzureService {
             } else {
                 // FALLBACK: Fetch all and match case-insensitive
                 console.warn(`      ⚠️ [ADO] Exact env lookup failed. Trying case-insensitive scan...`);
-                envUrl = `${urlBase}/_apis/distributedtask/environments?api-version=7.0-preview.1`;
+                envUrl = `${urlBase}/_apis/distributedtask/environments?api-version=7.1-preview.1`;
                 console.log(`📡 [ADO Request] GET ${envUrl} (Fallback)`);
                 envResp = await fetch(envUrl, {
                     headers: {
@@ -730,7 +730,7 @@ export class AzureService {
             if (!envId) return null;
 
             // 2. Query Deployments for this specific definition and environment (Surgical Step 2)
-            const deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/deployments?definitionId=${definitionId}&latestState=succeeded&$top=1&api-version=7.0-preview.1`;
+            const deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/deployments?definitionId=${definitionId}&latestState=succeeded&$top=1&api-version=7.1-preview.1`;
             console.log(`📡 [ADO Request] GET ${deployUrl}`);
             const deployResp = await fetch(deployUrl, {
                 headers: {
@@ -855,7 +855,7 @@ export class AzureService {
      */
     static async fetchPipelineRunTimeline(org: string, project: string, runId: number, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<TimelineRecord[]> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
-        const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
         // Standard ADO builds/timeline endpoint
         const url = `${urlBase}/_apis/build/builds/${runId}/timeline?api-version=7.1-preview.2`;
