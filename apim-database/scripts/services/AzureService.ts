@@ -410,7 +410,19 @@ export class AzureService {
 
         try {
             let envResp = await fetch(envUrl, { headers: { 'Authorization': authHeader } });
-            let envData = await envResp.json() as { count: number; value: any[] };
+
+            // Safety check for 401/404 empty bodies
+            if (!envResp.ok && (envResp.status === 401 || envResp.status === 403)) {
+                console.warn(`      ⚠️ [ADO] Auth failed (${envResp.status}) for ${environmentName}. Surgical skipped.`);
+                return null;
+            }
+
+            let envData: { count: number; value: any[] } = { count: 0, value: [] };
+            if (envResp.ok) {
+                try {
+                    envData = await envResp.json() as { count: number; value: any[] };
+                } catch (e) { /* ignore non-json */ }
+            }
 
             if (envResp.ok && envData.count > 0) {
                 envId = envData.value[0].id;
