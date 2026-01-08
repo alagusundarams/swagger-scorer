@@ -86,6 +86,36 @@ export interface CodeSearchResponse {
     }[];
 }
 
+export interface ADOReleaseDefinition {
+    id: number;
+    name: string;
+    path: string;
+    url: string;
+    _links: { web: { href: string } };
+}
+
+export interface ADORelease {
+    id: number;
+    name: string;
+    status: string;
+    createdOn: string;
+    modifiedOn: string;
+    environments: {
+        id: number;
+        name: string;
+        status: string;
+        deploySteps: {
+            queuedOn: string;
+            status: string;
+        }[];
+    }[];
+    artifacts: {
+        definitionReference: {
+            version: { id: string; name: string };
+        };
+    }[];
+}
+
 export class AzureService {
     static async getAzureAccessToken(resource: string = 'https://management.azure.com'): Promise<string> {
         try {
@@ -349,7 +379,13 @@ export class AzureService {
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
-            const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': authHeader,
+                    'Accept': 'application/json',
+                    'X-TFS-FedAuthRedirect': 'Suppress'
+                }
+            });
             console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             const text = await response.text();
 
@@ -362,10 +398,85 @@ export class AzureService {
                 }
             } else {
                 console.warn(`      ⚠️  HTTP ${response.status}: ${text.substring(0, 100)}...`);
+                if (response.status === 401) {
+                    throw new Error("401 Unauthorized - Check PAT Scopes (Build/Pipeline Read)");
+                }
+            }
+        } catch (err: any) {
+            console.error(`      ❌ Network Error:`, err.message);
+            if (err.message.includes("401")) throw err;
+        }
+        return [];
+    }
+
+    /**
+     * Fetch Release Definitions (Classic Pipelines)
+     */
+    static async fetchADOReleaseDefinitions(org: string, project: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADOPipeline[]> {
+        const orgUrl = this.getAdoInstanceUrl(baseUrl, org);
+        const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+
+        // Classic Release API is in vsrm.dev.azure.com
+        const vsrmUrl = orgUrl.includes('visualstudio.com')
+            ? orgUrl.replace('.visualstudio.com', '.vsrm.visualstudio.com')
+            : orgUrl.replace('dev.azure.com', 'vsrm.dev.azure.com');
+
+        const url = `${vsrmUrl}/${org}/${encodeURIComponent(project)}/_apis/release/definitions?api-version=7.1-preview.1&$top=100`;
+
+        console.log(`📡 [ADO Request] GET ${url}`);
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': authHeader,
+                    'Accept': 'application/json',
+                    'X-TFS-FedAuthRedirect': 'Suppress'
+                }
+            });
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            if (response.ok) {
+                const data = await response.json() as { value: any[] };
+                return data.value.map(r => ({
+                    id: r.id,
+                    name: r.name,
+                    folder: r.path || '',
+                    url: r.url,
+                    _links: r._links
+                }));
             }
         } catch (err) {
-            console.error(`      ❌ Network Error:`, err);
+            console.error(`❌ [ADO] Failed to fetch release definitions:`, err);
         }
+        return [];
+    }
+
+    /**
+     * Fetch Latest Releases for a definition
+     */
+    static async fetchADOReleases(org: string, project: string, definitionId: number, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADORelease[]> {
+        const orgUrl = this.getAdoInstanceUrl(baseUrl, org);
+        const authHeader = `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+
+        const vsrmUrl = orgUrl.includes('visualstudio.com')
+            ? orgUrl.replace('.visualstudio.com', '.vsrm.visualstudio.com')
+            : orgUrl.replace('dev.azure.com', 'vsrm.dev.azure.com');
+
+        const url = `${vsrmUrl}/${org}/${encodeURIComponent(project)}/_apis/release/releases?definitionId=${definitionId}&api-version=7.1-preview.1&$top=20`;
+
+        console.log(`📡 [ADO Request] GET ${url}`);
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': authHeader,
+                    'Accept': 'application/json',
+                    'X-TFS-FedAuthRedirect': 'Suppress'
+                }
+            });
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            if (response.ok) {
+                const data = await response.json() as { value: ADORelease[] };
+                return data.value || [];
+            }
+        } catch (err) { }
         return [];
     }
 
@@ -409,12 +520,19 @@ export class AzureService {
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
 
-        let url = `${urlBase}/_apis/build/builds?api-version=7.1-preview.1&$top=10`;
+        // Broaden search to include partially succeeded builds
+        let url = `${urlBase}/_apis/build/builds?api-version=7.1-preview.1&$top=20&resultFilter=succeeded,partiallySucceeded`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
-            const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': authHeader,
+                    'Accept': 'application/json',
+                    'X-TFS-FedAuthRedirect': 'Suppress'
+                }
+            });
             console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { value: any[] };
@@ -444,11 +562,18 @@ export class AzureService {
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
 
-        const url = `${urlBase}/_apis/build/builds?api-version=7.1-preview.1&definitions=${definitionId}&resultFilter=succeeded&$top=${top}&$skip=${skip}`;
+        // resultFilter=succeeded,partiallySucceeded
+        const url = `${urlBase}/_apis/build/builds?api-version=7.1-preview.1&definitions=${definitionId}&resultFilter=succeeded,partiallySucceeded&$top=${top}&$skip=${skip}`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
-            const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': authHeader,
+                    'Accept': 'application/json',
+                    'X-TFS-FedAuthRedirect': 'Suppress'
+                }
+            });
             console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { value: any[] };

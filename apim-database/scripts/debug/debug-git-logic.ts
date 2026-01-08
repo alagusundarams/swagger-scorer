@@ -193,7 +193,14 @@ async function runDebug() {
     const runDiscovery = async () => {
         let results = await AzureService.fetchADOPipelines(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl);
         if (results.length === 0) {
+            console.log(`   ⏳ No YAML pipelines found. Trying Build Definitions...`);
             results = await AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl);
+        }
+        if (results.length === 0) {
+            console.log(`   ⏳ No build definitions found. Trying Classic Releases...`);
+            results = await AzureService.fetchADOReleaseDefinitions(devops.organization, projectIdentifier, devops.pat, devops.baseUrl);
+            // Mark these as releases for special handling later
+            results = results.map(r => ({ ...r, isRelease: true }));
         }
         return results;
     };
@@ -225,7 +232,9 @@ async function runDebug() {
     if (pipelineCandidates[0].score < 10) {
         console.log(`   ⚠️  LOW CONFIDENCE MATCH: ${matchedPipeline.name}.`);
     } else {
-        console.log(`   ✅ Best Match: ${matchedPipeline.name} (ID: ${matchedPipeline.id})`);
+        const typeStr = (matchedPipeline as any).isRelease ? 'Classic Release' : 'Build/YAML';
+        console.log(`   ✅ Best Match (${typeStr}): ${matchedPipeline.name} (ID: ${matchedPipeline.id})`);
+        console.log(`      🔗 URL: ${matchedPipeline._links?.web?.href || 'N/A'}`);
     }
 
     // --- STEP 4: SURGICAL ENVIRONMENT SYNC (HYBRID STRATEGY) ---
@@ -238,10 +247,27 @@ async function runDebug() {
     console.log(`   📂 Project Context: ${projectIdentifier}`);
 
     for (const envName of envsToSync) {
-        // High Speed Try: Use the Environments API directly (no scanning)
-        const deploy = await AzureService.fetchLatestEnvironmentDeployment(
-            devops.organization, projectIdentifier, matchedPipeline.id, envName, devops.pat, devops.baseUrl
-        );
+        let deploy: any = null;
+
+        if ((matchedPipeline as any).isRelease) {
+            // Use Release API
+            const releases = await AzureService.fetchADOReleases(devops.organization, projectIdentifier, matchedPipeline.id, devops.pat, devops.baseUrl);
+            const latest = releases.find(r =>
+                r.environments?.some(e => e.name.toUpperCase() === envName && e.status?.toLowerCase() === 'succeeded')
+            );
+            if (latest) {
+                const env = latest.environments.find(e => e.name.toUpperCase() === envName);
+                deploy = {
+                    build: { sourceVersion: latest.artifacts?.[0]?.definitionReference?.version?.id },
+                    finishTime: env?.deploySteps?.[0]?.queuedOn || latest.modifiedOn
+                };
+            }
+        } else {
+            // Use Environments API
+            deploy = await AzureService.fetchLatestEnvironmentDeployment(
+                devops.organization, projectIdentifier, matchedPipeline.id, envName, devops.pat, devops.baseUrl
+            );
+        }
 
         if (deploy) {
             const commitHash = deploy.build?.sourceVersion || 'unknown';
@@ -264,7 +290,7 @@ async function runDebug() {
 
         while (Object.keys(deployments).length < envsToSync.length && skip < maxDepth) {
             const builds = await AzureService.fetchBuildsByDefinition(
-                devops.organization, projectIdent, matchedPipeline.id, devops.pat, devops.baseUrl, undefined, pageSize, skip
+                devops.organization, projectIdentifier, matchedPipeline.id, devops.pat, devops.baseUrl, undefined, pageSize, skip
             );
 
             if (builds.length === 0) break;
@@ -273,7 +299,7 @@ async function runDebug() {
                 if (Object.keys(deployments).length === envsToSync.length) break;
 
                 if (!timelineCache.has(run.id)) {
-                    timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdent, run.id, devops.pat, devops.baseUrl));
+                    timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdentifier, run.id, devops.pat, devops.baseUrl));
                 }
 
                 const timeline = timelineCache.get(run.id)!;
@@ -283,8 +309,16 @@ async function runDebug() {
                     const record = timeline.find((t: any) => {
                         const type = (t.type || '').toLowerCase();
                         const isContainer = ['stage', 'job', 'phase'].includes(type);
-                        const nameMatches = sanitize(t.name).includes(sanitize(envName));
+                        const cleanTName = sanitize(t.name);
+                        const cleanEnvName = sanitize(envName);
+                        const nameMatches = cleanTName.includes(cleanEnvName);
                         const isSuccess = t.result === 'succeeded' || t.result === 'partiallySucceeded';
+
+                        // Debug log for potential matches
+                        if (isContainer && nameMatches && !isSuccess) {
+                            console.log(`      ⚠️  Found ${envName} in Build ${run.id}, but result was '${t.result}' (Skipped)`);
+                        }
+
                         return isContainer && nameMatches && isSuccess;
                     });
 
