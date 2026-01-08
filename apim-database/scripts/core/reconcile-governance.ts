@@ -108,6 +108,10 @@ async function main() {
         console.error("❌ Database URL missing in config.json or DATABASE_URL env var.");
         process.exit(1);
     }
+    // Log Masked DB URL for debugging
+    const maskedUrl = dbUrl.replace(/:([^:@]+)@/, ':****@');
+    console.log(`🔌 Database Connection: ${maskedUrl}`);
+
     const pool = new Pool({ connectionString: dbUrl });
     const client = await pool.connect();
 
@@ -135,8 +139,8 @@ async function main() {
 
     try {
         // BEGIN TRANSACTION
-        // await client.query('BEGIN');
-        console.log('🔒 Transaction started (DISABLED for Debugging)...\n');
+        await client.query('BEGIN');
+        console.log('🔒 Transaction started...\n');
 
         // --- A. PRODUCTS RECONCILIATION ---
         console.log(`� Reconciling ${inventory.length} products...`);
@@ -537,7 +541,7 @@ async function main() {
         }
 
         // COMMIT TRANSACTION
-        // await client.query('COMMIT');
+        await client.query('COMMIT');
         console.log(`\n✅ Reconciliation Complete!`);
         const pCount = await client.query(`SELECT COUNT(*) FROM products`);
         const aCount = await client.query(`SELECT COUNT(*) FROM apis`);
@@ -545,7 +549,7 @@ async function main() {
 
     } catch (e: any) {
         // ROLLBACK ON ERROR
-        // await client.query('ROLLBACK');
+        await client.query('ROLLBACK');
         console.error(`\n❌ Reconciliation Failed:`, e.message);
         if (e.stack) console.error(e.stack);
     } finally {
