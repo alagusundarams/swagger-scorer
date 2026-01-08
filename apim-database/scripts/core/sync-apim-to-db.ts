@@ -741,9 +741,9 @@ async function runWorker(envName: string) {
 
             await pool.query(`
                 INSERT INTO products (id, name, display_name, version, environment, description, state, subscriber_count, owner_team_id, 
-                    last_deployed_commit_hash, last_deployed_at, detected_anomalies, management_mode, terraform_pipeline_url, github_url, 
-                    production_deployment_date, production_hash, region, policy_xml, updated_at)
-                VALUES ($1, $2, $3, $15, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $16, $17, $18, $19, NOW())
+                    last_deployed_commit_hash, last_deployed_at, detected_anomalies, management_mode, pipeline_url, 
+                    git_repo_url, region, updated_at)
+                VALUES ($1, $2, $3, $14, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $15, $16, NOW())
                 ON CONFLICT (id) DO UPDATE SET
                     display_name = EXCLUDED.display_name,
                     state = EXCLUDED.state,
@@ -751,20 +751,17 @@ async function runWorker(envName: string) {
                     subscriber_count = EXCLUDED.subscriber_count,
                     owner_team_id = EXCLUDED.owner_team_id,
                     last_deployed_commit_hash = EXCLUDED.last_deployed_commit_hash,
+                    last_deployed_at = EXCLUDED.last_deployed_at,
                     detected_anomalies = EXCLUDED.detected_anomalies,
                     management_mode = EXCLUDED.management_mode,
-                    terraform_pipeline_url = EXCLUDED.terraform_pipeline_url,
-                    github_url = EXCLUDED.github_url,
-                    production_deployment_date = EXCLUDED.production_deployment_date,
-                    production_hash = EXCLUDED.production_hash,
+                    pipeline_url = EXCLUDED.pipeline_url,
                     region = EXCLUDED.region,
-                    policy_xml = EXCLUDED.policy_xml,
                     updated_at = NOW();
             `, [
                 uniqueProductId, p.id, p.name, AZURE_CONFIG.environment, p.description, p.state, p.subscriptionCount, dbOwnerId,
                 gitInfo.hash, gitInfo.date, JSON.stringify(anomalies), derivedManagementMode,
-                gitInfo.pipelineUrl, gitInfo.repoUrl, extractedVersion,
-                gitInfo.production?.date || null, gitInfo.production?.hash || null, region, p.policyXml
+                gitInfo.pipelineUrl, extractedVersion, gitInfo.repoUrl,
+                region
             ]);
 
             // Register Identities found in Product Policy
@@ -816,18 +813,16 @@ async function runWorker(envName: string) {
             await pool.query(`
                 INSERT INTO apis(
                 id, name, display_name, path, product_id, apim_raw_data, 
-                git_repo_url, git_file_path, updated_at
+                updated_at
             )
-                VALUES($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+                VALUES($1, $2, $3, $4, $5, $6, NOW())
                 ON CONFLICT(id) DO UPDATE SET
                     display_name = EXCLUDED.display_name,
                 path = EXCLUDED.path,
                 product_id = EXCLUDED.product_id,
                 apim_raw_data = EXCLUDED.apim_raw_data,
-                git_repo_url = EXCLUDED.git_repo_url,
-                git_file_path = EXCLUDED.git_file_path,
                 updated_at = NOW();
-            `, [uniqueApiId, a.id, a.name, a.path, linkedProductId, rawData, repoUrl, bestSpecPath]);
+            `, [uniqueApiId, a.id, a.name, a.path, linkedProductId, rawData]);
 
             // Register Identities found in API Policy
             const apiIdsFound = extractClientIdsFromPolicy(a.policyXml);

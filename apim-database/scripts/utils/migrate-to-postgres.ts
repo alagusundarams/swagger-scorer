@@ -176,9 +176,9 @@ async function migrateProducts(pool: Pool, products: any[], importEnv: string) {
                 INSERT INTO products (
                     id, name, display_name, version, description, state, type,
                     owner_team_id, environment, visibility, management_mode,
-                    git_repo_url, git_file_path, terraform_pipeline_url, last_deployed_commit_hash,
+                    git_repo_url, pipeline_url, last_deployed_commit_hash,
                     subscriber_count, quality_score, apim_raw_data, created_at, updated_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
                 ON CONFLICT (id) DO UPDATE SET
                     display_name = EXCLUDED.display_name,
                     description = EXCLUDED.description,
@@ -196,7 +196,6 @@ async function migrateProducts(pool: Pool, products: any[], importEnv: string) {
                 'internal',
                 product.managementMode || (gitRepoUrl ? 'TERRAFORM_MANAGED' : 'UNTRACKED'),
                 gitRepoUrl,
-                gitFilePath,
                 pipelineUrl,
                 deploymentHash,
                 0,
@@ -288,9 +287,9 @@ async function migrateAPIs(pool: Pool, apis: any[], products: any[], importEnv: 
             await pool.query(`
                 INSERT INTO apis (
                     id, product_id, origin_team_id, name, display_name, description, path,
-                    service_url, protocols, subscription_required, git_repo_url, git_file_path,
+                    service_url, protocols, subscription_required, 
                     apim_raw_data, created_at, updated_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
                 ON CONFLICT (id) DO UPDATE SET
                     product_id = EXCLUDED.product_id,
                     name = EXCLUDED.name,
@@ -300,8 +299,6 @@ async function migrateAPIs(pool: Pool, apis: any[], products: any[], importEnv: 
                     service_url = EXCLUDED.service_url,
                     protocols = EXCLUDED.protocols,
                     subscription_required = EXCLUDED.subscription_required,
-                    git_repo_url = EXCLUDED.git_repo_url,
-                    git_file_path = EXCLUDED.git_file_path,
                     updated_at = NOW()
             `, [
                 apiId,
@@ -314,8 +311,6 @@ async function migrateAPIs(pool: Pool, apis: any[], products: any[], importEnv: 
                 props.serviceUrl || null,
                 props.protocols ? props.protocols.join(',') : 'https',
                 props.subscriptionRequired !== false,
-                apiGitRepoUrl,
-                apiGitFilePath,
                 JSON.stringify(api)
             ]);
 

@@ -88,7 +88,6 @@ async function main() {
         inventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
     }
 
-    // Load ADO Metadata if available, else warn and use empty
     let adoList: ADOMetadata[] = [];
     if (existsSync(adoMetaPath)) {
         adoList = JSON.parse(readFileSync(adoMetaPath, 'utf8'));
@@ -103,26 +102,6 @@ async function main() {
     // Filter by environment if flag is provided
     if (targetEnv) {
         inventory = inventory.filter((p: any) => p.environments.map((e: any) => e.toUpperCase()).includes(targetEnv));
-
-        // Match environment keys in apimMeta (case-insensitive)
-        const nvKey = Object.keys(apimMeta.namedValues).find(k => k.toUpperCase() === targetEnv);
-        apimMeta.namedValues = nvKey ? { [nvKey]: apimMeta.namedValues[nvKey] } : {};
-
-        const appKey = Object.keys(apimMeta.appIds).find(k => k.toUpperCase() === targetEnv);
-        apimMeta.appIds = appKey ? { [appKey]: apimMeta.appIds[appKey] } : {};
-
-        const backKey = Object.keys(apimMeta.backends).find(k => k.toUpperCase() === targetEnv);
-        apimMeta.backends = backKey ? { [backKey]: apimMeta.backends[backKey] } : {};
-
-        const forensicsKey = Object.keys(apimMeta.apiForensics).find(k => k.toUpperCase() === targetEnv);
-        apimMeta.apiForensics = forensicsKey ? { [forensicsKey]: apimMeta.apiForensics[forensicsKey] } : {};
-
-        const prodForensicsKey = Object.keys(apimMeta.productForensics).find(k => k.toUpperCase() === targetEnv);
-        apimMeta.productForensics = prodForensicsKey ? { [prodForensicsKey]: apimMeta.productForensics[prodForensicsKey] } : {};
-
-        const linksKey = Object.keys(apimMeta.productApiLinks).find(k => k.toUpperCase() === targetEnv);
-        apimMeta.productApiLinks = linksKey ? { [linksKey]: apimMeta.productApiLinks[linksKey] } : {};
-
         console.log(`📊 Filtered to ${inventory.length} products associated with ${targetEnv}.`);
     }
 
@@ -170,175 +149,135 @@ async function main() {
                 status: 'ORPHAN'
             };
 
-            for (const envName of prod.environments) {
-                const uniqueProductId = `${prod.id}:${envName}:Global`;
-                const localDeploy = (ado.deployments as any)[envName];
-                const devDeploy = (ado.deployments as any)['DEV'];
-                const qaDeploy = (ado.deployments as any)['QA'];
-                const stageDeploy = (ado.deployments as any)['STAGE'];
-                const prodDeploy = (ado.deployments as any)['PROD'];
+            const devDeploy = (ado.deployments as any)['DEV'];
+            const qaDeploy = (ado.deployments as any)['QA'];
+            const stageDeploy = (ado.deployments as any)['STAGE'];
+            const prodDeploy = (ado.deployments as any)['PROD'];
 
-                try {
-                    const repoProject = (ado.repository as any)?.project;
-                    const repoName = (ado.repository as any)?.name;
-                    const pipelineId = ado.pipeline?.id;
+            try {
+                const repoProject = (ado.repository as any)?.project;
+                const repoName = (ado.repository as any)?.name;
+                const pipelineId = ado.pipeline?.id;
 
-                    const pipelineUrl = (ado.pipeline && repoProject)
-                        ? AzureService.getVstsUrl(config.devops.baseUrl, config.devops.organization, repoProject, `_build?definitionId=${pipelineId}`)
-                        : null;
+                const pipelineUrl = (ado.pipeline && repoProject)
+                    ? AzureService.getVstsUrl(config.devops.baseUrl, config.devops.organization, repoProject, `_build?definitionId=${pipelineId}`)
+                    : null;
 
-                    const githubUrl = (repoProject && repoName)
-                        ? AzureService.getVstsUrl(config.devops.baseUrl, config.devops.organization, repoProject, `_git/${repoName}`)
-                        : null;
+                const gitRepoUrl = (repoProject && repoName)
+                    ? AzureService.getVstsUrl(config.devops.baseUrl, config.devops.organization, repoProject, `_git/${repoName}`)
+                    : null;
+
+                // Iterate through environments for this product (Tall Model)
+                const envs = prod.environments || ['DEV'];
+
+                for (const env of envs) {
+                    const upperEnv = env.toUpperCase();
+                    const deployment = (ado.deployments as any)[upperEnv] || {};
+                    const targetId = `${prod.name}:${upperEnv}:Global`;
 
                     await pool.query(`
                         INSERT INTO products (
                             id, name, display_name, version, state, environment, region,
+                            pipeline_url, git_repo_url,
                             last_deployed_commit_hash, last_deployed_at,
-                            terraform_pipeline_url, github_url,
-                            dev_hash, dev_deployment_date,
-                            qa_hash, qa_deployment_date,
-                            stage_hash, stage_deployment_date,
-                            production_hash, production_deployment_date,
                             management_mode, updated_at
                         )
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, NOW())
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
                         ON CONFLICT (id) DO UPDATE SET
+                            pipeline_url = COALESCE(EXCLUDED.pipeline_url, products.pipeline_url),
+                            git_repo_url = COALESCE(EXCLUDED.git_repo_url, products.git_repo_url),
                             last_deployed_commit_hash = COALESCE(EXCLUDED.last_deployed_commit_hash, products.last_deployed_commit_hash),
                             last_deployed_at = COALESCE(EXCLUDED.last_deployed_at, products.last_deployed_at),
-                            terraform_pipeline_url = COALESCE(EXCLUDED.terraform_pipeline_url, products.terraform_pipeline_url),
-                            github_url = COALESCE(EXCLUDED.github_url, products.github_url),
-                            dev_hash = COALESCE(EXCLUDED.dev_hash, products.dev_hash),
-                            dev_deployment_date = COALESCE(EXCLUDED.dev_deployment_date, products.dev_deployment_date),
-                            qa_hash = COALESCE(EXCLUDED.qa_hash, products.qa_hash),
-                            qa_deployment_date = COALESCE(EXCLUDED.qa_deployment_date, products.qa_deployment_date),
-                            stage_hash = COALESCE(EXCLUDED.stage_hash, products.stage_hash),
-                            stage_deployment_date = COALESCE(EXCLUDED.stage_deployment_date, products.stage_deployment_date),
-                            production_hash = COALESCE(EXCLUDED.production_hash, products.production_hash),
-                            production_deployment_date = COALESCE(EXCLUDED.production_deployment_date, products.production_deployment_date),
                             management_mode = EXCLUDED.management_mode,
                             updated_at = NOW();
                     `, [
-                        uniqueProductId, prod.id, prod.name, null, 'published', envName, 'Global',
-                        localDeploy?.hash || null, localDeploy?.date || null,
-                        pipelineUrl,
-                        githubUrl,
-                        devDeploy?.hash || null, devDeploy?.date || null,
-                        qaDeploy?.hash || null, qaDeploy?.date || null,
-                        stageDeploy?.hash || null, stageDeploy?.date || null,
-                        prodDeploy?.hash || null, prodDeploy?.date || null,
+                        targetId, prod.name, prod.name, null, 'published', upperEnv, 'Global',
+                        pipelineUrl, gitRepoUrl,
+                        deployment.hash || null, deployment.date || null,
                         ado.status === 'MATCHED' ? 'TERRAFORM_MANAGED' : 'UNTRACKED'
                     ]);
-                } catch (err: any) {
-                    console.error(`❌ FAILED to sync Product: "${prod.name}" (${envName})`);
-                    console.error(`   Details: ${err.message}`);
-                    if (err.detail) console.error(`   DB Detail: ${err.detail}`);
-                    throw err;
                 }
 
                 if (verbose) {
                     const mode = ado.status === 'MATCHED' ? '🔧 TERRAFORM' : '📦 PORTAL';
-                    const hash = localDeploy?.hash?.substring(0, 7) || 'none';
-                    console.log(`   📦 Product: "${prod.name}" (${envName}) - ${mode} - Hash: ${hash}`);
+                    console.log(`   📦 Product: "${prod.name}" (${prod.id}) - ${mode}`);
                 }
+            } catch (err: any) {
+                console.error(`❌ FAILED to sync Product: "${prod.name}"`);
+                console.error(`   Details: ${err.message}`);
+                if (err.detail) console.error(`   DB Detail: ${err.detail}`);
+                throw err;
+            }
 
-                // --- A.2 APIS RECONCILIATION (Hierarchical) ---
+            // --- A.2 APIS RECONCILIATION ---
+            for (const envName of prod.environments) {
                 const apiDetails = apimMeta.productApiLinks[envName]?.[prod.id] || [];
                 if (verbose && apiDetails.length > 0) {
-                    console.log(`      🔌 APIs: ${apiDetails.length} linked to product`);
+                    console.log(`      🔌 [${envName}] APIs: ${apiDetails.length} linked to product`);
                 }
 
                 for (const api of apiDetails) {
-                    const apiName = typeof api === 'string' ? api : api.name;  // Backward compatibility (Option B)
-                    const apiPath = typeof api === 'string' ? `/${api}` : (api.path || null);  // Use captured path or NULL (hybrid approach)
-                    const uniqueApiId = `${uniqueProductId}:${apiName}`;
+                    const apiName = typeof api === 'string' ? api : api.name;
+                    const apiPath = typeof api === 'string' ? `/${api}` : (api.path || null);
+                    const uniqueApiId = `${prod.id}:${envName}:${apiName}`;
+
                     try {
                         await pool.query(`
-                            INSERT INTO apis (id, product_id, name, display_name, path, updated_at)
-                            VALUES ($1, $2, $3, $4, $5, NOW())
-                            ON CONFLICT (id) DO UPDATE SET
-                                name = EXCLUDED.name,
-                                display_name = EXCLUDED.display_name,
-                                path = EXCLUDED.path,
-                                updated_at = NOW();
-                        `, [uniqueApiId, uniqueProductId, apiName, apiName, apiPath]);
-                    } catch (err: any) {
-                        console.error(`❌ FAILED to sync API: "${apiName}" in Product "${prod.name}"`);
-                        console.error(`   Details: ${err.message}`);
-                        if (err.detail) console.error(`   DB Detail: ${err.detail}`);
-                        throw err;
-                    }
+                                INSERT INTO apis (id, product_id, name, display_name, path, updated_at)
+                                VALUES ($1, $2, $3, $4, $5, NOW())
+                                ON CONFLICT (id) DO UPDATE SET
+                                    name = EXCLUDED.name,
+                                    display_name = EXCLUDED.display_name,
+                                    path = EXCLUDED.path,
+                                    updated_at = NOW();
+                            `, [uniqueApiId, prod.id, apiName, apiName, apiPath]);
 
-                    if (verbose) {
-                        console.log(`         📄 API: "${apiName}"`);
-                    }
-
-                    // Link to Backends
-                    const forensics = apimMeta.apiForensics[envName]?.[apiName];
-                    if (forensics) {
-                        for (const bId of forensics.backends) {
-                            await pool.query(`
-                                INSERT INTO api_backends (api_id, backend_id, environment)
-                                VALUES ($1, $2, $3)
-                                ON CONFLICT (api_id, backend_id, environment) DO NOTHING;
-                            `, [uniqueApiId, bId, envName]);
-
-                            if (verbose) {
-                                console.log(`            🔌 Backend: ${bId}`);
+                        // Link to Backends
+                        const forensics = apimMeta.apiForensics[envName]?.[apiName];
+                        if (forensics) {
+                            for (const bId of forensics.backends) {
+                                await pool.query(`
+                                        INSERT INTO api_backends (api_id, backend_id, environment)
+                                        VALUES ($1, $2, $3)
+                                        ON CONFLICT (api_id, backend_id, environment) DO NOTHING;
+                                    `, [uniqueApiId, bId, envName]);
                             }
                         }
-                    }
 
-                    // --- OPERATIONS EXTRACTION FROM OPENAPI SPEC ---
-                    const apiContract = apimMeta.apiContracts[apiName];
-                    if (apiContract && apiContract.definition) {
-                        const spec = apiContract.definition;
-                        const paths = spec.paths || {};
-                        let operationsCount = 0;
-
-                        for (const [pathTemplate, pathItem] of Object.entries(paths)) {
-                            const methods = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'];
-
-                            for (const method of methods) {
-                                const operation = (pathItem as any)[method];
-                                if (operation) {
-                                    // Generate unique operation ID: apiId:method:path
-                                    const operationId = `${uniqueApiId}:${method}:${pathTemplate.replace(/\//g, '_')}`;
-                                    const operationName = operation.operationId || `${method}_${pathTemplate.replace(/\//g, '_')}`;
-                                    const summary = operation.summary || operation.description || pathTemplate;
-                                    const description = operation.description || '';
-
-                                    try {
+                        // --- OPERATIONS EXTRACTION ---
+                        const apiContract = apimMeta.apiContracts[apiName];
+                        if (apiContract && apiContract.definition) {
+                            const spec = apiContract.definition;
+                            const paths = spec.paths || {};
+                            for (const [pathTemplate, pathItem] of Object.entries(paths)) {
+                                const methods = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'];
+                                for (const method of methods) {
+                                    const operation = (pathItem as any)[method];
+                                    if (operation) {
+                                        const operationId = `${uniqueApiId}:${method}:${pathTemplate.replace(/\//g, '_')}`;
+                                        const operationName = operation.operationId || `${method}_${pathTemplate.replace(/\//g, '_')}`;
+                                        const summary = operation.summary || operation.description || pathTemplate;
                                         await pool.query(`
-                                            INSERT INTO operations (id, api_id, name, display_name, method, url_template, description)
-                                            VALUES ($1, $2, $3, $4, $5, $6, $7)
-                                            ON CONFLICT (id) DO UPDATE SET
-                                                name = EXCLUDED.name,
-                                                display_name = EXCLUDED.display_name,
-                                                method = EXCLUDED.method,
-                                                url_template = EXCLUDED.url_template,
-                                                description = EXCLUDED.description;
-                                        `, [
-                                            operationId,
-                                            uniqueApiId,
-                                            operationName,
-                                            summary,
-                                            method.toUpperCase(),
-                                            pathTemplate,
-                                            description
+                                                INSERT INTO operations (id, api_id, name, display_name, method, url_template, description)
+                                                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                                                ON CONFLICT (id) DO UPDATE SET
+                                                    name = EXCLUDED.name,
+                                                    display_name = EXCLUDED.display_name,
+                                                    method = EXCLUDED.method,
+                                                    url_template = EXCLUDED.url_template,
+                                                    description = EXCLUDED.description;
+                                            `, [
+                                            operationId, uniqueApiId, operationName, summary,
+                                            method.toUpperCase(), pathTemplate, operation.description || ''
                                         ]);
-                                        operationsCount++;
-                                    } catch (err: any) {
-                                        console.error(`❌ FAILED to sync Operation: ${method.toUpperCase()} ${pathTemplate}`);
-                                        console.error(`   API: "${apiName}", Details: ${err.message}`);
                                     }
                                 }
                             }
                         }
-
-                        if (verbose && operationsCount > 0) {
-                            console.log(`            📍 Operations: ${operationsCount} extracted from OpenAPI spec`);
-                        }
+                    } catch (err: any) {
+                        console.error(`❌ FAILED to sync API/Operation: "${apiName}" in Product "${prod.name}" (${envName})`);
+                        console.error(`   Details: ${err.message}`);
+                        throw err;
                     }
                 }
             }
@@ -347,28 +286,23 @@ async function main() {
         // --- B. ACCESS CONTROL (NAMED VALUES) ---
         console.log(`🌍 Reconciling Named Values...`);
         for (const [env, nvs] of Object.entries(apimMeta.namedValues)) {
-            // Optimization: Filter products for this environment ONCE to avoid O(N*M) lookups
-            const envProducts = inventory.filter((p: any) =>
-                p.environments.map((e: any) => e.toUpperCase()).includes(env.toUpperCase())
-            );
-            const envProductIds = envProducts.map(p => `${p.id}:${env}:Global`);
+            // Find products in this environment - use prod.id as target now
+            const envProductIds = inventory
+                .filter((p: any) => p.environments.map((e: any) => e.toUpperCase()).includes(env.toUpperCase()))
+                .map(p => p.id);
 
-            console.log(`   [${env}] Processing ${nvs.length} Named Values (Linking to ${envProductIds.length} products each)...`);
+            console.log(`   [${env}] Processing ${nvs.length} Named Values...`);
 
             for (const nv of nvs) {
                 const val = nv.keyVaultUrl ? nv.keyVaultUrl : (nv.value || '');
                 const type = nv.keyVaultUrl ? 'key_vault' : 'literal';
-
-                // Deterministic ID for idempotency: env + systemName + optional scope
                 const nvId = `nv-${env}-${nv.name}`;
 
                 try {
-                    // Insert/update named value (product_id stays NULL for now)
                     await pool.query(`
                         INSERT INTO named_values (id, product_id, display_name, system_name, value, type, is_secret, environment, region, updated_at)
                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
-                        ON CONFLICT (id) 
-                        DO UPDATE SET
+                        ON CONFLICT (id) DO UPDATE SET
                             display_name = EXCLUDED.display_name,
                             value = EXCLUDED.value,
                             type = EXCLUDED.type,
@@ -376,8 +310,6 @@ async function main() {
                             updated_at = NOW();
                     `, [nvId, null, nv.displayName, nv.name, val, type, nv.isSecret, env, 'Global']);
 
-                    // NEW: Bulk Link to products in this environment via unnest
-                    // This replaces the inner loop that caused the 15-minute hang
                     if (envProductIds.length > 0) {
                         await pool.query(`
                             INSERT INTO product_named_values (product_id, named_value_id, is_owner, can_modify)
@@ -385,16 +317,9 @@ async function main() {
                             ON CONFLICT (product_id, named_value_id) DO NOTHING
                         `, [envProductIds, nvId]);
                     }
-
-                    // Granular logging as explicitly requested: "tell what fails what works one by one"
-                    console.log(`      ✅ Synced Named Value: "${nv.name}"`);
-
+                    if (verbose) console.log(`      ✅ Synced: "${nv.name}"`);
                 } catch (err: any) {
-                    console.error(`❌ FAILED to sync Named Value: "${nv.name}" (Env: ${env})`);
-                    console.error(`   Value: "${val}" (Is Secret: ${nv.isSecret})`);
-                    console.error(`   Details: ${err.message}`);
-                    if (err.detail) console.error(`   DB Detail: ${err.detail}`);
-                    // Continue to next NV so we see what else works/fails
+                    console.error(`❌ FAILED to sync Named Value: "${nv.name}" (${env}): ${err.message}`);
                 }
             }
         }
@@ -403,218 +328,114 @@ async function main() {
         console.log(`🔗 Resolving App Identities via Graph...`);
         const allAppIds = new Set<string>();
         Object.values(apimMeta.appIds).forEach(list => list.forEach(id => allAppIds.add(id)));
-        console.log(`   Found ${allAppIds.size} unique App IDs to resolve`);
 
         if (allAppIds.size > 0) {
             const resolved = await AzureService.fetchAppRegistrations(Array.from(allAppIds));
-            const appMap = new Map<string, { name: string, uri?: string }>(resolved.map(r => [r.appId, { name: r.displayName, uri: r.appIdUri }]));
-            console.log(`   ✅ Resolved ${appMap.size} App Registrations via Microsoft Graph`);
+            const appMap = new Map();
+            resolved.forEach(r => appMap.set(r.appId, r));
 
             for (const [env, ids] of Object.entries(apimMeta.appIds)) {
                 for (const id of ids) {
                     const resolvedApp = appMap.get(id);
-                    const name = resolvedApp?.name || 'Unknown Application';
-                    const appIdUri = resolvedApp?.uri || null;
+                    const name = resolvedApp?.displayName || 'Unknown Application';
+                    const appIdUri = resolvedApp?.appIdUri || null;
 
-                    // HEURISTIC: Find linkages in Forensics
+                    // Usage Discovery
                     let linkedProductId: string | null = null;
                     let linkedApiId: string | null = null;
-                    let identityType = 'PRODUCT'; // Default
 
-                    // 1. Check Products (Priority)
-                    if (apimMeta.productForensics[env]) {
-                        for (const [prodName, forensics] of Object.entries(apimMeta.productForensics[env])) {
+                    // Product usage?
+                    const prodForensics = apimMeta.productForensics[env];
+                    if (prodForensics) {
+                        for (const [prodId, forensics] of Object.entries(prodForensics)) {
                             if (forensics.guids.includes(id)) {
-                                // Found usage in this product
-                                // Need to resolve Product ID. We have inventory.
-                                const p = inventory.find(i => i.name === prodName);
-                                if (p) {
-                                    // Construct the unique product ID used in DB
-                                    linkedProductId = `${p.id}:${env}:Global`;
-                                    identityType = 'PRODUCT';
-                                    break; // Assume 1:1 for now
-                                }
+                                linkedProductId = prodId;
+                                break;
                             }
                         }
                     }
 
-                    // 2. Check APIs (Secondary)
-                    if (!linkedProductId && apimMeta.apiForensics[env]) {
-                        for (const [apiName, forensics] of Object.entries(apimMeta.apiForensics[env])) {
-                            if (forensics.guids.includes(id)) {
-                                // Found usage in this API
-                                // Need to find which Product it belongs to -> then construct API ID?
-                                // Actually, we just need API ID: `productId:env:Global:apiName`
-                                // We can search `apimMeta.productApiLinks` to find the parent product
-                                if (apimMeta.productApiLinks[env]) {
-                                    for (const [prodName, apis] of Object.entries(apimMeta.productApiLinks[env])) {
-                                        if (apis.some(a => a.name === apiName)) {
-                                            const p = inventory.find(i => i.name === prodName);
-                                            if (p) {
-                                                const uniqueProductId = `${p.id}:${env}:Global`;
-                                                linkedApiId = `${uniqueProductId}:${apiName}`;
-                                                identityType = 'API';
-                                                break;
-                                            }
+                    // API usage?
+                    if (!linkedProductId) {
+                        const apiForensics = apimMeta.apiForensics[env];
+                        if (apiForensics) {
+                            for (const [apiName, forensics] of Object.entries(apiForensics)) {
+                                if (forensics.guids.includes(id)) {
+                                    // Found API usage, now find the parent product
+                                    for (const [prodId, apis] of Object.entries(apimMeta.productApiLinks[env] || {})) {
+                                        if (apis.some(a => (typeof a === 'string' ? a === apiName : a.name === apiName))) {
+                                            linkedProductId = prodId;
+                                            linkedApiId = `${prodId}:${env}:${apiName}`;
+                                            break;
                                         }
                                     }
+                                    if (linkedApiId) break;
                                 }
-                                if (linkedApiId) break;
                             }
                         }
                     }
 
-                    const res = await pool.query(`
+                    await pool.query(`
                         INSERT INTO app_registrations (id, client_id, display_name, app_id_uri, environment, product_id, api_id, type, updated_at)
                         VALUES ($1, $1, $2, $3, $4, $5, $6, $7, NOW())
                         ON CONFLICT (id) DO UPDATE SET
                             display_name = EXCLUDED.display_name,
                             app_id_uri = EXCLUDED.app_id_uri,
-                            product_id = COALESCE(EXCLUDED.product_id, app_registrations.product_id),
-                            api_id = COALESCE(EXCLUDED.api_id, app_registrations.api_id),
+                            product_id = EXCLUDED.product_id,
+                            api_id = EXCLUDED.api_id,
                             type = EXCLUDED.type,
-                            updated_at = NOW()
-                        RETURNING *;
-                    `, [id, name, appIdUri, env, linkedProductId, linkedApiId, identityType]);
-
-                    // Update parent table (Products or APIs) to link the identity back
-                    if (linkedProductId) {
-                        await pool.query(`
-                            UPDATE products 
-                            SET identity_client_id = $1, 
-                                identity_display_name = $2, 
-                                identity_app_id_uri = $3,
-                                updated_at = NOW()
-                            WHERE id = $4
-                        `, [id, name, appIdUri, linkedProductId]);
-                    } else if (linkedApiId) {
-                        await pool.query(`
-                            UPDATE apis 
-                            SET identity_client_id = $1, 
-                                identity_display_name = $2, 
-                                identity_app_id_uri = $3,
-                                updated_at = NOW()
-                            WHERE id = $4
-                        `, [id, name, appIdUri, linkedApiId]);
-                    }
-
-                    if (verbose) {
-                        console.log(`      🔑 ${id.substring(0, 8)}... -> "${name}" (${env})`);
-                    }
+                            updated_at = NOW();
+                    `, [id, name, appIdUri, env, linkedProductId, linkedApiId, linkedProductId ? 'PRODUCT' : (linkedApiId ? 'API' : 'UNKNOWN')]);
                 }
             }
         }
 
+        // --- D. BACKENDS ---
         console.log(`🔌 Reconciling Backend inventory...`);
-        for (const [env, backends] of Object.entries(apimMeta.backends || {})) {
+        for (const [env, backends] of Object.entries(apimMeta.backends)) {
             for (const b of backends) {
                 await pool.query(`
                     INSERT INTO governance_backends (id, environment, url, description, title, protocol, scope, updated_at)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
                     ON CONFLICT (id, environment) DO UPDATE SET
-                        url = EXCLUDED.url,
-                        description = EXCLUDED.description,
-                        title = EXCLUDED.title,
-                        protocol = EXCLUDED.protocol,
-                        scope = COALESCE(governance_backends.scope, EXCLUDED.scope),
-                        updated_at = NOW();
+                        url = EXCLUDED.url, description = EXCLUDED.description, title = EXCLUDED.title,
+                        protocol = EXCLUDED.protocol, updated_at = NOW();
                 `, [b.id, env, b.url, b.description, b.title, b.protocol, 'GLOBAL']);
             }
         }
 
-        // --- D. SUBSCRIPTIONS RECONCILIATION ---
+        // --- E. SUBSCRIPTIONS ---
         console.log(`🔑 Reconciling Subscriptions...`);
-        for (const [env, subs] of Object.entries(apimMeta.subscriptions || {})) {
-            if (!subs || subs.length === 0) continue;
-
-            console.log(`   [${env}] Processing ${subs.length} subscriptions`);
-
+        for (const [env, subs] of Object.entries(apimMeta.subscriptions)) {
             for (const sub of subs) {
                 const subId = `${env}:${sub.id}`;
-                const productId = `${sub.productId}:${env}:Global`; // Match products table format
+                const productId = sub.productId;
 
-                // Extract owner ID from APIM path (e.g., "/users/abc123" -> "abc123")
+                let subscriberTeamId: string | null = null;
                 const ownerMatch = sub.ownerId?.match(/\/users\/(.+)/);
                 const ownerUserId = ownerMatch ? ownerMatch[1] : null;
 
-                // Check if this is a default subscription (naming pattern: default_{productName})
-                const isDefaultSubscription = sub.displayName?.startsWith('default_');
-
-                // Start with NULL - only assign if team exists
-                let subscriberTeamId: string | null = null;
-
-                if (isDefaultSubscription) {
-                    // For default subscriptions, try to auto-assign to product owner
-                    const prodQuery = await pool.query('SELECT owner_team_id FROM products WHERE id = $1', [productId]);
-                    if (prodQuery.rows.length > 0 && prodQuery.rows[0].owner_team_id) {
-                        const potentialTeamId = prodQuery.rows[0].owner_team_id;
-
-                        // Verify team exists in teams table
-                        const teamCheck = await pool.query('SELECT id FROM teams WHERE id = $1', [potentialTeamId]);
-                        if (teamCheck.rows.length > 0) {
-                            subscriberTeamId = potentialTeamId;
-                            if (verbose) {
-                                console.log(`      ✅ Auto-assigned default subscription to product owner: ${subscriberTeamId}`);
-                            }
-                        } else if (verbose) {
-                            console.log(`      ⚠️  Product owner team ${potentialTeamId} not found in teams table`);
-                        }
-                    }
+                if (sub.displayName?.startsWith('default_')) {
+                    const prodRes = await pool.query('SELECT owner_team_id FROM products WHERE id = $1', [productId]);
+                    subscriberTeamId = prodRes.rows[0]?.owner_team_id || null;
                 } else if (ownerUserId) {
-                    // For non-default subscriptions, check if ownerUserId is a valid team
-                    const teamCheck = await pool.query('SELECT id FROM teams WHERE id = $1', [ownerUserId]);
-                    if (teamCheck.rows.length > 0) {
-                        subscriberTeamId = ownerUserId;
-                    } else if (verbose) {
-                        console.log(`      ⚠️  Owner ${ownerUserId} not found in teams table - subscription will be orphaned`);
-                    }
+                    const teamRes = await pool.query('SELECT id FROM teams WHERE id = $1', [ownerUserId]);
+                    if (teamRes.rows.length > 0) subscriberTeamId = ownerUserId;
                 }
 
-                try {
-                    await pool.query(`
-                        INSERT INTO subscriptions (
-                            id, product_id, subscriber_team_id, display_name, state,
-                            created_at, expiration_date, updated_at
-                        )
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-                        ON CONFLICT (id) DO UPDATE SET
-                            state = EXCLUDED.state,
-                            display_name = EXCLUDED.display_name,
-                            expiration_date = EXCLUDED.expiration_date,
-                            updated_at = NOW();
-                    `, [
-                        subId,
-                        productId,
-                        subscriberTeamId, // Auto-assigned for default, NULL for others (orphaned)
-                        sub.displayName,
-                        sub.state,
-                        sub.createdDate,
-                        sub.expirationDate
-                    ]);
-
-                    if (!subscriberTeamId && !isDefaultSubscription && verbose) {
-                        console.log(`      ⚠️  Orphaned subscription: ${sub.displayName} - needs admin assignment`);
-                    }
-                } catch (err: any) {
-                    console.error(`❌ FAILED to sync Subscription: ${sub.id}`);
-                    console.error(`   Details: ${err.message}`);
-                }
+                await pool.query(`
+                    INSERT INTO subscriptions (id, product_id, subscriber_team_id, display_name, state, created_at, expiration_date, updated_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+                    ON CONFLICT (id) DO UPDATE SET
+                        state = EXCLUDED.state, display_name = EXCLUDED.display_name, updated_at = NOW();
+                `, [subId, productId, subscriberTeamId, sub.displayName, sub.state, sub.createdDate, sub.expirationDate]);
             }
         }
 
-        // Backends linked via APIs already handled in A.2 loop for better context
-
         console.log(`\n✅ Reconciliation Complete!`);
-        console.log(`\n📊 Summary:`);
-        const productCount = await pool.query(`SELECT COUNT(*) FROM products${targetEnv ? ` WHERE environment = '${targetEnv}'` : ''}`);
-        const apiCount = await pool.query(`SELECT COUNT(*) FROM apis`);
-        const terraformManaged = await pool.query(`SELECT COUNT(*) FROM products WHERE management_mode = 'TERRAFORM_MANAGED'${targetEnv ? ` AND environment = '${targetEnv}'` : ''}`);
-        const untracked = await pool.query(`SELECT COUNT(*) FROM products WHERE management_mode = 'UNTRACKED'${targetEnv ? ` AND environment = '${targetEnv}'` : ''}`);
-
-        console.log(`   Products: ${productCount.rows[0].count}`);
-        console.log(`   APIs: ${apiCount.rows[0].count}`);
-        console.log(`   🔧 Terraform-Managed: ${terraformManaged.rows[0].count}`);
-        console.log(`   📦 Untracked: ${untracked.rows[0].count}`);
+        const pCount = await pool.query(`SELECT COUNT(*) FROM products`);
+        const aCount = await pool.query(`SELECT COUNT(*) FROM apis`);
+        console.log(`   Products: ${pCount.rows[0].count} | APIs: ${aCount.rows[0].count}`);
 
     } catch (e: any) {
         console.error(`\n❌ Reconciliation Failed:`, e.message);

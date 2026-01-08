@@ -1,13 +1,8 @@
-/**
- * @fileoverview Promotion Service - Auto-Promotion Workflow
- * 
- * Handles automatic promotion after approval.
- * Flow: DEV → QA → STAGE (PROD requires manual flow)
- */
-
 import { query } from '../core/db.js';
-import { deployProductToEnvironment } from '../apim/SdkArmService.js';
 import { auditService } from '../core/AuditService.js';
+import { RepoService } from '../git/ado/RepoService.js';
+import { ResourceDiscovery } from '../../utils/resourceDiscovery.js';
+
 
 export interface PromotionResult {
     success: boolean;
@@ -51,7 +46,10 @@ export async function autoPromoteProduct(
     try {
         // 1. Get product details for deployment
         const productRes = await query(`
-            SELECT display_name, description, api_path, policy_xml
+            SELECT name, display_name, description, api_path, version, region, 
+                   owner_team_id, type, visibility, authorized_teams,
+                   terraform_pipeline_url, github_url, git_repo_url, git_file_path,
+                   identity_client_id, last_deployed_commit_hash
             FROM products
             WHERE id = $1
         `, [productId]);
@@ -60,62 +58,91 @@ export async function autoPromoteProduct(
             throw new Error(`Product ${productId} not found`);
         }
 
-        const product = productRes.rows[0];
+        const sp = productRes.rows[0];
 
         // 2. Prepare Policy (Smart Overlay Merge)
-        // Instead of blind copy, we try to find an overlay (mocked lookup or repo lookup)
-        // For MVP: We assume the base is what we deploy unless we implemented the full repo fetch here.
-        // But per design, we call OverlayService.
+        // In real life we'd fetch from Blob Storage or APIM first
+        const { getProductPolicy } = await import('../inventory/ProductsService.js');
+        const { policyXml: sourceXml } = await getProductPolicy(productId);
+
         const { OverlayService } = await import('../policy/OverlayService.js');
         const overlayService = new OverlayService();
+        const { finalXml } = await overlayService.mergePolicy(sourceXml, '');
 
-        // Mock: In real life we'd fetch `policy.{env}.xml` from the repo using RepoService
-        // Here we just use the base product policy + simulate a merge if needed
-        const { finalXml } = await overlayService.mergePolicy(product.policy_xml, ''); // Empty overlay for now (Snapshot behavior preserved until explicit repo fetch added)
+        // 2b. Commit to Git (Primary Source of Truth)
+        let finalHash = sourceHash;
+        const repoService = new RepoService();
+        const fileList = sp.git_repo_url ? await repoService.listRepoFiles(productId, sp.git_repo_url).catch(() => []) : [];
+        const policyPath = ResourceDiscovery.resolveProductPolicyPath(fileList, sp.name, targetEnvironment)
+            || ResourceDiscovery.getDefaultProductPolicyPath(sp.name);
 
-        // 2b. Deploy to ARM/APIM
-        console.log(`[Promotion] Deploying to ARM...`);
-        const deployment = await deployProductToEnvironment(
-            productId,
-            targetEnvironment,
-            {
-                displayName: product.display_name,
-                description: product.description,
-                apiPath: product.api_path,
-                policyXml: finalXml // Use merged XML
-            }
-        );
-
-        if (!deployment.success) {
-            throw new Error(deployment.error || 'ARM deployment failed');
+        if (sp.git_repo_url) {
+            console.log(`[Promotion] Committing merged policy to Git for ${targetEnvironment} at ${policyPath}...`);
+            finalHash = await repoService.commitFiles(productId, sp.git_repo_url, [
+                { path: policyPath, content: finalXml }
+            ], `chore: Promote ${sp.name} to ${targetEnvironment} (Approval: ${approvalId})`);
+            console.log(`[Promotion] Produced Git Hash: ${finalHash}`);
         }
 
-        console.log(`[Promotion] ARM deployment successful: ${deployment.deploymentId}`);
+        // 2c. Direct APIM updates are DISALLOWED per architectural principles. 
+        // The Saga will reconcile APIM based on the Git commit produced above.
+        console.log(`[Promotion] Desired state committed to Git: ${finalHash}. Awaiting Saga reconciliation.`);
 
-        // 3. Update product hash in database
-        const hashColumn = `${targetEnvironment.toLowerCase()}_hash`;
+        // 2d. Store policy in blob storage (Persistence for portal view/history)
+        const { getBlobStorage } = await import('../storage/BlobStorageService.js');
+        const storage = getBlobStorage();
+        await storage.upload(Buffer.from(finalXml), policyPath, requesterId);
+
+        // 3. Upsert target environment row in database
+        const targetId = `${sp.name}:${targetEnvironment}:${sp.region}`;
+
         await query(`
-            UPDATE products
-            SET ${hashColumn} = $1,
+            INSERT INTO products (
+                id, name, display_name, version, description, state, owner_team_id, 
+                environment, region, type, visibility, authorized_teams, 
+                management_mode, pipeline_url, 
+                git_repo_url, identity_client_id, 
+                last_deployed_commit_hash, last_deployed_at,
+                updated_at
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, 
+                $8, $9, $10, $11, $12, 
+                $13, $14, $15, $16,
+                $17, NOW(),
+                NOW()
+            )
+            ON CONFLICT (id) DO UPDATE SET
+                display_name = EXCLUDED.display_name,
+                description = EXCLUDED.description,
+                state = EXCLUDED.state,
+                owner_team_id = EXCLUDED.owner_team_id,
+                pipeline_url = EXCLUDED.pipeline_url,
+                git_repo_url = EXCLUDED.git_repo_url,
+                last_deployed_commit_hash = EXCLUDED.last_deployed_commit_hash,
+                last_deployed_at = EXCLUDED.last_deployed_at,
                 updated_at = NOW()
-            WHERE id = $2
-        `, [sourceHash, productId]);
+        `, [
+            targetId, sp.name, sp.display_name, sp.version, sp.description, 'published', sp.owner_team_id,
+            targetEnvironment, sp.region, sp.type, sp.visibility, sp.authorized_teams,
+            'TERRAFORM_MANAGED', sp.pipeline_url || sp.terraform_pipeline_url,
+            sp.git_repo_url, sp.identity_client_id,
+            finalHash
+        ]);
 
-        console.log(`[Promotion] Updated ${hashColumn} to ${sourceHash}`);
+        console.log(`[Promotion] Upserted target environment row: ${targetId} with hash ${finalHash}`);
 
         // 4. Log SUCCESS to audit_log using AuditService
         await auditService.log({
-            // entityType removed, using resourceType
             resourceType: 'product',
             resourceId: productId,
             action: 'PROMOTE',
             userId: requesterId,
-            userEmail: 'system@portal.local', // TODO: userEmail passing 
+            userEmail: 'system@portal.local',
             userRole: 'system',
             details: {
                 targetEnvironment,
                 sourceHash,
-                deploymentId: deployment.deploymentId,
+                finalHash,
                 approvalId,
                 status: 'success'
             }
@@ -124,9 +151,9 @@ export async function autoPromoteProduct(
         console.log(`[Promotion] Logged to audit trail`);
 
         return {
-            success: true,
-            deploymentId: deployment.deploymentId
+            success: true
         };
+
 
     } catch (error: any) {
         console.error(`[Promotion] Failed:`, error);
@@ -167,46 +194,74 @@ export async function promoteProduct(
     console.log(`[Promotion] Manual promotion of ${productId} to ${targetEnvironment} by ${requesterId}`);
 
     try {
-        // 1. Get product details for deployment
+        // 1. Get product details for promotion
         const productRes = await query(`
-            SELECT display_name, description, api_path, policy_xml, dev_hash
-            FROM products
-            WHERE id = $1
+            SELECT * FROM products WHERE id = $1
         `, [productId]);
 
         if (productRes.rows.length === 0) {
             throw new Error(`Product ${productId} not found`);
         }
 
-        const product = productRes.rows[0];
+        const sp = productRes.rows[0];
+        const targetId = `${sp.name}:${targetEnvironment}:${sp.region}`;
 
-        // 2. Deploy to ARM/APIM
-        console.log(`[Promotion] Deploying to ARM...`);
-        const deployment = await deployProductToEnvironment(
-            productId,
-            targetEnvironment,
-            {
-                displayName: product.display_name,
-                description: product.description,
-                apiPath: product.api_path,
-                policyXml: product.policy_xml
-            }
-        );
+        // 2. Prepare content for target environment
+        const { getProductPolicy } = await import('../inventory/ProductsService.js');
+        const { policyXml } = await getProductPolicy(productId);
 
-        if (!deployment.success) {
-            throw new Error(deployment.error || 'ARM deployment failed');
+        let finalHash = sp.last_deployed_commit_hash || 'manual-hash';
+
+        // 3. Commit to Git (Primary Source of Truth)
+        const repoService = new RepoService();
+        const fileList = sp.git_repo_url ? await repoService.listRepoFiles(productId, sp.git_repo_url).catch(() => []) : [];
+        const policyPath = ResourceDiscovery.resolveProductPolicyPath(fileList, sp.name, targetEnvironment)
+            || ResourceDiscovery.getDefaultProductPolicyPath(sp.name);
+
+        if (sp.git_repo_url) {
+            console.log(`[Promotion] Committing manual promotion to Git for ${targetEnvironment} at ${policyPath}...`);
+            finalHash = await repoService.commitFiles(productId, sp.git_repo_url, [
+                { path: policyPath, content: policyXml }
+            ], `chore: Manual promote ${sp.name} to ${targetEnvironment} by ${requesterId}`);
+            console.log(`[Promotion] Produced Git Hash: ${finalHash}`);
         }
 
-        // 3. Update hash in DB
-        const hashColumn = `${targetEnvironment.toLowerCase()}_hash`;
+        // 4. Upsert target environment row in database
         await query(`
-            UPDATE products
-            SET ${hashColumn} = $1,
-            updated_at = NOW()
-            WHERE id = $2
-        `, [product.dev_hash || 'manual-hash', productId]);
+            INSERT INTO products (
+                id, name, display_name, version, description, state, owner_team_id, 
+                environment, region, type, visibility, authorized_teams, 
+                management_mode, terraform_pipeline_url, github_url, 
+                git_repo_url, git_file_path, identity_client_id, 
+                last_deployed_commit_hash, last_deployed_at,
+                updated_at
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, 
+                $8, $9, $10, $11, $12, 
+                $13, $14, $15, 
+                $16, $17, $18, 
+                $19, NOW(),
+                NOW()
+            )
+            ON CONFLICT (id) DO UPDATE SET
+                display_name = EXCLUDED.display_name,
+                description = EXCLUDED.description,
+                state = EXCLUDED.state,
+                owner_team_id = EXCLUDED.owner_team_id,
+                last_deployed_commit_hash = EXCLUDED.last_deployed_commit_hash,
+                last_deployed_at = EXCLUDED.last_deployed_at,
+                updated_at = NOW()
+        `, [
+            targetId, sp.name, sp.display_name, sp.version, sp.description, 'published', sp.owner_team_id,
+            targetEnvironment, sp.region, sp.type, sp.visibility, sp.authorized_teams,
+            'TERRAFORM_MANAGED', sp.terraform_pipeline_url, sp.github_url,
+            sp.git_repo_url, sp.git_file_path, sp.identity_client_id,
+            finalHash
+        ]);
 
-        // 4. Log to audit trail
+        console.log(`[Promotion] Manual upsert target row: ${targetId}`);
+
+        // 5. Log to audit trail
         await auditService.log({
             resourceType: 'product',
             resourceId: productId,
@@ -216,15 +271,14 @@ export async function promoteProduct(
             userRole: 'system',
             details: {
                 targetEnvironment,
-                deploymentId: deployment.deploymentId,
+                finalHash,
                 method: 'manual',
                 status: 'success'
             }
         });
 
         return {
-            success: true,
-            deploymentId: deployment.deploymentId
+            success: true
         };
     } catch (error: any) {
         console.error(`[Promotion] Manual promotion failed:`, error);

@@ -122,12 +122,12 @@ export class ApisRepository {
     async addApi(api: any) {
         return await query(`
             INSERT INTO apis (
-                id, product_id, name, display_name, description, path, quality_score, origin_team_id, git_repo_url, git_file_path, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+                id, product_id, name, display_name, description, path, quality_score, origin_team_id, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
             RETURNING *
         `, [
             api.id, api.productId, api.name, api.displayName, api.description, api.path,
-            api.qualityScore || 0, api.originTeamId, api.gitRepoUrl, api.gitFilePath
+            api.qualityScore || 0, api.originTeamId
         ]);
     }
 

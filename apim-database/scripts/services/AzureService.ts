@@ -431,8 +431,71 @@ export class AzureService {
     }
 
     /**
-     * Scan recent builds to find the latest successful stage matching a name.
-     * More robust than Environment API for many enterprise setups.
+     * Efficiently scans build history for multiple stages in one pass.
+     * Continues scanning until all requested stages are found OR a max limit (100 builds) is reached.
+     */
+    static async fetchLatestStageResults(
+        org: string,
+        project: string,
+        definitionId: number,
+        stageNames: string[],
+        pat: string,
+        baseUrl: string = 'https://dev.azure.com'
+    ): Promise<Record<string, { hash: string; date: string }>> {
+        const results: Record<string, { hash: string; date: string }> = {};
+        const remainingStages = new Set(stageNames.map(s => s.toLowerCase()));
+
+        console.log(`      🔎 [Deep Scan] Searching for stages: [${stageNames.join(', ')}] in Pipeline ${definitionId}...`);
+
+        const pageSize = 20;
+        const maxBuilds = 100;
+
+        try {
+            for (let offset = 0; offset < maxBuilds && remainingStages.size > 0; offset += pageSize) {
+                const builds = await this.fetchBuildsByDefinition(org, project, definitionId, pat, baseUrl, undefined, pageSize, offset);
+                if (builds.length === 0) break;
+
+                console.log(`      ⏳ [Deep Scan] Scanning builds ${offset + 1} to ${offset + builds.length}...`);
+
+                for (const build of builds) {
+                    const timeline = await this.fetchPipelineRunTimeline(org, project, build.id, pat, baseUrl);
+                    if (!timeline) continue;
+
+                    // Check each remaining stage against this build's timeline
+                    for (const stageName of Array.from(remainingStages)) {
+                        const stage = timeline.find(r =>
+                            r.type?.toLowerCase() === 'stage' &&
+                            r.name?.toLowerCase().includes(stageName) &&
+                            r.status?.toLowerCase() === 'completed' &&
+                            r.result?.toLowerCase() === 'succeeded'
+                        );
+
+                        if (stage) {
+                            results[stageName.toUpperCase()] = {
+                                hash: build.sourceVersion || 'unknown',
+                                date: stage.finishTime || build.finishTime
+                            };
+                            remainingStages.delete(stageName);
+                            console.log(`      ✅ [HIT] Found ${stageName.toUpperCase()} in Build ${build.id} (${build.sourceVersion?.substring(0, 7)})`);
+                        }
+                    }
+
+                    if (remainingStages.size === 0) break;
+                }
+            }
+
+            if (remainingStages.size > 0) {
+                console.log(`      ⚠️  [Deep Scan] Could not find remaining stages: [${Array.from(remainingStages).join(', ')}] after ${maxBuilds} builds.`);
+            }
+        } catch (err: any) {
+            console.error(`      ❌ [Deep Scan] Critical error: ${err.message}`);
+        }
+
+        return results;
+    }
+
+    /**
+     * Legacy single-stage wrapper for backward compatibility.
      */
     static async fetchLatestStageResult(
         org: string,
@@ -442,40 +505,8 @@ export class AzureService {
         pat: string,
         baseUrl: string = 'https://dev.azure.com'
     ): Promise<{ hash: string; date: string } | null> {
-        console.log(`      🔎 [Scan] Searching for successful Stage: "${stageName}" in Pipeline ${definitionId}...`);
-
-        try {
-            // 1. Get last 15 successful builds
-            const builds = await this.fetchBuildsByDefinition(org, project, definitionId, pat, baseUrl, undefined, 15);
-            if (builds.length === 0) {
-                console.log(`      ⚠️ [Scan] No successful builds found for Pipeline ${definitionId}`);
-                return null;
-            }
-
-            // 2. Scan timelines for the stage
-            for (const build of builds) {
-                const timeline = await this.fetchPipelineRunTimeline(org, project, build.id, pat, baseUrl);
-                const stage = timeline.find(r =>
-                    r.type?.toLowerCase() === 'stage' &&
-                    r.name?.toLowerCase().includes(stageName.toLowerCase()) &&
-                    r.status?.toLowerCase() === 'completed' &&
-                    r.result?.toLowerCase() === 'succeeded'
-                );
-
-                if (stage) {
-                    console.log(`      ✅ [Scan] Found match in Build ${build.id}: Stage "${stage.name}" finished at ${stage.finishTime}`);
-                    return {
-                        hash: build.sourceVersion || 'unknown',
-                        date: stage.finishTime || build.finishTime
-                    };
-                }
-            }
-
-            console.log(`      ⚠️ [Scan] Stage "${stageName}" not found in last ${builds.length} builds.`);
-        } catch (err: any) {
-            console.error(`      ❌ [Scan] Critical error during timeline scan: ${err.message}`);
-        }
-        return null;
+        const results = await this.fetchLatestStageResults(org, project, definitionId, [stageName], pat, baseUrl);
+        return results[stageName.toUpperCase()] || null;
     }
     static async fetchPipelineRuns(org: string, project: string, pipelineId: number, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<PipelineRun[]> {
         const cleanBaseUrl = baseUrl.replace(/\/+$/, '');

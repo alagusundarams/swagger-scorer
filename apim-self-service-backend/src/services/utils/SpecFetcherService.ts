@@ -140,7 +140,7 @@ export async function fetchSpecForProduct(productId: string): Promise<string> {
     console.log(`[SpecFetcher] Fetching spec for ${productId}...`);
     // Get product from database
     const result = await query(`
-        SELECT id, name, git_repo_url, git_file_path, environment
+        SELECT id, name, git_repo_url, environment
         FROM products
         WHERE id = $1
     `, [productId]);
@@ -153,11 +153,18 @@ export async function fetchSpecForProduct(productId: string): Promise<string> {
 
     // Try Git first if available
     if (product.git_repo_url) {
-        console.log(`[SpecFetcher] Attempting Git fetch from ${product.git_repo_url} / ${product.git_file_path || 'openapi.yaml'}`);
+        console.log(`[SpecFetcher] Attempting Git fetch from ${product.git_repo_url}...`);
         try {
-            const spec = await fetchFileFromGitApi(product.git_repo_url, product.git_file_path);
-            console.log(`[SpecFetcher] ✅ Successfully fetched from Git`);
-            return spec;
+            // Use discovery-style defaults if we don't have a path
+            // For now we just try a few common paths since this is a fallback service
+            const pathsToTry = ['openapi.yaml', 'swagger.yaml', 'openapi.json'];
+            for (const path of pathsToTry) {
+                try {
+                    const spec = await fetchFileFromGitApi(product.git_repo_url, path);
+                    console.log(`[SpecFetcher] ✅ Successfully fetched from Git: ${path}`);
+                    return spec;
+                } catch (e) { /* continue */ }
+            }
         } catch (gitErr) {
             console.warn(`[SpecFetcher] ⚠️ Failed to fetch from Git, falling back to APIM:`, gitErr instanceof Error ? gitErr.message : gitErr);
         }

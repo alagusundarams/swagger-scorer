@@ -18,25 +18,12 @@ async function migrate() {
     try {
         console.log(`🔄 Starting Schema Migration on ${envConfig.databaseUrl}...`);
 
-        // Add `github_url` if not exists
+        // Rename/Add pipeline_url if not exists
         await pool.query(`
             ALTER TABLE products 
-            ADD COLUMN IF NOT EXISTS github_url TEXT;
+            ADD COLUMN IF NOT EXISTS pipeline_url TEXT;
         `);
-        console.log("✅ Added 'github_url' column.");
-
-        // Add `terraform_pipeline_url` if not exists (Note: schema says it accepts it, but verifying)
-        // Actually, looking at 01-schema.sql, `terraform_pipeline_url` WAS there line 87. 
-        // But `github_url` was missing? Or incorrectly named?
-        // Wait, line 90 says `git_repo_url TEXT`. 
-        // The sync script uses `github_url`. We should ALIAS or ADD it.
-        // Let's add `terraform_pipeline_url` explicitly just in case.
-
-        await pool.query(`
-            ALTER TABLE products 
-            ADD COLUMN IF NOT EXISTS terraform_pipeline_url TEXT;
-        `);
-        console.log("✅ Added 'terraform_pipeline_url' column.");
+        console.log("✅ Added 'pipeline_url' column.");
 
         console.log("🚀 Migration Complete.");
     } catch (err) {

@@ -1,13 +1,6 @@
-/**
- * Policy Display Routes
- * 
- * Gateway-agnostic endpoints
- * Backend parses policies, returns display metadata
- */
-
 import { FastifyPluginAsync } from 'fastify';
-import { query } from '../services/core/db.js';
 import { getGatewayService } from '../services/gateway/GatewayFactory.js';
+
 
 const policyDisplayRoutes: FastifyPluginAsync = async (fastify) => {
     /**
@@ -18,60 +11,41 @@ const policyDisplayRoutes: FastifyPluginAsync = async (fastify) => {
         const { id } = request.params as { id: string };
 
         try {
-            // Get product with policy XML
-            const result = await query(`
-                SELECT id, policy_xml, gateway_type
-                FROM products
-                WHERE id = $1
-            `, [id]);
+            const { getProductPolicy } = await import('../services/inventory/ProductsService.js');
+            const { ProductsRepository } = await import('../repositories/products.repo.js');
+            const productsRepo = new ProductsRepository();
 
-            if (result.rows.length === 0) {
-                return reply.code(404).send({ error: 'Product not found' });
-            }
+            const { policyXml } = await getProductPolicy(id);
+            const productRes = await productsRepo.getProductById(id);
+            const product = productRes.rows[0];
 
-            const product = result.rows[0];
-            const gatewayType = product.gateway_type || 'apim';  // Default to APIM
-            const policyXml = product.policy_xml || '';
+            if (!product) return reply.code(404).send({ error: 'Product not found' });
 
-            // Get gateway service
+            const gatewayType = product.gateway_type || 'apim';
             const gateway = getGatewayService(gatewayType);
-
-            // Parse to display structure (backend processing)
             const displayStructure = gateway.parseToDisplayStructure(policyXml);
 
-            return {
-                success: true,
-                productId: id,
-                displayStructure
-            };
+            return { success: true, productId: id, displayStructure };
         } catch (error: any) {
             fastify.log.error({ err: error }, 'Failed to get policy display');
             return reply.code(500).send({ error: error.message });
         }
     });
 
-    /**
-     * POST /api/v1/products/:id/policy-validate
-     * Validate policy syntax
-     */
     fastify.post('/products/:id/policy-validate', async (request, reply) => {
         const { id } = request.params as { id: string };
         const { policyXml } = request.body as { policyXml: string };
 
         try {
-            // Get product to determine gateway type
-            const result = await query(`
-                SELECT gateway_type FROM products WHERE id = $1
-            `, [id]);
+            const { ProductsRepository } = await import('../repositories/products.repo.js');
+            const productsRepo = new ProductsRepository();
+            const productRes = await productsRepo.getProductById(id);
+            const product = productRes.rows[0];
 
-            if (result.rows.length === 0) {
-                return reply.code(404).send({ error: 'Product not found' });
-            }
+            if (!product) return reply.code(404).send({ error: 'Product not found' });
 
-            const gatewayType = result.rows[0].gateway_type || 'apim';
+            const gatewayType = product.gateway_type || 'apim';
             const gateway = getGatewayService(gatewayType);
-
-            // Validate
             const validation = gateway.validatePolicy(policyXml);
 
             return { success: true, validation };

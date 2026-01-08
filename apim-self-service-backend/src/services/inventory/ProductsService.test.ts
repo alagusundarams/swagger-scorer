@@ -149,7 +149,7 @@ describe('Products Service Final Final', () => {
         await productsService.updatePermissionMatrix('p1', [{ adGroupId: 'g1', environment: 'DEV', role: 'admin' }]);
 
         await productsService.getProductPolicy('p1');
-        await productsService.updateProductPolicy('p1', '<xml/>', mockUserContext);
+        await productsService.updateProductPolicy('p1', '<xml/>', { id: 'user1', ...mockUserContext });
 
         await productsService.ejectProduct('p1');
         await productsService.syncProductOperations('p1');

@@ -117,8 +117,12 @@ export const OnboardingIntentModal = ({ onSelectIntent, userTeams }: OnboardingI
 
                 {/* Existing Product Card */}
                 <div
-                    onClick={() => setMode('picking')}
-                    className="group relative bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all cursor-pointer overflow-hidden"
+                    onClick={() => myProducts.length > 0 && setMode('picking')}
+                    className={`group relative bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-xl transition-all overflow-hidden ${myProducts.length > 0
+                            ? 'hover:shadow-2xl hover:scale-[1.02] cursor-pointer'
+                            : 'opacity-50 cursor-not-allowed'
+                        }`}
+                    title={myProducts.length === 0 ? 'No products available. Create a new product first.' : ''}
                 >
                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
                         <span className="text-9xl">🌿</span>
@@ -130,9 +134,15 @@ export const OnboardingIntentModal = ({ onSelectIntent, userTeams }: OnboardingI
                     <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
                         Append a REST/SOAP API to an existing product. Inherits current policies and team ownership.
                     </p>
-                    <div className="mt-6 text-xs font-bold text-blue-600 uppercase tracking-wider group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
-                        Select Product <span>→</span>
-                    </div>
+                    {myProducts.length === 0 ? (
+                        <div className="mt-6 text-xs font-bold text-orange-500 uppercase tracking-wider inline-flex items-center gap-1">
+                            ⚠️ No Products Available
+                        </div>
+                    ) : (
+                        <div className="mt-6 text-xs font-bold text-blue-600 uppercase tracking-wider group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
+                            Select Product <span>→</span>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

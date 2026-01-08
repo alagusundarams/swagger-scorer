@@ -16,6 +16,7 @@ import { ApisRepository } from '../../repositories/apis.repo.js';
 import { OperationsRepository } from '../../repositories/operations.repo.js';
 import { TeamsRepository } from '../../repositories/teams.repo.js';
 import { NamedValuesRepository } from '../../repositories/named-values.repo.js';
+import { ResourceDiscovery, DiscoveryResult } from '../../utils/resourceDiscovery.js';
 import { fetchSpecForProduct } from '../utils/SpecFetcherService.js';
 import { createNamedValue } from './NamedValuesService.js';
 
@@ -98,16 +99,6 @@ async function assembleProducts(productRows: any[], apiRows: any[]) {
     const repoService = new RepoService();
 
     return await Promise.all(productRows.map(async (p: any) => {
-        // Map Hashes
-        const envHashes = {
-            DEV: p.dev_hash,
-            QA: p.qa_hash,
-            STAGE: p.stage_hash,
-            PROD: p.prod_hash
-        };
-
-        const currentEnvHash = envHashes[p.environment as keyof typeof envHashes] || null;
-
         return {
             // Core fields
             id: p.id,
@@ -131,13 +122,13 @@ async function assembleProducts(productRows: any[], apiRows: any[]) {
 
             // Management
             managementMode: p.management_mode,
-            terraformPipelineUrl: p.terraform_pipeline_url,
+            pipelineUrl: p.pipeline_url,
             gitRepoUrl: p.git_repo_url,
-            gitFilePath: p.git_file_path,
             lastDeployedCommitHash: p.last_deployed_commit_hash,
+            lastDeployedAt: p.last_deployed_at,
 
-            // Environment Hashes (Version Matrix)
-            envHashes,
+            // Deployment Status
+            isDeployed: !!p.last_deployed_commit_hash,
 
             // Identity (App Registration)
             identity: p.identity_client_id ? {
@@ -161,7 +152,7 @@ async function assembleProducts(productRows: any[], apiRows: any[]) {
                     if (process.env.ENABLE_GIT_CHECKS === 'true' && a.git_repo_url && a.git_file_path) {
                         try {
                             const metadata = await repoService.getCommitMetadata(a.git_repo_url, a.git_file_path);
-                            if (metadata && metadata.hash !== currentEnvHash) {
+                            if (metadata && metadata.hash !== p.last_deployed_commit_hash) {
                                 statusDetails = `Changed in ${p.environment} (Draft)`;
                             }
                         } catch (e) {
@@ -271,14 +262,6 @@ export async function getProductById(id: string, environment?: string, userConte
     // Fetch APIs for this product
     const apiRes = await apisRepo.getAllApisByProductId(id);
 
-    // Map Hashes
-    const envHashes = {
-        DEV: p.dev_hash,
-        QA: p.qa_hash,
-        STAGE: p.stage_hash,
-        PROD: p.prod_hash
-    };
-
     // Determine effective environment for the view
     const effectiveEnv = environment || p.environment;
 
@@ -286,8 +269,7 @@ export async function getProductById(id: string, environment?: string, userConte
     const accessLevel = await calculateAccessLevel(p, userContext, effectiveEnv);
 
     // GATE 3: Deployment Check
-    const currentEnvHash = envHashes[effectiveEnv as keyof typeof envHashes] || null;
-    const isDeployed = !!currentEnvHash;
+    const isDeployed = !!p.last_deployed_commit_hash;
 
     // --- Strict Gating: Strip data if access is blocked ---
     if (accessLevel === 'NONE') {
@@ -319,7 +301,6 @@ export async function getProductById(id: string, environment?: string, userConte
         // RBAC Meta
         accessLevel,
         isDeployed,
-        envHashes, // Include for frontend to disable options
 
         // Team ownership
         ownerTeamId: p.owner_team_id,
@@ -332,9 +313,8 @@ export async function getProductById(id: string, environment?: string, userConte
 
         // Management
         managementMode: p.management_mode,
-        terraformPipelineUrl: p.terraform_pipeline_url,
+        pipelineUrl: p.pipeline_url,
         gitRepoUrl: p.git_repo_url,
-        gitFilePath: p.git_file_path,
         lastDeployedCommitHash: p.last_deployed_commit_hash,
 
 
@@ -356,7 +336,7 @@ export async function getProductById(id: string, environment?: string, userConte
             if (process.env.ENABLE_GIT_CHECKS === 'true' && a.git_repo_url && a.git_file_path) {
                 try {
                     const metadata = await repoService.getCommitMetadata(a.git_repo_url, a.git_file_path);
-                    if (metadata && metadata.hash !== currentEnvHash) {
+                    if (metadata && metadata.hash !== p.last_deployed_commit_hash) {
                         statusDetails = `Changed in ${effectiveEnv}`;
                     }
                 } catch (e) {
@@ -429,15 +409,28 @@ export async function getSecureProductSpec(productId: string, userGroups: string
         throw new Error(`ACCESS_DENIED: User does not have access to ${product.environment} environment contracts.`);
     }
 
-    // 3. Delegation (Preserve Mock Logic)
+    // 3. Delegation (Discovery-Aware Spec Fetching)
     const config = getAppConfig();
     const isMock = config.useBackendMocks;
 
-    const { fetchSpecForProduct } = isMock
-        ? await import('../utils/SpecFetcherService.mock.js')
-        : await import('../utils/SpecFetcherService.js');
+    if (isMock) {
+        const { fetchSpecForProduct } = await import('../utils/SpecFetcherService.mock.js');
+        return await fetchSpecForProduct(productId);
+    }
 
-    return await fetchSpecForProduct(productId);
+    // Direct Discovery for Contracts
+    const repoService = new RepoService();
+    const fileList = await repoService.listRepoFiles(product.id, product.git_repo_url).catch(() => []);
+    const contractPath = ResourceDiscovery.resolveContractPath(fileList, product.name, product.name);
+
+    if (contractPath && product.git_repo_url) {
+        const content = await repoService.getFileContent(product.id, product.git_repo_url, contractPath);
+        if (content) return content;
+    }
+
+    // Fallback to SpecFetcherService
+    const { fetchSpecForProduct: realFetch } = await import('../utils/SpecFetcherService.js');
+    return await realFetch(productId);
 }
 
 /**
@@ -521,8 +514,7 @@ export async function addProduct(product: {
     environment: string,
     type?: string,
     managementMode?: string,
-    gitRepoUrl?: string,
-    gitFilePath?: string
+    gitRepoUrl?: string
 }) {
     const res = await productsRepo.addProduct(product);
 
@@ -552,8 +544,7 @@ export async function addApi(api: {
     path: string,
     qualityScore?: number,
     originTeamId?: string,
-    gitRepoUrl?: string,
-    gitFilePath?: string
+    gitRepoUrl?: string
 }) {
     const res = await apisRepo.addApi(api);
 
@@ -951,46 +942,122 @@ export async function ejectProduct(productId: string) {
 }
 /**
  * Fetch Product Policy XML
+ * SOURCE OF TRUTH: 
+ * 1. If Deployed (has hash) -> Fetch from Git (source of truth for managed state)
+ * 2. Else -> Fetch from Blob Storage (Drafts/Onboarding)
+ * 3. Fallback -> APIM (as last resort/discovery)
  */
 export async function getProductPolicy(productId: string) {
-    const res = await productsRepo.getProductPolicy(productId);
-    if (res.rows.length === 0) throw new Error('Product not found');
+    const productRes = await productsRepo.getProductById(productId);
+    if (productRes.rows.length === 0) throw new Error('Product not found');
+    const p = productRes.rows[0];
+
+    const repoService = new RepoService();
+    let xml: string | null = null;
+    let metadata: DiscoveryResult = { path: null, source: 'BLOB', readOnly: false };
+
+    // 1. Try Git Discovery
+    if (p.git_repo_url) {
+        try {
+            const fileList = await repoService.listRepoFiles(productId, p.git_repo_url);
+            const resolvedPath = ResourceDiscovery.resolveProductPolicyPath(fileList, p.name, p.environment);
+
+            if (resolvedPath) {
+                xml = await repoService.getFileContent(productId, p.git_repo_url, resolvedPath);
+                if (xml) {
+                    metadata = { path: resolvedPath, source: 'GIT', readOnly: false };
+                }
+            }
+        } catch (err) {
+            console.warn(`[ProductsService] Git discovery failed, falling back:`, err);
+        }
+    }
+
+    // 2. Try Blob Discovery (Standard or Multi-Strategy Path)
+    if (!xml) {
+        const { getBlobStorage } = await import('../storage/BlobStorageService.js');
+        const storage = getBlobStorage();
+
+        // Try both structures in blob
+        const blobList = await storage.listAll();
+        const resolvedPath = ResourceDiscovery.resolveProductPolicyPath(blobList, p.name, p.environment) || ResourceDiscovery.getDefaultProductPolicyPath(p.name);
+
+        if (await storage.exists(resolvedPath)) {
+            const buffer = await storage.download(resolvedPath);
+            xml = buffer.toString();
+            metadata = { path: resolvedPath, source: 'BLOB', readOnly: false };
+        }
+    }
+
+    // 3. Fallback to APIM Live State (Governance Warning)
+    if (!xml && p.last_deployed_commit_hash) {
+        console.log(`[ProductsService] Falling back to APIM Live State for ${p.name}`);
+        const apim = await getApimService();
+        xml = await apim.getProductPolicy(p.name, p.environment);
+        metadata = {
+            path: 'LIVE_APIM',
+            source: 'APIM',
+            readOnly: true,
+            warning: '⚠️ Read-Only: This policy is fetched from APIM Live State. Changes must be committed to Git for deployment.'
+        };
+    }
+
     return {
         id: productId,
-        policyXml: res.rows[0].policy_xml || '<policies>\n  <inbound>\n    <base />\n  </inbound>\n  <backend>\n    <base />\n  </backend>\n  <outbound>\n    <base />\n  </outbound>\n  <on-error>\n    <base />\n  </on-error>\n</policies>'
+        policyXml: xml || '<policies>\n  <inbound>\n    <base />\n  </inbound>\n  <backend>\n    <base />\n  </backend>\n  <outbound>\n    <base />\n  </outbound>\n  <on-error>\n    <base />\n  </on-error>\n</policies>',
+        metadata
     };
 }
 
 /**
  * Update Product Policy XML
+ * SOURCE OF TRUTH:
+ * 1. If Deployed -> Commit to Git (Saga then deploys)
+ * 2. Else -> Update Blob Storage (Draft)
  */
-/**
- * Update Product Policy XML
- */
-export async function updateProductPolicy(productId: string, xml: string, userContext: { role: string, teams: string[], groups: string[] }) {
+export async function updateProductPolicy(productId: string, xml: string, userContext: { id: string, role: string, teams: string[], groups: string[] }) {
     // 1. Fetch Product
     const productRes = await productsRepo.getProductById(productId);
     if (productRes.rows.length === 0) throw new Error('Product not found');
-    const product = productRes.rows[0];
+    const p = productRes.rows[0];
 
     // 2. Validate Access (Must have WRITE access)
-    const accessLevel = await calculateAccessLevel(product, userContext, product.environment);
+    const accessLevel = await calculateAccessLevel(p, userContext, p.environment);
     if (accessLevel !== 'WRITE') {
-        throw new Error(`ACCESS_DENIED: You do not have permission to edit policies in ${product.environment}.`);
+        throw new Error(`ACCESS_DENIED: You do not have permission to edit policies in ${p.environment}.`);
     }
 
-    // 3. Update
-    const res = await productsRepo.updateProductPolicy(productId, xml);
-    if (res.rows.length === 0) throw new Error('Product not found');
+    // 3. Resolve Path via Discovery
+    const repoService = new RepoService();
+    const fileList = p.git_repo_url ? await repoService.listRepoFiles(productId, p.git_repo_url).catch(() => []) : [];
+    const resolvedPath = ResourceDiscovery.resolveProductPolicyPath(fileList, p.name, p.environment)
+        || ResourceDiscovery.getDefaultProductPolicyPath(p.name);
+
+    if (p.last_deployed_commit_hash && p.git_repo_url) {
+        // Target: Git (Source of truth for managed state)
+        console.log(`[ProductsService] Committing live policy update to Git for ${p.name} at ${resolvedPath}`);
+        const newHash = await repoService.commitFiles(productId, p.git_repo_url, [
+            { path: resolvedPath, content: xml }
+        ], `chore: Update policy for ${p.name} via Policy Studio`);
+
+        await productsRepo.updateProduct(productId, { last_deployed_commit_hash: newHash });
+    } else {
+        // Target: Blob Storage (Draft)
+        console.log(`[ProductsService] Updating policy draft in Blob Storage: ${resolvedPath}`);
+        const { getBlobStorage } = await import('../storage/BlobStorageService.js');
+        const storage = getBlobStorage();
+        await storage.upload(Buffer.from(xml), resolvedPath, userContext.id);
+    }
 
     await logAudit({
         entityType: 'PRODUCT',
         entityId: productId,
         action: 'UPDATE_POLICY',
-        userId: 'system-user', // Should use real user, but context passed for Authz
-        changes: { note: 'Product Policy Updated via Policy Studio' }
+        userId: userContext.id,
+        changes: { note: 'Product Policy Updated via Policy Studio', destination: p.last_deployed_commit_hash ? 'GIT' : 'BLOB' }
     });
-    return res.rows[0];
+
+    return { success: true };
 }
 
 /**

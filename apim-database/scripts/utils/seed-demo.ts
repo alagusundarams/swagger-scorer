@@ -111,16 +111,14 @@ async function seedDemoData() {
         `);
 
         await pool.query(`
-            INSERT INTO apis (id, product_id, name, display_name, path, quality_score, git_repo_url, git_file_path)
+            INSERT INTO apis (id, product_id, name, display_name, path, quality_score)
             VALUES (
                 'api-legacy-01',
                 'prod-legacy',
                 'order-processing',
                 'Order Processing Endpoint',
                 '/orders/v1',
-                40.00,
-                NULL,
-                NULL
+                40.00
             );
         `);
         console.log('✅ Legacy Product Seeded.');
@@ -132,8 +130,8 @@ async function seedDemoData() {
                 id, name, display_name, version, state, environment,
                 owner_team_id, management_mode, authorized_teams,
                 detected_anomalies, quality_score, 
-                last_deployed_commit_hash, terraform_pipeline_url,
-                dev_hash, qa_hash, production_hash, git_repo_url
+                last_deployed_commit_hash, pipeline_url,
+                git_repo_url
             ) VALUES (
                 'prod-payment-v2',
                 'payment-gateway-v2',
@@ -148,24 +146,19 @@ async function seedDemoData() {
                 98.50,
                 'a1b2c3d',
                 'https://dev.azure.com/contoso/project/_build?definitionId=123',
-                'new-feature-hash-xyz',
-                'a1b2c3d',
-                'a1b2c3d',
                 'https://dev.azure.com/contoso/payment-gateway-v2'
             );
         `);
 
         await pool.query(`
-            INSERT INTO apis (id, product_id, name, display_name, path, quality_score, git_repo_url, git_file_path)
+            INSERT INTO apis (id, product_id, name, display_name, path, quality_score)
             VALUES (
                 'api-payment-v2',
                 'prod-payment-v2',
                 'payment-api',
                 'Payment API',
                 '/payments/v2',
-                99.00,
-                'https://dev.azure.com/contoso/payment-gateway-v2',
-                'src/specs/payment-v2.yaml'
+                99.00
             );
         `);
         console.log('✅ Modern Product Seeded.');

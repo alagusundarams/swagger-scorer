@@ -196,24 +196,22 @@ async function main() {
             console.log(`   ✅ Pipeline: ${matchedPipeline.name}`);
 
             const envsToSync = targetEnv ? [targetEnv] : prod.environments;
-            for (const envName of envsToSync) {
-                try {
-                    const deploy = await AzureService.fetchLatestStageResult(
-                        devops.organization, projectId || project, matchedPipeline.id, envName, devops.pat, devops.baseUrl
-                    );
+            try {
+                const batchResults = await AzureService.fetchLatestStageResults(
+                    devops.organization, projectId || project, matchedPipeline.id, envsToSync, devops.pat, devops.baseUrl
+                );
 
+                for (const envName of envsToSync) {
+                    const deploy = batchResults[envName.toUpperCase()];
                     if (deploy) {
-                        meta.deployments[envName] = {
-                            hash: deploy.hash,
-                            date: deploy.date
-                        };
-                        console.log(`      🎯 [HIT] ${envName.padEnd(5)}: Captured ${deploy.hash.substring(0, 7)} (via Stage Sync)`);
+                        meta.deployments[envName] = { hash: deploy.hash, date: deploy.date };
+                        console.log(`      🎯 [HIT] ${envName.padEnd(5)}: Captured ${deploy.hash.substring(0, 7)}`);
                     } else {
-                        console.log(`      ⚠️  [MISS] ${envName.padEnd(5)}: No successful stage found.`);
+                        console.log(`      ⚠️  [MISS] ${envName.padEnd(5)}: Not found in deep scan (100 builds).`);
                     }
-                } catch (err: any) {
-                    console.error(`      ❌ [Error] Failed to sync ${envName}: ${err.message}`);
                 }
+            } catch (err: any) {
+                console.error(`      ❌ [Error] Batch sync failed: ${err.message}`);
             }
             results.push(meta);
         } catch (e: any) {

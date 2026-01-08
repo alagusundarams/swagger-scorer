@@ -5,10 +5,8 @@
  */
 
 import { query } from '../core/db.js';
-import { readFile } from 'fs/promises';
-import { join } from 'path';
-import { tmpdir } from 'os';
-import simpleGit from 'simple-git';
+import { RepoService } from '../git/ado/RepoService.js';
+import { ResourceDiscovery } from '../../utils/resourceDiscovery.js';
 import * as yaml from 'yamljs';
 import SwaggerParser from '@apidevtools/swagger-parser';
 
@@ -21,7 +19,7 @@ export async function scoreAllProducts() {
     try {
         // Get all products without scores
         const result = await query(`
-            SELECT id, name, git_repo_url, git_file_path
+            SELECT id, name, git_repo_url
             FROM products
             WHERE quality_score IS NULL
             ORDER BY created_at DESC
@@ -43,8 +41,8 @@ export async function scoreAllProducts() {
             try {
                 const score = await scoreProduct(
                     product.id,
-                    product.git_repo_url,
-                    product.git_file_path
+                    product.name,
+                    product.git_repo_url
                 );
 
                 if (score !== null) {
@@ -80,25 +78,29 @@ export async function scoreAllProducts() {
  */
 async function scoreProduct(
     productId: string,
-    gitRepoUrl: string | null,
-    gitFilePath: string | null
+    productName: string,
+    gitRepoUrl: string | null
 ): Promise<number | null> {
     // If no Git repo, can't score
     if (!gitRepoUrl) {
         return null;
     }
 
-    const repoPath = join(tmpdir(), `scoring-${productId}-${Date.now()}`);
-
     try {
-        // Clone the repo
-        console.log(`    📥 Cloning ${gitRepoUrl}...`);
-        const git = simpleGit();
-        await git.clone(gitRepoUrl, repoPath, ['--depth', '1']);
+        const repoService = new RepoService();
 
-        // Read OpenAPI spec
-        const specPath = join(repoPath, gitFilePath || 'openapi.yaml');
-        const specContent = await readFile(specPath, 'utf-8');
+        // Discover contracts
+        const fileList = await repoService.listRepoFiles(productId, gitRepoUrl);
+        const specPath = ResourceDiscovery.resolveContractPath(fileList, productName, productName);
+
+        if (!specPath) {
+            console.warn(`    ⚠️  No contract found for product ${productName} in discovery.`);
+            return null;
+        }
+
+        // Fetch spec content
+        const specContent = await repoService.getFileContent(productId, gitRepoUrl, specPath);
+        if (!specContent) return null;
 
         // Parse and validate OpenAPI spec
         const spec = specContent.trim().startsWith('{')
@@ -109,16 +111,10 @@ async function scoreProduct(
         await SwaggerParser.validate(spec as any);
 
         // Calculate quality score (simplified - can be enhanced)
-        const score = calculateQualityScore(spec);
-
-        // Clean up repo
-        await cleanupRepo(repoPath);
-
-        return score;
+        return calculateQualityScore(spec);
     } catch (err) {
-        // Clean up on error
-        await cleanupRepo(repoPath);
-        throw err;
+        console.warn(`    ❌ Error scoring product ${productId}:`, err instanceof Error ? err.message : String(err));
+        return null;
     }
 }
 
@@ -175,18 +171,8 @@ function calculateQualityScore(spec: any): number {
     return Math.round((score / maxScore) * 100);
 }
 
-/**
- * Clean up temporary repo directory
- */
-async function cleanupRepo(repoPath: string) {
-    try {
-        const { rm } = await import('fs/promises');
-        await rm(repoPath, { recursive: true, force: true });
-    } catch (err) {
-        // Ignore cleanup errors
-        console.warn(`    ⚠️  Failed to cleanup ${repoPath}`);
-    }
-}
+// Cleanup function removed as we no longer clone manually here
+// RepoService handles its own caching/cloning strategy
 
 /**
  * Score a specific product by ID
@@ -205,8 +191,8 @@ export async function scoreProductById(productId: string): Promise<number | null
     const product = result.rows[0];
     const score = await scoreProduct(
         product.id,
-        product.git_repo_url,
-        product.git_file_path
+        product.name,
+        product.git_repo_url
     );
 
     if (score !== null) {

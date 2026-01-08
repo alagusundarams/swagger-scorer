@@ -59,27 +59,29 @@ const SnippetButton = ({ onSelect, disabled }: { onSelect: (val: string) => void
 
                     {/* Dropdown Menu - Positioned ABSOLUTELY to scroll WITH the page */}
                     <div
-                        className="absolute z-[9999] w-72 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl shadow-2xl p-2 animate-in fade-in zoom-in-95 duration-200"
+                        className="absolute z-[9999] w-72 max-w-[90vw] bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
                         style={{ top: coords.top, left: coords.left }}
                     >
                         <div className="p-2 border-b border-gray-50 dark:border-slate-700 mb-1">
                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Policy Variables</p>
                         </div>
-                        {snippets.map(s => (
-                            <button
-                                key={s.value}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onSelect(s.value);
-                                    setIsOpen(false);
-                                }}
-                                className="w-full text-left px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-600 rounded-lg transition-colors flex items-center gap-3 group"
-                            >
-                                <span className="text-sm">{s.icon}</span>
-                                <span className="flex-1 whitespace-nowrap">{s.label}</span>
-                                <code className="text-[10px] font-mono text-slate-500 group-hover:text-purple-600 bg-gray-100 dark:bg-black/40 px-1.5 py-0.5 rounded whitespace-nowrap">{s.value}</code>
-                            </button>
-                        ))}
+                        <div className="max-h-80 overflow-y-auto custom-scrollbar p-2">
+                            {snippets.map(s => (
+                                <button
+                                    key={s.value}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onSelect(s.value);
+                                        setIsOpen(false);
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-600 rounded-lg transition-colors flex items-center gap-3 group"
+                                >
+                                    <span className="text-sm flex-shrink-0">{s.icon}</span>
+                                    <span className="flex-1 whitespace-nowrap overflow-hidden text-ellipsis">{s.label}</span>
+                                    <code className="text-[10px] font-mono text-slate-500 group-hover:text-purple-600 bg-gray-100 dark:bg-black/40 px-1.5 py-0.5 rounded max-w-[120px] overflow-hidden text-ellipsis whitespace-nowrap flex-shrink-0">{s.value}</code>
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </>,
                 document.body

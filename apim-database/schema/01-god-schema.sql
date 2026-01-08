@@ -77,14 +77,9 @@ CREATE TABLE IF NOT EXISTS products (
     
     -- Management mode (ALL start as TERRAFORM_MANAGED)
     management_mode TEXT CHECK (management_mode IN ('TERRAFORM_MANAGED', 'HYBRID', 'UNTRACKED')) DEFAULT 'UNTRACKED',
-    terraform_pipeline_url TEXT,
-    github_url TEXT,
-    
-    -- Git repository (varies by environment)
-    git_repo_url TEXT,  -- Main repo URL (DEV/QA/STAGE share one)
-    git_file_path TEXT, -- Path to contract file in repo
-    git_prod_repo_url TEXT,  -- Separate PROD repo if different
-    git_prod_file_path TEXT, -- PROD file path if different
+    pipeline_url TEXT,
+    -- Git repository (one repo for all environments)
+    git_repo_url TEXT,
     
     -- Linked identity (App Registration)
     identity_client_id TEXT,
@@ -106,21 +101,8 @@ CREATE TABLE IF NOT EXISTS products (
     last_deployed_commit_hash TEXT,
     last_deployed_at TIMESTAMP WITH TIME ZONE,
     
-    -- Universal Chain Visibility (Updated by all workers to enable comparison views)
-    dev_deployment_date TIMESTAMP WITH TIME ZONE,
-    dev_hash TEXT,
-    qa_deployment_date TIMESTAMP WITH TIME ZONE,
-    qa_hash TEXT,
-    stage_deployment_date TIMESTAMP WITH TIME ZONE,
-    stage_hash TEXT,
-    production_deployment_date TIMESTAMP WITH TIME ZONE,
-    production_hash TEXT,
-    
     -- Governance Intelligence
-    detected_anomalies JSONB, -- e.g. ["MANUAL_CREATION", "ENV_SKIP", "UNOWNED"]
-    
-    -- Policy Content (Self-Service)
-    policy_xml TEXT
+    detected_anomalies JSONB -- e.g. ["MANUAL_CREATION", "ENV_SKIP", "UNOWNED"]
 );
 
 CREATE INDEX idx_products_owner ON products(owner_team_id);
@@ -147,15 +129,6 @@ CREATE TABLE IF NOT EXISTS apis (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     
-    -- Source Control
-    git_repo_url TEXT,
-    git_file_path TEXT,
-
-    -- Linked identity (App Registration)
-    identity_client_id TEXT,
-    identity_display_name TEXT,
-    identity_app_id_uri TEXT,
-
     -- APIM source data
     apim_raw_data JSONB
 );

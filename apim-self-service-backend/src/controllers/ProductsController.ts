@@ -142,6 +142,7 @@ export class ProductsController {
         const { groups, role, teams } = request.query as any;
 
         const userContext = {
+            id: (request as any).user?.id || 'system-user',
             role: role || (request as any).user?.role || 'consumer',
             teams: teams ? teams.split(',') : (request as any).user?.teams || [],
             groups: groups ? groups.split(',') : (request as any).user?.groups || []

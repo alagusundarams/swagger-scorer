@@ -42,3 +42,22 @@ import { ArmServiceMock } from './ArmService.mock.js';
 export async function getArmService(_environment: string): Promise<any> {
     return new ArmServiceMock();
 }
+export async function getProductPolicy(productId: string, environment: string): Promise<string | null> {
+    console.log(`☁️ [MOCK_MODE] Get Product Policy for ${productId} (${environment})`);
+    return '<policies><inbound><base /></inbound></policies>';
+}
+
+export async function updateProductPolicy(productId: string, xml: string, environment: string): Promise<boolean> {
+    console.log(`☁️ [MOCK_MODE] Update Product Policy for ${productId} (${environment}): ${xml.substring(0, 20)}...`);
+    return true;
+}
+
+export async function getApiPolicy(apiId: string, environment: string): Promise<string | null> {
+    console.log(`☁️ [MOCK_MODE] Get API Policy for ${apiId} (${environment})`);
+    return '<policies><inbound><base /></inbound></policies>';
+}
+
+export async function updateApiPolicy(apiId: string, xml: string, environment: string): Promise<boolean> {
+    console.log(`☁️ [MOCK_MODE] Update API Policy for ${apiId} (${environment}): ${xml.substring(0, 20)}...`);
+    return true;
+}

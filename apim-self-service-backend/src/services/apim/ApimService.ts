@@ -209,3 +209,18 @@ export async function getGenericResource(
 
     return await arm.getResource(path);
 }
+/**
+ * Gets a Product's Policy from APIM
+ */
+export async function getProductPolicy(productId: string, environment: string): Promise<string | null> {
+    const arm = await getArmService(environment);
+    return await arm.getProductPolicy(productId);
+}
+
+/**
+ * Gets an API's Policy from APIM
+ */
+export async function getApiPolicy(apiId: string, environment: string): Promise<string | null> {
+    const arm = await getArmService(environment);
+    return await arm.getApiPolicy(apiId);
+}

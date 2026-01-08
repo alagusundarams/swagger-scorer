@@ -12,13 +12,10 @@ export class ProductsRepository {
             queryParams.push(environment);
         }
 
-        // Filter by Team OR Permission Matrix if not Admin
         if (userRole !== 'admin') {
             const teamCondition = teamId ? `p.owner_team_id = $${paramIndex++}` : '1=0';
             if (teamId) queryParams.push(teamId);
 
-            // RBAC: Check if user has ANY role in permission_matrix for this product via their groups
-            // We use ANY($n) for array comparison in Postgres
             const rbacCondition = userGroups.length > 0
                 ? `EXISTS (SELECT 1 FROM permission_matrix pm WHERE pm.product_id = p.id AND pm.ad_group_id = ANY($${paramIndex++}::text[]))`
                 : '1=0';
@@ -28,14 +25,11 @@ export class ProductsRepository {
             whereConditions.push(`(${teamCondition} OR ${rbacCondition})`);
         }
 
-        const whereClause = whereConditions.length > 0
-            ? `WHERE ${whereConditions.join(' AND ')}`
-            : '';
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
         return await query(`
             SELECT p.*, 
                    t.name as owner_team_name,
-                   p.dev_hash, p.qa_hash, p.stage_hash, p.production_hash as prod_hash,
                    COALESCE(sub_counts.active_subscribers, 0) as calculated_subscriber_count,
                    ar.client_id as identity_client_id,
                    ar.display_name as identity_display_name
@@ -61,7 +55,6 @@ export class ProductsRepository {
         limit: number = 20,
         offset: number = 0
     ) {
-        // Build WHERE clauses (same as getAllProducts)
         const whereConditions: string[] = [];
         const queryParams: any[] = [];
         let paramIndex = 1;
@@ -71,7 +64,6 @@ export class ProductsRepository {
             queryParams.push(environment);
         }
 
-        // Filter by Team OR Permission Matrix if not Admin
         if (userRole !== 'admin') {
             const teamCondition = teamId ? `p.owner_team_id = $${paramIndex++}` : '1=0';
             if (teamId) queryParams.push(teamId);
@@ -85,9 +77,7 @@ export class ProductsRepository {
             whereConditions.push(`(${teamCondition} OR ${rbacCondition})`);
         }
 
-        const whereClause = whereConditions.length > 0
-            ? `WHERE ${whereConditions.join(' AND ')}`
-            : '';
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
         // Get total count
         const countResult = await query(`
@@ -98,7 +88,6 @@ export class ProductsRepository {
 
         const total = parseInt(countResult.rows[0]?.total || '0');
 
-        // Get paginated data
         const limitParam = `$${paramIndex++}`;
         const offsetParam = `$${paramIndex++}`;
         queryParams.push(limit, offset);
@@ -106,7 +95,6 @@ export class ProductsRepository {
         const dataResult = await query(`
             SELECT p.*, 
                    t.name as owner_team_name,
-                   p.dev_hash, p.qa_hash, p.stage_hash, p.production_hash as prod_hash,
                    COALESCE(sub_counts.active_subscribers, 0) as calculated_subscriber_count,
                    ar.client_id as identity_client_id,
                    ar.display_name as identity_display_name
@@ -136,24 +124,23 @@ export class ProductsRepository {
     async addProduct(product: any) {
         return await query(`
             INSERT INTO products (
-                id, name, display_name, description, state, owner_team_id, environment, management_mode, git_repo_url, git_file_path, 
-                dev_hash, qa_hash, stage_hash, production_hash,
+                id, name, display_name, description, state, owner_team_id, environment, management_mode, git_repo_url, pipeline_url,
+                last_deployed_commit_hash,
                 created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
-                $11, $12, $13, $14,
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+                $11,
                 NOW(), NOW())
             RETURNING *
         `, [
             product.id, product.name, product.displayName, product.description, product.state, product.ownerTeamId, product.environment,
-            product.managementMode || 'UNTRACKED', product.gitRepoUrl, product.gitFilePath,
-            product.devHash || null, product.qaHash || null, product.stageHash || null, product.prodHash || null
+            product.managementMode || 'UNTRACKED', product.gitRepoUrl, product.pipelineUrl,
+            product.lastDeployedCommitHash || null
         ]);
     }
 
     async getProductById(id: string) {
         return await query(`
             SELECT p.*, 
-                   p.production_hash as prod_hash,
                    ar.client_id as identity_client_id,
                    ar.display_name as identity_display_name,
                    ar.app_id_uri as identity_app_id_uri,
@@ -190,10 +177,11 @@ export class ProductsRepository {
                     'id', p.id,
                     'environment', p.environment,
                     'state', p.state,
-                    'ownerTeamId', p.owner_team_id
+                    'ownerTeamId', p.owner_team_id,
+                    'reconciliationStatus', p.reconciliation_status
                 )) as deployments
             FROM products p
-            GROUP BY p.name, p.display_name, p.owner_team_id, t.name
+            GROUP BY p.name, p.display_name, p.owner_team_id, p.description
             ORDER BY p.display_name ASC
         `);
     }
@@ -210,14 +198,24 @@ export class ProductsRepository {
         );
     }
 
-    async getProductPolicy(productId: string) {
-        return await query('SELECT policy_xml FROM products WHERE id = $1', [productId]);
-    }
+    async updateProduct(id: string, updates: Partial<{
+        display_name: string;
+        description: string;
+        state: string;
+        owner_team_id: string;
+        last_deployed_commit_hash: string;
+        last_deployed_at: Date;
+        pipeline_url: string;
+    }>) {
+        const keys = Object.keys(updates);
+        if (keys.length === 0) return null;
 
-    async updateProductPolicy(productId: string, xml: string) {
+        const setClause = keys.map((key, i) => `${key} = $${i + 1}`).join(', ');
+        const values = Object.values(updates);
+
         return await query(
-            'UPDATE products SET policy_xml = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
-            [xml, productId]
+            `UPDATE products SET ${setClause}, updated_at = NOW() WHERE id = $${keys.length + 1} RETURNING *`,
+            [...values, id]
         );
     }
 

@@ -205,4 +205,57 @@ export class RepoService {
 
         return 'no-changes';
     }
+    /**
+     * Reads a file's content from the repository.
+     */
+    async getFileContent(productId: string, repoUrl: string, filePath: string): Promise<string | null> {
+        try {
+            const { path: localPath } = await this.syncRepo(productId, repoUrl);
+            const fullPath = path.join(localPath, filePath);
+
+            if (fs.existsSync(fullPath)) {
+                return fs.readFileSync(fullPath, 'utf-8');
+            }
+            return null;
+        } catch (error) {
+            console.error(`[ADO] Failed to read file ${filePath} for ${productId}:`, error);
+            return null;
+        }
+    }
+
+    /**
+     * Lists all files in the repository recursively.
+     * Returns relative paths.
+     */
+    async listRepoFiles(productId: string, repoUrl: string): Promise<string[]> {
+        const { path: localPath } = await this.syncRepo(productId, repoUrl);
+
+        const walk = (dir: string): string[] => {
+            let results: string[] = [];
+            const list = fs.readdirSync(dir);
+            list.forEach(file => {
+                file = path.join(dir, file);
+                const stat = fs.statSync(file);
+                if (stat && stat.isDirectory()) {
+                    if (!file.includes('.git')) {
+                        results = results.concat(walk(file));
+                    }
+                } else {
+                    results.push(path.relative(localPath, file));
+                }
+            });
+            return results;
+        };
+
+        return walk(localPath);
+    }
+
+    /**
+     * Checks if a file exists in the repository.
+     */
+    async existsInRepo(productId: string, repoUrl: string, filePath: string): Promise<boolean> {
+        const { path: localPath } = await this.syncRepo(productId, repoUrl);
+        const fullPath = path.join(localPath, filePath);
+        return fs.existsSync(fullPath);
+    }
 }

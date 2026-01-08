@@ -103,9 +103,8 @@ async function main() {
                 environment,
                 management_mode as status,
                 CASE 
-                    WHEN management_mode = 'UNTRACKED' THEN 'No Terraform pipeline or repository found'
-                    WHEN terraform_pipeline_url IS NULL THEN 'Missing pipeline URL'
-                    WHEN github_url IS NULL THEN 'Missing GitHub URL'
+                    WHEN management_mode = 'UNTRACKED' THEN 'No repository found or not managed by portal'
+                    WHEN pipeline_url IS NULL THEN 'Missing pipeline URL'
                     ELSE 'Unknown orphan reason'
                 END as reason
             FROM products
