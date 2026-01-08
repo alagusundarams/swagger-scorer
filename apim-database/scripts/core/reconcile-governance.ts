@@ -434,7 +434,7 @@ async function main() {
                             api_id = CASE WHEN EXCLUDED.api_id IS NULL THEN app_registrations.api_id ELSE EXCLUDED.api_id END,
                             type = EXCLUDED.type,
                             updated_at = NOW();
-                    `, [id, name, appIdUri, env, linkedProductId, linkedApiId, linkedProductId ? 'PRODUCT' : (linkedApiId ? 'API' : 'UNKNOWN')]);
+                    `, [id, name, appIdUri, env, linkedProductId, linkedApiId, linkedProductId ? 'PRODUCT' : (linkedApiId ? 'API' : 'PRODUCT')]);
                 }
             }
         }
