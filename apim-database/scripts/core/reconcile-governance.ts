@@ -85,11 +85,15 @@ async function main() {
     }
 
     if (existsSync(inventoryPath)) {
-        inventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
         // Patch inventory: Ensure environments array exists
+        // If missing, assume product exists in ALL configured environments (Smart Default)
+        const content = readFileSync(inventoryPath, 'utf8');
+        inventory = JSON.parse(content);
+        const allEnvNames = config.azure?.environments?.map((e: any) => e.name) || ['DEV'];
+
         inventory.forEach((p: any) => {
             if (!p.environments || p.environments.length === 0) {
-                p.environments = ['DEV'];
+                p.environments = allEnvNames;
             }
         });
     }
