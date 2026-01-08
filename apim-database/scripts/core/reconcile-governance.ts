@@ -490,10 +490,12 @@ async function main() {
 
                 const subId = `${env}:${sub.id}`;
 
-                // FIXED: Convert logical productId to environment-specific
-                // Robust lookup: Case-insensitive match & trim
-                const subProdIdSafe = (sub.productId || '').trim().toLowerCase();
-                const prod = inventory.find((p: any) => p.id.trim().toLowerCase() === subProdIdSafe);
+                // FIXED: Handle both "starter" and "/products/starter" formats
+                // Extract last segment of the ID for comparison
+                const rawProdId = sub.productId || '';
+                const cleanSubProdId = rawProdId.split('/').pop()?.trim().toLowerCase();
+
+                const prod = inventory.find((p: any) => p.id.trim().toLowerCase() === cleanSubProdId);
 
                 if (!prod) {
                     console.warn(`⚠️  Skipping subscription "${sub.displayName}" - product ${sub.productId} not found in inventory.`);
