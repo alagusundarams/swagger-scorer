@@ -87,9 +87,6 @@ export interface CodeSearchResponse {
 }
 
 export class AzureService {
-    /**
-     * Get Azure access token using Azure CLI
-     */
     static async getAzureAccessToken(resource: string = 'https://management.azure.com'): Promise<string> {
         try {
             // On Windows, inherit full environment to ensure 'az' is in PATH
@@ -105,8 +102,33 @@ export class AzureService {
             return token;
         } catch (error: any) {
             const errorMsg = error.stderr?.toString() || error.stdout?.toString() || error.message || 'Unknown error';
+            console.error(`❌ [Auth] Failed to get Azure access token: ${errorMsg}`);
             throw new Error(`Failed to get Azure access token. ${errorMsg}. Ensure 'az login' was successful.`);
         }
+    }
+
+    /**
+     * Correctly joins ADO URL segments based on host type (dev.azure.com vs visualstudio.com).
+     * Prevents double slashes and missing organization segments.
+     */
+    static getVstsUrl(baseUrl: string, org: string, project: string, subPath: string): string {
+        const cleanBase = baseUrl.replace(/\/+$/, '');
+        const cleanOrg = org.replace(/\/+$/, '');
+        const cleanProject = project.replace(/\/+$/, '');
+        const cleanPath = subPath.replace(/^\/+/, '');
+
+        if (cleanBase.includes('visualstudio.com')) {
+            // Handle: https://org.visualstudio.com/Project/_git/Repo
+            // Often org is already in the subdomain
+            const subdomainMatch = cleanBase.match(/https?:\/\/([^.]+)\.visualstudio\.com/);
+            if (subdomainMatch && subdomainMatch[1].toLowerCase() === cleanOrg.toLowerCase()) {
+                return `${cleanBase}/${encodeURIComponent(cleanProject)}/${cleanPath}`;
+            }
+            return `${cleanBase}/${encodeURIComponent(cleanOrg)}/${encodeURIComponent(cleanProject)}/${cleanPath}`;
+        }
+
+        // Handle: https://dev.azure.com/org/Project/_git/Repo
+        return `${cleanBase}/${encodeURIComponent(cleanOrg)}/${encodeURIComponent(cleanProject)}/${cleanPath}`;
     }
 
     /**
@@ -328,7 +350,9 @@ export class AzureService {
                 const data = await response.json() as { value: any[] };
                 return data.value || [];
             }
-        } catch (err) { }
+        } catch (err: any) {
+            console.error(`      ❌ [ADO Builds] Network error: ${err.message}`);
+        }
         return [];
     }
 
@@ -365,10 +389,6 @@ export class AzureService {
         return [];
     }
 
-    /**
-     * Fetch the latest successful deployment for a specific environment and pipeline definition.
-     * This is the "Sharp" surgical way to find PROD/STAGE/QA markers.
-     */
     static async fetchLatestEnvironmentDeployment(
         org: string,
         project: string,
@@ -384,12 +404,14 @@ export class AzureService {
         const urlBase = isLegacy ? `${cleanBaseUrl}/${project}` : `${cleanBaseUrl}/${org}/${project}`;
 
         // 1. Find the Environment ID for the given name (Surgical Step 1)
-        // Note: In ADO, environment names like 'PROD' or 'QA' are case-sensitive or product-prefixed
         const envUrl = `${urlBase}/_apis/distributedtask/environments?name=${environmentName}&api-version=7.1-preview.1`;
 
         try {
             const envResp = await fetch(envUrl, { headers: { 'Authorization': authHeader } });
-            if (!envResp.ok) return null;
+            if (!envResp.ok) {
+                console.warn(`      ⚠️ [ADO] Env lookup failed for ${environmentName} (${envResp.status})`);
+                return null;
+            }
             const envData = await envResp.json() as { count: number; value: any[] };
             if (envData.count === 0) return null;
 
@@ -402,8 +424,56 @@ export class AzureService {
             const deployData = await deployResp.json() as { count: number; value: any[] };
 
             return deployData.count > 0 ? deployData.value[0] : null;
-        } catch (err) {
-            console.warn(`⚠️ [ADO] Surgical environment lookup failed for ${environmentName}:`, err);
+        } catch (err: any) {
+            console.warn(`      ⚠️ [ADO] Surgical environment lookup failed for ${environmentName}: ${err.message}`);
+        }
+        return null;
+    }
+
+    /**
+     * Scan recent builds to find the latest successful stage matching a name.
+     * More robust than Environment API for many enterprise setups.
+     */
+    static async fetchLatestStageResult(
+        org: string,
+        project: string,
+        definitionId: number,
+        stageName: string,
+        pat: string,
+        baseUrl: string = 'https://dev.azure.com'
+    ): Promise<{ hash: string; date: string } | null> {
+        console.log(`      🔎 [Scan] Searching for successful Stage: "${stageName}" in Pipeline ${definitionId}...`);
+
+        try {
+            // 1. Get last 15 successful builds
+            const builds = await this.fetchBuildsByDefinition(org, project, definitionId, pat, baseUrl, undefined, 15);
+            if (builds.length === 0) {
+                console.log(`      ⚠️ [Scan] No successful builds found for Pipeline ${definitionId}`);
+                return null;
+            }
+
+            // 2. Scan timelines for the stage
+            for (const build of builds) {
+                const timeline = await this.fetchPipelineRunTimeline(org, project, build.id, pat, baseUrl);
+                const stage = timeline.find(r =>
+                    r.type?.toLowerCase() === 'stage' &&
+                    r.name?.toLowerCase().includes(stageName.toLowerCase()) &&
+                    r.status?.toLowerCase() === 'completed' &&
+                    r.result?.toLowerCase() === 'succeeded'
+                );
+
+                if (stage) {
+                    console.log(`      ✅ [Scan] Found match in Build ${build.id}: Stage "${stage.name}" finished at ${stage.finishTime}`);
+                    return {
+                        hash: build.sourceVersion || 'unknown',
+                        date: stage.finishTime || build.finishTime
+                    };
+                }
+            }
+
+            console.log(`      ⚠️ [Scan] Stage "${stageName}" not found in last ${builds.length} builds.`);
+        } catch (err: any) {
+            console.error(`      ❌ [Scan] Critical error during timeline scan: ${err.message}`);
         }
         return null;
     }

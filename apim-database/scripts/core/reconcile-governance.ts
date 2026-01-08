@@ -179,6 +179,18 @@ async function main() {
                 const prodDeploy = (ado.deployments as any)['PROD'];
 
                 try {
+                    const repoProject = (ado.repository as any)?.project;
+                    const repoName = (ado.repository as any)?.name;
+                    const pipelineId = ado.pipeline?.id;
+
+                    const pipelineUrl = (ado.pipeline && repoProject)
+                        ? AzureService.getVstsUrl(config.devops.baseUrl, config.devops.organization, repoProject, `_build?definitionId=${pipelineId}`)
+                        : null;
+
+                    const githubUrl = (repoProject && repoName)
+                        ? AzureService.getVstsUrl(config.devops.baseUrl, config.devops.organization, repoProject, `_git/${repoName}`)
+                        : null;
+
                     await pool.query(`
                         INSERT INTO products (
                             id, name, display_name, version, state, environment, region,
@@ -196,21 +208,21 @@ async function main() {
                             last_deployed_at = COALESCE(EXCLUDED.last_deployed_at, products.last_deployed_at),
                             terraform_pipeline_url = COALESCE(EXCLUDED.terraform_pipeline_url, products.terraform_pipeline_url),
                             github_url = COALESCE(EXCLUDED.github_url, products.github_url),
-                            dev_hash = EXCLUDED.dev_hash,
-                            dev_deployment_date = EXCLUDED.dev_deployment_date,
-                            qa_hash = EXCLUDED.qa_hash,
-                            qa_deployment_date = EXCLUDED.qa_deployment_date,
-                            stage_hash = EXCLUDED.stage_hash,
-                            stage_deployment_date = EXCLUDED.stage_deployment_date,
-                            production_hash = EXCLUDED.production_hash,
-                            production_deployment_date = EXCLUDED.production_deployment_date,
+                            dev_hash = COALESCE(EXCLUDED.dev_hash, products.dev_hash),
+                            dev_deployment_date = COALESCE(EXCLUDED.dev_deployment_date, products.dev_deployment_date),
+                            qa_hash = COALESCE(EXCLUDED.qa_hash, products.qa_hash),
+                            qa_deployment_date = COALESCE(EXCLUDED.qa_deployment_date, products.qa_deployment_date),
+                            stage_hash = COALESCE(EXCLUDED.stage_hash, products.stage_hash),
+                            stage_deployment_date = COALESCE(EXCLUDED.stage_deployment_date, products.stage_deployment_date),
+                            production_hash = COALESCE(EXCLUDED.production_hash, products.production_hash),
+                            production_deployment_date = COALESCE(EXCLUDED.production_deployment_date, products.production_deployment_date),
                             management_mode = EXCLUDED.management_mode,
                             updated_at = NOW();
                     `, [
                         uniqueProductId, prod.id, prod.name, null, 'published', envName, 'Global',
                         localDeploy?.hash || null, localDeploy?.date || null,
-                        ado.pipeline ? `${config.devops.baseUrl}/${config.devops.organization}/${(ado.repository as any)?.project}/_build?definitionId=${ado.pipeline.id}` : null,
-                        ado.repository ? `${config.devops.baseUrl}/${config.devops.organization}/${(ado.repository as any)?.project}/_git/${(ado.repository as any)?.name}` : null,
+                        pipelineUrl,
+                        githubUrl,
                         devDeploy?.hash || null, devDeploy?.date || null,
                         qaDeploy?.hash || null, qaDeploy?.date || null,
                         stageDeploy?.hash || null, stageDeploy?.date || null,

@@ -167,7 +167,9 @@ async function main() {
                     const repoDetails = await AzureService.fetchRepoById(devops.organization, repoId, devops.pat, devops.baseUrl);
                     project = repoDetails.project.name;
                     projectId = repoDetails.project.id;
-                } catch (e) { }
+                } catch (e: any) {
+                    console.warn(`      ⚠️  Failed to resolve Repo ID ${repoId}: ${e.message}`);
+                }
             }
 
             meta.repository = { id: repoId, name: repo.name, project: project, projectId: projectId || project };
@@ -195,16 +197,22 @@ async function main() {
 
             const envsToSync = targetEnv ? [targetEnv] : prod.environments;
             for (const envName of envsToSync) {
-                const deploy = await AzureService.fetchLatestEnvironmentDeployment(
-                    devops.organization, projectId || project, matchedPipeline.id, envName, devops.pat, devops.baseUrl
-                );
+                try {
+                    const deploy = await AzureService.fetchLatestStageResult(
+                        devops.organization, projectId || project, matchedPipeline.id, envName, devops.pat, devops.baseUrl
+                    );
 
-                if (deploy) {
-                    meta.deployments[envName] = {
-                        hash: deploy.build?.sourceVersion || 'unknown',
-                        date: deploy.finishTime || deploy.startTime
-                    };
-                    console.log(`      🎯 ${envName.padEnd(5)}: Surgical Hit! Captured ${meta.deployments[envName].hash.substring(0, 7)}`);
+                    if (deploy) {
+                        meta.deployments[envName] = {
+                            hash: deploy.hash,
+                            date: deploy.date
+                        };
+                        console.log(`      🎯 [HIT] ${envName.padEnd(5)}: Captured ${deploy.hash.substring(0, 7)} (via Stage Sync)`);
+                    } else {
+                        console.log(`      ⚠️  [MISS] ${envName.padEnd(5)}: No successful stage found.`);
+                    }
+                } catch (err: any) {
+                    console.error(`      ❌ [Error] Failed to sync ${envName}: ${err.message}`);
                 }
             }
             results.push(meta);
