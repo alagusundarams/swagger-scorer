@@ -404,6 +404,15 @@ async function main() {
                         }
                     }
 
+                    // SAFETY: Verify product exists if we're linking to one
+                    if (linkedProductId) {
+                        const prodCheck = await pool.query('SELECT 1 FROM products WHERE id = $1', [linkedProductId]);
+                        if (prodCheck.rows.length === 0) {
+                            console.warn(`⚠️  Skipping app reg "${name}" - linked product ${linkedProductId} not found in DB`);
+                            continue;
+                        }
+                    }
+
                     await pool.query(`
                         INSERT INTO app_registrations (id, client_id, display_name, app_id_uri, environment, product_id, api_id, type, updated_at)
                         VALUES ($1, $1, $2, $3, $4, $5, $6, $7, NOW())
