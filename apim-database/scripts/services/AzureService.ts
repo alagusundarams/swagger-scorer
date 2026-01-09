@@ -181,11 +181,32 @@ export class AzureService {
      * Gets the full Organization URL (e.g., https://dev.azure.com/org or https://org.visualstudio.com)
      */
     static getAdoOrgUrl(baseUrl: string, org: string): string {
-        const instance = this.getAdoInstanceUrl(baseUrl, org);
-        if (instance.toLowerCase().includes('visualstudio.com')) {
-            return instance; // already has org in subdomain USUALLY
+        const cleanBase = baseUrl.replace(/\/+$/, '');
+        const lowerBase = cleanBase.toLowerCase();
+        const lowerOrg = org.toLowerCase();
+
+        // If it's a visualstudio.com URL, it usually has the org in the subdomain
+        if (lowerBase.includes('visualstudio.com')) {
+            return cleanBase;
         }
-        return `${instance}/${org}`;
+
+        // If the baseUrl already ends with /org, don't append it again
+        if (lowerBase.endsWith(`/${lowerOrg}`)) {
+            return cleanBase;
+        }
+
+        // For dev.azure.com, we want https://dev.azure.com/org
+        // If cleanBase is just https://dev.azure.com, append org
+        if (lowerBase === 'https://dev.azure.com' || lowerBase === 'http://dev.azure.com') {
+            return `${cleanBase}/${org}`;
+        }
+
+        // Otherwise, if it doesn't contain the org, append it
+        if (!lowerBase.includes(`/${lowerOrg}/`) && !lowerBase.endsWith(`/${lowerOrg}`)) {
+            return `${cleanBase}/${org}`;
+        }
+
+        return cleanBase;
     }
 
     static getAdoSearchUrl(baseUrl: string, org: string): string {
@@ -572,9 +593,7 @@ export class AzureService {
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
         let url = `${urlBase}/_apis/build/definitions`;
-        if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
-
-        if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
+        if (repoId) url += `?repositoryId=${repoId}&repositoryType=TfsGit`;
         // console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
@@ -830,7 +849,7 @@ export class AzureService {
 
                 if (matching.length === 0) {
                     const availableIds = [...new Set(deployData.value.map((d: any) => d.definition?.id).filter(Boolean))];
-                    console.warn(`   ⚠️ [DEPLOY] No deployments found for pipeline ${definitionId}. Available definition IDs in this env: ${availableIds.join(', ')}`);
+                    console.warn(`   ⚠️ [DEPLOY] No deployments found for pipeline ${definitionId} in environment ${envId}. Available definition IDs: ${availableIds.join(', ')}`);
                     return null;
                 }
 
@@ -872,7 +891,7 @@ export class AzureService {
     ): Promise<any[]> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = this.getAuthHeader(pat, bearerToken);
-        const url = `${orgUrl}/${encodeURIComponent(project)}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords?$top=${top}&api-version=7.1`;
+        const url = `${orgUrl}/${encodeURIComponent(project)}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords?$top=${top}&api-version=6.0-preview.1`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
