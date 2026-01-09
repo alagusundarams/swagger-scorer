@@ -6,6 +6,7 @@ export interface AppRegistration {
     clientId: string;
     displayName: string;
     appIdUri?: string;
+    secretExpiryDate?: string;
 }
 
 export class AzureService {
@@ -53,7 +54,7 @@ export class AzureService {
                 filterString = `appId eq '${query}'`;
             }
 
-            const url = `https://graph.microsoft.com/v1.0/applications?$filter=${filterString}&$select=appId,displayName,identifierUris&$top=15`;
+            const url = `https://graph.microsoft.com/v1.0/applications?$filter=${filterString}&$select=appId,displayName,identifierUris,passwordCredentials&$top=15`;
 
             const response = await fetch(url, {
                 headers: {
@@ -70,11 +71,24 @@ export class AzureService {
 
             const data = await response.json() as { value: any[] };
             if (data.value) {
-                results.push(...data.value.map((app: any) => ({
-                    clientId: app.appId,
-                    displayName: app.displayName,
-                    appIdUri: (app.identifierUris && app.identifierUris.length > 0) ? app.identifierUris[0] : undefined
-                })));
+                results.push(...data.value.map((app: any) => {
+                    // Extract earliest expiring secret
+                    let nearestExpiry: string | undefined = undefined;
+                    if (app.passwordCredentials && app.passwordCredentials.length > 0) {
+                        const expiries = app.passwordCredentials
+                            .map((p: any) => p.endDateTime)
+                            .filter((d: string) => d)
+                            .sort();
+                        nearestExpiry = expiries[0];
+                    }
+
+                    return {
+                        clientId: app.appId,
+                        displayName: app.displayName,
+                        appIdUri: (app.identifierUris && app.identifierUris.length > 0) ? app.identifierUris[0] : undefined,
+                        secretExpiryDate: nearestExpiry
+                    };
+                }));
             }
         } catch (err: any) {
             console.error(`❌ [AzureService] Search Error:`, err.message);
@@ -98,7 +112,7 @@ export class AzureService {
         const token = await this.getGraphAccessToken();
 
         try {
-            const url = `https://graph.microsoft.com/v1.0/applications?$filter=appId eq '${clientId}'&$select=appId,displayName,identifierUris`;
+            const url = `https://graph.microsoft.com/v1.0/applications?$filter=appId eq '${clientId}'&$select=appId,displayName,identifierUris,passwordCredentials`;
             const response = await fetch(url, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -110,10 +124,22 @@ export class AzureService {
                 const data = await response.json() as { value: any[] };
                 if (data.value && data.value.length > 0) {
                     const app = data.value[0];
+
+                    // Extract earliest expiring secret
+                    let nearestExpiry: string | undefined = undefined;
+                    if (app.passwordCredentials && app.passwordCredentials.length > 0) {
+                        const expiries = app.passwordCredentials
+                            .map((p: any) => p.endDateTime)
+                            .filter((d: string) => d)
+                            .sort();
+                        nearestExpiry = expiries[0];
+                    }
+
                     return {
                         clientId: app.appId,
                         displayName: app.displayName,
-                        appIdUri: (app.identifierUris && app.identifierUris.length > 0) ? app.identifierUris[0] : undefined
+                        appIdUri: (app.identifierUris && app.identifierUris.length > 0) ? app.identifierUris[0] : undefined,
+                        secretExpiryDate: nearestExpiry
                     };
                 }
             }

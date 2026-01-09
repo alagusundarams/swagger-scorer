@@ -38,16 +38,17 @@ export class AppRegistrationsRepository {
         ownerTeamId: string;
         productId?: string;
         apiId?: string;
+        secretExpiryDate?: string;
         type: 'PRODUCT' | 'API';
     }) {
         return await query(`
             INSERT INTO app_registrations (
-                id, client_id, display_name, app_id_uri, environment, owner_team_id, product_id, api_id, type, created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+                id, client_id, display_name, app_id_uri, environment, owner_team_id, product_id, api_id, type, secret_expiry_date, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
             RETURNING *
         `, [
             data.id, data.clientId, data.displayName, data.appIdUri, data.environment,
-            data.ownerTeamId, data.productId, data.apiId, data.type
+            data.ownerTeamId, data.productId, data.apiId, data.type, data.secretExpiryDate
         ]);
     }
 

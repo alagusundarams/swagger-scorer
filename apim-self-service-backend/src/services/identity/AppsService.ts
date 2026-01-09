@@ -141,15 +141,16 @@ export async function linkAppRegistration(
     const id = `app-${uuidv4()}`;
     const res = await query(`
         INSERT INTO app_registrations (
-            id, client_id, display_name, environment, product_id, type
-        ) VALUES ($1, $2, $3, $4, $5, 'PRODUCT')
+            id, client_id, display_name, environment, product_id, type, secret_expiry_date
+        ) VALUES ($1, $2, $3, $4, $5, 'PRODUCT', $6)
         ON CONFLICT (client_id) DO UPDATE SET
             product_id = EXCLUDED.product_id,
             environment = EXCLUDED.environment,
             display_name = EXCLUDED.display_name,
+            secret_expiry_date = EXCLUDED.secret_expiry_date,
             updated_at = NOW()
         RETURNING *
-    `, [id, clientId, azureApp.displayName || displayName, environment, targetProductId]);
+    `, [id, clientId, azureApp.displayName || displayName, environment, targetProductId, azureApp.secretExpiryDate]);
 
     const linkedApp = res.rows[0];
 
@@ -174,6 +175,7 @@ export async function linkAppRegistration(
         clientId: linkedApp.client_id,
         displayName: linkedApp.display_name,
         environment: linkedApp.environment,
-        productId: linkedApp.product_id
+        productId: linkedApp.product_id,
+        secretExpiryDate: linkedApp.secret_expiry_date
     };
 }

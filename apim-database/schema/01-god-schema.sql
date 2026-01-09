@@ -193,6 +193,7 @@ CREATE TABLE IF NOT EXISTS app_registrations (
     api_id TEXT REFERENCES apis(id),
     owner_team_id TEXT REFERENCES teams(id),
     type TEXT CHECK (type IN ('PRODUCT', 'API')) DEFAULT 'PRODUCT', -- Intent: Shared (PRODUCT) or Isolated (API)
+    secret_expiry_date TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
