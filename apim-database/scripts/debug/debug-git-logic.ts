@@ -144,7 +144,7 @@ async function runDebug() {
 
     try {
         console.log(`\n🔎 Authorizing Repository Metadata: ${primaryRepoName}...`);
-        const details = await AzureService.fetchRepoById(devops.organization, primaryRepoId || primaryRepoName, devops.pat, devops.baseUrl);
+        const details = await AzureService.fetchRepoById(devops.organization, primaryRepoId || primaryRepoName, devops.pat, devops.baseUrl, bearerToken);
         project = details.project.name;
         projectIdent = details.project.id;
         (finalRepo as any).webUrl = details.webUrl;
@@ -303,9 +303,10 @@ async function runDebug() {
     const deployments: Record<string, { hash: string; date: string; branch?: string; author?: string; message?: string; url?: string }> = {};
     const timelineCache = new Map<number, any[]>();
 
-    console.log(`   ⏳ Attempting surgical strikes (Environments API)...`);
+    console.log(`   ⏳ Attempting surgical strikes for ${matchedPipeline.name} (ID: ${matchedPipeline.id})...`);
     for (const envName of envsToSync) {
         let deploy: any = null;
+        console.log(`      🔎 Checking ${envName}...`);
         if ((matchedPipeline as any).isRelease) {
             const releases = await AzureService.fetchADOReleases(devops.organization, projectIdentifier, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken);
             const latest = releases.find(r => r.environments?.some(e => e.name.toUpperCase() === envName && e.status?.toLowerCase() === 'succeeded'));
@@ -320,6 +321,7 @@ async function runDebug() {
                 };
             }
         } else {
+            console.log(`      📡 [Surgical] Searching deployments for ${envName}...`);
             deploy = await AzureService.fetchLatestEnvironmentDeployment(devops.organization, projectIdentifier, matchedPipeline.id, envName, devops.pat, devops.baseUrl, bearerToken);
         }
 
@@ -337,8 +339,8 @@ async function runDebug() {
                 deployments[envName] = {
                     hash: commitHash,
                     date: deploy.finishTime || deploy.startTime || fullDetails.finishTime,
-                    branch: fullDetails.sourceBranch || deploy.sourceBranch,
-                    author: fullDetails.requestedFor?.displayName || deploy.requestedFor?.displayName,
+                    branch: fullDetails.sourceBranch || deploy.sourceBranch || 'unknown',
+                    author: fullDetails.requestedFor?.displayName || deploy.requestedFor?.displayName || 'Unknown',
                     message: fullDetails.triggerInfo?.['ci.message'] || 'No message',
                     url: fullDetails._links?.web?.href || deploy.url
                 };
@@ -346,8 +348,12 @@ async function runDebug() {
                 console.log(`         👤 Author: ${deployments[envName].author}`);
                 console.log(`         🌿 Branch: ${deployments[envName].branch}`);
             } else {
-                console.warn(`      ⚠️  ${envName.padEnd(5)}: Found deployment but could not extract commit hash. (Deploy ID: ${deploy.id})`);
+                console.warn(`      ⚠️  ${envName.padEnd(5)}: Found deployment but could not extract commit hash.`);
+                if (verbose) console.log(`         DEBUG: Raw Deploy Object Keys: ${Object.keys(deploy).join(', ')}`);
+                if (verbose && deploy.owner) console.log(`         DEBUG: Owner ID: ${deploy.owner.id} (${deploy.owner.name})`);
             }
+        } else {
+            console.log(`      ℹ️  ${envName.padEnd(5)}: No direct surgical strike results found.`);
         }
     }
 
@@ -359,14 +365,14 @@ async function runDebug() {
         const maxDepth = 100;
 
         while (Object.keys(deployments).length < envsToSync.length && skip < maxDepth) {
-            const builds = await AzureService.fetchBuildsByDefinition(devops.organization, projectIdentifier, matchedPipeline.id, devops.pat, devops.baseUrl, undefined, pageSize, skip);
+            const builds = await AzureService.fetchBuildsByDefinition(devops.organization, projectIdentifier, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken, pageSize, skip);
             console.log(`   📡 [Scan] Page ${Math.floor(skip / pageSize) + 1}: Found ${builds.length} builds...`);
 
             if (builds.length === 0 && skip === 0) {
                 console.log(`   ⚠️ No builds found for definition. Trying broader search...`);
-                let broadBuilds = await AzureService.fetchADOBuilds(devops.organization, projectIdentifier, (matchedPipeline as any).repositoryId || primaryRepoId, devops.pat, devops.baseUrl);
+                let broadBuilds = await AzureService.fetchADOBuilds(devops.organization, projectIdentifier, (matchedPipeline as any).repositoryId || primaryRepoId, devops.pat, devops.baseUrl, bearerToken);
                 if (broadBuilds.length === 0) {
-                    broadBuilds = await AzureService.fetchADOBuilds(devops.organization, projectIdentifier, '', devops.pat, devops.baseUrl);
+                    broadBuilds = await AzureService.fetchADOBuilds(devops.organization, projectIdentifier, '', devops.pat, devops.baseUrl, bearerToken);
                 }
                 if (broadBuilds.length > 0) builds.push(...broadBuilds.slice(0, 20));
             }
@@ -375,7 +381,7 @@ async function runDebug() {
             for (const run of builds) {
                 if (Object.keys(deployments).length === envsToSync.length) break;
                 if (!timelineCache.has(run.id)) {
-                    timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdentifier, run.id, devops.pat, devops.baseUrl));
+                    timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectIdentifier, run.id, devops.pat, devops.baseUrl, bearerToken));
                 }
                 const timeline = timelineCache.get(run.id)!;
                 if (!timeline || timeline.length === 0) continue;
