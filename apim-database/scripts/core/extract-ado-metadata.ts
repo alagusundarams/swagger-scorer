@@ -25,8 +25,8 @@ function loadConfig() {
 
     const priorities = [
         join(repoRoot, 'config.json'),                     // 1. Root config
-        join(repoRoot, 'apim-self-service-backend', 'config.json'), // 2. Backend config
-        join(dbRoot, 'config.json')                        // 3. DB config
+        join(dbRoot, 'config.json'),                       // 2. DB config (Local to these scripts - High Priority)
+        join(repoRoot, 'apim-self-service-backend', 'config.json') // 3. Backend config (Fallback)
     ];
 
     for (const p of priorities) {

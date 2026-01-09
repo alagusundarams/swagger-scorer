@@ -34,15 +34,25 @@ function loadConfig() {
     // Priority 2: Root config.json (if running from root)
     const rootConfig = join(cwd, 'config.json');
 
-    // Priority 3: Backend config (often contains the real secrets in this monorepo)
-    const backendConfig = join(cwd, 'apim-self-service-backend', 'config.json');
-
-    // Priority 4: Default/Placeholder config
+    // Priority 2: local database config (High Priority - matches debug scripts)
     const dbConfig = join(cwd, 'apim-database', 'config.json');
+
+    // Priority 3: Backend config (Fallback)
+    const backendConfig = join(cwd, 'apim-self-service-backend', 'config.json');
 
     let configPath = '';
     if (existsSync(rootConfig)) configPath = rootConfig;
-    else if (existsSync(backendConfig)) {
+    else if (existsSync(dbConfig)) {
+        // Check DB config for validity
+        try {
+            const temp = JSON.parse(readFileSync(dbConfig, 'utf8'));
+            if (temp.devops?.pat && temp.devops.pat !== 'your-read-only-pat') {
+                configPath = dbConfig;
+            }
+        } catch (e) { }
+    }
+
+    if (!configPath && existsSync(backendConfig)) {
         // Only use backend config if it has devops creds
         try {
             const temp = JSON.parse(readFileSync(backendConfig, 'utf8'));
