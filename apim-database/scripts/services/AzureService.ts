@@ -708,7 +708,7 @@ export class AzureService {
 
         // 1. Find the Environment ID for the given name (Surgical Step 1)
         let envId: number | null = null;
-        let envUrl = `${urlBase}/_apis/distributedtask/environments?name=${encodeURIComponent(environmentName)}&api-version=7.1-preview.1`;
+        let envUrl = `${urlBase}/_apis/distributedtask/environments?name=${encodeURIComponent(environmentName)}`;
 
         console.log(`📡 [ADO Request] GET ${envUrl}`);
 
@@ -741,7 +741,7 @@ export class AzureService {
             } else {
                 // FALLBACK: Fetch all and match case-insensitive
                 console.warn(`      ⚠️ [ADO] Exact env lookup failed. Trying case-insensitive scan...`);
-                envUrl = `${urlBase}/_apis/distributedtask/environments?api-version=7.1-preview.1`;
+                envUrl = `${urlBase}/_apis/distributedtask/environments`;
                 console.log(`📡 [ADO Request] GET ${envUrl} (Fallback)`);
                 envResp = await fetch(envUrl, {
                     headers: {
@@ -766,7 +766,7 @@ export class AzureService {
             if (!envId) return null;
 
             // 2. Query Deployments for this specific definition and environment (Surgical Step 2)
-            let deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/deployments?definitionId=${definitionId}&latestState=succeeded&$top=1&api-version=7.1-preview.1`;
+            let deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/deployments?definitionId=${definitionId}&latestState=succeeded&$top=1`;
             console.log(`📡 [ADO Request] GET ${deployUrl}`);
             const deployResp = await fetch(deployUrl, {
                 headers: {
@@ -779,7 +779,7 @@ export class AzureService {
 
             if (deployResp.status === 404) {
                 console.warn(`      ⚠️  404 on 'deployments' endpoint. Trying 'environmentdeploymentrecords' fallback...`);
-                deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords?definitionId=${definitionId}&api-version=7.1-preview.1&$top=1`;
+                deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords?definitionId=${definitionId}&$top=1`;
                 console.log(`📡 [ADO Request] GET ${deployUrl} (Fallback)`);
                 const fbResp = await fetch(deployUrl, { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } });
                 if (fbResp.ok) {
@@ -822,7 +822,7 @@ export class AzureService {
     ): Promise<any[]> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = this.getAuthHeader(pat, bearerToken);
-        const url = `${orgUrl}/${encodeURIComponent(project)}/_apis/distributedtask/environments/${envId}/deployments?$top=${top}&api-version=7.1-preview.1`;
+        const url = `${orgUrl}/${encodeURIComponent(project)}/_apis/distributedtask/environments/${envId}/deployments?$top=${top}`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
