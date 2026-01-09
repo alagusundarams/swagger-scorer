@@ -482,6 +482,7 @@ export class AzureService {
             } else {
                 console.warn(`      ⚠️  HTTP ${response.status}: ${text.substring(0, 100)}...`);
                 if (response.status === 401) {
+                    console.warn(`      💡 Tip: 401 Unauthorized. Ensure your PAT has 'Pipeline (Read)' and 'Build (Read)' scopes.`);
                     throw new Error("401 Unauthorized - Check PAT Scopes (Build/Pipeline Read)");
                 }
             }
@@ -689,7 +690,7 @@ export class AzureService {
             // Safety check for 401/404 empty bodies
             if (!envResp.ok && (envResp.status === 401 || envResp.status === 403)) {
                 console.warn(`      ⚠️ [ADO] Auth failed (${envResp.status}) for ${environmentName}. Surgical lookup skipped.`);
-                console.warn(`      💡 Tip: Verify your PAT has 'Environment (Read)' scope and the project '${project}' is correct.`);
+                console.warn(`      💡 Tip: Verify your PAT has 'Environment (Read)' and 'Release (Read)' scopes.`);
                 return null;
             }
 
@@ -749,6 +750,41 @@ export class AzureService {
             console.warn(`      ⚠️ [ADO] Surgical environment lookup failed: ${err.message}`);
         }
         return null;
+    }
+
+    /**
+     * Broadly fetch recent deployments for an environment (no definition filter)
+     */
+    static async fetchEnvironmentDeployments(
+        org: string,
+        project: string,
+        envId: number,
+        pat: string,
+        baseUrl: string = 'https://dev.azure.com',
+        bearerToken?: string,
+        top: number = 20
+    ): Promise<any[]> {
+        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
+        const authHeader = this.getAuthHeader(pat, bearerToken);
+        const url = `${orgUrl}/${encodeURIComponent(project)}/_apis/distributedtask/environments/${envId}/deployments?$top=${top}`;
+
+        console.log(`📡 [ADO Request] GET ${url}`);
+        try {
+            const resp = await fetch(url, {
+                headers: {
+                    'Authorization': authHeader,
+                    'Accept': 'application/json',
+                    'X-TFS-FedAuthRedirect': 'Suppress'
+                }
+            });
+            if (resp.ok) {
+                const data = await resp.json() as { value: any[] };
+                return data.value || [];
+            }
+        } catch (err) {
+            console.error(`❌ [ADO] Failed to fetch environment deployments:`, err);
+        }
+        return [];
     }
 
     /**

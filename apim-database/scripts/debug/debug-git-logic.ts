@@ -164,7 +164,7 @@ async function runDebug() {
     }
 
     const runDiscovery = async () => {
-        console.log(`   ⏳ Fetching all pipeline types (YAML, Classic, Release) for Repo and Project...`);
+        console.log(`   ⏳ Fetching all pipeline types...`);
 
         const safeFetch = async (fn: () => Promise<any[]>, label: string) => {
             try {
@@ -200,7 +200,54 @@ async function runDebug() {
         });
     };
 
-    const pipelines = await runDiscovery();
+    const runSurgicalDiscovery = async (): Promise<any[]> => {
+        console.log(`   ⏳ Attempting Surgical Pipeline Discovery (Environment -> Deployment -> Pipeline)...`);
+        const searchEnvs = ['PROD', 'STAGE', 'QA', 'DEV'];
+        const foundPipes = new Map<number, any>();
+
+        for (const envName of searchEnvs) {
+            console.log(`      🔎 Checking environment: ${envName}...`);
+            const envUrl = `${devops.baseUrl}/${devops.organization}/${encodeURIComponent(projectIdentifier)}/_apis/distributedtask/environments?name=${envName}`;
+            try {
+                const resp = await fetch(envUrl, {
+                    headers: { 'Authorization': AzureService.getAuthHeader(devops.pat), 'Accept': 'application/json' }
+                });
+                if (resp.ok) {
+                    const data = await resp.json() as { count: number; value: any[] };
+                    const match = data.value.find((e: any) => e.name.toUpperCase() === envName);
+                    if (match) {
+                        const envDeploys = await AzureService.fetchEnvironmentDeployments(devops.organization, projectIdentifier, match.id, devops.pat, devops.baseUrl);
+                        console.log(`      ✅ Found ${envDeploys.length} recent deployments in ${envName}.`);
+
+                        for (const d of envDeploys) {
+                            if (d.definition && d.definition.id) {
+                                const pipe = {
+                                    ...d.definition,
+                                    type: 'Surgical (Live)',
+                                    _links: { web: { href: `${devops.baseUrl}/${devops.organization}/${projectIdentifier}/_build?definitionId=${d.definition.id}` } }
+                                };
+                                foundPipes.set(d.definition.id, pipe);
+                            }
+                        }
+                        if (foundPipes.size > 0) break; // Found something, stop looking at other envs
+                    }
+                }
+            } catch (e) {
+                console.warn(`      ⚠️  Surgical lookup for ${envName} failed.`);
+            }
+        }
+        return Array.from(foundPipes.values());
+    };
+
+    let pipelines = await runSurgicalDiscovery();
+
+    if (pipelines.length === 0) {
+        console.log(`   ⚠️  Surgical discovery failed or returned no results. Falling back to general discovery...`);
+        pipelines = await runDiscovery();
+    } else {
+        console.log(`   ✅ Surgical discovery found ${pipelines.length} likely live pipelines.`);
+    }
+
     if (pipelines.length === 0) {
         console.log(`   ❌ No pipelines found for this repository.`);
         return;
