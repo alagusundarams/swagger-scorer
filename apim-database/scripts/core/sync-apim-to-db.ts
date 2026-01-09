@@ -24,17 +24,34 @@ import { AzureService, AppRegistration } from '../services/AzureService.js';
 
 // --- CONFIG LOADER ---
 function loadConfig() {
-    const rootConfig = join(process.cwd(), 'apim-database', 'config.json');
-    const localConfig = join(process.cwd(), 'config.json');
-    const relativeConfig = join(__dirname, '..', '..', 'config.json');
+    const cwd = process.cwd();
+    // Priority 1: Exact path override (if passed via env, though not implemented here)
+
+    // Priority 2: Root config.json (if running from root)
+    const rootConfig = join(cwd, 'config.json');
+
+    // Priority 3: Backend config (often contains the real secrets in this monorepo)
+    const backendConfig = join(cwd, 'apim-self-service-backend', 'config.json');
+
+    // Priority 4: Default/Placeholder config
+    const dbConfig = join(cwd, 'apim-database', 'config.json');
 
     let configPath = '';
     if (existsSync(rootConfig)) configPath = rootConfig;
-    else if (existsSync(localConfig)) configPath = localConfig;
-    else if (existsSync(relativeConfig)) configPath = relativeConfig;
+    else if (existsSync(backendConfig)) {
+        // Only use backend config if it has devops creds
+        try {
+            const temp = JSON.parse(readFileSync(backendConfig, 'utf8'));
+            if (temp.devops?.pat && temp.devops.pat !== 'your-read-only-pat') {
+                configPath = backendConfig;
+            }
+        } catch (e) { }
+    }
+
+    if (!configPath && existsSync(dbConfig)) configPath = dbConfig;
 
     if (configPath) {
-        // console.log(`📂 Using config from: ${configPath}`); // Reduce noise in orchestrator
+        console.log(`📂 Using config from: ${configPath}`);
         return JSON.parse(readFileSync(configPath, 'utf8'));
     }
     return {};

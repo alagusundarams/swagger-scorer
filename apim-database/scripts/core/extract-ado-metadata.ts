@@ -14,12 +14,35 @@ const { Pool } = pkg;
 
 // --- CONFIG LOADER ---
 function loadConfig() {
-    const configPaths = [
-        join(process.cwd(), 'apim-database', 'config.json'),
-        join(process.cwd(), 'config.json')
-    ];
-    for (const path of configPaths) {
-        if (existsSync(path)) return JSON.parse(readFileSync(path, 'utf8'));
+    const cwd = process.cwd();
+    // Priority 1: Exact path override (if passed via env, though not implemented here)
+
+    // Priority 2: Root config.json (if running from root)
+    const rootConfig = join(cwd, 'config.json');
+
+    // Priority 3: Backend config (often contains the real secrets in this monorepo)
+    const backendConfig = join(cwd, 'apim-self-service-backend', 'config.json');
+
+    // Priority 4: Default/Placeholder config
+    const dbConfig = join(cwd, 'apim-database', 'config.json');
+
+    let configPath = '';
+    if (existsSync(rootConfig)) configPath = rootConfig;
+    else if (existsSync(backendConfig)) {
+        // Only use backend config if it has devops creds
+        try {
+            const temp = JSON.parse(readFileSync(backendConfig, 'utf8'));
+            if (temp.devops?.pat && temp.devops.pat !== 'your-read-only-pat') {
+                configPath = backendConfig;
+            }
+        } catch (e) { }
+    }
+
+    if (!configPath && existsSync(dbConfig)) configPath = dbConfig;
+
+    if (configPath) {
+        console.log(`📂 Using config from: ${configPath}`);
+        return JSON.parse(readFileSync(configPath, 'utf8'));
     }
     return {};
 }
