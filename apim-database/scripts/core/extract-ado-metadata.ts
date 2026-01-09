@@ -287,7 +287,6 @@ async function main() {
 
                     // Step 1: Find environment ID by name (EXACT MATCH to debug script line 222)
                     const envUrl = `${devops.baseUrl}/${devops.organization}/${encodeURIComponent(projectId)}/_apis/distributedtask/environments?name=${envName}&api-version=7.1`;
-                    let envId: number | null = null;
 
                     try {
                         const authHeader = AzureService.getAuthHeader(devops.pat, bearerToken);
@@ -298,12 +297,12 @@ async function main() {
                             const data = await resp.json() as { count: number; value: any[] };
                             const match = data.value.find((e: any) => e.name.toUpperCase() === envName.toUpperCase());
                             if (match) {
-                                envId = match.id;
-                                console.log(`      ✅ Found environment ${envName} (ID: ${envId})`);
+                                const currentEnvId = match.id;
+                                console.log(`      ✅ Found environment ${envName} (ID: ${currentEnvId})`);
 
                                 // Step 2: Fetch ALL deployments for this environment (EXACT MATCH to debug script line 231)
                                 const envDeploys = await AzureService.fetchEnvironmentDeployments(
-                                    devops.organization, projectId, envId!, devops.pat, devops.baseUrl, bearerToken
+                                    devops.organization, projectId, currentEnvId, devops.pat, devops.baseUrl, bearerToken
                                 );
                                 console.log(`      ✅ Found ${envDeploys.length} recent deployments in ${envName}.`);
 

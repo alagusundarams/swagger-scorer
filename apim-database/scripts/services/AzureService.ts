@@ -470,7 +470,7 @@ export class AzureService {
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
         let url = `${urlBase}/_apis/pipelines`;
-        if (repoId) url += `&repositoryId=${repoId}&repositoryType=azureRepo`;
+        if (repoId) url += `?repositoryId=${repoId}&repositoryType=azureRepo`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
