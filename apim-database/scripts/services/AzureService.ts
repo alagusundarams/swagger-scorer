@@ -286,9 +286,9 @@ export class AzureService {
     /**
      * Verifies the ADO connection and retrieves identity information.
      */
-    static async verifyAdoConnection(org: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<any> {
+    static async verifyAdoConnection(org: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<any> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
-        const authHeader = this.getAuthHeader(pat);
+        const authHeader = this.getAuthHeader(pat, bearerToken);
         const url = `${orgUrl}/_apis/connectionData`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
@@ -508,8 +508,8 @@ export class AzureService {
     /**
      * Fetch Release Definitions (Classic Pipelines)
      */
-    static async fetchADOReleaseDefinitions(org: string, project: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADOPipeline[]> {
-        const authHeader = this.getAuthHeader(pat);
+    static async fetchADOReleaseDefinitions(org: string, project: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<ADOPipeline[]> {
+        const authHeader = this.getAuthHeader(pat, bearerToken);
         const releaseBase = this.getAdoReleaseUrl(baseUrl, org, project);
         const url = `${releaseBase}/_apis/release/definitions?$top=100`;
 
@@ -542,8 +542,8 @@ export class AzureService {
     /**
      * Fetch Latest Releases for a definition
      */
-    static async fetchADOReleases(org: string, project: string, definitionId: number, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADORelease[]> {
-        const authHeader = this.getAuthHeader(pat);
+    static async fetchADOReleases(org: string, project: string, definitionId: number, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<ADORelease[]> {
+        const authHeader = this.getAuthHeader(pat, bearerToken);
         const releaseBase = this.getAdoReleaseUrl(baseUrl, org, project);
         const url = `${releaseBase}/_apis/release/releases?definitionId=${definitionId}&$top=20`;
 
@@ -600,9 +600,9 @@ export class AzureService {
     /**
      * Fetch a specific build by ID
      */
-    static async fetchADOBuild(org: string, project: string, buildId: number, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<any> {
+    static async fetchADOBuild(org: string, project: string, buildId: number, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<any> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
-        const authHeader = this.getAuthHeader(pat);
+        const authHeader = this.getAuthHeader(pat, bearerToken);
         const url = `${orgUrl}/${encodeURIComponent(project)}/_apis/build/builds/${buildId}`;
 
         try {
@@ -784,7 +784,7 @@ export class AzureService {
                 const deploy = deployData.value[0];
                 // If the deployment object doesn't have the build/hash details, try to fetch the owner build
                 if (!deploy.build?.sourceVersion && deploy.owner?.id) {
-                    const fullBuild = await this.fetchADOBuild(org, project, deploy.owner.id, pat, baseUrl);
+                    const fullBuild = await this.fetchADOBuild(org, project, deploy.owner.id, pat, baseUrl, bearerToken);
                     if (fullBuild) deploy.build = fullBuild;
                 }
                 return deploy;

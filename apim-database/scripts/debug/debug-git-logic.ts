@@ -60,6 +60,18 @@ async function runDebug() {
     console.log(`   Target Env:     ${envArg}`);
     if (repoOverride) console.log(`   🛠️  Repo Override: "${repoOverride}"`);
 
+    // --- AUTH INITIALIZATION ---
+    let bearerToken: string | undefined;
+    try {
+        console.log(`\n🔑 Authenticating...`);
+        bearerToken = await AzureService.getAzureAccessToken('499b84a3-100d-4558-8351-c1e149307c81');
+        console.log(`   ✅ Acquired Azure CLI Bearer Token for ADO.`);
+    } catch (e: any) {
+        console.warn(`   ⚠️  Azure CLI login failed or 'az' not found. Falling back to PAT only. (${e.message})`);
+    }
+
+    const authHeader = AzureService.getAuthHeader(devops.pat, bearerToken);
+
     // --- STEP 1: REPOSITORY DISCOVERY ---
     console.log(`\n➡️  Step 1: Repository Ranking & Selection...`);
 
@@ -68,21 +80,21 @@ async function runDebug() {
 
     if (repoOverride) {
         console.log(`   ⚙️ Using override repository: "${repoOverride}"...`);
-        const searchRes = await AzureService.searchCode(devops.organization, `repo:${repoOverride} ext:tf`, devops.pat, devops.baseUrl);
+        const searchRes = await AzureService.searchCode(devops.organization, `repo:${repoOverride} ext:tf`, devops.pat, devops.baseUrl, bearerToken);
         finalRepo = searchRes.results?.[0]?.repository;
         if (!finalRepo) {
-            const repos = await AzureService.searchCode(devops.organization, `${repoOverride}`, devops.pat, devops.baseUrl);
+            const repos = await AzureService.searchCode(devops.organization, `${repoOverride}`, devops.pat, devops.baseUrl, bearerToken);
             finalRepo = repos.results?.find((r: any) => sanitize(r.repository.name) === sanitize(repoOverride))?.repository;
         }
     } else {
         const quotedName = productNameArg!.includes(' ') ? `"${productNameArg}"` : productNameArg;
         console.log(`   📡 Searching for: ${quotedName}`);
-        const res = await AzureService.searchCode(devops.organization, quotedName!, devops.pat, devops.baseUrl);
+        const res = await AzureService.searchCode(devops.organization, quotedName!, devops.pat, devops.baseUrl, bearerToken);
 
         if (res.count === 0) {
             console.log(`   ❌ No repositories found for "${productNameArg}".`);
             console.log(`   🔎 Trying fallback (sanitized name)...`);
-            const fallback = await AzureService.searchCode(devops.organization, cleanProd, devops.pat, devops.baseUrl);
+            const fallback = await AzureService.searchCode(devops.organization, cleanProd, devops.pat, devops.baseUrl, bearerToken);
             if (fallback.count > 0) {
                 res.results = fallback.results;
                 res.count = fallback.count;
@@ -157,9 +169,9 @@ async function runDebug() {
     // --- STEP 2: PIPELINE DISCOVERY ---
     console.log(`\n➡️  Step 2: Pipeline Discovery...`);
     try {
-        await AzureService.verifyAdoConnection(devops.organization, devops.pat, devops.baseUrl);
+        await AzureService.verifyAdoConnection(devops.organization, devops.pat, devops.baseUrl, bearerToken);
     } catch (err: any) {
-        console.error(`❌ [AUTH] PAT Verification failed: ${err.message}`);
+        console.error(`❌ [AUTH] PAT/Token Verification failed: ${err.message}`);
         process.exit(1);
     }
 
@@ -176,11 +188,11 @@ async function runDebug() {
         };
 
         const [yamlPipes, buildDefs, releaseDefs, projPipes, projBuilds] = await Promise.all([
-            safeFetch(() => AzureService.fetchADOPipelines(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl), 'YAML Pipelines'),
-            safeFetch(() => AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl), 'Build Definitions'),
-            safeFetch(() => AzureService.fetchADOReleaseDefinitions(devops.organization, projectIdentifier, devops.pat, devops.baseUrl), 'Release Definitions'),
-            safeFetch(() => AzureService.fetchADOPipelines(devops.organization, projectIdentifier, '', devops.pat, devops.baseUrl), 'Proj YAML'),
-            safeFetch(() => AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, '', devops.pat, devops.baseUrl), 'Proj Build')
+            safeFetch(() => AzureService.fetchADOPipelines(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl, bearerToken), 'YAML Pipelines'),
+            safeFetch(() => AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl, bearerToken), 'Build Definitions'),
+            safeFetch(() => AzureService.fetchADOReleaseDefinitions(devops.organization, projectIdentifier, devops.pat, devops.baseUrl, bearerToken), 'Release Definitions'),
+            safeFetch(() => AzureService.fetchADOPipelines(devops.organization, projectIdentifier, '', devops.pat, devops.baseUrl, bearerToken), 'Proj YAML'),
+            safeFetch(() => AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, '', devops.pat, devops.baseUrl, bearerToken), 'Proj Build')
         ]);
 
         let combined = [
@@ -210,13 +222,13 @@ async function runDebug() {
             const envUrl = `${devops.baseUrl}/${devops.organization}/${encodeURIComponent(projectIdentifier)}/_apis/distributedtask/environments?name=${envName}`;
             try {
                 const resp = await fetch(envUrl, {
-                    headers: { 'Authorization': AzureService.getAuthHeader(devops.pat), 'Accept': 'application/json' }
+                    headers: { 'Authorization': authHeader, 'Accept': 'application/json' }
                 });
                 if (resp.ok) {
                     const data = await resp.json() as { count: number; value: any[] };
                     const match = data.value.find((e: any) => e.name.toUpperCase() === envName);
                     if (match) {
-                        const envDeploys = await AzureService.fetchEnvironmentDeployments(devops.organization, projectIdentifier, match.id, devops.pat, devops.baseUrl);
+                        const envDeploys = await AzureService.fetchEnvironmentDeployments(devops.organization, projectIdentifier, match.id, devops.pat, devops.baseUrl, bearerToken);
                         console.log(`      ✅ Found ${envDeploys.length} recent deployments in ${envName}.`);
 
                         for (const d of envDeploys) {
@@ -295,7 +307,7 @@ async function runDebug() {
     for (const envName of envsToSync) {
         let deploy: any = null;
         if ((matchedPipeline as any).isRelease) {
-            const releases = await AzureService.fetchADOReleases(devops.organization, projectIdentifier, matchedPipeline.id, devops.pat, devops.baseUrl);
+            const releases = await AzureService.fetchADOReleases(devops.organization, projectIdentifier, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken);
             const latest = releases.find(r => r.environments?.some(e => e.name.toUpperCase() === envName && e.status?.toLowerCase() === 'succeeded'));
             if (latest) {
                 const env = latest.environments.find(e => e.name.toUpperCase() === envName);
@@ -308,7 +320,7 @@ async function runDebug() {
                 };
             }
         } else {
-            deploy = await AzureService.fetchLatestEnvironmentDeployment(devops.organization, projectIdentifier, matchedPipeline.id, envName, devops.pat, devops.baseUrl);
+            deploy = await AzureService.fetchLatestEnvironmentDeployment(devops.organization, projectIdentifier, matchedPipeline.id, envName, devops.pat, devops.baseUrl, bearerToken);
         }
 
         if (deploy) {
@@ -317,7 +329,7 @@ async function runDebug() {
 
             // If missing, try to resolve via owner (Run/Build ID)
             if (!commitHash && deploy.owner?.id) {
-                fullDetails = await AzureService.fetchADOBuild(devops.organization, projectIdentifier, deploy.owner.id, devops.pat, devops.baseUrl);
+                fullDetails = await AzureService.fetchADOBuild(devops.organization, projectIdentifier, deploy.owner.id, devops.pat, devops.baseUrl, bearerToken);
                 commitHash = fullDetails?.sourceVersion;
             }
 
