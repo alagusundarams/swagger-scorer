@@ -180,6 +180,7 @@ export interface Subscription {
     lastSyncedAt?: string;
     appRegistrationId?: string;
     appRegistration?: AppRegistration;
+    teamName?: string;
 }
 
 // --- Governance Domain ---

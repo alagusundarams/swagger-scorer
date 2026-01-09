@@ -51,11 +51,18 @@ export const generatePolicyXml = (template: PolicyTemplate, config: Record<strin
 
     // 2. Replace regular {{fieldName}} with values
     fields.forEach(input => {
-        const val = config[input.name] !== undefined ? config[input.name] : (input.default || '');
+        let val = config[input.name] !== undefined ? config[input.name] : (input.default || '');
         const placeholder = `{{${input.name}}}`;
 
-        // Handle Arrays in simple placeholders (join with comma)
-        if (Array.isArray(val)) {
+        // SPECIAL HANDLING: Complex structures like validate-jwt claims
+        if ((template.id === 'validate-jwt') && ['audiences', 'roles', 'azp'].includes(input.name)) {
+            const parts = String(val).split(',').map(v => v.trim()).filter(Boolean);
+            const wrapped = parts.map(p => `\n                <value>${p}</value>`).join('');
+            xml = xml.replace(new RegExp(`<value>\\s*${placeholder}\\s*</value>`, 'g'), wrapped);
+            // Fallback for case where it's not wrapped in value in template (less likely with balanced templates)
+            xml = xml.replace(new RegExp(placeholder, 'g'), String(val).trim());
+        }
+        else if (Array.isArray(val)) {
             xml = xml.replace(new RegExp(placeholder, 'g'), val.join(', '));
         } else {
             xml = xml.replace(new RegExp(placeholder, 'g'), String(val).trim());
@@ -173,11 +180,12 @@ export const parsePolicyXml = (xmlString: string, templates: PolicyTemplate[]): 
                         values['header'] = element.getAttribute('header-name') || 'Authorization';
 
                         const openIdConfig = element.getElementsByTagName('openid-config')[0];
-                        values['issuer'] = openIdConfig?.getAttribute('url') || '';
+                        values['issuer'] = openIdConfig?.getAttribute('url')?.replace('/.well-known/openid-configuration', '') || '';
 
                         const requiredClaims = element.getElementsByTagName('required-claims')[0];
                         if (requiredClaims) {
                             const claims = Array.from(requiredClaims.getElementsByTagName('claim'));
+
                             const getClaimValues = (name: string) => {
                                 const claim = claims.find(c => c.getAttribute('name') === name);
                                 if (!claim) return '';

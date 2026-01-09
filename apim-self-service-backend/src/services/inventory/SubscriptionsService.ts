@@ -86,7 +86,7 @@ export async function getSubscriptionsForProduct(productId: string) {
         JOIN products p ON s.product_id = p.id
         LEFT JOIN teams t ON s.subscriber_team_id = t.id
         LEFT JOIN app_registrations ar ON s.app_registration_id = ar.id
-        WHERE s.product_id = $1
+        WHERE LOWER(s.product_id) = LOWER($1)
         ORDER BY s.created_at DESC
     `, [productId]);
 

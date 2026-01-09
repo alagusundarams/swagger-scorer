@@ -43,7 +43,7 @@ export function SubscriberCard({ subscription, team, isOwnerLead, onRevokeAccess
                             })()}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-slate-500 flex items-center gap-1 flex-wrap">
-                            <span>{team?.name || subscription.subscriberTeamId}</span>
+                            <span>{team?.name || subscription.teamName || subscription.subscriberTeamId}</span>
                             <span>•</span>
                             <span>Client ID:</span>
                             <code className="text-xs font-mono bg-gray-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
@@ -67,7 +67,7 @@ export function SubscriberCard({ subscription, team, isOwnerLead, onRevokeAccess
                 ) : (
                     <>
                         <div className="font-semibold text-gray-900 dark:text-white">
-                            {team?.name || subscription.subscriberTeamId}
+                            {team?.name || subscription.teamName || subscription.subscriberTeamId}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-slate-500">
                             {team?.description || 'Team'} • Subscribed {formatReadableDate(subscription.createdAt)}

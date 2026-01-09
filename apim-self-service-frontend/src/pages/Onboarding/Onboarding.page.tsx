@@ -126,17 +126,14 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
     const getVisualStep = () => {
         if (step <= 1) return step; // Prep and Intent
         if (intent === 'new') {
-            // New Flow: 2(Identity)->2, 3(Spec)->3, 5(Policy)->4, 6(Res)->4, 7(Full)->5
-            if (step === 2) return 2;
-            if (step === 3) return 3;
-            if (step >= 5 && step <= 6) return 4; // Policies + Resolution group
-            if (step === 7) return 5;
-            return 2;
+            // New Flow: 2(Identity)->2, 3(Spec)->3, 4(Policy)->4, 5(Res)->5, 6(Full)->6
+            return step;
         } else {
-            // Existing Flow: 3(Spec)->2, 5(Policy)->3, 6(Res)->3, 7(Full)->4
+            // Existing Flow: 3(Spec)->2, 4(Policy)->3, 5(Res)->4, 6(Full)->5
             if (step === 3) return 2;
-            if (step >= 5 && step <= 6) return 3;
-            if (step === 7) return 4;
+            if (step === 4) return 3;
+            if (step === 5) return 4;
+            if (step === 6) return 5;
             return 2;
         }
     };
@@ -173,14 +170,9 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
 
         let nextStep = step + 1;
 
-        // MERGE STEP 4 & 5: Skip standalone Product Policy step
-        if (step === 3) {
-            nextStep = 5; // Jump straight to Unified Policy Studio (shifted)
-        }
-
         // Skip logic for Existing flow (Already handled by above but good to keep explicit)
         if (intent === 'existing') {
-            if (step === 3) nextStep = 5;
+            if (step === 1) nextStep = 3; // Intent -> Spec
         }
         setStep(nextStep);
     };
@@ -192,13 +184,7 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
     const handleBack = () => {
         let prevStep = step - 1;
 
-        // MERGE STEP 4 & 5: Back from Unified Studio goes to Spec
-        if (step === 5) {
-            prevStep = 3;
-        }
-
         if (intent === 'existing') {
-            if (step === 5) prevStep = 3; // Skip back to Contract
             if (step === 3) prevStep = 1; // Back to Intent
         }
         setStep(prevStep);
@@ -273,8 +259,8 @@ export const OnboardingWizard = ({ validateProductName }: OnboardingWizardProps)
 
                         {/* Step 4: Skipped (Merged into Step 5) */}
 
-                        {/* Step 5: Unified Policy Studio */}
-                        {step === 5 && (
+                        {/* Step 4: Policy Studio (Consolidated from 4 & 5) */}
+                        {step === 4 && (
                             <OnboardingApiPolicyStep
                                 onBack={handleBack}
                                 onNext={(apiPolicies, productPolicyXml) => {

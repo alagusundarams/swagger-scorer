@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { ScoringConfig } from '../types/index.js';
 import { AppRegistrationsRepository } from '../repositories/app-registrations.repo.js';
 import { ProductsRepository } from '../repositories/products.repo.js';
+import { publishingService } from '../services/git/PublishingService.js';
 
 export class OnboardingController {
     private appRegRepo = new AppRegistrationsRepository();
@@ -276,7 +277,26 @@ export class OnboardingController {
             // 4. Update Staging Record
             await query('UPDATE api_onboarding_staging SET status = $1, updated_at = NOW() WHERE id = $2', ['FULFILLED', id]);
 
-            // 5. Log Audit (High level)
+            // 6. Sync to Git (GitOps fulfillment)
+            const specContent = await onboardingStorageService.retrieveSpec(staging.blob_path);
+
+            // In a real scenario, we'd look up the team's repo URL. 
+            // For now, we use a placeholder or check if it's in the request.
+            const repoUrl = (body as any).gitRepoUrl || `https://dev.azure.com/myorg/apim/_git/${productId}`;
+            const userName = (request as any).user?.name || 'Portal User';
+            const userEmail = (request as any).user?.email || 'user@example.com';
+
+            await publishingService.publishToGit(
+                productId,
+                apiId,
+                specContent,
+                repoUrl,
+                { name: userName, email: userEmail },
+                // Optional: policyXml if provided in onboarding payload
+                (body as any).policyXml
+            );
+
+            // 7. Log Audit (High level)
             await logAudit({
                 entityType: 'ONBOARDING',
                 entityId: id,

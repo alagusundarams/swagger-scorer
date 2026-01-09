@@ -1,0 +1,14 @@
+[
+  {
+    "productId": "prod-legacy",
+    "productName": "legacy-order-api",
+    "deployments": {},
+    "status": "REPO_MISSING"
+  },
+  {
+    "productId": "prod-payment-v2",
+    "productName": "payment-gateway-v2",
+    "deployments": {},
+    "status": "REPO_MISSING"
+  }
+]

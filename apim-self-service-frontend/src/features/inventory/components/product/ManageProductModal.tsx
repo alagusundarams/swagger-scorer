@@ -27,7 +27,7 @@ export const ManageProductModal = ({
     const { teams: allTeams } = useAppData();
 
     // --- Local State ---
-    const [activeTab, setActiveTab] = useState<'metadata' | 'access'>('metadata');
+    const [activeTab, setActiveTab] = useState<'metadata' | 'access' | 'identity'>('metadata');
 
     // Ensure we have a default structure for local state to avoid 'undefined' checks
     const [formData, setFormData] = useState<Required<Pick<Product, 'displayName' | 'description' | 'version' | 'visibility' | 'authorizedTeams'>>>({
@@ -157,7 +157,8 @@ export const ManageProductModal = ({
                 <div className="flex px-8 border-b border-gray-100 dark:border-slate-700">
                     {[
                         { id: 'metadata', label: 'Core Metadata' },
-                        { id: 'access', label: 'Visibility & Access' }
+                        { id: 'access', label: 'Visibility & Access' },
+                        { id: 'identity', label: 'Identity & Linked Apps' }
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -337,7 +338,63 @@ export const ManageProductModal = ({
                         </div>
                     )}
 
-                    {/* Actions */}
+                    {/* --- IDENTITY TAB --- */}
+                    {activeTab === 'identity' && (
+                        <div className="animate-fade-in space-y-6">
+                            <div className="p-4 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl border border-emerald-100 dark:border-emerald-800/30">
+                                <p className="text-[10px] uppercase tracking-widest font-black text-emerald-600 dark:text-emerald-400 mb-1">
+                                    Product-Level Identity
+                                </p>
+                                <p className="text-xs text-emerald-700/70 dark:text-emerald-400/70 font-medium leading-relaxed">
+                                    Linked App Registrations automatically follow this product through all environments. Consumers use these identities to interact with the API bundle.
+                                </p>
+                            </div>
+
+                            {product.identity ? (
+                                <div className="p-6 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-2xl flex justify-between items-center group">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">{product.identity.displayName}</span>
+                                            <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-400 text-[9px] font-black rounded uppercase">Linked</span>
+                                        </div>
+                                        <p className="text-xs font-mono text-slate-500">{product.identity.clientId}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            if (confirm("Disconnecting this identity may break consumer integrations. Are you sure?")) {
+                                                onUpdate({ identity: undefined });
+                                            }
+                                        }}
+                                        className="p-3 text-slate-400 hover:text-red-500 hover:bg-white dark:hover:bg-slate-800 rounded-xl transition-all"
+                                    >
+                                        Disconnect
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <p className="text-xs text-slate-500 font-medium">No identity linked. Search and link an Azure AD App Registration to establish this product's identity.</p>
+                                    <div className="relative group">
+                                        <input
+                                            type="text"
+                                            placeholder="Search by Client ID or Display Name..."
+                                            className="w-full p-4 pl-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl font-bold shadow-sm focus:ring-2 focus:ring-blue-500/20 outline-none transition-all group-hover:border-blue-400"
+                                            onChange={async (e) => {
+                                                const q = e.target.value;
+                                                if (q.length > 3) {
+                                                    // This would typically trigger a debounced search in a real component
+                                                    console.log("Searching for:", q);
+                                                }
+                                            }}
+                                        />
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl opacity-40">🔍</span>
+                                    </div>
+                                    <div className="text-center p-8 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl">
+                                        <p className="text-xs text-slate-400 font-medium italic">Example: "APIM-Product-MyService"</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                     <div className="flex justify-end gap-4 pt-8 border-t border-gray-100 dark:border-slate-700 mt-8">
                         <button
                             onClick={onClose}

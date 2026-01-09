@@ -138,3 +138,4 @@ This backlog outlines the features and capabilities of the APIM Self-Service Por
 76. **[Doc] Operational Runbooks:** Procedures for Incident Management and Recovery.
 77. **[QA] Performance Profiling:** Load testing of critical paths (Inventory/Sync).
 78. **[QA] Accessibility Audit:** WCAG compliance checks (Contrast/Screen Readers).
+79. **[Ops] Database Script Categorization:** Analyze and categorize existing scripts in `apim-database` into Day 1 (Setup/Provisioning) and Day 2 (Maintenance/Operations) workflows (Golden Copy Analysis).

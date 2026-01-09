@@ -118,8 +118,7 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
 
     // === Memoized Computations ===
     const productSubscriptions = useMemo<Subscription[]>(() => {
-        const validSubscriptions = allSubscriptions.filter((s: Subscription) => s.productId === product.id);
-        return validSubscriptions.filter(sub => sub.state === 'active');
+        return allSubscriptions.filter((s: Subscription) => s.productId.toLowerCase() === product.id.toLowerCase());
     },
         [allSubscriptions, product.id]
     );
