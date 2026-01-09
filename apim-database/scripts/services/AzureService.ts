@@ -765,8 +765,8 @@ export class AzureService {
 
             if (!envId) return null;
 
-            // 2. Query Deployments for this specific definition and environment (Surgical Step 2)
-            let deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/deployments?definitionId=${definitionId}&latestState=succeeded&$top=1`;
+            // 2. Query Deployment Records for this specific definition and environment (Surgical Step 2)
+            const deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords?definitionId=${definitionId}&latestState=succeeded&$top=1`;
             console.log(`📡 [ADO Request] GET ${deployUrl}`);
             const deployResp = await fetch(deployUrl, {
                 headers: {
@@ -776,18 +776,6 @@ export class AzureService {
                 }
             });
             console.log(`📡 [ADO Response] ${deployResp.status} ${deployResp.statusText}`);
-
-            if (deployResp.status === 404) {
-                console.warn(`      ⚠️  404 on 'deployments' endpoint. Trying 'environmentdeploymentrecords' fallback...`);
-                deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords?definitionId=${definitionId}&$top=1`;
-                console.log(`📡 [ADO Request] GET ${deployUrl} (Fallback)`);
-                const fbResp = await fetch(deployUrl, { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } });
-                if (fbResp.ok) {
-                    const fbData = await fbResp.json() as { count: number; value: any[] };
-                    if (fbData.count > 0) return fbData.value[0];
-                }
-                return null;
-            }
 
             if (!deployResp.ok) return null;
             const deployData = await deployResp.json() as { count: number; value: any[] };
@@ -822,7 +810,7 @@ export class AzureService {
     ): Promise<any[]> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = this.getAuthHeader(pat, bearerToken);
-        const url = `${orgUrl}/${encodeURIComponent(project)}/_apis/distributedtask/environments/${envId}/deployments?$top=${top}`;
+        const url = `${orgUrl}/${encodeURIComponent(project)}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords?$top=${top}`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
