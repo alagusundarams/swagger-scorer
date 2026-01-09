@@ -183,11 +183,11 @@ export class AzureService {
         if (cleanBase.includes('visualstudio.com')) {
             const subdomainMatch = cleanBase.match(/https?:\/\/([^.]+)\.visualstudio\.com/);
             const searchOrg = subdomainMatch ? subdomainMatch[1] : org;
-            return `https://${searchOrg}.almsearch.visualstudio.com/_apis/search/codesearchresults?api-version=7.1-preview.1`;
+            return `https://${searchOrg}.almsearch.visualstudio.com/_apis/search/codesearchresults?api-version=7.1`;
         }
 
         // Handle Modern: https://dev.azure.com/org -> https://almsearch.dev.azure.com/org
-        return `https://almsearch.dev.azure.com/${org}/_apis/search/codesearchresults?api-version=7.1-preview.1`;
+        return `https://almsearch.dev.azure.com/${org}/_apis/search/codesearchresults?api-version=7.1`;
     }
 
     /**
@@ -225,7 +225,7 @@ export class AzureService {
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
 
-        const url = `${urlBase}/_apis/git/repositories/${repoId}/items?scopePath=${scopePath}&recursionLevel=${recursionLevel}&includeContentMetadata=true&api-version=7.1-preview.1`;
+        const url = `${urlBase}/_apis/git/repositories/${repoId}/items?scopePath=${scopePath}&recursionLevel=${recursionLevel}&includeContentMetadata=true`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
@@ -249,7 +249,7 @@ export class AzureService {
     static async fetchFileContent(org: string, repoId: string, scopePath: string, pat: string, recursionLevel: string = 'None', baseUrl: string = 'https://dev.azure.com'): Promise<any> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = this.getAuthHeader(pat);
-        const url = `${orgUrl}/_apis/git/repositories/${repoId}/items?scopePath=${scopePath}&recursionLevel=${recursionLevel}&includeContentMetadata=true&api-version=7.1-preview.1`;
+        const url = `${orgUrl}/_apis/git/repositories/${repoId}/items?scopePath=${scopePath}&recursionLevel=${recursionLevel}&includeContentMetadata=true`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
@@ -277,7 +277,7 @@ export class AzureService {
     static async verifyAdoConnection(org: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<any> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = this.getAuthHeader(pat);
-        const url = `${orgUrl}/_apis/connectionData?api-version=7.1-preview.1`;
+        const url = `${orgUrl}/_apis/connectionData`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
@@ -382,7 +382,7 @@ export class AzureService {
     static async fetchADOProjects(org: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADOProject[]> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = this.getAuthHeader(pat);
-        const url = `${orgUrl}/_apis/projects?api-version=7.1-preview.4`;
+        const url = `${orgUrl}/_apis/projects`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
@@ -406,7 +406,7 @@ export class AzureService {
      */
     static async fetchRepoById(org: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<ADORepo> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
-        const url = `${orgUrl}/_apis/git/repositories/${repoId}?api-version=7.1-preview.1`;
+        const url = `${orgUrl}/_apis/git/repositories/${repoId}`;
         const authHeader = this.getAuthHeader(pat, bearerToken);
 
         console.log(`📡 [ADO Request] GET ${url}`);
@@ -432,7 +432,7 @@ export class AzureService {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const projectResults = await Promise.all(projects.map(async (project) => {
             try {
-                const url = `${orgUrl}/${encodeURIComponent(project.name)}/_apis/git/repositories?api-version=7.1-preview.1`;
+                const url = `${orgUrl}/${encodeURIComponent(project.name)}/_apis/git/repositories`;
                 console.log(`📡 [ADO Request] GET ${url}`);
                 const response = await fetch(url, { headers: { 'Authorization': authHeader } });
                 console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
@@ -457,7 +457,7 @@ export class AzureService {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
-        let url = `${urlBase}/_apis/pipelines?api-version=7.1-preview.1`;
+        let url = `${urlBase}/_apis/pipelines`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=azureRepo`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
@@ -498,7 +498,7 @@ export class AzureService {
     static async fetchADOReleaseDefinitions(org: string, project: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADOPipeline[]> {
         const authHeader = this.getAuthHeader(pat);
         const releaseBase = this.getAdoReleaseUrl(baseUrl, org, project);
-        const url = `${releaseBase}/_apis/release/definitions?api-version=7.1-preview.1&$top=100`;
+        const url = `${releaseBase}/_apis/release/definitions?$top=100`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
@@ -532,7 +532,7 @@ export class AzureService {
     static async fetchADOReleases(org: string, project: string, definitionId: number, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADORelease[]> {
         const authHeader = this.getAuthHeader(pat);
         const releaseBase = this.getAdoReleaseUrl(baseUrl, org, project);
-        const url = `${releaseBase}/_apis/release/releases?definitionId=${definitionId}&api-version=7.1-preview.1&$top=20`;
+        const url = `${releaseBase}/_apis/release/releases?definitionId=${definitionId}&$top=20`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
@@ -559,7 +559,7 @@ export class AzureService {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
-        let url = `${urlBase}/_apis/build/definitions?api-version=7.1-preview.1`;
+        let url = `${urlBase}/_apis/build/definitions`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
@@ -593,7 +593,7 @@ export class AzureService {
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
 
         // Use the rawest possible URL to match user's successful browser tests
-        let url = `${urlBase}/_apis/build/builds?api-version=7.1-preview.1&$top=50`;
+        let url = `${urlBase}/_apis/build/builds?$top=50&queryOrder=finishTimeDescending`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
@@ -635,7 +635,7 @@ export class AzureService {
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
 
         // Synchronize versions and ensure no strict result filter (the caller filters locally)
-        const url = `${urlBase}/_apis/build/builds?api-version=7.1-preview.1&definitions=${definitionId}&$top=${top}&$skip=${skip}`;
+        const url = `${urlBase}/_apis/build/builds?definitions=${definitionId}&$top=${top}&$skip=${skip}&queryOrder=finishTimeDescending`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
@@ -672,7 +672,7 @@ export class AzureService {
 
         // 1. Find the Environment ID for the given name (Surgical Step 1)
         let envId: number | null = null;
-        let envUrl = `${urlBase}/_apis/distributedtask/environments?name=${encodeURIComponent(environmentName)}&api-version=7.1-preview.1`;
+        let envUrl = `${urlBase}/_apis/distributedtask/environments?name=${encodeURIComponent(environmentName)}`;
 
         console.log(`📡 [ADO Request] GET ${envUrl}`);
 
@@ -705,7 +705,7 @@ export class AzureService {
             } else {
                 // FALLBACK: Fetch all and match case-insensitive
                 console.warn(`      ⚠️ [ADO] Exact env lookup failed. Trying case-insensitive scan...`);
-                envUrl = `${urlBase}/_apis/distributedtask/environments?api-version=7.1-preview.1`;
+                envUrl = `${urlBase}/_apis/distributedtask/environments`;
                 console.log(`📡 [ADO Request] GET ${envUrl} (Fallback)`);
                 envResp = await fetch(envUrl, {
                     headers: {
@@ -730,7 +730,7 @@ export class AzureService {
             if (!envId) return null;
 
             // 2. Query Deployments for this specific definition and environment (Surgical Step 2)
-            const deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/deployments?definitionId=${definitionId}&latestState=succeeded&$top=1&api-version=7.1-preview.1`;
+            const deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/deployments?definitionId=${definitionId}&latestState=succeeded&$top=1`;
             console.log(`📡 [ADO Request] GET ${deployUrl}`);
             const deployResp = await fetch(deployUrl, {
                 headers: {
@@ -834,7 +834,7 @@ export class AzureService {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
-        const url = `${urlBase}/_apis/pipelines/${pipelineId}/runs?api-version=7.1-preview.1`;
+        const url = `${urlBase}/_apis/pipelines/${pipelineId}/runs`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
@@ -858,7 +858,7 @@ export class AzureService {
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
         // Standard ADO builds/timeline endpoint
-        const url = `${urlBase}/_apis/build/builds/${runId}/timeline?api-version=7.1-preview.2`;
+        const url = `${urlBase}/_apis/build/builds/${runId}/timeline`;
 
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
