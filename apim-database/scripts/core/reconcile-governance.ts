@@ -17,7 +17,14 @@ interface ADOMetadata {
     productName: string;
     repository: { id: string; name: string; project: string; projectId: string };
     pipeline: { id: number; name: string };
-    deployments: Record<string, { hash: string; date: string }>;
+    deployments: Record<string, {
+        hash: string;
+        date: string;
+        branch?: string;
+        author?: string;
+        message?: string;
+        url?: string;
+    }>;
     status: 'MATCHED' | 'REPO_MISSING' | 'PIPELINE_MISSING' | 'ORPHAN';
 }
 
@@ -142,6 +149,23 @@ async function main() {
         await client.query('BEGIN');
         console.log('🔒 Transaction started...\n');
 
+        // --- 2.2 Ensure product_deployments table exists ---
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS product_deployments (
+                product_id TEXT REFERENCES products(id) ON DELETE CASCADE NOT NULL,
+                environment TEXT NOT NULL CHECK (environment IN ('DEV', 'QA', 'STAGE', 'PROD')),
+                commit_hash TEXT,
+                deployment_date TIMESTAMP WITH TIME ZONE,
+                branch TEXT,
+                author TEXT,
+                message TEXT,
+                deployment_url TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                PRIMARY KEY (product_id, environment)
+            );
+        `);
+
         // --- A. PRODUCTS RECONCILIATION ---
         console.log(`� Reconciling ${inventory.length} products...`);
         for (const prod of inventory) {
@@ -213,6 +237,30 @@ async function main() {
                         deployment.hash || null, deployment.date || null,
                         ado.status === 'MATCHED' ? 'TERRAFORM_MANAGED' : 'UNTRACKED'
                     ]);
+
+                    // --- ENRICHED DEPLOYMENTS INGESTION ---
+                    if (deployment.hash) {
+                        if (process.env.DEBUG_SQL) console.log(`[DB] Upserting Deployment Info for ${targetId}`);
+                        await client.query(`
+                            INSERT INTO product_deployments (
+                                product_id, environment, commit_hash, deployment_date,
+                                branch, author, message, deployment_url, updated_at
+                            )
+                            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+                            ON CONFLICT (product_id, environment) DO UPDATE SET
+                                commit_hash = EXCLUDED.commit_hash,
+                                deployment_date = EXCLUDED.deployment_date,
+                                branch = EXCLUDED.branch,
+                                author = EXCLUDED.author,
+                                message = EXCLUDED.message,
+                                deployment_url = EXCLUDED.deployment_url,
+                                updated_at = NOW();
+                        `, [
+                            targetId, upperEnv, deployment.hash, deployment.date,
+                            deployment.branch || null, deployment.author || null,
+                            deployment.message || null, deployment.url || null
+                        ]);
+                    }
                 }
 
                 if (verbose) {
@@ -483,6 +531,11 @@ async function main() {
 
         // --- E. SUBSCRIPTIONS ---
         console.log(`🔑 Reconciling Subscriptions...`);
+
+        // Build Optimization Map
+        const inventoryMap = new Map<string, any>();
+        inventory.forEach((p: any) => inventoryMap.set(p.id.trim().toLowerCase(), p));
+
         for (const [env, subs] of Object.entries(apimMeta.subscriptions)) {
             const upperEnv = env.toUpperCase();
             for (const sub of subs) {
@@ -499,7 +552,7 @@ async function main() {
                 const rawProdId = sub.productId || '';
                 const cleanSubProdId = rawProdId.split('/').pop()?.trim().toLowerCase();
 
-                const prod = inventory.find((p: any) => p.id.trim().toLowerCase() === cleanSubProdId);
+                const prod = inventoryMap.get(cleanSubProdId);
 
                 if (!prod) {
                     console.warn(`⚠️  Skipping subscription "${sub.displayName}" - product ${sub.productId} not found in inventory.`);

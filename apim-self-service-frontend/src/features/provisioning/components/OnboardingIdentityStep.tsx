@@ -69,7 +69,7 @@ export const OnboardingIdentityStep: React.FC<OnboardingIdentityStepProps> = ({
             if (searchTerm.length >= 2) {
                 setIsSearching(true);
                 try {
-                    const results = await inventoryApi.searchAppRegistrations(searchTerm);
+                    const results = await inventoryApi.searchAzureIdentities(searchTerm);
                     setSearchResults(results);
                     setShowDropdown(true);
                 } catch (err) {
@@ -136,20 +136,25 @@ export const OnboardingIdentityStep: React.FC<OnboardingIdentityStepProps> = ({
 
 
     // Validation
+    const isGuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
     const isIdentityValid = () => {
         if (intent === 'new') {
-            // Must have client ID and URI
-            return appIdentity.clientId && appIdentity.appIdUri;
+            // Must have valid client ID (GUID) and URI
+            const validId = appIdentity.clientId && isGuid(appIdentity.clientId);
+            return validId && appIdentity.appIdUri;
         } else {
             // Existing
             if (!selectedProduct) return false;
             // If parent has identity, we are valid (inherited)
             if (selectedProduct.identity?.clientId) return true;
             // If parent has NO identity, we must provide one
-            return appIdentity.clientId && appIdentity.appIdUri;
+            const validId = appIdentity.clientId && isGuid(appIdentity.clientId);
+            return validId && appIdentity.appIdUri;
         }
     };
 
+    const isClientIdValid = appIdentity.clientId ? isGuid(appIdentity.clientId) : null;
     const isValid = formData.name && formData.ownerTeamId && /^[a-zA-Z0-9-_]+$/.test(formData.name) && isIdentityValid();
 
     return (
@@ -264,7 +269,11 @@ export const OnboardingIdentityStep: React.FC<OnboardingIdentityStepProps> = ({
                         <div className="space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-3 relative" ref={dropdownRef}>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Client ID (Search by Name or ID)</label>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex justify-between">
+                                        <span>Client ID (Search by Name or ID)</span>
+                                        {isClientIdValid === true && <span className="text-green-500">✓ Valid GUID</span>}
+                                        {isClientIdValid === false && <span className="text-red-500">⚠ Invalid GUID</span>}
+                                    </label>
                                     <div className="relative">
                                         <input
                                             type="text"
@@ -274,7 +283,12 @@ export const OnboardingIdentityStep: React.FC<OnboardingIdentityStepProps> = ({
                                                 onChange({ ...formData, appIdentity: { ...appIdentity, clientId: e.target.value } });
                                             }}
                                             onFocus={() => searchTerm.length >= 2 && setShowDropdown(true)}
-                                            className="w-full px-6 py-4 bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none pr-12"
+                                            className={`w-full px-6 py-4 bg-white dark:bg-black border rounded-xl font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none pr-12 transition-all ${isClientIdValid === false
+                                                ? 'border-red-300 text-red-500 focus:ring-red-500/20'
+                                                : isClientIdValid === true
+                                                    ? 'border-green-300 text-slate-900 dark:text-white focus:ring-green-500/20'
+                                                    : 'border-gray-200 dark:border-gray-800'
+                                                }`}
                                             placeholder="Search application name or ID..."
                                         />
                                         {isSearching && (

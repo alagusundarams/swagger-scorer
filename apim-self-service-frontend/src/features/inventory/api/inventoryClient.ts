@@ -162,8 +162,13 @@ export const inventoryApi = {
         return res.data;
     },
     // App Registration Search
-    searchAppRegistrations: async (q: string) => {
-        const res = await baseClient.get(`/apps/search?q=${encodeURIComponent(q)}`);
+    // Identity Management
+    searchAzureIdentities: async (q: string) => {
+        const res = await baseClient.get(`/identity/azure-search?q=${encodeURIComponent(q)}`);
+        return res.data; // Returns { clientId, displayName, appIdUri }[]
+    },
+    linkIdentity: async (payload: { productId: string, environment: string, clientId: string, displayName: string }) => {
+        const res = await baseClient.post('/identity/link', payload);
         return res.data;
     }
 };

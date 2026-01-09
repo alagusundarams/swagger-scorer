@@ -135,6 +135,17 @@ export interface Product {
         STAGE?: string;
         PROD?: string;
     };
+    deployments?: Deployment[];
+}
+
+export interface Deployment {
+    environment: string;
+    commitHash: string;
+    deploymentDate: string;
+    branch: string;
+    author: string;
+    message: string;
+    deploymentUrl: string;
 }
 
 // --- Consumer Domain ---

@@ -59,6 +59,21 @@ export async function autoPromoteProduct(
         }
 
         const sp = productRes.rows[0];
+        const targetId = `${sp.name}:${targetEnvironment}:${sp.region}`;
+
+        // 1a. CRITICAL ENFORCEMENT: Verify Target Identity Link Exists
+        // Based on the new manual selection workflow, a link MUST exist in the DB before promotion.
+        const identityCheck = await query(`
+            SELECT id, client_id FROM app_registrations 
+            WHERE product_id = $1 AND environment = $2
+        `, [targetId, targetEnvironment]);
+
+        if (identityCheck.rows.length === 0) {
+            throw new Error(`[Blocking] Target Identity not found for ${targetEnvironment}. Please select and link an App Registration in the Promotion Wizard before proceeding.`);
+        }
+
+        const resolvedIdentityClientId = identityCheck.rows[0].client_id;
+        console.log(`[Promotion] Resolved Identity for ${targetEnvironment}: ${resolvedIdentityClientId}`);
 
         // 2. Prepare Policy (Smart Overlay Merge)
         // In real life we'd fetch from Blob Storage or APIM first
@@ -94,7 +109,7 @@ export async function autoPromoteProduct(
         await storage.upload(Buffer.from(finalXml), policyPath, requesterId);
 
         // 3. Upsert target environment row in database
-        const targetId = `${sp.name}:${targetEnvironment}:${sp.region}`;
+
 
         await query(`
             INSERT INTO products (
@@ -125,7 +140,7 @@ export async function autoPromoteProduct(
             targetId, sp.name, sp.display_name, sp.version, sp.description, 'published', sp.owner_team_id,
             targetEnvironment, sp.region, sp.type, sp.visibility, sp.authorized_teams,
             'TERRAFORM_MANAGED', sp.pipeline_url || sp.terraform_pipeline_url,
-            sp.git_repo_url, sp.identity_client_id,
+            sp.git_repo_url, resolvedIdentityClientId,
             finalHash
         ]);
 
@@ -206,6 +221,19 @@ export async function promoteProduct(
         const sp = productRes.rows[0];
         const targetId = `${sp.name}:${targetEnvironment}:${sp.region}`;
 
+        // 1a. CRITICAL ENFORCEMENT: Verify Target Identity Link Exists
+        const identityCheck = await query(`
+            SELECT id, client_id FROM app_registrations 
+            WHERE product_id = $1 AND environment = $2
+        `, [targetId, targetEnvironment]);
+
+        if (identityCheck.rows.length === 0) {
+            throw new Error(`[Blocking] Target Identity not found for ${targetEnvironment}. Please LINK an App Registration first.`);
+        }
+
+        const resolvedIdentityClientId = identityCheck.rows[0].client_id;
+        console.log(`[Promotion] Resolved Identity for ${targetEnvironment}: ${resolvedIdentityClientId}`);
+
         // 2. Prepare content for target environment
         const { getProductPolicy } = await import('../inventory/ProductsService.js');
         const { policyXml } = await getProductPolicy(productId);
@@ -255,7 +283,7 @@ export async function promoteProduct(
             targetId, sp.name, sp.display_name, sp.version, sp.description, 'published', sp.owner_team_id,
             targetEnvironment, sp.region, sp.type, sp.visibility, sp.authorized_teams,
             'TERRAFORM_MANAGED', sp.terraform_pipeline_url, sp.github_url,
-            sp.git_repo_url, sp.git_file_path, sp.identity_client_id,
+            sp.git_repo_url, sp.git_file_path, resolvedIdentityClientId,
             finalHash
         ]);
 

@@ -151,6 +151,15 @@ export class ProductsRepository {
         `, [id]);
     }
 
+    async getProductDeployments(id: string) {
+        return await query(`
+            SELECT environment, commit_hash, deployment_date, branch, author, message, deployment_url
+            FROM product_deployments
+            WHERE product_id = $1
+            ORDER BY deployment_date DESC
+        `, [id]);
+    }
+
 
 
     async updateProductOwner(id: string, ownerTeamId: string) {

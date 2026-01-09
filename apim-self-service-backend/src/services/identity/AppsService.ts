@@ -6,20 +6,21 @@
 
 import { query } from '../core/db.js';
 import { logAudit } from '../core/AuditService.js';
-import { AppRegistrationsRepository } from '../../repositories/app-registrations.repo.js';
+// import { AppRegistrationsRepository } from '../../repositories/app-registrations.repo.js';
+import { AzureService } from '../core/AzureService.js';
+import { v4 as uuidv4 } from 'uuid';
 
-const appsRepo = new AppRegistrationsRepository();
+// const appsRepo = new AppRegistrationsRepository();
 
 /**
  * Search all available app registrations
  */
+/**
+ * Search all available app registrations (Live Azure Search)
+ */
 export async function searchApps(query: string) {
-    const res = await appsRepo.searchAppRegistrations(query);
-    return res.rows.map((row: any) => ({
-        clientId: row.client_id,
-        displayName: row.display_name,
-        appIdUri: row.app_id_uri
-    }));
+    // We search Azure directly to find identities even if they aren't in our DB yet.
+    return await AzureService.searchAppRegistrations(query);
 }
 
 /**
@@ -83,6 +84,7 @@ export async function addAppRegistration(app: {
         changes: app
     });
 
+
     return {
         ...res.rows[0],
         displayName: res.rows[0].display_name,
@@ -91,5 +93,87 @@ export async function addAppRegistration(app: {
         secretExpiryDate: res.rows[0].secret_expiry_date,
         productId: res.rows[0].product_id,
         ownerTeamId: res.rows[0].owner_team_id
+    };
+}
+
+/**
+ * STRICT Link App Registration with Azure Validation
+ * This is the primary method for "Manual Selection" workflow.
+ */
+export async function linkAppRegistration(
+    sourceProductId: string,
+    environment: string,
+    identityData: { clientId: string, displayName: string },
+    userId: string
+) {
+    const { clientId, displayName } = identityData;
+
+    // 1. Validate against Azure (Trust but Verify)
+    const azureApp = await AzureService.validateAppRegistration(clientId);
+
+    if (!azureApp) {
+        throw new Error(`Identity '${clientId}' not found in Azure. Please verify the Client ID.`);
+    }
+
+    // 2. Resolve Target Product ID & Ensure Stub Exists
+    const productRes = await query('SELECT * FROM products WHERE id = $1', [sourceProductId]);
+    if (productRes.rows.length === 0) throw new Error(`Product ${sourceProductId} not found`);
+    const sp = productRes.rows[0];
+
+    const targetProductId = `${sp.name}:${environment}:${sp.region}`;
+
+    // Ensure Target Product Exists (Stub) to satisfy FK
+    await query(`
+        INSERT INTO products (
+            id, name, display_name, environment, region, state, 
+            owner_team_id, type, visibility, management_mode
+        ) VALUES (
+            $1, $2, $3, $4, $5, 'notPublished', 
+            $6, $7, $8, 'TERRAFORM_MANAGED'
+        )
+        ON CONFLICT (id) DO NOTHING
+    `, [
+        targetProductId, sp.name, sp.display_name, environment, sp.region,
+        sp.owner_team_id, sp.type, sp.visibility
+    ]);
+
+    // 3. Perform Link (Upsert) to TARGET Product ID
+    const id = `app-${uuidv4()}`;
+    const res = await query(`
+        INSERT INTO app_registrations (
+            id, client_id, display_name, environment, product_id, type
+        ) VALUES ($1, $2, $3, $4, $5, 'PRODUCT')
+        ON CONFLICT (client_id) DO UPDATE SET
+            product_id = EXCLUDED.product_id,
+            environment = EXCLUDED.environment,
+            display_name = EXCLUDED.display_name,
+            updated_at = NOW()
+        RETURNING *
+    `, [id, clientId, azureApp.displayName || displayName, environment, targetProductId]);
+
+    const linkedApp = res.rows[0];
+
+    // 4. Audit Log
+    await logAudit({
+        entityType: 'APP_REGISTRATION',
+        entityId: linkedApp.id,
+        action: 'LINK_IDENTITY',
+        userId: userId,
+        resourceId: targetProductId,
+        resourceType: 'product',
+        details: {
+            environment,
+            clientId,
+            method: 'MANUAL_LINK_VERIFIED',
+            sourceProductId
+        }
+    });
+
+    return {
+        id: linkedApp.id,
+        clientId: linkedApp.client_id,
+        displayName: linkedApp.display_name,
+        environment: linkedApp.environment,
+        productId: linkedApp.product_id
     };
 }

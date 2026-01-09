@@ -248,7 +248,7 @@ export function ProducerHeader({
 
                 {/* Git Synchronization */}
                 <div className="bg-gray-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-gray-100 dark:border-slate-700/50">
-                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Git Synchronization</h3>
+                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Git Synchronization ({currentEnv})</h3>
                     <div className="space-y-2">
                         <div className="flex justify-between items-center">
                             <span className="text-xs text-gray-500 font-bold">Repo URL</span>
@@ -256,12 +256,45 @@ export function ProducerHeader({
                                 {product.gitRepoUrl ? 'View Repository' : 'Not Linked'}
                             </a>
                         </div>
-                        <div className="flex justify-between items-center">
-                            <span className="text-xs text-gray-500 font-bold">Last Commit</span>
-                            <code className="text-xs font-mono bg-white dark:bg-slate-900 px-2 py-1 rounded border border-gray-200 dark:border-slate-700">
-                                {product.lastDeployedCommitHash ? product.lastDeployedCommitHash.substring(0, 7) : 'N/A'}
-                            </code>
-                        </div>
+                        {product.deployments?.find(d => d.environment === currentEnv) ? (
+                            <>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-gray-500 font-bold">Branch</span>
+                                    <span className="text-xs font-bold text-gray-900 dark:text-gray-300">
+                                        {product.deployments.find(d => d.environment === currentEnv)?.branch || 'unknown'}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-gray-500 font-bold">Last Commit</span>
+                                    <a
+                                        href={product.deployments.find(d => d.environment === currentEnv)?.deploymentUrl || '#'}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-xs font-mono bg-white dark:bg-slate-900 px-2 py-1 rounded border border-gray-200 dark:border-slate-700 text-blue-600 hover:underline"
+                                    >
+                                        {(product.deployments.find(d => d.environment === currentEnv)?.commitHash || '').substring(0, 7)}
+                                    </a>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-gray-500 font-bold">Author</span>
+                                    <span className="text-xs font-bold text-gray-900 dark:text-gray-300 truncate max-w-[150px]">
+                                        {product.deployments.find(d => d.environment === currentEnv)?.author}
+                                    </span>
+                                </div>
+                                <div className="pt-1 mt-1 border-t border-gray-200 dark:border-slate-700">
+                                    <p className="text-[10px] text-gray-400 italic truncate" title={product.deployments.find(d => d.environment === currentEnv)?.message}>
+                                        "{product.deployments.find(d => d.environment === currentEnv)?.message}"
+                                    </p>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-gray-500 font-bold">Last Commit</span>
+                                <code className="text-xs font-mono bg-white dark:bg-slate-900 px-2 py-1 rounded border border-gray-200 dark:border-slate-700">
+                                    {product.lastDeployedCommitHash ? product.lastDeployedCommitHash.substring(0, 7) : 'N/A'}
+                                </code>
+                            </div>
+                        )}
                     </div>
                 </div>
 

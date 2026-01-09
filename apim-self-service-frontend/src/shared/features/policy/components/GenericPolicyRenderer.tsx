@@ -3,6 +3,13 @@ import { createPortal } from 'react-dom';
 import { type PolicyStep } from '../types';
 import { PolicyTemplate, getPolicyFields } from '../../../../features/provisioning/components/policyTemplates';
 import { PolicyCard } from './PolicyCard';
+import { IdentitySearchInput } from './IdentitySearchInput';
+
+// Heuristic to detect if a field should be an Identity Picker
+const isIdentityField = (name: string) => {
+    const n = name.toLowerCase();
+    return n.includes('audience') || n === 'azp' || n === 'client_id' || n === 'clientid';
+};
 
 const SnippetButton = ({ onSelect, disabled }: { onSelect: (val: string) => void, disabled?: boolean }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -185,6 +192,13 @@ export const GenericPolicyRenderer = ({
                                 disabled={readOnly}
                                 rows={3}
                                 className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl px-4 py-3 text-xs font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all outline-none resize-none disabled:opacity-50"
+                            />
+                        ) : isIdentityField(input.name) ? (
+                            <IdentitySearchInput
+                                value={step.values[input.name] || ''}
+                                onChange={(val) => handleFieldChange(input.name, val)}
+                                readOnly={readOnly}
+                                placeholder={input.placeholder || "Search Azure AD..."}
                             />
                         ) : (
                             <input

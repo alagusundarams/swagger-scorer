@@ -44,6 +44,9 @@ async function seedOrphans() {
             { id: 'orphan-prod-6', name: 'QAResults Service', env: 'QA', version: 'v1.5' },
             { id: 'orphan-prod-7', name: 'Unassigned Mobile API', env: 'PROD', version: 'v3.0' },
             { id: 'orphan-prod-8', name: 'Ghost Service', env: 'STAGE', version: 'v?' },
+            // Test Case for Reconciliation Fix:
+            // DB has 'CaseTest-Product', Azure might return 'casetest-product'. This should verify the fix.
+            { id: 'CaseTest-Product', name: 'Case Verification App', env: 'DEV', version: 'v1.0' },
         ];
 
         for (const p of orphans) {

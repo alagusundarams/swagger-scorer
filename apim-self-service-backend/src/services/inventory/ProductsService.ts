@@ -330,6 +330,17 @@ export async function getProductById(id: string, environment?: string, userConte
         createdAt: p.created_at,
         updatedAt: p.updated_at,
 
+        // Enriched Deployments
+        deployments: (await productsRepo.getProductDeployments(id)).rows.map((d: any) => ({
+            environment: d.environment,
+            commitHash: d.commit_hash,
+            deploymentDate: d.deployment_date,
+            branch: d.branch,
+            author: d.author,
+            message: d.message,
+            deploymentUrl: d.deployment_url
+        })),
+
         // APIs
         apis: await Promise.all(apiRes.rows.map(async (a: any) => {
             let statusDetails = 'Synced';

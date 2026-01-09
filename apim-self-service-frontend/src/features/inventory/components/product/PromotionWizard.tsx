@@ -3,6 +3,7 @@ import { type Product, type Environment } from '../../../../shared/types/domain'
 import { getNextEnvironment } from '../../../../utils/statusUtils';
 import { OnboardingApiPolicyStep } from '../../../provisioning/components/OnboardingApiPolicyStep';
 import { OnboardingResolutionStep } from '../../../provisioning/components/OnboardingResolutionStep';
+import { TargetIdentityStep } from './TargetIdentityStep';
 import { inventoryApi } from '../../api/inventoryClient';
 import { useStore } from '../../../../store/useStore';
 
@@ -36,7 +37,7 @@ interface PromotionWizardProps {
 
 export const PromotionWizard = ({ isOpen, onClose, product, onComplete }: PromotionWizardProps) => {
     const { addNotification } = useStore();
-    const [step, setStep] = useState(1); // 1: Strategy, 2: Edit (Opt), 3: Resolve, 4: Summary
+    const [step, setStep] = useState(1); // 1: Strategy, 2: Identity, 3: Edit (Opt), 4: Resolve, 5: Summary
     const [strategy, setStrategy] = useState<'copy' | 'modify'>('copy');
     const [targetEnv, setTargetEnv] = useState<Environment>('QA');
     const [policyXml, setPolicyXml] = useState('');
@@ -69,11 +70,7 @@ export const PromotionWizard = ({ isOpen, onClose, product, onComplete }: Promot
 
     const handleStrategySelect = (s: 'copy' | 'modify') => {
         setStrategy(s);
-        if (s === 'copy') {
-            setStep(3); // Jump to resolution
-        } else {
-            setStep(2); // Go to Policy Studio
-        }
+        setStep(2); // Always go to Identity Selection next
     };
 
     const handlePromotionSubmit = async () => {
@@ -160,15 +157,33 @@ export const PromotionWizard = ({ isOpen, onClose, product, onComplete }: Promot
                     </div>
                 )}
 
-                {/* Step 2: Policy Editor (Modified Copy) */}
+                {/* Step 2: Target Identity Selection (NEW) */}
                 {step === 2 && (
+                    <TargetIdentityStep
+                        targetEnv={targetEnv}
+                        productId={product.id}
+                        onBack={() => setStep(1)}
+                        onNext={(identity) => {
+                            console.log('Linked Identity:', identity);
+                            // Navigate based on Strategy
+                            if (strategy === 'copy') {
+                                setStep(4); // Jump to Resolution
+                            } else {
+                                setStep(3); // Go to Policy Editor
+                            }
+                        }}
+                    />
+                )}
+
+                {/* Step 3: Policy Editor (Modified Copy) */}
+                {step === 3 && (
                     <div className="flex-1 flex flex-col min-h-0 bg-slate-50 dark:bg-slate-950">
                         <OnboardingApiPolicyStep
-                            onBack={() => setStep(1)}
+                            onBack={() => setStep(2)} // Back to Identity
                             onNext={(apis, productXml) => {
                                 setApiPolicies(apis);
                                 setPolicyXml(productXml || '');
-                                setStep(3);
+                                setStep(4); // Go to Resolution
                             }}
                             productName={product.displayName}
                             productPolicyXml={policyXml}
@@ -177,24 +192,24 @@ export const PromotionWizard = ({ isOpen, onClose, product, onComplete }: Promot
                     </div>
                 )}
 
-                {/* Step 3: Variable Resolution for Target Env */}
-                {step === 3 && (
+                {/* Step 4: Variable Resolution for Target Env */}
+                {step === 4 && (
                     <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-slate-900">
                         <OnboardingResolutionStep
                             productPolicyXml={policyXml}
                             apiPolicies={apiPolicies}
-                            existingNamedValues={[]} // We want to resolve specifically for the target env
-                            onBack={() => setStep(strategy === 'modify' ? 2 : 1)}
+                            existingNamedValues={[]}
+                            onBack={() => setStep(strategy === 'modify' ? 3 : 2)} // Back to Policy or Identity
                             onNext={(values) => {
                                 setResolvedValues(values);
-                                setStep(4);
+                                setStep(5); // Go to Summary
                             }}
                         />
                     </div>
                 )}
 
-                {/* Step 4: Final Summary & Submit */}
-                {step === 4 && (
+                {/* Step 5: Final Summary & Submit */}
+                {step === 5 && (
                     <div className="flex-1 flex items-center justify-center p-12 bg-slate-50 dark:bg-slate-950">
                         <div className="max-w-xl w-full bg-white dark:bg-slate-800 p-10 rounded-[3rem] shadow-premium border border-slate-100 dark:border-slate-700 flex flex-col items-center text-center">
                             <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/30 rounded-3xl flex items-center justify-center text-3xl mb-6">🚀</div>

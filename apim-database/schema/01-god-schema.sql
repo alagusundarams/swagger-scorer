@@ -113,6 +113,28 @@ CREATE INDEX idx_products_quality ON products(quality_score);
 CREATE INDEX idx_products_git_repo ON products(git_repo_url);
 
 -- =============================================================================
+-- PRODUCT DEPLOYMENTS
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS product_deployments (
+    product_id TEXT REFERENCES products(id) ON DELETE CASCADE NOT NULL,
+    environment TEXT NOT NULL CHECK (environment IN ('DEV', 'QA', 'STAGE', 'PROD')),
+    commit_hash TEXT,
+    deployment_date TIMESTAMP WITH TIME ZONE,
+    branch TEXT,
+    author TEXT,
+    message TEXT,
+    deployment_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    PRIMARY KEY (product_id, environment)
+);
+
+CREATE INDEX idx_pd_product ON product_deployments(product_id);
+CREATE INDEX idx_pd_environment ON product_deployments(environment);
+
+
+-- =============================================================================
 -- APIS
 -- =============================================================================
 

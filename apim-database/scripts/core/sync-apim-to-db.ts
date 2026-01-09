@@ -377,7 +377,7 @@ async function resolveGitMetadata(productName: string, productTags: Record<strin
         if (searchResp.count === 0) return fallback;
 
         const repoMap = new Map<string, any>();
-        searchResp.results.forEach(r => {
+        searchResp.results.forEach((r: any) => {
             if (!repoMap.has(r.repository.name)) {
                 repoMap.set(r.repository.name, {
                     id: r.repository.id,
@@ -388,7 +388,7 @@ async function resolveGitMetadata(productName: string, productTags: Record<strin
         });
 
         const filteredRepos = Array.from(repoMap.values()).filter(r => !r.name.toLowerCase().includes('grp'));
-        if (filteredRepos.length !== 1) return fallback; // Handle ambiguity/zero in logs if needed, but keeping simple for now
+        if (filteredRepos.length === 0) return fallback;
 
         matchedRepo = filteredRepos[0];
         const cleanBase = (devopsConfig.baseUrl || 'https://dev.azure.com').replace(/\/$/, '');
@@ -398,66 +398,27 @@ async function resolveGitMetadata(productName: string, productTags: Record<strin
 
     } catch (e) { return fallback; }
 
-    // 2. Fetch Pipelines & Scan Runs
+    // 2. Surgical Strike Deployment Discovery
     try {
         const pipelines = await AzureService.fetchADOPipelines(devopsConfig.organization, matchedRepo.project, matchedRepo.id, devopsConfig.pat, devopsConfig.baseUrl);
         if (pipelines.length === 0) return { ...fallback, repoUrl };
 
         const bestPipeline = pipelines.find(p => p.name.includes(matchedRepo.name) || p.name.toLowerCase().includes('ci')) || pipelines[0];
-        const runs = await AzureService.fetchPipelineRuns(devopsConfig.organization, matchedRepo.project, bestPipeline.id, devopsConfig.pat, devopsConfig.baseUrl);
 
+        // Fetch Latest for Current Env (Original Fallback)
+        const runs = await AzureService.fetchPipelineRuns(devopsConfig.organization, matchedRepo.project, bestPipeline.id, devopsConfig.pat, devopsConfig.baseUrl);
         if (runs.length === 0) return { ...fallback, repoUrl };
 
-        // We want: 
-        // 1. Latest successful run for CURRENT environment 
-        // 2. Latest successful run for PROD environment
-        let currentMetadata = { hash: '', date: '' };
-        let prodMetadata = { hash: '', date: '' };
-        let pipelineUrl = '';
+        const metadata: GitMetadata = {
+            hash: runs[0].sourceVersion || '',
+            date: runs[0].finishedDate || null,
+            pipelineUrl: (runs[0] as any)._links?.web?.href || (runs[0] as any).web?.href,
+            repoUrl
+        };
 
-        // Optimization: scan only last 20 runs
-        for (const run of runs.slice(0, 20)) {
-            const timeline = await AzureService.fetchPipelineRunTimeline(devopsConfig.organization, matchedRepo.project, run.id, devopsConfig.pat, devopsConfig.baseUrl);
-
-            // Check for Current Env Success
-            if (!currentMetadata.hash) {
-                const stage = timeline.find(r => r.type === 'stage' && r.name.toLowerCase().includes(currentEnv.toLowerCase()) && r.result === 'succeeded');
-                if (stage) {
-                    currentMetadata = {
-                        hash: 'sourceVersion' in run ? (run as any).sourceVersion : '',
-                        date: stage.finishTime || run.finishedDate
-                    };
-                    pipelineUrl = (run as any)._links?.web?.href || (run as any).web?.href;
-                }
-            }
-
-            // Check for Prod Env Success
-            if (!prodMetadata.hash) {
-                const stage = timeline.find(r => r.type === 'stage' && (r.name.toLowerCase().includes('prod') || r.name.toLowerCase().includes('production')) && r.result === 'succeeded');
-                if (stage) {
-                    prodMetadata = {
-                        hash: 'sourceVersion' in run ? (run as any).sourceVersion : '',
-                        date: stage.finishTime || run.finishedDate
-                    };
-                }
-            }
-
-            if (currentMetadata.hash && prodMetadata.hash) break;
-        }
-
-        // Fallback if no specific stage found: use latest run as 'current'
-        if (!currentMetadata.hash) {
-            currentMetadata = {
-                hash: 'sourceVersion' in runs[0] ? (runs[0] as any).sourceVersion : '',
-                date: runs[0].finishedDate
-            };
-            pipelineUrl = (runs[0] as any)._links?.web?.href || (runs[0] as any).web?.href;
-        }
-
-        // D. File Crawler (Inline)
+        // 3. File Crawler (Inline) - Find OpenAPI Specs
         let discoveredSpecs: string[] = [];
         try {
-            // Only crawl if we have a match
             if (matchedRepo) {
                 const items = await AzureService.fetchRepoItems(
                     devopsConfig.organization,
@@ -476,17 +437,11 @@ async function resolveGitMetadata(productName: string, productTags: Record<strin
             console.warn(`      ⚠️  [Sync] Crawler failed:`, e);
         }
 
-        return {
-            hash: currentMetadata.hash,
-            date: currentMetadata.date,
-            pipelineUrl,
-            repoUrl,
-            production: prodMetadata.hash ? prodMetadata : undefined,
-            discoveredSpecs
-        };
+        metadata.discoveredSpecs = discoveredSpecs;
+        return metadata;
 
     } catch (error) {
-        return fallback;
+        return { ...fallback, repoUrl };
     }
 }
 
@@ -643,6 +598,23 @@ async function runWorker(envName: string) {
         await pool.query(`ALTER TABLE subscriptions DROP COLUMN IF EXISTS primary_key_value;`);
         await pool.query(`ALTER TABLE subscriptions DROP COLUMN IF EXISTS secondary_key_value;`);
         await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS policy_xml TEXT;`); // Add policy_xml column to products
+
+        // Manual Migration for product_deployments
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS product_deployments (
+                product_id TEXT REFERENCES products(id) ON DELETE CASCADE NOT NULL,
+                environment TEXT NOT NULL CHECK (environment IN ('DEV', 'QA', 'STAGE', 'PROD')),
+                commit_hash TEXT,
+                deployment_date TIMESTAMP WITH TIME ZONE,
+                branch TEXT,
+                author TEXT,
+                message TEXT,
+                deployment_url TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                PRIMARY KEY (product_id, environment)
+            );
+        `);
 
         // Legacy placeholder cleanup - no longer needed with environment/region identity
         // await pool.query(`
@@ -846,6 +818,50 @@ async function runWorker(envName: string) {
             }
         }
 
+        // Build Known Product ID Map for Case-Insensitive Lookup (FK Integrity)
+        const productMap = new Map<string, string>();
+        apimProducts.forEach(p => productMap.set(p.id.toLowerCase(), p.id));
+
+        // Note: apimSubs is already populated above (line 651)
+
+
+        // ... (Skipping Named Values logic for brevity in this replacement block if possible, but context requires me to include start of loop) ...
+        // Wait, I need to verify where "knownProductIds" was defined. It was line 647.
+        // And the loop starts at 821.
+        // I will replace separate blocks or I need to handle the gap.
+        // "knownProductIds" is used in 830.
+        // I will replace the "knownProductIds" definition AND the loop check.
+        // But they are far apart (647 vs 830).
+        // I will use multi_replace.
+
+        // Actually, let me just fix the check site (830) and the prep site (647) is too far.
+        // I'll assume I can redefine the map just before the loop or use existing variables if I modify 647.
+        // Let's modify the loop logic heavily to be robust.
+
+        // REPLACEMENT 1: Redefine the mapping logic before the loop
+        // REPLACEMENT 2: Update the loop check.
+
+        // Wait, I can't see line 647 in this view? I saw it in previous view.
+        // I will just instantiate the map inside the usage area if I can, or use the tool twice.
+        // Actually, I'll just change the CHECK to be smart if I assume "knownProductIds" is available.
+        // checking knownProductIds.has(s.productId)
+
+        // BETTER: I will replace the Loop logic (821-835) and inside it, I will recover the "Real ID" from "knownProductIds" by iterating? No that's slow.
+        // I should reconstruct the map locally.
+
+        // Let's do a replace on the LOOP.
+
+        // Check lines 821-835.
+        // I can construct a map `const realProductIds = new Map(Array.from(knownProductIds).map(id => [id.toLowerCase(), id]));` right before the loop?
+        // But `knownProductIds` was created way back.
+
+        // I'll insert the map creation at the start of the loop block.
+
+        const realProductMap = new Map<string, string>();
+        for (const pid of knownProductIds) {
+            realProductMap.set(pid.toLowerCase(), pid);
+        }
+
         for (const s of apimSubs) {
             if (!s.scope || !s.scope.toLowerCase().includes('/products/')) {
                 // console.warn(`⚠️ Skipping Non - Product Subscription: ${ s.name } (Scope: ${ s.scope })`);
@@ -854,13 +870,20 @@ async function runWorker(envName: string) {
                 continue;
             }
 
+            // Case-Insensitive Resolution
+            const rawProdId = s.productId;
+            const realProdId = realProductMap.get(rawProdId.toLowerCase());
+
             // Referential Integrity Check
-            if (!knownProductIds.has(s.productId)) {
-                // console.warn(`⚠️ Skipping Orphaned Subscription: ${ s.name } (Target Product '${s.productId}' not found in sync)`);
-                syncReport.gaps.orphanedSubscriptions.push({ id: s.id, name: s.name, targetProduct: s.productId, reason: 'Target Product not found in APIM or DB' });
+            if (!realProdId) {
+                console.warn(`⚠️ Orphaned Subscription: ${s.name} (Target '${rawProdId}' not found)`);
+                syncReport.gaps.orphanedSubscriptions.push({ id: s.id, name: s.name, targetProduct: rawProdId, reason: 'Target Product not found in APIM or DB' });
                 syncReport.summary.orphanedSubsSkipped++;
                 continue;
             }
+
+            // Perform link with REAL Product ID
+            s.productId = realProdId; // Update so the INSERT below uses the correct casing
 
             await pool.query(`
                 INSERT INTO teams(id, display_name, type, updated_at)
