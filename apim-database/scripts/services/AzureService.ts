@@ -707,6 +707,8 @@ export class AzureService {
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
 
+        console.log(`\n🔍 [DEPLOY DEBUG] Fetching deployment for Environment: "${environmentName}" in Pipeline ${definitionId}`);
+
         // 1. Find the Environment ID for the given name (Surgical Step 1)
         let envId: number | null = null;
         let envUrl = `${urlBase}/_apis/distributedtask/environments?name=${encodeURIComponent(environmentName)}&api-version=7.1`;
@@ -734,16 +736,23 @@ export class AzureService {
             if (envResp.ok) {
                 try {
                     envData = await envResp.json() as { count: number; value: any[] };
-                } catch (e) { /* ignore non-json */ }
+                    console.log(`   📊 Environment lookup returned ${envData.count} results`);
+                    if (envData.count > 0) {
+                        console.log(`   📋 Available environments: ${envData.value.map((e: any) => e.name).join(', ')}`);
+                    }
+                } catch (e) {
+                    console.warn(`   ⚠️ Failed to parse environment response as JSON`);
+                }
             }
 
             if (envResp.ok && envData.count > 0) {
                 envId = envData.value[0].id;
+                console.log(`   ✅ Matched environment: "${envData.value[0].name}" (ID: ${envId})`);
             } else {
                 // FALLBACK: Fetch all and match case-insensitive
                 console.warn(`      ⚠️ [ADO] Exact env lookup failed. Trying case-insensitive scan...`);
                 envUrl = `${urlBase}/_apis/distributedtask/environments?api-version=7.1`;
-                // console.log(`📡 [ADO Request] GET ${envUrl} (Fallback)`);
+                console.log(`📡 [ADO Request] GET ${envUrl} (Fallback)`);
                 envResp = await fetch(envUrl, {
                     headers: {
                         'Authorization': authHeader,
@@ -751,24 +760,35 @@ export class AzureService {
                         'X-TFS-FedAuthRedirect': 'Suppress'
                     }
                 });
-                // console.log(`📡 [ADO Response] ${envResp.status} ${envResp.statusText}`);
+                console.log(`📡 [ADO Response] ${envResp.status} ${envResp.statusText}`);
 
                 if (envResp.ok) {
                     envData = await envResp.json() as { count: number; value: any[] };
+                    console.log(`   📊 Found ${envData.count} total environments in project`);
+                    if (envData.count > 0) {
+                        console.log(`   📋 All environments: ${envData.value.map((e: any) => e.name).join(', ')}`);
+                    }
                     const targetLower = environmentName.toLowerCase().trim();
                     const match = envData.value.find((e: any) => e.name.toLowerCase().trim() === targetLower);
                     if (match) {
                         envId = match.id;
                         console.log(`      ✅ Found match: '${match.name}' (ID: ${envId})`);
+                    } else {
+                        console.error(`      ❌ No environment matches "${environmentName}" (case-insensitive)`);
                     }
+                } else {
+                    console.error(`      ❌ Fallback environment list failed: ${envResp.status}`);
                 }
             }
 
-            if (!envId) return null;
+            if (!envId) {
+                console.error(`   ❌ [DEPLOY] Could not resolve environment ID for "${environmentName}" - returning null`);
+                return null;
+            }
 
             // 2. Query Deployment Records for this specific definition and environment (Surgical Step 2)
             const deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords?definitionId=${definitionId}&latestState=succeeded&$top=1&api-version=7.1`;
-            // console.log(`📡 [ADO Request] GET ${deployUrl}`);
+            console.log(`📡 [ADO Request] GET ${deployUrl}`);
             const deployResp = await fetch(deployUrl, {
                 headers: {
                     'Authorization': authHeader,
@@ -776,23 +796,38 @@ export class AzureService {
                     'X-TFS-FedAuthRedirect': 'Suppress'
                 }
             });
-            // console.log(`📡 [ADO Response] ${deployResp.status} ${deployResp.statusText}`);
+            console.log(`📡 [ADO Response] ${deployResp.status} ${deployResp.statusText}`);
 
-            if (!deployResp.ok) return null;
+            if (!deployResp.ok) {
+                console.error(`   ❌ [DEPLOY] Deployment query failed with ${deployResp.status}`);
+                const errText = await deployResp.text();
+                console.error(`   ❌ Error body: ${errText.substring(0, 200)}`);
+                return null;
+            }
             const deployData = await deployResp.json() as { count: number; value: any[] };
+            console.log(`   📊 Deployment records found: ${deployData.count}`);
 
             if (deployData.count > 0) {
                 const deploy = deployData.value[0];
+                console.log(`   ✅ Latest deployment: ${JSON.stringify({ owner: deploy.owner?.id, build: deploy.build?.id, finishTime: deploy.finishTime })}`);
                 // If the deployment object doesn't have the build/hash details, try to fetch the owner build
                 if (!deploy.build?.sourceVersion && deploy.owner?.id) {
+                    console.log(`   🔄 Fetching full build details for owner ${deploy.owner.id}...`);
                     const fullBuild = await this.fetchADOBuild(org, project, deploy.owner.id, pat, baseUrl, bearerToken);
-                    if (fullBuild) deploy.build = fullBuild;
+                    if (fullBuild) {
+                        deploy.build = fullBuild;
+                        console.log(`   ✅ Build details merged`);
+                    }
                 }
                 return deploy;
+            } else {
+                console.warn(`   ⚠️ [DEPLOY] No deployment records found for env ${envId}, pipeline ${definitionId} (filter: succeeded)`);
+                console.warn(`   💡 Try checking if deployments exist without the "succeeded" filter`);
             }
             return null;
         } catch (err: any) {
-            console.warn(`      ⚠️ [ADO] Surgical environment lookup failed: ${err.message}`);
+            console.error(`      ❌ [ADO] Surgical environment lookup failed: ${err.message}`);
+            console.error(`      Stack: ${err.stack}`);
         }
         return null;
     }
