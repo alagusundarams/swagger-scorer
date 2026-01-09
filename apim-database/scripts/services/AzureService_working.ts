@@ -181,32 +181,11 @@ export class AzureService {
      * Gets the full Organization URL (e.g., https://dev.azure.com/org or https://org.visualstudio.com)
      */
     static getAdoOrgUrl(baseUrl: string, org: string): string {
-        const cleanBase = baseUrl.replace(/\/+$/, '');
-        const lowerBase = cleanBase.toLowerCase();
-        const lowerOrg = org.toLowerCase();
-
-        // If it's a visualstudio.com URL, it usually has the org in the subdomain
-        if (lowerBase.includes('visualstudio.com')) {
-            return cleanBase;
+        const instance = this.getAdoInstanceUrl(baseUrl, org);
+        if (instance.toLowerCase().includes('visualstudio.com')) {
+            return instance; // already has org in subdomain USUALLY
         }
-
-        // If the baseUrl already ends with /org, don't append it again
-        if (lowerBase.endsWith(`/${lowerOrg}`)) {
-            return cleanBase;
-        }
-
-        // For dev.azure.com, we want https://dev.azure.com/org
-        // If cleanBase is just https://dev.azure.com, append org
-        if (lowerBase === 'https://dev.azure.com' || lowerBase === 'http://dev.azure.com') {
-            return `${cleanBase}/${org}`;
-        }
-
-        // Otherwise, if it doesn't contain the org, append it
-        if (!lowerBase.includes(`/${lowerOrg}/`) && !lowerBase.endsWith(`/${lowerOrg}`)) {
-            return `${cleanBase}/${org}`;
-        }
-
-        return cleanBase;
+        return `${instance}/${org}`;
     }
 
     static getAdoSearchUrl(baseUrl: string, org: string): string {
@@ -260,10 +239,10 @@ export class AzureService {
 
         const url = `${urlBase}/_apis/git/repositories/${repoId}/items?scopePath=${scopePath}&recursionLevel=${recursionLevel}&includeContentMetadata=true`;
 
-        // console.log(`📡 [ADO Request] GET ${url}`);
+        console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { count: number, value: any[] };
                 return data.value || [];
@@ -284,7 +263,7 @@ export class AzureService {
         const authHeader = this.getAuthHeader(pat);
         const url = `${orgUrl}/_apis/git/repositories/${repoId}/items?scopePath=${scopePath}&recursionLevel=${recursionLevel}&includeContentMetadata=true`;
 
-        // console.log(`📡 [ADO Request] GET ${url}`);
+        console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, {
                 headers: {
@@ -292,7 +271,7 @@ export class AzureService {
                     'Accept': 'application/json'
                 }
             });
-            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 return await response.text(); // Return raw text content
             } else {
@@ -312,7 +291,7 @@ export class AzureService {
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const url = `${orgUrl}/_apis/connectionData`;
 
-        // console.log(`📡 [ADO Request] GET ${url}`);
+        console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, {
                 headers: {
@@ -320,7 +299,7 @@ export class AzureService {
                     'X-TFS-FedAuthRedirect': 'Suppress'
                 }
             });
-            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (!response.ok) {
                 const txt = await response.text();
                 console.error(`❌ [ADO] Auth Failed (${response.status}):`, txt.substring(0, 200));
@@ -415,12 +394,12 @@ export class AzureService {
     static async fetchADOProjects(org: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADOProject[]> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = this.getAuthHeader(pat);
-        const url = `${orgUrl}/_apis/projects?api-version=7.1`;
+        const url = `${orgUrl}/_apis/projects`;
 
-        // console.log(`📡 [ADO Request] GET ${url}`);
+        console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { value: ADOProject[] };
                 return data.value;
@@ -442,9 +421,9 @@ export class AzureService {
         const url = `${orgUrl}/_apis/git/repositories/${repoId}`;
         const authHeader = this.getAuthHeader(pat, bearerToken);
 
-        // console.log(`📡 [ADO Request] GET ${url}`);
+        console.log(`📡 [ADO Request] GET ${url}`);
         const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-        // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+        console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
         if (!response.ok) {
             const txt = await response.text();
             throw new Error(`Failed to fetch repo ${repoId} (${response.status}): ${txt.substring(0, 100)}`);
@@ -466,9 +445,9 @@ export class AzureService {
         const projectResults = await Promise.all(projects.map(async (project) => {
             try {
                 const url = `${orgUrl}/${encodeURIComponent(project.name)}/_apis/git/repositories`;
-                // console.log(`📡 [ADO Request] GET ${url}`);
+                console.log(`📡 [ADO Request] GET ${url}`);
                 const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-                // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+                console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
 
                 if (response.ok) {
                     const data = await response.json() as { value: ADORepo[] };
@@ -490,7 +469,7 @@ export class AzureService {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
-        let url = `${urlBase}/_apis/pipelines?api-version=7.1`;
+        let url = `${urlBase}/_apis/pipelines`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=azureRepo`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
@@ -533,7 +512,8 @@ export class AzureService {
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const releaseBase = this.getAdoReleaseUrl(baseUrl, org, project);
         const url = `${releaseBase}/_apis/release/definitions?$top=100`;
-        // console.log(`📡 [ADO Request] GET ${url}`);
+
+        console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, {
                 headers: {
@@ -542,7 +522,7 @@ export class AzureService {
                     'X-TFS-FedAuthRedirect': 'Suppress'
                 }
             });
-            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { value: any[] };
                 return data.value.map(r => ({
@@ -592,12 +572,13 @@ export class AzureService {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
-        let url = `${urlBase}/_apis/build/definitions?api-version=7.1`;
+        let url = `${urlBase}/_apis/build/definitions`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
-        // console.log(`📡 [ADO Request] GET ${url}`);
+
+        console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             const text = await response.text();
 
             if (response.ok) {
@@ -623,7 +604,6 @@ export class AzureService {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const url = `${orgUrl}/${encodeURIComponent(project)}/_apis/build/builds/${buildId}`;
-        console.log(`📡 [ADO Request] Build Details GET ${url}`);
 
         try {
             const resp = await fetch(url, {
@@ -661,7 +641,7 @@ export class AzureService {
                     'X-TFS-FedAuthRedirect': 'Suppress'
                 }
             });
-            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { value: any[] };
                 return data.value || [];
@@ -693,7 +673,7 @@ export class AzureService {
         // Synchronize versions and ensure no strict result filter (the caller filters locally)
         const url = `${urlBase}/_apis/build/builds?definitions=${definitionId}&$top=${top}&$skip=${skip}&queryOrder=finishTimeDescending`;
 
-        console.log(`📡 [ADO Request] Build List (By Definition) GET ${url}`);
+        console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, {
                 headers: {
@@ -702,7 +682,7 @@ export class AzureService {
                     'X-TFS-FedAuthRedirect': 'Suppress'
                 }
             });
-            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { value: any[] };
                 return data.value || [];
@@ -726,11 +706,9 @@ export class AzureService {
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
 
-        console.log(`\n🔍 [DEPLOY DEBUG] Fetching deployment for Environment: "${environmentName}" in Pipeline ${definitionId}`);
-
         // 1. Find the Environment ID for the given name (Surgical Step 1)
         let envId: number | null = null;
-        let envUrl = `${urlBase}/_apis/distributedtask/environments?name=${encodeURIComponent(environmentName)}&api-version=7.1`;
+        let envUrl = `${urlBase}/_apis/distributedtask/environments?name=${encodeURIComponent(environmentName)}`;
 
         console.log(`📡 [ADO Request] GET ${envUrl}`);
 
@@ -755,22 +733,15 @@ export class AzureService {
             if (envResp.ok) {
                 try {
                     envData = await envResp.json() as { count: number; value: any[] };
-                    console.log(`   📊 Environment lookup returned ${envData.count} results`);
-                    if (envData.count > 0) {
-                        console.log(`   📋 Available environments: ${envData.value.map((e: any) => e.name).join(', ')}`);
-                    }
-                } catch (e) {
-                    console.warn(`   ⚠️ Failed to parse environment response as JSON`);
-                }
+                } catch (e) { /* ignore non-json */ }
             }
 
             if (envResp.ok && envData.count > 0) {
                 envId = envData.value[0].id;
-                console.log(`   ✅ Matched environment: "${envData.value[0].name}" (ID: ${envId})`);
             } else {
                 // FALLBACK: Fetch all and match case-insensitive
                 console.warn(`      ⚠️ [ADO] Exact env lookup failed. Trying case-insensitive scan...`);
-                envUrl = `${urlBase}/_apis/distributedtask/environments?api-version=7.1`;
+                envUrl = `${urlBase}/_apis/distributedtask/environments`;
                 console.log(`📡 [ADO Request] GET ${envUrl} (Fallback)`);
                 envResp = await fetch(envUrl, {
                     headers: {
@@ -783,34 +754,21 @@ export class AzureService {
 
                 if (envResp.ok) {
                     envData = await envResp.json() as { count: number; value: any[] };
-                    console.log(`   📊 Found ${envData.count} total environments in project`);
-                    if (envData.count > 0) {
-                        console.log(`   📋 All environments: ${envData.value.map((e: any) => e.name).join(', ')}`);
-                    }
                     const targetLower = environmentName.toLowerCase().trim();
                     const match = envData.value.find((e: any) => e.name.toLowerCase().trim() === targetLower);
                     if (match) {
                         envId = match.id;
                         console.log(`      ✅ Found match: '${match.name}' (ID: ${envId})`);
-                    } else {
-                        console.error(`      ❌ No environment matches "${environmentName}" (case-insensitive)`);
                     }
-                } else {
-                    console.error(`      ❌ Fallback environment list failed: ${envResp.status}`);
                 }
             }
 
-            if (!envId) {
-                console.error(`   ❌ [DEPLOY] Could not resolve environment ID for "${environmentName}" - returning null`);
-                return null;
-            }
+            if (!envId) return null;
 
             // 2. Query Deployments for this specific definition and environment (Surgical Step 2)
-            // Restore narrowing logic from yesterday (definitionId + latestState)
             let deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/deployments?definitionId=${definitionId}&latestState=succeeded&$top=1`;
             console.log(`📡 [ADO Request] GET ${deployUrl}`);
-
-            let deployResp = await fetch(deployUrl, {
+            const deployResp = await fetch(deployUrl, {
                 headers: {
                     'Authorization': authHeader,
                     'Accept': 'application/json',
@@ -819,69 +777,33 @@ export class AzureService {
             });
             console.log(`📡 [ADO Response] ${deployResp.status} ${deployResp.statusText}`);
 
-            // FALLBACK if /deployments is not available or doesn't narrow correctly
-            if (!deployResp.ok || deployResp.status === 404) {
-                console.warn(`      ⚠️ [ADO] /deployments endpoint failed (${deployResp.status}). Falling back to broad record scan...`);
-                deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords`;
-                console.log(`📡 [ADO Request] GET ${deployUrl} (Broad Fallback)`);
-                deployResp = await fetch(deployUrl, {
-                    headers: { 'Authorization': authHeader, 'Accept': 'application/json' }
-                });
-            }
-
-            if (!deployResp.ok) {
-                console.error(`   ❌ [DEPLOY] Deployment query failed with ${deployResp.status}`);
+            if (deployResp.status === 404) {
+                console.warn(`      ⚠️  404 on 'deployments' endpoint. Trying 'environmentdeploymentrecords' fallback...`);
+                deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords?definitionId=${definitionId}&$top=1`;
+                console.log(`📡 [ADO Request] GET ${deployUrl} (Fallback)`);
+                const fbResp = await fetch(deployUrl, { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } });
+                if (fbResp.ok) {
+                    const fbData = await fbResp.json() as { count: number; value: any[] };
+                    if (fbData.count > 0) return fbData.value[0];
+                }
                 return null;
             }
 
+            if (!deployResp.ok) return null;
             const deployData = await deployResp.json() as { count: number; value: any[] };
-            console.log(`   📊 Results from ADO: ${deployData.count}`);
 
             if (deployData.count > 0) {
-                // If it was the broad fallback, we still need to filter by ID
-                const matching = deployData.value
-                    .filter((d: any) => {
-                        const dId = d.definition?.id;
-                        const oId = d.owner?.definition?.id;
-                        return (dId && Number(dId) === Number(definitionId)) ||
-                            (oId && Number(oId) === Number(definitionId));
-                    })
-                    .sort((a: any, b: any) => {
-                        const aTime = new Date(a.finishTime || a.startTime || 0).getTime();
-                        const bTime = new Date(b.finishTime || b.startTime || 0).getTime();
-                        return bTime - aTime;
-                    });
-
-                if (matching.length === 0) {
-                    console.warn(`   ⚠️ [DEPLOY] No deployments matched definition ${definitionId} in the broad scan.`);
-                    return null;
-                }
-
-                const deploy = matching[0];
-                console.log(`   ✅ Latest deployment found (ID: ${deploy.id})`);
-                console.log(`      - ID: ${deploy.id}`);
-                console.log(`      - Owner: ${JSON.stringify(deploy.owner)}`);
-                console.log(`      - Build: ${JSON.stringify(deploy.build)}`);
-                console.log(`      - FinishTime: ${deploy.finishTime}`);
-
+                const deploy = deployData.value[0];
                 // If the deployment object doesn't have the build/hash details, try to fetch the owner build
-                if (!deploy.build?.sourceVersion && (deploy.owner?.id || deploy.build?.id)) {
-                    const idToFetch = deploy.owner?.id || deploy.build?.id;
-                    console.log(`   🔄 Fetching full build details for ID ${idToFetch}...`);
-                    const fullBuild = await this.fetchADOBuild(org, project, idToFetch, pat, baseUrl, bearerToken);
-                    if (fullBuild) {
-                        deploy.build = fullBuild;
-                        console.log(`   ✅ Build details merged`);
-                    }
+                if (!deploy.build?.sourceVersion && deploy.owner?.id) {
+                    const fullBuild = await this.fetchADOBuild(org, project, deploy.owner.id, pat, baseUrl, bearerToken);
+                    if (fullBuild) deploy.build = fullBuild;
                 }
                 return deploy;
-            } else {
-                console.warn(`   ⚠️ [DEPLOY] No deployment records found in environment ${envId}`);
             }
             return null;
         } catch (err: any) {
-            console.error(`      ❌ [ADO] Surgical environment lookup failed: ${err.message}`);
-            console.error(`      Stack: ${err.stack}`);
+            console.warn(`      ⚠️ [ADO] Surgical environment lookup failed: ${err.message}`);
         }
         return null;
     }
@@ -900,7 +822,7 @@ export class AzureService {
     ): Promise<any[]> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = this.getAuthHeader(pat, bearerToken);
-        const url = `${orgUrl}/${encodeURIComponent(project)}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords?$top=${top}`;
+        const url = `${orgUrl}/${encodeURIComponent(project)}/_apis/distributedtask/environments/${envId}/deployments?$top=${top}`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
@@ -1005,10 +927,11 @@ export class AzureService {
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
         const url = `${urlBase}/_apis/pipelines/${pipelineId}/runs`;
-        // console.log(`📡 [ADO Request] GET ${url}`);
+
+        console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { value: PipelineRun[] };
                 return data.value;
