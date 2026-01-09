@@ -302,7 +302,7 @@ async function main() {
 
                                 // Step 2: Fetch ALL deployments for this environment (EXACT MATCH to debug script line 231)
                                 const envDeploys = await AzureService.fetchEnvironmentDeployments(
-                                    devops.organization, projectId, envId, devops.pat, devops.baseUrl, bearerToken
+                                    devops.organization, projectId, envId!, devops.pat, devops.baseUrl, bearerToken
                                 );
                                 console.log(`      ✅ Found ${envDeploys.length} recent deployments in ${envName}.`);
 
