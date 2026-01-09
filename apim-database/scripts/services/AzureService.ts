@@ -805,9 +805,10 @@ export class AzureService {
                 return null;
             }
 
-            // 2. Query Deployments for this specific definition and environment (Surgical Step 2)
-            // Restore narrowing logic from yesterday (definitionId + latestState)
-            let deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/deployments?definitionId=${definitionId}&latestState=succeeded&$top=1`;
+            // 2. Query Deployment Records - CORRECTED ENDPOINT
+            // Documentation confirms definitionId is NOT supported as a query param here.
+            // We fetch the latest 100 records and filter locally to ensure narrowing.
+            let deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords?$top=100&api-version=7.1`;
             console.log(`📡 [ADO Request] GET ${deployUrl}`);
 
             let deployResp = await fetch(deployUrl, {
@@ -819,44 +820,31 @@ export class AzureService {
             });
             console.log(`📡 [ADO Response] ${deployResp.status} ${deployResp.statusText}`);
 
-            // FALLBACK if /deployments is not available or doesn't narrow correctly
-            if (!deployResp.ok || deployResp.status === 404) {
-                console.warn(`      ⚠️ [ADO] /deployments endpoint failed (${deployResp.status}). Falling back to broad record scan...`);
-                deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords`;
-                console.log(`📡 [ADO Request] GET ${deployUrl} (Broad Fallback)`);
-                deployResp = await fetch(deployUrl, {
-                    headers: { 'Authorization': authHeader, 'Accept': 'application/json' }
-                });
-            }
-
             if (!deployResp.ok) {
                 console.error(`   ❌ [DEPLOY] Deployment query failed with ${deployResp.status}`);
                 return null;
             }
 
             const deployData = await deployResp.json() as { count: number; value: any[] };
-            console.log(`   📊 Results from ADO: ${deployData.count}`);
+            console.log(`   📊 Total records retrieved from environment: ${deployData.count}`);
 
-            if (deployData.count > 0) {
-                // If it was the broad fallback, we still need to filter by ID
-                const matching = deployData.value
-                    .filter((d: any) => {
-                        const dId = d.definition?.id;
-                        const oId = d.owner?.definition?.id;
-                        return (dId && Number(dId) === Number(definitionId)) ||
-                            (oId && Number(oId) === Number(definitionId));
-                    })
-                    .sort((a: any, b: any) => {
-                        const aTime = new Date(a.finishTime || a.startTime || 0).getTime();
-                        const bTime = new Date(b.finishTime || b.startTime || 0).getTime();
-                        return bTime - aTime;
-                    });
+            // Perform client-side narrowing (filtering by definitionId)
+            const matching = (deployData.value || [])
+                .filter((d: any) => {
+                    const dId = d.definition?.id;
+                    const oId = d.owner?.definition?.id;
+                    return (dId && Number(dId) === Number(definitionId)) ||
+                        (oId && Number(oId) === Number(definitionId));
+                })
+                .sort((a: any, b: any) => {
+                    const aTime = new Date(a.finishTime || a.startTime || 0).getTime();
+                    const bTime = new Date(b.finishTime || b.startTime || 0).getTime();
+                    return bTime - aTime; // Newest first
+                });
 
-                if (matching.length === 0) {
-                    console.warn(`   ⚠️ [DEPLOY] No deployments matched definition ${definitionId} in the broad scan.`);
-                    return null;
-                }
+            console.log(`   📊 Narrowed to ${matching.length} records matching pipeline ${definitionId}`);
 
+            if (matching.length > 0) {
                 const deploy = matching[0];
                 console.log(`   ✅ Latest deployment found (ID: ${deploy.id})`);
                 console.log(`      - ID: ${deploy.id}`);
@@ -876,14 +864,13 @@ export class AzureService {
                 }
                 return deploy;
             } else {
-                console.warn(`   ⚠️ [DEPLOY] No deployment records found in environment ${envId}`);
+                console.warn(`   ⚠️ [DEPLOY] No deployments matched definition ${definitionId} in the broad scan.`);
+                return null;
             }
-            return null;
         } catch (err: any) {
             console.error(`      ❌ [ADO] Surgical environment lookup failed: ${err.message}`);
-            console.error(`      Stack: ${err.stack}`);
+            return null;
         }
-        return null;
     }
 
     /**
@@ -1019,27 +1006,6 @@ export class AzureService {
         return [];
     }
 
-    /**
-     * Fetch Timeline for a specific Pipeline Run
-     */
-    static async fetchPipelineRunTimeline(org: string, project: string, runId: number, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<TimelineRecord[]> {
-        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
-        const authHeader = this.getAuthHeader(pat, bearerToken);
-        const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
-        // Standard ADO builds/timeline endpoint
-        const url = `${urlBase}/_apis/build/builds/${runId}/timeline`;
-
-        try {
-            const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-            if (response.ok) {
-                const data = await response.json() as { records: TimelineRecord[] };
-                return data.records;
-            }
-        } catch (err) {
-            console.error(`❌ [ADO] Failed to fetch timeline for run ${runId}:`, err);
-        }
-        return [];
-    }
 
     /**
      * Get MS Graph access token using Azure CLI
@@ -1171,6 +1137,27 @@ export class AzureService {
             return { count: 0, results: [] };
         }
         return await response.json();
+    }
+
+    /**
+     * Fetch Timeline for a specific Pipeline Run
+     */
+    static async fetchPipelineRunTimeline(org: string, project: string, runId: number, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<any[]> {
+        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
+        const authHeader = this.getAuthHeader(pat, bearerToken);
+        const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
+        const url = `${urlBase}/_apis/build/builds/${runId}/timeline`;
+
+        try {
+            const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+            if (response.ok) {
+                const data = await response.json() as { records: any[] };
+                return data.records;
+            }
+        } catch (err) {
+            console.error(`❌ [ADO] Failed to fetch timeline for run ${runId}:`, err);
+        }
+        return [];
     }
 }
 
