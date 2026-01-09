@@ -201,6 +201,10 @@ function getApimConfig(token: string, azConfig: AzureConfig): any {
         baseUrl: process.env.AZURE_DEVOPS_URL || config.devops?.baseUrl || 'https://dev.azure.com'
     };
 
+    // SANITIZE: Remove trailing slashes
+    if (effectiveDevOps.organization) effectiveDevOps.organization = effectiveDevOps.organization.replace(/\/+$/, '').replace(/^\/+/, '');
+    if (effectiveDevOps.baseUrl) effectiveDevOps.baseUrl = effectiveDevOps.baseUrl.replace(/\/+$/, '');
+
     return {
         instance: azConfig.serviceName,
         resourceGroup: azConfig.resourceGroup,

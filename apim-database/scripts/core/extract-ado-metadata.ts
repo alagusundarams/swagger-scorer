@@ -99,6 +99,10 @@ async function main() {
         baseUrl: process.env.AZURE_DEVOPS_URL || config.devops?.baseUrl || 'https://dev.azure.com'
     };
 
+    // SANITIZE: Remove trailing slashes to prevent "https://org.visualstudio.com//repo" errors
+    if (devops.organization) devops.organization = devops.organization.replace(/\/+$/, '').replace(/^\/+/, '');
+    if (devops.baseUrl) devops.baseUrl = devops.baseUrl.replace(/\/+$/, '');
+
     if (!devops || !devops.pat || devops.pat === 'your-read-only-pat') {
         console.error("❌ DevOps PAT missing or invalid (checked config.json and AZURE_DEVOPS_PAT env var)");
         process.exit(1);
@@ -116,7 +120,11 @@ async function main() {
 
     // --- CONNECTION VERIFICATION WITH FAILOVER ---
     try {
-        console.log(`   📡 Connecting to: ${devops.baseUrl}/${devops.organization}...`);
+        const targetUrl = devops.baseUrl.includes('visualstudio.com')
+            ? devops.baseUrl
+            : `${devops.baseUrl}/${devops.organization}`;
+        console.log(`   📡 Connecting to: ${targetUrl}...`);
+
         const connection = await AzureService.verifyAdoConnection(devops.organization, devops.pat, devops.baseUrl, bearerToken);
         console.log(`   ✅ Connection Verified: ${connection.authenticatedUser?.customDisplayName || connection.authenticatedUser?.id}`);
     } catch (err: any) {
