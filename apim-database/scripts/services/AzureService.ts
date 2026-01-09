@@ -623,6 +623,7 @@ export class AzureService {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const url = `${orgUrl}/${encodeURIComponent(project)}/_apis/build/builds/${buildId}`;
+        console.log(`📡 [ADO Request] Build Details GET ${url}`);
 
         try {
             const resp = await fetch(url, {
@@ -651,8 +652,7 @@ export class AzureService {
         let url = `${urlBase}/_apis/build/builds?$top=50&queryOrder=finishTimeDescending`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
 
-        if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
-        // console.log(`📡 [ADO Request] GET ${url}`);
+        console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, {
                 headers: {
@@ -693,7 +693,7 @@ export class AzureService {
         // Synchronize versions and ensure no strict result filter (the caller filters locally)
         const url = `${urlBase}/_apis/build/builds?definitions=${definitionId}&$top=${top}&$skip=${skip}&queryOrder=finishTimeDescending`;
 
-        // console.log(`📡 [ADO Request] GET ${url}`);
+        console.log(`📡 [ADO Request] Build List (By Definition) GET ${url}`);
         try {
             const response = await fetch(url, {
                 headers: {
@@ -850,16 +850,25 @@ export class AzureService {
                 if (matching.length === 0) {
                     const availableIds = [...new Set(deployData.value.map((d: any) => d.definition?.id).filter(Boolean))];
                     console.warn(`   ⚠️ [DEPLOY] No deployments found for pipeline ${definitionId} in environment ${envId}. Available definition IDs: ${availableIds.join(', ')}`);
+                    // Log the first few records to see structure
+                    if (deployData.value.length > 0) {
+                        console.log(`      ℹ️ [DEBUG] Sample record definition structure: ${JSON.stringify(deployData.value[0].definition)}`);
+                    }
                     return null;
                 }
 
                 const deploy = matching[0];
-                console.log(`   ✅ Latest deployment: ${JSON.stringify({ owner: deploy.owner?.id, build: deploy.build?.id, finishTime: deploy.finishTime })}`);
+                console.log(`   ✅ Latest deployment found for pipeline ${definitionId}:`);
+                console.log(`      - ID: ${deploy.id}`);
+                console.log(`      - Owner: ${JSON.stringify(deploy.owner)}`);
+                console.log(`      - Build: ${JSON.stringify(deploy.build)}`);
+                console.log(`      - FinishTime: ${deploy.finishTime}`);
 
                 // If the deployment object doesn't have the build/hash details, try to fetch the owner build
-                if (!deploy.build?.sourceVersion && deploy.owner?.id) {
-                    console.log(`   🔄 Fetching full build details for owner ${deploy.owner.id}...`);
-                    const fullBuild = await this.fetchADOBuild(org, project, deploy.owner.id, pat, baseUrl, bearerToken);
+                if (!deploy.build?.sourceVersion && (deploy.owner?.id || deploy.build?.id)) {
+                    const idToFetch = deploy.owner?.id || deploy.build?.id;
+                    console.log(`   🔄 Fetching full build details for ID ${idToFetch}...`);
+                    const fullBuild = await this.fetchADOBuild(org, project, idToFetch, pat, baseUrl, bearerToken);
                     if (fullBuild) {
                         deploy.build = fullBuild;
                         console.log(`   ✅ Build details merged`);

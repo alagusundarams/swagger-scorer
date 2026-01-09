@@ -306,7 +306,8 @@ async function main() {
                     }
 
                     if (deploy) {
-                        let commitHash = deploy.build?.sourceVersion;
+                        if (verbose) console.log(`      ℹ️ [DEBUG] Raw deploy object: ${JSON.stringify(deploy)}`);
+                        let commitHash = deploy.build?.sourceVersion || deploy.build?.sourceVersionID || deploy.owner?.sourceVersion;
                         let fullDetails = deploy;
 
                         const ownerId = deploy.owner?.id || deploy.build?.id;
@@ -314,14 +315,15 @@ async function main() {
                             console.log(`      📡 Fetching full build details (ID: ${ownerId}) for metadata...`);
                             const details = await AzureService.fetchADOBuild(devops.organization, projectId, ownerId, devops.pat, devops.baseUrl, bearerToken);
                             if (details) {
+                                if (verbose) console.log(`      ℹ️ [DEBUG] Raw build details: ${JSON.stringify(details)}`);
                                 fullDetails = details;
-                                commitHash = commitHash || details.sourceVersion;
+                                commitHash = commitHash || details.sourceVersion || details.sourceVersionID;
                             }
                         }
 
                         if (commitHash && commitHash !== 'unknown') {
-                            const author = fullDetails.requestedFor?.displayName || fullDetails.requestedBy?.displayName || 'Unknown';
-                            const rawBranch = fullDetails.sourceBranch || deploy.sourceBranch || 'unknown';
+                            const author = fullDetails.requestedFor?.displayName || fullDetails.requestedBy?.displayName || deploy.owner?.requestedFor?.displayName || 'Unknown';
+                            const rawBranch = fullDetails.sourceBranch || deploy.sourceBranch || deploy.build?.sourceBranch || 'unknown';
                             const branch = rawBranch.replace('refs/heads/', '');
                             const message = fullDetails.triggerInfo?.['ci.message'] || fullDetails.comment || 'No message';
 
@@ -333,7 +335,9 @@ async function main() {
                                 message,
                                 url: fullDetails._links?.web?.href || deploy.url
                             };
-                            console.log(`      🎯 ${envName.padEnd(5)}: Surgical Hit! Captured ${commitHash.substring(0, 7)}`);
+                            console.log(`      🎯 ${envName.padEnd(5)}: Surgical Hit! Captured ${commitHash.substring(0, 7)} (Auth: ${author})`);
+                        } else {
+                            console.warn(`      ⚠️  ${envName.padEnd(5)}: Deployment found but commit hash is missing or unknown.`);
                         }
                     }
                 }
@@ -400,7 +404,8 @@ async function main() {
                                 }
 
                                 if (record) {
-                                    const hash = run.sourceVersion || 'unknown';
+                                    if (verbose) console.log(`      ℹ️ [DEBUG] Scanner matched build ${run.id}. Raw run: ${JSON.stringify(run)}`);
+                                    const hash = run.sourceVersion || run.sourceVersionID || 'unknown';
                                     const author = run.requestedFor?.displayName || run.requestedBy?.displayName || 'Unknown';
                                     const branch = (run.sourceBranch || 'unknown').replace('refs/heads/', '');
                                     const message = run.triggerInfo?.['ci.message'] || run.comment || 'No message';
@@ -413,7 +418,7 @@ async function main() {
                                         message,
                                         url: run._links?.web?.href
                                     };
-                                    console.log(`      📍 ${envName.padEnd(5)}: Scanner Hit! Captured ${hash.substring(0, 7)}`);
+                                    console.log(`      📍 ${envName.padEnd(5)}: Scanner Hit! Captured ${hash.substring(0, 7)} (Auth: ${author})`);
                                 }
                             }
                         }
