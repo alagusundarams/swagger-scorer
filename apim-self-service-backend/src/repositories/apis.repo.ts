@@ -187,10 +187,16 @@ export class ApisRepository {
                     'qualityScore', a.quality_score,
                     'originTeamId', a.origin_team_id,
                     'gatewayUrl', a.gateway_url,
-                    'serviceUrl', a.service_url
+                    'serviceUrl', a.service_url,
+                    'operations', o.json_data
                 )) as deployments
             FROM apis a
             JOIN products p ON a.product_id = p.id
+            LEFT JOIN LATERAL (
+                SELECT json_agg(op.*) as json_data
+                FROM operations op
+                WHERE op.api_id = a.id
+            ) o ON true
             GROUP BY a.name, a.display_name, a.path
             ORDER BY a.display_name ASC
         `);

@@ -54,8 +54,17 @@ export async function initDb(connectionString: string) {
  * Helper to run a query with automatic logging and error handling
  */
 export async function query(text: string, params?: any[]) {
+    // Global Query Logging for Transparency/Debugging
+    console.log(`[SQL Query] Executing: ${text.replace(/\s+/g, ' ').trim()}`);
+    if (params && params.length > 0) {
+        console.log(`[SQL Params] ${JSON.stringify(params)}`);
+    }
+
     try {
+        const start = Date.now();
         const res = await pool.query(text, params);
+        const duration = Date.now() - start;
+        console.log(`[SQL Result] Rows: ${res.rowCount}, Duration: ${duration}ms`);
         return res;
     } catch (err) {
         console.error('❌ Database Query Error:', { text, error: err });
