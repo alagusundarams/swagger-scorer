@@ -114,12 +114,32 @@ async function main() {
         console.warn(`   ⚠️  Azure CLI login failed, using PAT only: ${e.message}`);
     }
 
+    // --- CONNECTION VERIFICATION WITH FAILOVER ---
     try {
+        console.log(`   📡 Connecting to: ${devops.baseUrl}/${devops.organization}...`);
         const connection = await AzureService.verifyAdoConnection(devops.organization, devops.pat, devops.baseUrl, bearerToken);
         console.log(`   ✅ Connection Verified: ${connection.authenticatedUser?.customDisplayName || connection.authenticatedUser?.id}`);
     } catch (err: any) {
-        console.error(`❌ [AUTH] Verification failed: ${err.message}`);
-        process.exit(1);
+        // FAILOVER LOGIC: If default dev.azure.com failed, try legacy visualstudio.com
+        const isDefaultUrl = devops.baseUrl.includes('dev.azure.com');
+        if (isDefaultUrl) {
+            console.warn(`   ⚠️  Default URL (${devops.baseUrl}) failed. Attempting legacy 'visualstudio.com' failover...`);
+            const legacyUrl = `https://${devops.organization}.visualstudio.com`;
+            try {
+                const connection = await AzureService.verifyAdoConnection(devops.organization, devops.pat, legacyUrl, bearerToken);
+                console.log(`   ✅ FALLBACK SUCCESS: Connected via ${legacyUrl}`);
+                console.log(`   🔄 Updating runtime config to use Legacy URL.`);
+                devops.baseUrl = legacyUrl; // <--- CRITICAL UPDATE
+            } catch (retryErr: any) {
+                console.error(`❌ [AUTH] Both Default and Legacy connection attempts failed.`);
+                console.error(`   1. ${devops.baseUrl} -> ${err.message}`);
+                console.error(`   2. ${legacyUrl} -> ${retryErr.message}`);
+                process.exit(1);
+            }
+        } else {
+            console.error(`❌ [AUTH] Verification failed: ${err.message}`);
+            process.exit(1);
+        }
     }
 
     let inventory: ProductIdentity[] = [];
