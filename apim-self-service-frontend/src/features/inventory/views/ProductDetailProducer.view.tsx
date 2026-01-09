@@ -4,7 +4,7 @@ import { type Product, type API, type Subscription, type ApprovalRequest } from 
 import { type User } from '../../../core/types/commonTypes';
 import { getNextEnvironment } from '../../../utils/statusUtils';
 import { useStore } from '../../../store/useStore';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { inventoryKeys } from '../../inventory/api/inventoryQueries';
 import { useAppData } from '../../../shared/context/AppDataContext';
 import { ManageProductModal }
@@ -59,10 +59,13 @@ export const ProductDetailProducer = ({ product, user }: ProductDetailProducerPr
     };
 
     /**
-     * MFE-Compliant: Using local state instead of cross-feature store access
-     * TODO: Fetch subscriptions via inventory's own API client
+     * MFE-Compliant: Fetch subscriptions via inventory's own API client
      */
-    const [allSubscriptions, _setAllSubscriptions] = useState<Subscription[]>([]);
+    const { data: allSubscriptions = [] } = useQuery({
+        queryKey: ['product-subscriptions', product.id],
+        queryFn: () => inventoryApi.getProductSubscriptions(product.id),
+        initialData: []
+    });
 
     /**
      * MFE-Compliant Data Access:

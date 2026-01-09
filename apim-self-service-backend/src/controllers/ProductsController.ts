@@ -13,6 +13,7 @@ import {
     updatePermissionMatrix
 } from '../services/inventory/ProductsService.js';
 import { promoteProduct } from '../services/workflow/PromotionService.js';
+import { getSubscriptionsForProduct } from '../services/inventory/SubscriptionsService.js';
 
 export class ProductsController {
 
@@ -236,6 +237,20 @@ export class ProductsController {
         } catch (error: any) {
             request.log.error({ err: error }, 'Error updating permission matrix');
             return reply.status(500).send({ error: 'Internal Server Error', message: 'Failed to update permissions' });
+        }
+    }
+
+    /**
+     * Get Product Subscriptions
+     */
+    async getProductSubscriptions(request: FastifyRequest, reply: FastifyReply) {
+        const { id } = request.params as any;
+        try {
+            const subscriptions = await getSubscriptionsForProduct(id);
+            return subscriptions;
+        } catch (error: any) {
+            request.log.error({ err: error }, 'Error fetching product subscriptions');
+            return reply.status(500).send({ error: 'Internal Server Error', message: error.message });
         }
     }
 }

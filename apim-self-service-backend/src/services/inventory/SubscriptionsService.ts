@@ -69,6 +69,50 @@ export async function getAllSubscriptions(userRole: string = 'admin', teamId?: s
 }
 
 /**
+ * Fetch subscriptions for a specific product
+ * @param productId The product ID to fetch subscriptions for
+ */
+export async function getSubscriptionsForProduct(productId: string) {
+    const res = await query(`
+        SELECT s.*, 
+               p.display_name as product_name, 
+               p.owner_team_id as product_owner_team_id,
+               t.name as team_name,
+               ar.id as app_id,
+               ar.display_name as app_display_name,
+               ar.client_id as app_client_id,
+               ar.environment as app_environment
+        FROM subscriptions s
+        JOIN products p ON s.product_id = p.id
+        LEFT JOIN teams t ON s.subscriber_team_id = t.id
+        LEFT JOIN app_registrations ar ON s.app_registration_id = ar.id
+        WHERE s.product_id = $1
+        ORDER BY s.created_at DESC
+    `, [productId]);
+
+    return res.rows.map(s => ({
+        ...s,
+        productId: s.product_id,
+        subscriberTeamId: s.subscriber_team_id,
+        productOwnerTeamId: s.product_owner_team_id,
+        teamName: s.team_name || '⚠️ Unassigned / Legacy',
+        createdAt: s.created_at,
+        expirationDate: s.expiration_date,
+        keysGeneratedAt: s.keys_generated_at,
+        lastSyncedAt: s.last_synced_at,
+        // Keys are redacted in this list view
+        primaryKey: { name: 'Primary', value: '••••••••' },
+        secondaryKey: { name: 'Secondary', value: '••••••••' },
+        appRegistration: s.app_id ? {
+            id: s.app_id,
+            displayName: s.app_display_name,
+            clientId: s.app_client_id,
+            environment: s.app_environment
+        } : null
+    }));
+}
+
+/**
  * DAY 1: Adopt an Orphaned Subscription
  * Allows Admins to assign a legacy subscription to a valid team.
  */

@@ -592,29 +592,9 @@ async function runWorker(envName: string) {
         // [ADO] Init Cache of all Repos
         await initAdoCache(config.devops);
 
-        // --- SCHEMA MIGRATIONS (IN-SCRIPT) ---
-        await pool.query(`ALTER TABLE app_registrations ADD COLUMN IF NOT EXISTS api_id TEXT;`);
-        await pool.query(`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS display_name TEXT;`);
-        await pool.query(`ALTER TABLE subscriptions DROP COLUMN IF EXISTS primary_key_value;`);
-        await pool.query(`ALTER TABLE subscriptions DROP COLUMN IF EXISTS secondary_key_value;`);
-        await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS policy_xml TEXT;`); // Add policy_xml column to products
+        // --- SCHEMA MIGRATIONS (REMOVED) ---
+        // Schema is now mastered in apim-database/schema/01-god-schema.sql -- "Day 1" Approach.
 
-        // Manual Migration for product_deployments
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS product_deployments (
-                product_id TEXT REFERENCES products(id) ON DELETE CASCADE NOT NULL,
-                environment TEXT NOT NULL CHECK (environment IN ('DEV', 'QA', 'STAGE', 'PROD')),
-                commit_hash TEXT,
-                deployment_date TIMESTAMP WITH TIME ZONE,
-                branch TEXT,
-                author TEXT,
-                message TEXT,
-                deployment_url TEXT,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                PRIMARY KEY (product_id, environment)
-            );
-        `);
 
         // Legacy placeholder cleanup - no longer needed with environment/region identity
         // await pool.query(`

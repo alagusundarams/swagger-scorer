@@ -143,6 +143,11 @@ export const inventoryApi = {
         const res = await baseClient.put(`/products/${encodeURIComponent(productId)}/policy`, { xml });
         return res.data;
     },
+    // Product Subscriptions
+    getProductSubscriptions: async (productId: string): Promise<any[]> => {
+        const res = await baseClient.get(`/products/${encodeURIComponent(productId)}/subscriptions`);
+        return res.data;
+    },
     // Missing Operations Fetcher
     getOperations: async (productId: string, apiId: string): Promise<any[]> => {
         const res = await baseClient.get(`/products/${encodeURIComponent(productId)}/apis/${encodeURIComponent(apiId)}/operations`);
@@ -163,7 +168,7 @@ export const inventoryApi = {
     },
     // App Registration Search
     // Identity Management
-    searchAzureIdentities: async (q: string) => {
+    searchAppRegistrations: async (q: string) => {
         const res = await baseClient.get(`/identity/azure-search?q=${encodeURIComponent(q)}`);
         return res.data; // Returns { clientId, displayName, appIdUri }[]
     },

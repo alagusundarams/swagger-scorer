@@ -150,21 +150,9 @@ async function main() {
         console.log('🔒 Transaction started...\n');
 
         // --- 2.2 Ensure product_deployments table exists ---
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS product_deployments (
-                product_id TEXT REFERENCES products(id) ON DELETE CASCADE NOT NULL,
-                environment TEXT NOT NULL CHECK (environment IN ('DEV', 'QA', 'STAGE', 'PROD')),
-                commit_hash TEXT,
-                deployment_date TIMESTAMP WITH TIME ZONE,
-                branch TEXT,
-                author TEXT,
-                message TEXT,
-                deployment_url TEXT,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                PRIMARY KEY (product_id, environment)
-            );
-        `);
+        // --- 2.2 Ensure product_deployments table exists ---
+        // (Handled by 01-god-schema.sql)
+
 
         // --- A. PRODUCTS RECONCILIATION ---
         console.log(`� Reconciling ${inventory.length} products...`);

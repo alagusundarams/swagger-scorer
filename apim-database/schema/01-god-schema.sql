@@ -120,7 +120,7 @@ CREATE TABLE IF NOT EXISTS product_deployments (
     product_id TEXT REFERENCES products(id) ON DELETE CASCADE NOT NULL,
     environment TEXT NOT NULL CHECK (environment IN ('DEV', 'QA', 'STAGE', 'PROD')),
     commit_hash TEXT,
-    deployment_date TIMESTAMP WITH TIME ZONE,
+    deployment_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     branch TEXT,
     author TEXT,
     message TEXT,

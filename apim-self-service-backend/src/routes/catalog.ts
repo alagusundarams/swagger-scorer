@@ -90,6 +90,9 @@ export async function catalogRoutes(fastify: FastifyInstance, _options: FastifyP
     // POST /api/v1/products/:id/promote
     fastify.post('/products/:id/promote', productsController.promoteProduct);
 
+    // GET /api/v1/products/:id/subscriptions
+    fastify.get('/products/:id/subscriptions', productsController.getProductSubscriptions);
+
     // ==========================================
     // APIs ROUTES
     // ==========================================
