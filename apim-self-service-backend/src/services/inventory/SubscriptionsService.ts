@@ -73,6 +73,8 @@ export async function getAllSubscriptions(userRole: string = 'admin', teamId?: s
  * @param productId The product ID to fetch subscriptions for
  */
 export async function getSubscriptionsForProduct(productId: string) {
+    // Flexible Matching: Handle cases where productId might be logical name (e.g. 'my-product') 
+    // or truncated (e.g. 'my-product:DEV') while DB stores 'my-product:DEV:Global'
     const res = await query(`
         SELECT s.*, 
                p.display_name as product_name, 
@@ -87,6 +89,8 @@ export async function getSubscriptionsForProduct(productId: string) {
         LEFT JOIN teams t ON s.subscriber_team_id = t.id
         LEFT JOIN app_registrations ar ON s.app_registration_id = ar.id
         WHERE LOWER(s.product_id) = LOWER($1)
+           OR LOWER(s.product_id) = LOWER($1 || ':Global')
+           OR s.product_id LIKE $1 || ':%:Global'
         ORDER BY s.created_at DESC
     `, [productId], 'GetSubscriptionsForProduct');
 

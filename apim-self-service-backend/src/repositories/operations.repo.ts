@@ -13,8 +13,10 @@ export class OperationsRepository {
         return await query(`
             SELECT * FROM operations
             WHERE api_id = $1
+               OR api_id = $1 || ':Global'
+               OR api_id LIKE $1 || ':%:Global'
             ORDER BY url_template ASC, method ASC
-        `, [apiId]);
+        `, [apiId], 'GetOperations');
     }
 
     /**
@@ -31,6 +33,6 @@ export class OperationsRepository {
                 description = EXCLUDED.description,
                 url_template = EXCLUDED.url_template
             RETURNING *
-        `, [op.apiId, op.method, op.path, op.displayName, op.description, op.urlTemplate]);
+        `, [op.apiId, op.method, op.path, op.displayName, op.description, op.urlTemplate], 'UpsertOperation');
     }
 }

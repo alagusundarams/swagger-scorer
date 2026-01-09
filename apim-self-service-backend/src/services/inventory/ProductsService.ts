@@ -254,7 +254,19 @@ export async function calculateAccessLevel(product: any, user: { role?: string, 
  * Now supports Granular Dual-Role Access Level
  */
 export async function getProductById(id: string, environment?: string, userContext: { role: string, teams: string[], groups: string[] } = { role: 'consumer', teams: [], groups: [] }) {
-    const productRes = await productsRepo.getProductById(id);
+    // try direct match
+    let productRes = await productsRepo.getProductById(id);
+
+    // Fallback: Try with :Global suffix if direct match fails
+    if (productRes.rows.length === 0) {
+        productRes = await productsRepo.getProductById(id + ':Global');
+    }
+
+    // Fallback: Try with environment + :Global if still not found and environment provided
+    if (productRes.rows.length === 0 && environment) {
+        productRes = await productsRepo.getProductById(`${id}:${environment.toUpperCase()}:Global`);
+    }
+
     if (productRes.rows.length === 0) return null;
     const p = productRes.rows[0];
 

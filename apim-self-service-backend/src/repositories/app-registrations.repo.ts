@@ -10,10 +10,12 @@ export class AppRegistrationsRepository {
      * Get all app registrations for a product
      */
     async getAppRegistrationsForProduct(productId: string) {
-        return await query(
-            'SELECT * FROM app_registrations WHERE product_id = $1',
-            [productId]
-        );
+        return await query(`
+            SELECT * FROM app_registrations 
+            WHERE product_id = $1
+               OR product_id = $1 || ':Global'
+               OR product_id LIKE $1 || ':%:Global'
+        `, [productId], 'GetAppRegistrationsForProduct');
     }
 
     /**
@@ -22,7 +24,7 @@ export class AppRegistrationsRepository {
     async getAppRegistrationByClientId(clientId: string) {
         return await query(
             'SELECT * FROM app_registrations WHERE client_id = $1',
-            [clientId]
+            [clientId], 'GetAppRegistrationByClientId'
         );
     }
 
@@ -49,7 +51,7 @@ export class AppRegistrationsRepository {
         `, [
             data.id, data.clientId, data.displayName, data.appIdUri, data.environment,
             data.ownerTeamId, data.productId, data.apiId, data.type, data.secretExpiryDate
-        ]);
+        ], 'CreateAppRegistration');
     }
 
     /**
@@ -58,7 +60,7 @@ export class AppRegistrationsRepository {
     async getAppRegistrationsForTeam(teamId: string) {
         return await query(
             'SELECT * FROM app_registrations WHERE owner_team_id = $1',
-            [teamId]
+            [teamId], 'GetAppRegistrationsForTeam'
         );
     }
 
@@ -74,7 +76,7 @@ export class AppRegistrationsRepository {
                OR client_id ILIKE $1 
                OR app_id_uri ILIKE $1
             LIMIT 20
-        `, [pattern]);
+        `, [pattern], 'SearchAppRegistrations');
     }
 
     /**
@@ -87,7 +89,7 @@ export class AppRegistrationsRepository {
               AND api_id IS NULL 
               AND environment = $1
             ORDER BY display_name ASC
-        `, [environment]);
+        `, [environment], 'GetOrphanAppRegistrations');
     }
 
     /**
@@ -101,6 +103,6 @@ export class AppRegistrationsRepository {
                 updated_at = NOW() 
             WHERE id = $3 
             RETURNING *
-        `, [productId, apiId, id]);
+        `, [productId, apiId, id], 'AdoptAppRegistration');
     }
 }

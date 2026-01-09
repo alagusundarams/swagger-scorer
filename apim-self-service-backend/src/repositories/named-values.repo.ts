@@ -13,7 +13,7 @@ export class NamedValuesRepository {
     async findNamedValueByName(systemName: string, environment: string) {
         return await query(
             'SELECT * FROM named_values WHERE system_name = $1 AND environment = $2 LIMIT 1',
-            [systemName, environment]
+            [systemName, environment], 'FindNamedValueByName'
         );
     }
 
@@ -30,8 +30,10 @@ export class NamedValuesRepository {
             FROM named_values nv
             LEFT JOIN apis a ON nv.scope_id = a.id
             WHERE nv.product_id = $1
+               OR nv.product_id = $1 || ':Global'
+               OR nv.product_id LIKE $1 || ':%:Global'
             ORDER BY nv.scope_id NULLS FIRST, nv.display_name ASC
-        `, [productId]);
+        `, [productId], 'GetNamedValues');
     }
 
     /**
@@ -44,7 +46,7 @@ export class NamedValuesRepository {
             ON CONFLICT (product_id, named_value_id) DO UPDATE
             SET is_owner = EXCLUDED.is_owner, can_modify = EXCLUDED.can_modify
             RETURNING *
-        `, [productId, namedValueId, options.isOwner, options.canModify]);
+        `, [productId, namedValueId, options.isOwner, options.canModify], 'LinkProductToNamedValue');
     }
 
     /**
@@ -53,7 +55,7 @@ export class NamedValuesRepository {
     async unlinkProductFromNamedValue(productId: string, namedValueId: string) {
         return await query(
             'DELETE FROM product_named_values WHERE product_id = $1 AND named_value_id = $2',
-            [productId, namedValueId]
+            [productId, namedValueId], 'UnlinkProductFromNamedValue'
         );
     }
 
@@ -63,7 +65,7 @@ export class NamedValuesRepository {
     async getProductNamedValueLink(productId: string, namedValueId: string) {
         return await query(
             'SELECT * FROM product_named_values WHERE product_id = $1 AND named_value_id = $2',
-            [productId, namedValueId]
+            [productId, namedValueId], 'GetProductNamedValueLink'
         );
     }
 
@@ -78,14 +80,14 @@ export class NamedValuesRepository {
             JOIN products p ON pnv.product_id = p.id
             LEFT JOIN teams t ON p.owner_team_id = t.id
             WHERE pnv.named_value_id = $1
-        `, [namedValueId]);
+        `, [namedValueId], 'GetNamedValueProducts');
     }
 
     /**
      * Check if a named value name already exists (collision detection)
      */
     async checkNamedValueCollision(value: string) {
-        return await query('SELECT * FROM named_values WHERE value = $1', [value]);
+        return await query('SELECT * FROM named_values WHERE value = $1', [value], 'CheckNamedValueCollision');
     }
 
     /**
@@ -94,7 +96,7 @@ export class NamedValuesRepository {
     async getExistingNamedValue(productId: string, systemName: string, scopeId?: string) {
         return await query(
             'SELECT * FROM named_values WHERE product_id = $1 AND system_name = $2 AND scope_id IS NOT DISTINCT FROM $3',
-            [productId, systemName, scopeId || null]
+            [productId, systemName, scopeId || null], 'GetExistingNamedValue'
         );
     }
 
@@ -104,7 +106,7 @@ export class NamedValuesRepository {
     async updateNamedValue(id: string, data: any) {
         return await query(
             'UPDATE named_values SET display_name = $1, value = $2 WHERE id = $3 RETURNING *',
-            [data.displayName, data.value, id]
+            [data.displayName, data.value, id], 'UpdateNamedValue'
         );
     }
 
@@ -114,7 +116,7 @@ export class NamedValuesRepository {
     async createNamedValue(productId: string, data: any) {
         return await query(
             'INSERT INTO named_values (product_id, system_name, display_name, value, scope_id, is_secret, environment) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-            [productId, data.systemName, data.displayName, data.value, data.scopeId || null, data.isSecret || false, data.environment]
+            [productId, data.systemName, data.displayName, data.value, data.scopeId || null, data.isSecret || false, data.environment], 'CreateNamedValue'
         );
     }
 
@@ -124,7 +126,7 @@ export class NamedValuesRepository {
     async deleteNamedValue(productId: string, valueId: string) {
         return await query(
             'DELETE FROM named_values WHERE product_id = $1 AND id = $2',
-            [productId, valueId]
+            [productId, valueId], 'DeleteNamedValue'
         );
     }
 
@@ -137,7 +139,7 @@ export class NamedValuesRepository {
             WHERE product_id IS NULL 
             AND environment = $1
             ORDER BY system_name ASC
-        `, [environment]);
+        `, [environment], 'GetOrphanNamedValues');
     }
 
     /**
@@ -146,7 +148,7 @@ export class NamedValuesRepository {
     async adoptNamedValue(id: string, productId: string) {
         return await query(
             'UPDATE named_values SET product_id = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
-            [productId, id]
+            [productId, id], 'AdoptNamedValue'
         );
     }
 }

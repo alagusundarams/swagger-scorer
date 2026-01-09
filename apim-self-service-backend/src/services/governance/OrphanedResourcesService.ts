@@ -37,7 +37,7 @@ export async function getOrphanedResources(environment?: string): Promise<Orphan
         FROM orphaned_resources
         ${whereClause}
         ORDER BY environment, type, name
-    `, params);
+    `, params, 'GetOrphanedResources');
 
     return result.rows.map(row => ({
         id: row.id,
@@ -57,7 +57,7 @@ export async function getAdGroups() {
         SELECT id, name, description, ad_group_id,created_at
         FROM teams
         ORDER BY name ASC
-    `);
+    `, [], 'getAdGroups');
 
     return result.rows.map(row => ({
         id: row.id,

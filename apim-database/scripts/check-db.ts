@@ -8,28 +8,37 @@ async function checkData() {
     try {
         await client.connect();
 
-        console.log('\n--- PRODUCTS SUMMARY ---');
-        const prods = await client.query("SELECT id, name, environment, owner_team_id FROM products LIMIT 10");
+        console.log('\n--- TOTAL COUNTS ---');
+        const counts = await client.query(`
+            SELECT 
+                (SELECT COUNT(*) FROM products) as products,
+                (SELECT COUNT(*) FROM apis) as apis,
+                (SELECT COUNT(*) FROM operations) as operations,
+                (SELECT COUNT(*) FROM subscriptions) as subscriptions,
+                (SELECT COUNT(*) FROM named_values) as named_values
+        `);
+        console.table(counts.rows);
+
+        console.log('\n--- PRODUCTS SUMMARY (TOP 5) ---');
+        const prods = await client.query("SELECT id, name, environment, owner_team_id FROM products LIMIT 5");
         console.table(prods.rows);
 
-        console.log('\n--- APIS SUMMARY ---');
-        const apis = await client.query("SELECT id, name, product_id, path FROM apis LIMIT 10");
-        console.table(apis.rows);
-
-        console.log('\n--- OPERATIONS SUMMARY ---');
-        const ops = await client.query("SELECT api_id, method, url_template, display_name FROM operations LIMIT 10");
-        console.table(ops.rows);
-
-        console.log('\n--- SUBSCRIPTIONS SUMMARY ---');
-        const subs = await client.query("SELECT id, product_id, subscriber_team_id, state FROM subscriptions LIMIT 10");
+        console.log('\n--- SUBSCRIPTIONS SUMMARY (TOP 5) ---');
+        const subs = await client.query("SELECT id, product_id, subscriber_team_id, state FROM subscriptions LIMIT 5");
         console.table(subs.rows);
 
-        // Check specifically for the ones the user might be looking at
+        console.log('\n--- NAMED VALUES SUMMARY (TOP 5) ---');
+        const nvs = await client.query("SELECT id, product_id, system_name, environment FROM named_values LIMIT 5");
+        console.table(nvs.rows);
+
+        // Check specifically for mapping between first product and its subscriptions
         if (prods.rows.length > 0) {
             const firstProd = prods.rows[0].id;
-            console.log(`\n--- SUBSCRIPTIONS for product: ${firstProd} ---`);
-            const subCheck = await client.query("SELECT * FROM subscriptions WHERE product_id = $1", [firstProd]);
-            console.table(subCheck.rows);
+            console.log(`\n--- LINK CHECK for Product ID: ${firstProd} ---`);
+            const subCount = await client.query("SELECT COUNT(*) FROM subscriptions WHERE product_id = $1", [firstProd]);
+            const nvCount = await client.query("SELECT COUNT(*) FROM named_values WHERE product_id = $1", [firstProd]);
+            console.log(`Subscriptions: ${subCount.rows[0].count}`);
+            console.log(`Named Values: ${nvCount.rows[0].count}`);
         }
 
     } catch (err: any) {

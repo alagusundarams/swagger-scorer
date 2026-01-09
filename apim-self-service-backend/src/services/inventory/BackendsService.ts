@@ -57,7 +57,7 @@ export async function getBackends(environment: string, userContext: UserContext)
         WHERE gb.environment = $1
         ${accessFilter}
         ORDER BY gb.id ASC
-    `, params);
+    `, params, 'GetBackends');
 
     return result.rows.map(row => ({
         id: row.id,
@@ -98,7 +98,7 @@ export async function getBackend(id: string, environment: string, userContext: U
         FROM governance_backends gb
         WHERE gb.id = $1 AND gb.environment = $2
         ${accessFilter}
-    `, params);
+    `, params, 'GetBackend');
 
     if (result.rows.length === 0) {
         return null;
@@ -142,7 +142,7 @@ export async function upsertBackend(params: {
             protocol = $6,
             updated_at = NOW()
         RETURNING id, environment, url, description, title, protocol, created_at, updated_at
-    `, [params.id, params.environment, params.url, params.description, params.title, params.protocol || 'https']);
+    `, [params.id, params.environment, params.url, params.description, params.title, params.protocol || 'https'], 'UpsertBackend');
 
     const row = result.rows[0];
     return {
@@ -168,7 +168,7 @@ export async function deleteBackend(id: string, environment: string, userContext
     const result = await query(`
         DELETE FROM governance_backends
         WHERE id = $1 AND environment = $2
-    `, [id, environment]);
+    `, [id, environment], 'DeleteBackend');
 
     return (result.rowCount || 0) > 0;
 }
@@ -183,7 +183,7 @@ export async function getOrphanBackends(environment: string): Promise<Backend[]>
         WHERE environment = $1
         AND (scope IS NULL OR (scope != 'GLOBAL' AND product_id IS NULL))
         ORDER BY id ASC
-    `, [environment]);
+    `, [environment], 'GetOrphanBackends');
 
     return result.rows.map(row => ({
         id: row.id,
@@ -208,7 +208,7 @@ export async function assignBackend(id: string, environment: string, data: { pro
         SET product_id = $1, api_id = $2, scope = $3, updated_at = NOW()
         WHERE id = $4 AND environment = $5
         RETURNING *
-    `, [data.productId || null, data.apiId || null, data.scope, id, environment]);
+    `, [data.productId || null, data.apiId || null, data.scope, id, environment], 'AssignBackend');
 
     return result.rows[0];
 }

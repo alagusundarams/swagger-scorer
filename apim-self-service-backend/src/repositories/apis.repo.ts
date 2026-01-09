@@ -114,6 +114,8 @@ export class ApisRepository {
                 WHERE op.api_id = a.id
             ) o ON true
             WHERE a.product_id = $1
+               OR a.product_id = $1 || ':Global'
+               OR a.product_id LIKE $1 || ':%:Global'
         `, [productId], 'GetAllApisByProductId');
     }
 

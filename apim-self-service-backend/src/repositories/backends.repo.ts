@@ -12,7 +12,7 @@ export class BackendsRepository {
     async findBackendByUrl(url: string, environment: string) {
         return await query(
             'SELECT * FROM governance_backends WHERE url = $1 AND environment = $2 LIMIT 1',
-            [url, environment]
+            [url, environment], 'FindBackendByUrl'
         );
     }
 
@@ -26,6 +26,6 @@ export class BackendsRepository {
             JOIN apis a ON ab.api_id = a.id
             JOIN products p ON a.product_id = p.id
             WHERE ab.backend_id = $1 AND ab.environment = $2
-        `, [backendId, environment]);
+        `, [backendId, environment], 'GetApisUsingBackend');
     }
 }
