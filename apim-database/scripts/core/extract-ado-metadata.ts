@@ -287,6 +287,12 @@ async function main() {
                     );
 
                     if (deploy) {
+                        console.log(`\n🔍 [DEBUG] Deployment Response for ${prod.name}/${envName}:`);
+                        console.log(`   deploy.owner.id: ${deploy.owner?.id}`);
+                        console.log(`   deploy.build?.id: ${deploy.build?.id}`);
+                        console.log(`   deploy.build?.sourceVersion: ${deploy.build?.sourceVersion}`);
+                        console.log(`   deploy.finishTime: ${deploy.finishTime}`);
+
                         let commitHash = deploy.build?.sourceVersion;
                         let fullDetails = deploy;
 
@@ -294,6 +300,15 @@ async function main() {
                         if (ownerId) {
                             const details = await AzureService.fetchADOBuild(devops.organization, projectId, ownerId, devops.pat, devops.baseUrl, bearerToken);
                             if (details) {
+                                console.log(`\n🔍 [DEBUG] Build Details for Build ${ownerId}:`);
+                                console.log(`   sourceVersion: ${details.sourceVersion}`);
+                                console.log(`   sourceBranch: ${details.sourceBranch}`);
+                                console.log(`   requestedFor: ${JSON.stringify(details.requestedFor)}`);
+                                console.log(`   requestedBy: ${JSON.stringify(details.requestedBy)}`);
+                                console.log(`   triggerInfo: ${JSON.stringify(details.triggerInfo)}`);
+                                console.log(`   comment: ${details.comment}`);
+                                console.log(`   _links.web.href: ${details._links?.web?.href}`);
+
                                 fullDetails = details;
                                 commitHash = commitHash || details.sourceVersion;
                             }
@@ -304,6 +319,12 @@ async function main() {
                             const branch = (fullDetails.sourceBranch || 'unknown').replace('refs/heads/', '');
                             const message = fullDetails.triggerInfo?.['ci.message'] || fullDetails.comment || 'No message';
 
+                            console.log(`\n📝 [FINAL] Extracted Data:`);
+                            console.log(`   hash: ${commitHash}`);
+                            console.log(`   branch: ${branch}`);
+                            console.log(`   author: ${author}`);
+                            console.log(`   message: ${message?.substring(0, 50)}...`);
+
                             meta.deployments[envName] = {
                                 hash: commitHash,
                                 date: deploy.finishTime || fullDetails.finishTime || new Date().toISOString(),
@@ -312,7 +333,11 @@ async function main() {
                                 message,
                                 url: fullDetails._links?.web?.href
                             };
+                        } else {
+                            console.warn(`   ⚠️ Skipping ${envName}: commitHash is ${commitHash}`);
                         }
+                    } else {
+                        console.warn(`   ⚠️ No deployment found for ${envName}`);
                     }
                 }
                 results.push(meta);
