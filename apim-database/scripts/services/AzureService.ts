@@ -787,7 +787,8 @@ export class AzureService {
             }
 
             // 2. Query Deployment Records for this specific definition and environment (Surgical Step 2)
-            const deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords?definitionId=${definitionId}&latestState=succeeded&$top=1&api-version=7.1`;
+            // CRITICAL: Remove latestState=succeeded filter - it excludes partial successes and deployments without state
+            const deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords?definitionId=${definitionId}&$top=10&api-version=7.1&$orderby=finishTime desc`;
             console.log(`📡 [ADO Request] GET ${deployUrl}`);
             const deployResp = await fetch(deployUrl, {
                 headers: {
@@ -808,6 +809,7 @@ export class AzureService {
             console.log(`   📊 Deployment records found: ${deployData.count}`);
 
             if (deployData.count > 0) {
+                // Take the most recent deployment (already sorted by finishTime desc)
                 const deploy = deployData.value[0];
                 console.log(`   ✅ Latest deployment: ${JSON.stringify({ owner: deploy.owner?.id, build: deploy.build?.id, finishTime: deploy.finishTime })}`);
                 // If the deployment object doesn't have the build/hash details, try to fetch the owner build
@@ -821,8 +823,8 @@ export class AzureService {
                 }
                 return deploy;
             } else {
-                console.warn(`   ⚠️ [DEPLOY] No deployment records found for env ${envId}, pipeline ${definitionId} (filter: succeeded)`);
-                console.warn(`   💡 Try checking if deployments exist without the "succeeded" filter`);
+                console.warn(`   ⚠️ [DEPLOY] No deployment records found for env ${envId}, pipeline ${definitionId}`);
+                console.warn(`   💡 This likely means no deployments exist for this environment/pipeline combination`);
             }
             return null;
         } catch (err: any) {
