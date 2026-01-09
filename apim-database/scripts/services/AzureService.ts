@@ -586,6 +586,29 @@ export class AzureService {
     }
 
     /**
+     * Fetch a specific build by ID
+     */
+    static async fetchADOBuild(org: string, project: string, buildId: number, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<any> {
+        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
+        const authHeader = this.getAuthHeader(pat);
+        const url = `${orgUrl}/${encodeURIComponent(project)}/_apis/build/builds/${buildId}`;
+
+        try {
+            const resp = await fetch(url, {
+                headers: {
+                    'Authorization': authHeader,
+                    'Accept': 'application/json',
+                    'X-TFS-FedAuthRedirect': 'Suppress'
+                }
+            });
+            if (resp.ok) return await resp.json();
+        } catch (e) {
+            console.error(`❌ [ADO] Failed to fetch build ${buildId}:`, e);
+        }
+        return null;
+    }
+
+    /**
      * Fetch Recent Builds (Discovery Fallback 3)
      */
     static async fetchADOBuilds(org: string, project: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<any[]> {
@@ -745,7 +768,16 @@ export class AzureService {
             if (!deployResp.ok) return null;
             const deployData = await deployResp.json() as { count: number; value: any[] };
 
-            return deployData.count > 0 ? deployData.value[0] : null;
+            if (deployData.count > 0) {
+                const deploy = deployData.value[0];
+                // If the deployment object doesn't have the build/hash details, try to fetch the owner build
+                if (!deploy.build?.sourceVersion && deploy.owner?.id) {
+                    const fullBuild = await this.fetchADOBuild(org, project, deploy.owner.id, pat, baseUrl);
+                    if (fullBuild) deploy.build = fullBuild;
+                }
+                return deploy;
+            }
+            return null;
         } catch (err: any) {
             console.warn(`      ⚠️ [ADO] Surgical environment lookup failed: ${err.message}`);
         }

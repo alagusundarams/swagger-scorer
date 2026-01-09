@@ -309,9 +309,20 @@ async function runDebug() {
         }
 
         if (deploy) {
-            const commitHash = deploy.build?.sourceVersion || 'unknown';
-            deployments[envName] = { hash: commitHash, date: deploy.finishTime || deploy.startTime };
-            console.log(`      🎯 ${envName.padEnd(5)}: Surgical Hit! Captured ${commitHash.substring(0, 7)}`);
+            let commitHash = deploy.build?.sourceVersion;
+
+            // If missing, try to resolve via owner (Run/Build ID)
+            if (!commitHash && deploy.owner?.id) {
+                const fullBuild = await AzureService.fetchADOBuild(devops.organization, projectIdentifier, deploy.owner.id, devops.pat, devops.baseUrl);
+                commitHash = fullBuild?.sourceVersion;
+            }
+
+            if (commitHash && commitHash !== 'unknown') {
+                deployments[envName] = { hash: commitHash, date: deploy.finishTime || deploy.startTime };
+                console.log(`      🎯 ${envName.padEnd(5)}: Surgical Hit! Captured ${commitHash.substring(0, 7)}`);
+            } else {
+                console.warn(`      ⚠️  ${envName.padEnd(5)}: Found deployment but could not extract commit hash. (Deploy ID: ${deploy.id})`);
+            }
         }
     }
 
