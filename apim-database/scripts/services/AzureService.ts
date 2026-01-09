@@ -833,16 +833,18 @@ export class AzureService {
                 const matching = deployData.value
                     .filter((d: any) => {
                         const dId = d.definition?.id;
-                        const match = Number(dId) === Number(definitionId);
-                        if (!match && dId) {
-                            // Only log mismatch if we are looking for something else
-                            // console.log(`      ℹ️ [DEBUG] record.definition.id (${dId}) !== target (${definitionId})`);
-                        }
+                        const oId = d.owner?.definition?.id;
+                        const match = (dId && Number(dId) === Number(definitionId)) ||
+                            (oId && Number(oId) === Number(definitionId));
+
+                        // Verbose diagnostic for each record if requested or if we have a suspected mismatch
+                        // console.log(`      ℹ️ [DEBUG] Checking record definitionId=${dId}, ownerDefinitionId=${oId} against target=${definitionId}`);
+
                         return match;
                     })
                     .sort((a: any, b: any) => {
-                        const aTime = new Date(a.finishTime || 0).getTime();
-                        const bTime = new Date(b.finishTime || 0).getTime();
+                        const aTime = new Date(a.finishTime || a.startTime || 0).getTime();
+                        const bTime = new Date(b.finishTime || b.startTime || 0).getTime();
                         return bTime - aTime; // Newest first
                     });
 
@@ -850,10 +852,15 @@ export class AzureService {
 
                 if (matching.length === 0) {
                     const availableIds = [...new Set(deployData.value.map((d: any) => d.definition?.id).filter(Boolean))];
-                    console.warn(`   ⚠️ [DEPLOY] No deployments found for pipeline ${definitionId} in environment ${envId}. Available definition IDs: ${availableIds.join(', ')}`);
-                    // Log the first few records to see structure
+                    const availableOwnerIds = [...new Set(deployData.value.map((d: any) => d.owner?.definition?.id).filter(Boolean))];
+                    console.warn(`   ⚠️ [DEPLOY] No deployments found for pipeline ${definitionId} in environment ${envId}.`);
+                    console.warn(`   ⚠️ Available definition IDs: ${availableIds.join(', ')}`);
+                    console.warn(`   ⚠️ Available owner definition IDs: ${availableOwnerIds.join(', ')}`);
+
+                    // Log raw sample of first record's definition/owner
                     if (deployData.value.length > 0) {
-                        console.log(`      ℹ️ [DEBUG] Sample record definition structure: ${JSON.stringify(deployData.value[0].definition)}`);
+                        const first = deployData.value[0];
+                        console.log(`      ℹ️ [DEBUG] Sample record structure: definition.id=${first.definition?.id}, owner.definition.id=${first.owner?.definition?.id}`);
                     }
                     return null;
                 }

@@ -307,7 +307,14 @@ async function main() {
 
                     if (deploy) {
                         if (verbose) console.log(`      ℹ️ [DEBUG] Raw deploy object: ${JSON.stringify(deploy)}`);
-                        let commitHash = deploy.build?.sourceVersion || deploy.build?.sourceVersionID || deploy.owner?.sourceVersion;
+                        // Expansive lookup for commit hash
+                        let commitHash = deploy.build?.sourceVersion ||
+                            deploy.build?.sourceVersionID ||
+                            deploy.owner?.sourceVersion ||
+                            deploy.owner?.sourceVersionID ||
+                            deploy.owner?.commitId ||
+                            (deploy.owner?.triggerInfo ? (deploy.owner.triggerInfo['ci.sourceSha'] || deploy.owner.triggerInfo['ci.sourceVersion']) : null);
+
                         let fullDetails = deploy;
 
                         const ownerId = deploy.owner?.id || deploy.build?.id;
@@ -317,15 +324,25 @@ async function main() {
                             if (details) {
                                 if (verbose) console.log(`      ℹ️ [DEBUG] Raw build details: ${JSON.stringify(details)}`);
                                 fullDetails = details;
-                                commitHash = commitHash || details.sourceVersion || details.sourceVersionID;
+                                commitHash = commitHash || details.sourceVersion || details.sourceVersionID || details.commitId;
                             }
                         }
 
                         if (commitHash && commitHash !== 'unknown') {
-                            const author = fullDetails.requestedFor?.displayName || fullDetails.requestedBy?.displayName || deploy.owner?.requestedFor?.displayName || 'Unknown';
-                            const rawBranch = fullDetails.sourceBranch || deploy.sourceBranch || deploy.build?.sourceBranch || 'unknown';
+                            const author = fullDetails.requestedFor?.displayName ||
+                                fullDetails.requestedBy?.displayName ||
+                                deploy.owner?.requestedFor?.displayName ||
+                                deploy.owner?.requestedBy?.displayName ||
+                                'Unknown';
+
+                            const rawBranch = fullDetails.sourceBranch ||
+                                deploy.sourceBranch ||
+                                deploy.build?.sourceBranch ||
+                                deploy.owner?.sourceBranch ||
+                                'unknown';
+
                             const branch = rawBranch.replace('refs/heads/', '');
-                            const message = fullDetails.triggerInfo?.['ci.message'] || fullDetails.comment || 'No message';
+                            const message = fullDetails.triggerInfo?.['ci.message'] || fullDetails.comment || deploy.owner?.comment || 'No message';
 
                             meta.deployments[envName] = {
                                 hash: commitHash,
@@ -333,11 +350,12 @@ async function main() {
                                 branch,
                                 author,
                                 message,
-                                url: fullDetails._links?.web?.href || deploy.url
+                                url: fullDetails._links?.web?.href || deploy._links?.web?.href || deploy.url
                             };
                             console.log(`      🎯 ${envName.padEnd(5)}: Surgical Hit! Captured ${commitHash.substring(0, 7)} (Auth: ${author})`);
                         } else {
-                            console.warn(`      ⚠️  ${envName.padEnd(5)}: Deployment found but commit hash is missing or unknown.`);
+                            console.warn(`      ⚠️  ${envName.padEnd(5)}: Deployment found (ID: ${deploy.id}) but commit hash is missing/unknown in all fallback fields.`);
+                            if (verbose) console.log(`      ℹ️ [DEBUG] Full Object checked: ${JSON.stringify({ deploy, fullDetails })}`);
                         }
                     }
                 }
