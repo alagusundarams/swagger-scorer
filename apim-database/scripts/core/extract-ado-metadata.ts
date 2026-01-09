@@ -371,12 +371,14 @@ async function main() {
                                 let record = timeline.find((t: any) => {
                                     const type = (t.type || t.recordType || '').toLowerCase();
                                     const isContainer = ['stage', 'job', 'phase'].includes(type);
-                                    const nameMatches = sanitize(t.name).includes(sanitize(envName));
+                                    const cleanName = sanitize(t.name || '');
+                                    const cleanEnv = sanitize(envName);
+                                    const nameMatches = cleanName.includes(cleanEnv) || cleanEnv.includes(cleanName);
                                     const isSuccess = ['succeeded', 'partiallysucceeded'].includes((t.result || '').toLowerCase());
                                     const isCompleted = (t.status || '').toLowerCase() === 'completed';
 
-                                    if (verbose && nameMatches) {
-                                        console.log(`      🔍 [Scan Pass 1] ${envName} vs "${t.name}" | Type: ${type} | Result: ${t.result} | Success: ${isSuccess} | Completed: ${isCompleted}`);
+                                    if (verbose && (nameMatches || t.name?.toLowerCase().includes(envName.toLowerCase()))) {
+                                        console.log(`      🔍 [Scan Pass 1] ${envName} vs "${t.name}" | Type: ${type} | Result: ${t.result} | Match: ${nameMatches}`);
                                     }
                                     return isContainer && nameMatches && isSuccess && isCompleted;
                                 });
@@ -384,12 +386,14 @@ async function main() {
                                 // Pass 2: Generous match
                                 if (!record) {
                                     record = timeline.find((t: any) => {
-                                        const nameMatches = sanitize(t.name).includes(sanitize(envName));
+                                        const cleanName = sanitize(t.name || '');
+                                        const cleanEnv = sanitize(envName);
+                                        const nameMatches = cleanName.includes(cleanEnv) || cleanEnv.includes(cleanName);
                                         const isSuccess = ['succeeded', 'partiallysucceeded'].includes((t.result || '').toLowerCase());
                                         const isCompleted = (t.status || '').toLowerCase() === 'completed';
 
-                                        if (verbose && nameMatches) {
-                                            console.log(`      🔍 [Scan Pass 2] ${envName} vs "${t.name}" | Result: ${t.result} | Success: ${isSuccess}`);
+                                        if (verbose && (nameMatches || t.name?.toLowerCase().includes(envName.toLowerCase()))) {
+                                            console.log(`      🔍 [Scan Pass 2] ${envName} vs "${t.name}" | Result: ${t.result} | Match: ${nameMatches}`);
                                         }
                                         return nameMatches && isSuccess && isCompleted;
                                     });
