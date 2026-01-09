@@ -415,7 +415,7 @@ export class AzureService {
     static async fetchADOProjects(org: string, pat: string, baseUrl: string = 'https://dev.azure.com'): Promise<ADOProject[]> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = this.getAuthHeader(pat);
-        const url = `${orgUrl}/_apis/projects`;
+        const url = `${orgUrl}/_apis/projects?api-version=7.1`;
 
         // console.log(`📡 [ADO Request] GET ${url}`);
         try {
@@ -490,8 +490,8 @@ export class AzureService {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
-        let url = `${urlBase}/_apis/pipelines`;
-        if (repoId) url += `?repositoryId=${repoId}&repositoryType=azureRepo`;
+        let url = `${urlBase}/_apis/pipelines?api-version=7.1`;
+        if (repoId) url += `&repositoryId=${repoId}&repositoryType=azureRepo`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
@@ -592,8 +592,8 @@ export class AzureService {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
-        let url = `${urlBase}/_apis/build/definitions`;
-        if (repoId) url += `?repositoryId=${repoId}&repositoryType=TfsGit`;
+        let url = `${urlBase}/_apis/build/definitions?api-version=7.1`;
+        if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
         // console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
