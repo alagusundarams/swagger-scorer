@@ -329,30 +329,46 @@ async function runDebug() {
             let commitHash = deploy.build?.sourceVersion;
             let fullDetails = deploy;
 
-            // If missing, try to resolve via owner (Run/Build ID)
-            if (!commitHash && deploy.owner?.id) {
-                fullDetails = await AzureService.fetchADOBuild(devops.organization, projectIdentifier, deploy.owner.id, devops.pat, devops.baseUrl, bearerToken);
-                commitHash = fullDetails?.sourceVersion;
+            // ALWAYS try to get full details if we have an owner ID to get Author/Branch/Message
+            const ownerId = deploy.owner?.id || deploy.build?.id;
+            if (ownerId) {
+                console.log(`      📡 Fetching full build details (ID: ${ownerId}) for metadata...`);
+                const details = await AzureService.fetchADOBuild(devops.organization, projectIdentifier, ownerId, devops.pat, devops.baseUrl, bearerToken);
+                if (details) {
+                    fullDetails = details;
+                    commitHash = commitHash || details.sourceVersion;
+                }
             }
 
             if (commitHash && commitHash !== 'unknown') {
+                const author = fullDetails.requestedFor?.displayName ||
+                    fullDetails.requestedBy?.displayName ||
+                    fullDetails.lastChangedBy?.displayName ||
+                    deploy.requestedFor?.displayName || 'Unknown';
+
+                const rawBranch = fullDetails.sourceBranch || deploy.sourceBranch || 'unknown';
+                const branch = rawBranch.replace('refs/heads/', '');
+
+                const message = fullDetails.triggerInfo?.['ci.message'] ||
+                    fullDetails.comment ||
+                    fullDetails.description || 'No message';
+
                 deployments[envName] = {
                     hash: commitHash,
-                    date: deploy.finishTime || deploy.startTime || fullDetails.finishTime,
-                    branch: fullDetails.sourceBranch || deploy.sourceBranch || 'unknown',
-                    author: fullDetails.requestedFor?.displayName || deploy.requestedFor?.displayName || 'Unknown',
-                    message: fullDetails.triggerInfo?.['ci.message'] || 'No message',
+                    date: deploy.finishTime || deploy.startTime || fullDetails.finishTime || fullDetails.startTime || new Date().toISOString(),
+                    branch,
+                    author,
+                    message,
                     url: fullDetails._links?.web?.href || deploy.url
                 };
-                console.log(`      🎯 ${envName.padEnd(5)}: Surgical Hit! Captured ${commitHash.substring(0, 7)}`);
-                console.log(`         👤 Author: ${deployments[envName].author}`);
-                console.log(`         🌿 Branch: ${deployments[envName].branch}`);
+                console.log(`      🎯 ${envName.padEnd(5)}: Surgical Hit! Compiled ${commitHash.substring(0, 7)}`);
+                console.log(`         👤 Author: ${author}`);
+                console.log(`         🌿 Branch: ${branch}`);
             } else {
                 console.warn(`      ⚠️  ${envName.padEnd(5)}: Found deployment but could not extract commit hash.`);
-                if (verbose) console.log(`         DEBUG: Raw Deploy Object Keys: ${Object.keys(deploy).join(', ')}`);
-                if (verbose && deploy.owner) console.log(`         DEBUG: Owner ID: ${deploy.owner.id} (${deploy.owner.name})`);
             }
-        } else {
+        }
+        else {
             console.log(`      ℹ️  ${envName.padEnd(5)}: No direct surgical strike results found.`);
         }
     }
@@ -408,17 +424,21 @@ async function runDebug() {
 
                     if (record) {
                         const hash = run.sourceVersion || 'unknown';
+                        const author = run.requestedFor?.displayName || run.requestedBy?.displayName || 'Unknown';
+                        const branch = (run.sourceBranch || 'unknown').replace('refs/heads/', '');
+                        const message = run.triggerInfo?.['ci.message'] || run.comment || 'No message';
+
                         deployments[envName] = {
                             hash,
-                            date: record.finishTime || run.finishedDate,
-                            branch: run.sourceBranch,
-                            author: run.requestedFor?.displayName,
-                            message: run.triggerInfo?.['ci.message'] || 'No message',
+                            date: record.finishTime || run.finishedDate || new Date().toISOString(),
+                            branch,
+                            author,
+                            message,
                             url: run._links?.web?.href
                         };
                         console.log(`      📍 ${envName.padEnd(5)}: Scanner Hit! Captured ${hash.substring(0, 7)}`);
-                        console.log(`         👤 Author: ${deployments[envName].author}`);
-                        console.log(`         🌿 Branch: ${deployments[envName].branch}`);
+                        console.log(`         👤 Author: ${author}`);
+                        console.log(`         🌿 Branch: ${branch}`);
                     }
                 }
             }
