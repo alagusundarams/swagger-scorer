@@ -811,7 +811,15 @@ export class AzureService {
             if (deployData.count > 0) {
                 // Filter by definitionId and sort by finishTime in code
                 const matching = deployData.value
-                    .filter((d: any) => d.definition?.id === definitionId)
+                    .filter((d: any) => {
+                        const dId = d.definition?.id;
+                        const match = Number(dId) === Number(definitionId);
+                        if (!match && dId) {
+                            // Only log mismatch if we are looking for something else
+                            // console.log(`      ℹ️ [DEBUG] record.definition.id (${dId}) !== target (${definitionId})`);
+                        }
+                        return match;
+                    })
                     .sort((a: any, b: any) => {
                         const aTime = new Date(a.finishTime || 0).getTime();
                         const bTime = new Date(b.finishTime || 0).getTime();
@@ -821,7 +829,8 @@ export class AzureService {
                 console.log(`   📊 Deployments matching pipeline ${definitionId}: ${matching.length}`);
 
                 if (matching.length === 0) {
-                    console.warn(`   ⚠️ [DEPLOY] No deployments found for pipeline ${definitionId} in environment ${envId}`);
+                    const availableIds = [...new Set(deployData.value.map((d: any) => d.definition?.id).filter(Boolean))];
+                    console.warn(`   ⚠️ [DEPLOY] No deployments found for pipeline ${definitionId}. Available definition IDs in this env: ${availableIds.join(', ')}`);
                     return null;
                 }
 
