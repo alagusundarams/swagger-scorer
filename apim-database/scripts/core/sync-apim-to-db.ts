@@ -457,10 +457,29 @@ async function resolveGitMetadata(productName: string, productTags: Record<strin
         const runs = await AzureService.fetchPipelineRuns(devopsConfig.organization, matchedRepo.project, bestPipeline.id, devopsConfig.pat, devopsConfig.baseUrl);
         if (runs.length === 0) return { ...fallback, repoUrl };
 
+        const run = runs[0];
+        let commitHash = run.sourceVersion || '';
+
+        // Multi-repo fix: if the run's primary repo doesn't match, look in resources
+        try {
+            const details = await AzureService.fetchADOBuild(devopsConfig.organization, matchedRepo.project, run.id, devopsConfig.pat, devopsConfig.baseUrl);
+            if (details && details.repository?.name !== matchedRepo.name) {
+                if (details.resources?.repositories) {
+                    const targetRepoRes = Object.values(details.resources.repositories).find((r: any) =>
+                        r.repository?.name?.toLowerCase() === matchedRepo.name.toLowerCase() ||
+                        r.repository?.id === matchedRepo.id
+                    );
+                    if ((targetRepoRes as any)?.version) {
+                        commitHash = (targetRepoRes as any).version;
+                    }
+                }
+            }
+        } catch (e) { /* fallback to primary */ }
+
         const metadata: GitMetadata = {
-            hash: runs[0].sourceVersion || '',
-            date: runs[0].finishedDate || null,
-            pipelineUrl: (runs[0] as any)._links?.web?.href || (runs[0] as any).web?.href,
+            hash: commitHash,
+            date: run.finishedDate || null,
+            pipelineUrl: (run as any)._links?.web?.href || (run as any).web?.href,
             repoUrl
         };
 
@@ -673,7 +692,14 @@ async function runWorker(envName: string) {
         syncReport.summary.apisFound = apimApis.length;
 
         // Build Known Product ID Set for FK integrity
-        const knownProductIds = new Set<string>(apimProducts.map(p => p.id));
+        const knownProductIds = new Map<string, string>();
+        apimProducts.forEach(p => {
+            const uniqueProductId = `${p.id}:${AZURE_CONFIG.environment}:${region}`;
+            knownProductIds.set(p.id.toLowerCase(), uniqueProductId);
+        });
+
+        // Cache API to Product mapping for Named Values
+        const apiToProductMap = new Map<string, string>();
 
         let apimSubs: any[] = [];
         try {
@@ -811,6 +837,8 @@ async function runWorker(envName: string) {
                 if (bestSpecPath) { writeToLog('INFO', [`   Using Spec File: ${bestSpecPath}`]); }
             }
 
+            apiToProductMap.set(uniqueApiId, linkedProductId || '');
+
             await pool.query(`
                 INSERT INTO apis(
                 id, name, display_name, path, product_id, apim_raw_data, 
@@ -886,10 +914,6 @@ async function runWorker(envName: string) {
 
         // I'll insert the map creation at the start of the loop block.
 
-        const realProductMap = new Map<string, string>();
-        for (const pid of knownProductIds) {
-            realProductMap.set(pid.toLowerCase(), pid);
-        }
 
         for (const s of apimSubs) {
             if (!s.scope || !s.scope.toLowerCase().includes('/products/')) {
@@ -899,20 +923,20 @@ async function runWorker(envName: string) {
                 continue;
             }
 
-            // Case-Insensitive Resolution
-            const rawProdId = s.productId;
-            const realProdId = realProductMap.get(rawProdId.toLowerCase());
+            // Case-Insensitive Resolution to Composite ID
+            const rawProdId: string = String(s.productId);
+            const uniqueProductId = knownProductIds.get(rawProdId.toLowerCase());
 
             // Referential Integrity Check
-            if (!realProdId) {
+            if (!uniqueProductId) {
                 console.warn(`⚠️ Orphaned Subscription: ${s.name} (Target '${rawProdId}' not found)`);
                 syncReport.gaps.orphanedSubscriptions.push({ id: s.id, name: s.name, targetProduct: rawProdId, reason: 'Target Product not found in APIM or DB' });
                 syncReport.summary.orphanedSubsSkipped++;
                 continue;
             }
 
-            // Perform link with REAL Product ID
-            s.productId = realProdId; // Update so the INSERT below uses the correct casing
+            // Perform link with COMPOSITE Product ID
+            s.productId = uniqueProductId;
 
             await pool.query(`
                 INSERT INTO teams(id, display_name, type, updated_at)
@@ -972,23 +996,12 @@ async function runWorker(envName: string) {
         // For clarity, we'll iterate apimApis again (in memory, fast).
         for (const a of apimApis) {
             const uniqueApiId = `${a.id}:${AZURE_CONFIG.environment}:${region}`;
-            // We need the LINKED Product ID for this API. 
-            // Simplified: We assume we can find it via the p.id or 'unknown-product' logic.
-            // Ideally we'd have a map of apiId -> productId from the loop above.
-            // For now, let's look up parent product from APIM structure if possible.
-            // But we don't have that link cached well. 
-            // Fallback: If API uses NV, we link it to 'unknown-product' but Scope = uniqueApiId.
-            // BETTER: We should rely on the DB having the API->Product link? No, sync is running now.
-            // Let's use 'unknown-product' for API-scoped NVs unless we know the parent.
-            // Actually, the API loop inserted APIs with linkedProductId. 
-            // Let's rely on the user manually fixing API-scoped ownership if we miss it, 
-            // OR we can make a best effort to find the product name from the API loop.
+            const linkedProductId = apiToProductMap.get(uniqueApiId);
 
             const nvs = extractNamedValuesFromPolicy(a.policyXml);
             for (const nvName of nvs) {
-                // orphaned values use product_id = NULL
-                // This ensures it shows up in the API config even without a parent product.
-                nvUsageMap.get(nvName)!.push({ uniqueProductId: null as any, scopeId: uniqueApiId });
+                // Link to API scope AND parent Product if available
+                nvUsageMap.get(nvName)!.push({ uniqueProductId: linkedProductId as any, scopeId: uniqueApiId });
             }
         }
 

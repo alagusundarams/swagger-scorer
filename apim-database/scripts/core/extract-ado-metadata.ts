@@ -322,9 +322,26 @@ async function main() {
                             console.log(`      📡 Fetching full build details (ID: ${ownerId}) for metadata...`);
                             const details = await AzureService.fetchADOBuild(devops.organization, projectId, ownerId, devops.pat, devops.baseUrl, bearerToken);
                             if (details) {
-                                if (verbose) console.log(`      ℹ️ [DEBUG] Raw build details: ${JSON.stringify(details)}`);
+                                if (verbose) console.log(`      ℹ️ [DEBUG] Raw build details fetched.`);
                                 fullDetails = details;
-                                commitHash = commitHash || details.sourceVersion || details.sourceVersionID || details.commitId;
+
+                                // MULTI-REPO FIX: If the build's primary repo is NOT our matched repo, look for the correct version in resources
+                                if (details.repository?.name && (meta as any).repository?.name && details.repository.name !== (meta as any).repository.name) {
+                                    if (verbose) console.log(`      ⚠️  Build repo (${details.repository.name}) differs from target (${(meta as any).repository.name}). Searching resources...`);
+                                    if (details.resources?.repositories) {
+                                        const targetRepoRes = Object.values(details.resources.repositories).find((r: any) =>
+                                            r.repository?.name?.toLowerCase() === (meta as any).repository.name.toLowerCase() ||
+                                            r.repository?.id === (meta as any).repository.id
+                                        );
+                                        const resAny = targetRepoRes as any;
+                                        if (resAny?.version) {
+                                            commitHash = resAny.version;
+                                            if (verbose) console.log(`      🎯 [Multi-Repo] Found version from target repository (${(meta as any).repository.name}): ${commitHash}`);
+                                        }
+                                    }
+                                } else {
+                                    commitHash = commitHash || details.sourceVersion || details.sourceVersionID || details.commitId;
+                                }
                             }
                         }
 

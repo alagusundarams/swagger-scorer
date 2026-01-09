@@ -42,7 +42,7 @@ interface MetadataStore {
     appIds: Record<string, string[]>;   // env -> unique_guids[] (rolled up for Graph resolution)
     apiContracts: Record<string, any>;  // apiId -> { displayName: string, definition: any }
     backends: Record<string, any[]>;    // env -> backend[]
-    apiForensics: Record<string, Record<string, { guids: string[], backends: string[] }>>; // env -> apiName -> forensics
+    apiForensics: Record<string, Record<string, { guids: string[], nvs: string[], backends: string[] }>>; // env -> apiName -> forensics
     productForensics: Record<string, Record<string, { guids: string[], nvs: string[] }>>; // env -> productName -> forensics
     productApiLinks: Record<string, Record<string, Array<{ name: string, path: string, gatewayUrl?: string, serviceUrl?: string }>>>; // env -> productId -> { name, path, urls }[]
     subscriptions: Record<string, any[]>; // env -> subscription[]
@@ -426,7 +426,7 @@ async function main() {
                             }
                         }
 
-                        metadata.apiForensics[env.name][apiName] = { guids, backends };
+                        metadata.apiForensics[env.name][apiName] = { guids, nvs, backends };
                         apiProcessedCount++;
                         if (verbose) {
                             console.log(`         📄 API "${apiName}": ${guids.length} GUIDs, ${backends.length} Backends`);

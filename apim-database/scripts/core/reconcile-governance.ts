@@ -33,7 +33,7 @@ interface MetadataStore {
     appIds: Record<string, string[]>;
     apiContracts: Record<string, any>;
     backends: Record<string, any[]>;
-    apiForensics: Record<string, Record<string, { guids: string[], backends: string[] }>>;
+    apiForensics: Record<string, Record<string, { guids: string[], nvs: string[], backends: string[] }>>;
     productForensics: Record<string, Record<string, { guids: string[], nvs: string[] }>>;
     productApiLinks: Record<string, Record<string, Array<{ name: string, path: string, gatewayUrl?: string, serviceUrl?: string }>>>;
     subscriptions: Record<string, any[]>;
@@ -377,8 +377,42 @@ async function main() {
                             updated_at = NOW();
                     `, [nvId, null, nv.displayName, nv.name, val, type, nv.isSecret, env, 'Global']);
 
-                    if (envProductIds.length > 0) {
-                        if (process.env.DEBUG_SQL) console.log(`[DB] Linking Named Value ${nvId} to products: ${envProductIds.join(', ')}`);
+                    // LINKAGE CLIMB: Find which products use this Named Value via API or Product policies
+                    const linkedEnvProductIds = new Set<string>();
+
+                    // 1. Direct Product Policy usage
+                    if (apimMeta.productForensics[env]) {
+                        for (const [pId, forensics] of Object.entries(apimMeta.productForensics[env])) {
+                            if (forensics.nvs.includes(nv.name)) linkedEnvProductIds.add(`${pId}:${upperEnv}:Global`);
+                        }
+                    }
+
+                    // 2. API Policy usage -> Parent Product
+                    if (apimMeta.apiForensics[env]) {
+                        for (const [apiName, forensics] of Object.entries(apimMeta.apiForensics[env])) {
+                            if (forensics.nvs.includes(nv.name)) {
+                                // Find which product this API belongs to in this environment
+                                for (const [pId, apis] of Object.entries(apimMeta.productApiLinks[env] || {})) {
+                                    if (apis.some(a => (typeof a === 'string' ? a === apiName : a.name === apiName))) {
+                                        linkedEnvProductIds.add(`${pId}:${upperEnv}:Global`);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (linkedEnvProductIds.size > 0) {
+                        const productIdsArr = Array.from(linkedEnvProductIds);
+                        if (process.env.DEBUG_SQL) console.log(`[DB] Linking Named Value ${nvId} to products: ${productIdsArr.join(', ')}`);
+                        await client.query(`
+                            INSERT INTO product_named_values (product_id, named_value_id, is_owner, can_modify)
+                            SELECT unnest($1::text[]), $2, true, true
+                            ON CONFLICT (product_id, named_value_id) DO NOTHING
+                        `, [productIdsArr, nvId]);
+                    } else if (envProductIds.length > 0) {
+                        // Fallback: If not found in any policy, keep existing broad linkage or skip?
+                        // User wanted to avoid "Orphaned" look, so we'll stick to broad linkage as fallback if env matches.
+                        if (process.env.DEBUG_SQL) console.log(`[DB] Linking Named Value ${nvId} to ALL products in ${env} (Fallback)`);
                         await client.query(`
                             INSERT INTO product_named_values (product_id, named_value_id, is_owner, can_modify)
                             SELECT unnest($1::text[]), $2, true, true
