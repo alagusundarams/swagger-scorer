@@ -6,8 +6,9 @@ import type { Subscription, AppRegistration } from '../../../shared/types/domain
  * 
  * Decentralized from inventory module.
  */
-export const getSubscriptions = async (): Promise<Subscription[]> => {
-    const res = await baseClient.get('/subscriptions');
+export const getSubscriptions = async (productId?: string): Promise<Subscription[]> => {
+    const url = productId ? `/products/${productId}/subscriptions` : '/subscriptions';
+    const res = await baseClient.get(url);
     // Robust check: Handle wrapped ({ subscriptions: [] }) vs unwrapped ([]) vs undefined
     const data = res.data;
     if (data?.subscriptions && Array.isArray(data.subscriptions)) {

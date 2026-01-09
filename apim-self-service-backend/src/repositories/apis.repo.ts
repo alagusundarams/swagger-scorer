@@ -26,7 +26,16 @@ export class ApisRepository {
             LEFT JOIN app_registrations ar_api ON ar_api.api_id = a.id
             LEFT JOIN app_registrations ar_prod ON ar_prod.product_id = p.id AND ar_prod.api_id IS NULL
             LEFT JOIN LATERAL (
-                SELECT json_agg(op.*) as json_data
+                SELECT json_agg(json_build_object(
+                    'id', op.id,
+                    'apiId', op.api_id,
+                    'name', op.name,
+                    'displayName', op.display_name,
+                    'method', op.method,
+                    'urlTemplate', op.url_template,
+                    'description', op.description,
+                    'createdAt', op.created_at
+                )) as json_data
                 FROM operations op
                 WHERE op.api_id = a.id
             ) o ON true
@@ -81,7 +90,16 @@ export class ApisRepository {
             LEFT JOIN app_registrations ar_api ON ar_api.api_id = a.id
             LEFT JOIN app_registrations ar_prod ON ar_prod.product_id = p.id AND ar_prod.api_id IS NULL
             LEFT JOIN LATERAL (
-                SELECT json_agg(op.*) as json_data
+                SELECT json_agg(json_build_object(
+                    'id', op.id,
+                    'apiId', op.api_id,
+                    'name', op.name,
+                    'displayName', op.display_name,
+                    'method', op.method,
+                    'urlTemplate', op.url_template,
+                    'description', op.description,
+                    'createdAt', op.created_at
+                )) as json_data
                 FROM operations op
                 WHERE op.api_id = a.id
             ) o ON true
@@ -109,7 +127,16 @@ export class ApisRepository {
             LEFT JOIN products p ON a.product_id = p.id
             LEFT JOIN app_registrations ar_prod ON ar_prod.product_id = p.id AND ar_prod.api_id IS NULL
             LEFT JOIN LATERAL (
-                SELECT json_agg(op.*) as json_data
+                SELECT json_agg(json_build_object(
+                    'id', op.id,
+                    'apiId', op.api_id,
+                    'name', op.name,
+                    'displayName', op.display_name,
+                    'method', op.method,
+                    'urlTemplate', op.url_template,
+                    'description', op.description,
+                    'createdAt', op.created_at
+                )) as json_data
                 FROM operations op
                 WHERE op.api_id = a.id
             ) o ON true
@@ -195,7 +222,16 @@ export class ApisRepository {
             FROM apis a
             JOIN products p ON a.product_id = p.id
             LEFT JOIN LATERAL (
-                SELECT json_agg(op.*) as json_data
+                SELECT json_agg(json_build_object(
+                    'id', op.id,
+                    'apiId', op.api_id,
+                    'name', op.name,
+                    'displayName', op.display_name,
+                    'method', op.method,
+                    'urlTemplate', op.url_template,
+                    'description', op.description,
+                    'createdAt', op.created_at
+                )) as json_data
                 FROM operations op
                 WHERE op.api_id = a.id
             ) o ON true

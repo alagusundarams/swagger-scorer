@@ -6,17 +6,17 @@ import { useStore } from '../../../store/useStore';
 // Keys
 export const consumerKeys = {
     all: ['consumer'] as const,
-    subscriptions: () => [...consumerKeys.all, 'subscriptions'] as const,
+    subscriptions: (productId?: string) => [...consumerKeys.all, 'subscriptions', productId || 'all'] as const,
     apps: (teamId?: string) => [...consumerKeys.all, 'apps', teamId || 'all'] as const,
     secrets: (subId: string) => [...consumerKeys.all, 'secrets', subId] as const,
 };
 
 // -- SUBSCRIPTIONS --
 
-export const useSubscriptionsQuery = () => {
+export const useSubscriptionsQuery = (productId?: string) => {
     return useQuery({
-        queryKey: consumerKeys.subscriptions(),
-        queryFn: consumerApi.getSubscriptions,
+        queryKey: consumerKeys.subscriptions(productId),
+        queryFn: () => consumerApi.getSubscriptions(productId),
         staleTime: 1000 * 60 * 2, // 2 mins
     });
 };

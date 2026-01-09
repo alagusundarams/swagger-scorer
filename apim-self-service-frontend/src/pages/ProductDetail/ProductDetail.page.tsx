@@ -49,7 +49,7 @@ export const ProductDetailPage = () => {
         data: allSubscriptions = [],
         isLoading: subLoading,
         error: subError
-    } = useSubscriptionsQuery();
+    } = useSubscriptionsQuery(productId);
 
     const isLoading = productLoading || subLoading;
     const error = (productError as Error)?.message || (subError as Error)?.message;
