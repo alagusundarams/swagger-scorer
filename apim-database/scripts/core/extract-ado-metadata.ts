@@ -217,6 +217,7 @@ async function main() {
         console.log(`\n📦 Batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(inventory.length / BATCH_SIZE)} (${batch.length} products)`);
 
         await Promise.all(batch.map(async (prod) => {
+            console.log(`\n🔍 Processing: ${prod.name}`);
             const meta: ADOMetadata = { productId: prod.id, productName: prod.name, deployments: {}, status: 'ORPHAN' };
             try {
                 const cleanProd = sanitize(prod.name);
