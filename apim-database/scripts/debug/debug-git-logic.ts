@@ -288,7 +288,7 @@ async function runDebug() {
     // --- STEP 4: SURGICAL ENVIRONMENT SYNC ---
     console.log(`\n➡️  Step 4: Surgical Environment Hash Sync (Hybrid Strategy)...`);
     const envsToSync = ['DEV', 'QA', 'STAGE', 'PROD'];
-    const deployments: Record<string, { hash: string; date: string }> = {};
+    const deployments: Record<string, { hash: string; date: string; branch?: string; author?: string; message?: string; url?: string }> = {};
     const timelineCache = new Map<number, any[]>();
 
     console.log(`   ⏳ Attempting surgical strikes (Environments API)...`);
@@ -301,7 +301,10 @@ async function runDebug() {
                 const env = latest.environments.find(e => e.name.toUpperCase() === envName);
                 deploy = {
                     build: { sourceVersion: latest.artifacts?.[0]?.definitionReference?.version?.id },
-                    finishTime: env?.deploySteps?.[0]?.queuedOn || latest.modifiedOn
+                    finishTime: env?.deploySteps?.[0]?.queuedOn || latest.modifiedOn,
+                    sourceBranch: latest.artifacts?.[0]?.definitionReference?.branch?.name || 'unknown',
+                    requestedFor: latest.createdBy,
+                    url: latest._links?.web?.href
                 };
             }
         } else {
@@ -310,16 +313,26 @@ async function runDebug() {
 
         if (deploy) {
             let commitHash = deploy.build?.sourceVersion;
+            let fullDetails = deploy;
 
             // If missing, try to resolve via owner (Run/Build ID)
             if (!commitHash && deploy.owner?.id) {
-                const fullBuild = await AzureService.fetchADOBuild(devops.organization, projectIdentifier, deploy.owner.id, devops.pat, devops.baseUrl);
-                commitHash = fullBuild?.sourceVersion;
+                fullDetails = await AzureService.fetchADOBuild(devops.organization, projectIdentifier, deploy.owner.id, devops.pat, devops.baseUrl);
+                commitHash = fullDetails?.sourceVersion;
             }
 
             if (commitHash && commitHash !== 'unknown') {
-                deployments[envName] = { hash: commitHash, date: deploy.finishTime || deploy.startTime };
+                deployments[envName] = {
+                    hash: commitHash,
+                    date: deploy.finishTime || deploy.startTime || fullDetails.finishTime,
+                    branch: fullDetails.sourceBranch || deploy.sourceBranch,
+                    author: fullDetails.requestedFor?.displayName || deploy.requestedFor?.displayName,
+                    message: fullDetails.triggerInfo?.['ci.message'] || 'No message',
+                    url: fullDetails._links?.web?.href || deploy.url
+                };
                 console.log(`      🎯 ${envName.padEnd(5)}: Surgical Hit! Captured ${commitHash.substring(0, 7)}`);
+                console.log(`         👤 Author: ${deployments[envName].author}`);
+                console.log(`         🌿 Branch: ${deployments[envName].branch}`);
             } else {
                 console.warn(`      ⚠️  ${envName.padEnd(5)}: Found deployment but could not extract commit hash. (Deploy ID: ${deploy.id})`);
             }
@@ -377,8 +390,17 @@ async function runDebug() {
 
                     if (record) {
                         const hash = run.sourceVersion || 'unknown';
-                        deployments[envName] = { hash, date: record.finishTime || run.finishedDate };
+                        deployments[envName] = {
+                            hash,
+                            date: record.finishTime || run.finishedDate,
+                            branch: run.sourceBranch,
+                            author: run.requestedFor?.displayName,
+                            message: run.triggerInfo?.['ci.message'] || 'No message',
+                            url: run._links?.web?.href
+                        };
                         console.log(`      📍 ${envName.padEnd(5)}: Scanner Hit! Captured ${hash.substring(0, 7)}`);
+                        console.log(`         👤 Author: ${deployments[envName].author}`);
+                        console.log(`         🌿 Branch: ${deployments[envName].branch}`);
                     }
                 }
             }

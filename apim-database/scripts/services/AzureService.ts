@@ -45,13 +45,17 @@ export interface PipelineRun {
     result: string;
     createdDate: string;
     finishedDate: string;
-    resources?: {
-        repositories: {
-            self: {
-                refName: string;
-                version: string;
-            }
-        }
+    sourceBranch: string;
+    sourceVersion: string;
+    requestedFor: {
+        displayName: string;
+        imageUrl: string;
+    };
+    triggerInfo?: {
+        "ci.message"?: string;
+    };
+    _links: {
+        web: { href: string };
     };
 }
 
@@ -100,6 +104,9 @@ export interface ADORelease {
     status: string;
     createdOn: string;
     modifiedOn: string;
+    createdBy: {
+        displayName: string;
+    };
     environments: {
         id: number;
         name: string;
@@ -110,10 +117,15 @@ export interface ADORelease {
         }[];
     }[];
     artifacts: {
+        alias: string;
         definitionReference: {
             version: { id: string; name: string };
+            branch: { id: string; name: string };
         };
     }[];
+    _links: {
+        web: { href: string };
+    };
 }
 
 export class AzureService {
