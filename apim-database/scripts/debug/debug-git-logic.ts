@@ -165,12 +165,22 @@ async function runDebug() {
 
     const runDiscovery = async () => {
         console.log(`   ⏳ Fetching all pipeline types (YAML, Classic, Release) for Repo and Project...`);
+
+        const safeFetch = async (fn: () => Promise<any[]>, label: string) => {
+            try {
+                return await fn();
+            } catch (e: any) {
+                console.warn(`      ⚠️  [Discovery] ${label} lookup failed: ${e.message}`);
+                return [];
+            }
+        };
+
         const [yamlPipes, buildDefs, releaseDefs, projPipes, projBuilds] = await Promise.all([
-            AzureService.fetchADOPipelines(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl),
-            AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl),
-            AzureService.fetchADOReleaseDefinitions(devops.organization, projectIdentifier, devops.pat, devops.baseUrl),
-            AzureService.fetchADOPipelines(devops.organization, projectIdentifier, '', devops.pat, devops.baseUrl),
-            AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, '', devops.pat, devops.baseUrl)
+            safeFetch(() => AzureService.fetchADOPipelines(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl), 'YAML Pipelines'),
+            safeFetch(() => AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl), 'Build Definitions'),
+            safeFetch(() => AzureService.fetchADOReleaseDefinitions(devops.organization, projectIdentifier, devops.pat, devops.baseUrl), 'Release Definitions'),
+            safeFetch(() => AzureService.fetchADOPipelines(devops.organization, projectIdentifier, '', devops.pat, devops.baseUrl), 'Proj YAML'),
+            safeFetch(() => AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, '', devops.pat, devops.baseUrl), 'Proj Build')
         ]);
 
         let combined = [
