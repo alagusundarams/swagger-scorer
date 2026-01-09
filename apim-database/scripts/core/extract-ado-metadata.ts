@@ -7,43 +7,47 @@
  */
 
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { AzureService } from '../services/AzureService.js';
 import pkg from 'pg';
 const { Pool } = pkg;
 
 // --- CONFIG LOADER ---
 function loadConfig() {
-    const cwd = process.cwd();
-    // Priority 1: Exact path override (if passed via env, though not implemented here)
+    // Robust resolution regardless of CWD
+    const scriptDir = __dirname;
+    const repoRoot = resolve(scriptDir, '..', '..', '..');
+    const dbRoot = resolve(scriptDir, '..', '..');
 
-    // Priority 2: Root config.json (if running from root)
-    const rootConfig = join(cwd, 'config.json');
+    const priorities = [
+        join(repoRoot, 'config.json'),                     // 1. Root config
+        join(repoRoot, 'apim-self-service-backend', 'config.json'), // 2. Backend config
+        join(dbRoot, 'config.json')                        // 3. DB config
+    ];
 
-    // Priority 3: Backend config (often contains the real secrets in this monorepo)
-    const backendConfig = join(cwd, 'apim-self-service-backend', 'config.json');
-
-    // Priority 4: Default/Placeholder config
-    const dbConfig = join(cwd, 'apim-database', 'config.json');
-
-    let configPath = '';
-    if (existsSync(rootConfig)) configPath = rootConfig;
-    else if (existsSync(backendConfig)) {
-        // Only use backend config if it has devops creds
-        try {
-            const temp = JSON.parse(readFileSync(backendConfig, 'utf8'));
-            if (temp.devops?.pat && temp.devops.pat !== 'your-read-only-pat') {
-                configPath = backendConfig;
+    for (const p of priorities) {
+        if (existsSync(p)) {
+            try {
+                const content = JSON.parse(readFileSync(p, 'utf8'));
+                // Simple validation to skip placeholders if possible
+                if (content.devops?.pat && content.devops.pat !== 'your-read-only-pat') {
+                    console.log(`📂 [Config] Loaded VALID config from: ${p}`);
+                    return content;
+                }
+                // Keep track of the fallback (likely placeholder)
+                if (!process.env.FOUND_CONFIG) process.env.FOUND_CONFIG = p;
+            } catch (e) {
+                console.warn(`⚠️ [Config] Failed to parse ${p}`);
             }
-        } catch (e) { }
+        }
     }
 
-    if (!configPath && existsSync(dbConfig)) configPath = dbConfig;
-
-    if (configPath) {
-        console.log(`📂 Using config from: ${configPath}`);
-        return JSON.parse(readFileSync(configPath, 'utf8'));
+    // Fallback to the first found one (even if placeholder) to avoid total crash
+    if (process.env.FOUND_CONFIG) {
+        console.warn(`⚠️ [Config] Using POTENTIAL PLACEHOLDER from: ${process.env.FOUND_CONFIG}`);
+        return JSON.parse(readFileSync(process.env.FOUND_CONFIG, 'utf8'));
     }
+
     return {};
 }
 
@@ -56,6 +60,11 @@ const productNameArg = args.find(a => a.startsWith('--product='))?.split('=')[1]
 const sourceMode = args.find(a => a.startsWith('--source='))?.split('=')[1] || 'inventory'; // 'inventory' or 'db'
 const verbose = !args.includes('--quiet');
 const limit = parseInt(args.find(a => a.startsWith('--limit='))?.split('=')[1] || '0', 10);
+
+if (config.devops?.pat) {
+    const masked = config.devops.pat.substring(0, 4) + '...' + config.devops.pat.substring(config.devops.pat.length - 4);
+    console.log(`🔐 [Auth] Using PAT: ${masked}`);
+}
 
 interface ProductIdentity {
     id: string;
@@ -77,9 +86,17 @@ async function main() {
     console.log(`🚀 [PART 2] Starting ADO Metadata Extraction (Source: ${sourceMode})...\n`);
     if (targetEnv) console.log(`🎯 Filtering for Environment: ${targetEnv}\n`);
 
-    const devops = config.devops;
-    if (!devops) {
-        console.error("❌ DevOps configuration missing in config.json");
+    // --- CONFIG OVERRIDES (ENV VARS) ---
+    // Critical: Prioritize Env Vars (AZURE_DEVOPS_PAT) as these are often used in Debug/CI
+    const devops = {
+        ...config.devops,
+        organization: process.env.AZURE_DEVOPS_ORG || config.devops?.organization,
+        pat: process.env.AZURE_DEVOPS_PAT || config.devops?.pat,
+        baseUrl: process.env.AZURE_DEVOPS_URL || config.devops?.baseUrl || 'https://dev.azure.com'
+    };
+
+    if (!devops || !devops.pat || devops.pat === 'your-read-only-pat') {
+        console.error("❌ DevOps PAT missing or invalid (checked config.json and AZURE_DEVOPS_PAT env var)");
         process.exit(1);
     }
 
