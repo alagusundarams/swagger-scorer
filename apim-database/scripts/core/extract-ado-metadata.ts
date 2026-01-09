@@ -281,82 +281,64 @@ async function main() {
 
                 const envsToSync = targetEnv ? [targetEnv] : prod.environments;
 
-                // --- SURGICAL SYNC (EXACT COPY FROM debug-git-logic.ts) ---
+                // --- DEPLOYMENT EXTRACTION (SYNCED WITH debug-git-logic.ts Step 4) ---
+                console.log(`   ⏳ Attempting surgical strikes for ${matchedPipeline.name} (ID: ${matchedPipeline.id})...`);
                 for (const envName of envsToSync) {
+                    let deploy: any = null;
                     console.log(`      🔎 Checking ${envName}...`);
 
-                    // Step 1: Find environment ID by name (EXACT MATCH to debug script line 222)
-                    const envUrl = `${devops.baseUrl}/${devops.organization}/${encodeURIComponent(projectId)}/_apis/distributedtask/environments?name=${envName}&api-version=7.1`;
+                    // 1. Surgical Strike
+                    if ((matchedPipeline as any).isRelease) {
+                        const releases = await AzureService.fetchADOReleases(devops.organization, projectId, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken);
+                        const latest = releases.find(r => r.environments?.some(e => e.name.toUpperCase() === envName.toUpperCase() && ['succeeded', 'partiallysucceeded'].includes((e.status || '').toLowerCase())));
+                        if (latest) {
+                            const env = latest.environments.find(e => e.name.toUpperCase() === envName.toUpperCase());
+                            deploy = {
+                                build: { sourceVersion: latest.artifacts?.[0]?.definitionReference?.version?.id },
+                                finishTime: env?.deploySteps?.[0]?.queuedOn || latest.modifiedOn,
+                                sourceBranch: latest.artifacts?.[0]?.definitionReference?.branch?.name || 'unknown',
+                                requestedFor: latest.createdBy,
+                                url: latest._links?.web?.href
+                            };
+                        }
+                    } else {
+                        deploy = await AzureService.fetchLatestEnvironmentDeployment(devops.organization, projectId, matchedPipeline.id, envName, devops.pat, devops.baseUrl, bearerToken);
+                    }
 
-                    try {
-                        const authHeader = AzureService.getAuthHeader(devops.pat, bearerToken);
-                        const resp = await fetch(envUrl, {
-                            headers: { 'Authorization': authHeader, 'Accept': 'application/json' }
-                        });
-                        if (resp.ok) {
-                            const data = await resp.json() as { count: number; value: any[] };
-                            const match = data.value.find((e: any) => e.name.toUpperCase() === envName.toUpperCase());
-                            if (match) {
-                                const currentEnvId = match.id;
-                                console.log(`      ✅ Found environment ${envName} (ID: ${currentEnvId})`);
+                    if (deploy) {
+                        let commitHash = deploy.build?.sourceVersion;
+                        let fullDetails = deploy;
 
-                                // Step 2: Fetch ALL deployments for this environment (EXACT MATCH to debug script line 231)
-                                const envDeploys = await AzureService.fetchEnvironmentDeployments(
-                                    devops.organization, projectId, currentEnvId, devops.pat, devops.baseUrl, bearerToken
-                                );
-                                console.log(`      ✅ Found ${envDeploys.length} recent deployments in ${envName}.`);
-
-                                // Step 3: Find deployment matching our pipeline (EXACT MATCH to debug script line 234-242)
-                                for (const d of envDeploys) {
-                                    if (d.definition && d.definition.id === matchedPipeline.id) {
-                                        let commitHash = d.definition?.sourceVersion || d.build?.sourceVersion;
-                                        let fullDetails = d;
-
-                                        // Fetch full build details for metadata (EXACT MATCH to debug script line 333-340)
-                                        const ownerId = d.owner?.id || d.build?.id;
-                                        if (ownerId) {
-                                            console.log(`      📡 Fetching full build details (ID: ${ownerId}) for metadata...`);
-                                            const details = await AzureService.fetchADOBuild(devops.organization, projectId, ownerId, devops.pat, devops.baseUrl, bearerToken);
-                                            if (details) {
-                                                fullDetails = details;
-                                                commitHash = commitHash || details.sourceVersion;
-                                            }
-                                        }
-
-                                        if (commitHash && commitHash !== 'unknown') {
-                                            const author = fullDetails.requestedFor?.displayName ||
-                                                fullDetails.requestedBy?.displayName ||
-                                                fullDetails.lastChangedBy?.displayName ||
-                                                d.requestedFor?.displayName || 'Unknown';
-
-                                            const rawBranch = fullDetails.sourceBranch || d.sourceBranch || 'unknown';
-                                            const branch = rawBranch.replace('refs/heads/', '');
-
-                                            const message = fullDetails.triggerInfo?.['ci.message'] ||
-                                                fullDetails.comment ||
-                                                fullDetails.description || 'No message';
-
-                                            meta.deployments[envName] = {
-                                                hash: commitHash,
-                                                date: d.finishTime || d.startTime || fullDetails.finishTime || fullDetails.startTime || new Date().toISOString(),
-                                                branch,
-                                                author,
-                                                message,
-                                                url: fullDetails._links?.web?.href || d.url
-                                            };
-                                            console.log(`      🎯 ${envName.padEnd(5)}: Found deployment ${commitHash.substring(0, 7)}`);
-                                            break; // Found deployment for this env, move to next
-                                        }
-                                    }
-                                }
+                        const ownerId = deploy.owner?.id || deploy.build?.id;
+                        if (ownerId) {
+                            console.log(`      📡 Fetching full build details (ID: ${ownerId}) for metadata...`);
+                            const details = await AzureService.fetchADOBuild(devops.organization, projectId, ownerId, devops.pat, devops.baseUrl, bearerToken);
+                            if (details) {
+                                fullDetails = details;
+                                commitHash = commitHash || details.sourceVersion;
                             }
                         }
-                    } catch (e: any) {
-                        console.warn(`      ⚠️ Environment lookup for ${envName} failed: ${e.message}`);
+
+                        if (commitHash && commitHash !== 'unknown') {
+                            const author = fullDetails.requestedFor?.displayName || fullDetails.requestedBy?.displayName || 'Unknown';
+                            const rawBranch = fullDetails.sourceBranch || deploy.sourceBranch || 'unknown';
+                            const branch = rawBranch.replace('refs/heads/', '');
+                            const message = fullDetails.triggerInfo?.['ci.message'] || fullDetails.comment || 'No message';
+
+                            meta.deployments[envName] = {
+                                hash: commitHash,
+                                date: deploy.finishTime || deploy.startTime || fullDetails.finishTime || fullDetails.startTime || new Date().toISOString(),
+                                branch,
+                                author,
+                                message,
+                                url: fullDetails._links?.web?.href || deploy.url
+                            };
+                            console.log(`      🎯 ${envName.padEnd(5)}: Surgical Hit! Captured ${commitHash.substring(0, 7)}`);
+                        }
                     }
                 }
 
-                // --- SCAN FALLBACK (EXACT COPY FROM debug-git-logic.ts lines 376-447) ---
+                // 2. Scan Fallback (if envs missing)
                 const missingEnvs = envsToSync.filter(e => !meta.deployments[e]);
                 if (missingEnvs.length > 0) {
                     console.log(`   🔍 Missed ${missingEnvs.length} envs. Falling back to paginated timeline scan (Depth: 100)...`);
@@ -377,24 +359,39 @@ async function main() {
                                 timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectId, run.id, devops.pat, devops.baseUrl, bearerToken));
                             }
                             const timeline = timelineCache.get(run.id)!;
-                            if (!timeline || timeline.length === 0) continue;
+                            if (!timeline || timeline.length === 0) {
+                                if (verbose) console.log(`      ⚠️ Build ${run.id} has no timeline records.`);
+                                continue;
+                            }
 
                             for (const envName of envsToSync) {
                                 if (meta.deployments[envName]) continue;
 
+                                // Pass 1: Container match (Stage/Job/Phase)
                                 let record = timeline.find((t: any) => {
-                                    const type = (t.type || '').toLowerCase();
+                                    const type = (t.type || t.recordType || '').toLowerCase();
                                     const isContainer = ['stage', 'job', 'phase'].includes(type);
                                     const nameMatches = sanitize(t.name).includes(sanitize(envName));
                                     const isSuccess = ['succeeded', 'partiallysucceeded'].includes((t.result || '').toLowerCase());
-                                    return isContainer && nameMatches && isSuccess && (t.status || '').toLowerCase() === 'completed';
+                                    const isCompleted = (t.status || '').toLowerCase() === 'completed';
+
+                                    if (verbose && nameMatches) {
+                                        console.log(`      🔍 [Scan Pass 1] ${envName} vs "${t.name}" | Type: ${type} | Result: ${t.result} | Success: ${isSuccess} | Completed: ${isCompleted}`);
+                                    }
+                                    return isContainer && nameMatches && isSuccess && isCompleted;
                                 });
 
+                                // Pass 2: Generous match
                                 if (!record) {
                                     record = timeline.find((t: any) => {
                                         const nameMatches = sanitize(t.name).includes(sanitize(envName));
                                         const isSuccess = ['succeeded', 'partiallysucceeded'].includes((t.result || '').toLowerCase());
-                                        return nameMatches && isSuccess && (t.status || '').toLowerCase() === 'completed';
+                                        const isCompleted = (t.status || '').toLowerCase() === 'completed';
+
+                                        if (verbose && nameMatches) {
+                                            console.log(`      🔍 [Scan Pass 2] ${envName} vs "${t.name}" | Result: ${t.result} | Success: ${isSuccess}`);
+                                        }
+                                        return nameMatches && isSuccess && isCompleted;
                                     });
                                 }
 
