@@ -239,10 +239,10 @@ export class AzureService {
 
         const url = `${urlBase}/_apis/git/repositories/${repoId}/items?scopePath=${scopePath}&recursionLevel=${recursionLevel}&includeContentMetadata=true`;
 
-        console.log(`📡 [ADO Request] GET ${url}`);
+        // console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { count: number, value: any[] };
                 return data.value || [];
@@ -263,7 +263,7 @@ export class AzureService {
         const authHeader = this.getAuthHeader(pat);
         const url = `${orgUrl}/_apis/git/repositories/${repoId}/items?scopePath=${scopePath}&recursionLevel=${recursionLevel}&includeContentMetadata=true`;
 
-        console.log(`📡 [ADO Request] GET ${url}`);
+        // console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, {
                 headers: {
@@ -271,7 +271,7 @@ export class AzureService {
                     'Accept': 'application/json'
                 }
             });
-            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 return await response.text(); // Return raw text content
             } else {
@@ -291,7 +291,7 @@ export class AzureService {
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const url = `${orgUrl}/_apis/connectionData`;
 
-        console.log(`📡 [ADO Request] GET ${url}`);
+        // console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, {
                 headers: {
@@ -299,7 +299,7 @@ export class AzureService {
                     'X-TFS-FedAuthRedirect': 'Suppress'
                 }
             });
-            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (!response.ok) {
                 const txt = await response.text();
                 console.error(`❌ [ADO] Auth Failed (${response.status}):`, txt.substring(0, 200));
@@ -396,10 +396,10 @@ export class AzureService {
         const authHeader = this.getAuthHeader(pat);
         const url = `${orgUrl}/_apis/projects`;
 
-        console.log(`📡 [ADO Request] GET ${url}`);
+        // console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { value: ADOProject[] };
                 return data.value;
@@ -421,9 +421,9 @@ export class AzureService {
         const url = `${orgUrl}/_apis/git/repositories/${repoId}`;
         const authHeader = this.getAuthHeader(pat, bearerToken);
 
-        console.log(`📡 [ADO Request] GET ${url}`);
+        // console.log(`📡 [ADO Request] GET ${url}`);
         const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-        console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+        // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
         if (!response.ok) {
             const txt = await response.text();
             throw new Error(`Failed to fetch repo ${repoId} (${response.status}): ${txt.substring(0, 100)}`);
@@ -445,9 +445,9 @@ export class AzureService {
         const projectResults = await Promise.all(projects.map(async (project) => {
             try {
                 const url = `${orgUrl}/${encodeURIComponent(project.name)}/_apis/git/repositories`;
-                console.log(`📡 [ADO Request] GET ${url}`);
+                // console.log(`📡 [ADO Request] GET ${url}`);
                 const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-                console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+                // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
 
                 if (response.ok) {
                     const data = await response.json() as { value: ADORepo[] };
@@ -512,8 +512,7 @@ export class AzureService {
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const releaseBase = this.getAdoReleaseUrl(baseUrl, org, project);
         const url = `${releaseBase}/_apis/release/definitions?$top=100`;
-
-        console.log(`📡 [ADO Request] GET ${url}`);
+        // console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, {
                 headers: {
@@ -522,7 +521,7 @@ export class AzureService {
                     'X-TFS-FedAuthRedirect': 'Suppress'
                 }
             });
-            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { value: any[] };
                 return data.value.map(r => ({
@@ -575,10 +574,11 @@ export class AzureService {
         let url = `${urlBase}/_apis/build/definitions`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
 
-        console.log(`📡 [ADO Request] GET ${url}`);
+        if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
+        // console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             const text = await response.text();
 
             if (response.ok) {
@@ -632,7 +632,8 @@ export class AzureService {
         let url = `${urlBase}/_apis/build/builds?$top=50&queryOrder=finishTimeDescending`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
 
-        console.log(`📡 [ADO Request] GET ${url}`);
+        if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
+        // console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, {
                 headers: {
@@ -641,7 +642,7 @@ export class AzureService {
                     'X-TFS-FedAuthRedirect': 'Suppress'
                 }
             });
-            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { value: any[] };
                 return data.value || [];
@@ -673,7 +674,7 @@ export class AzureService {
         // Synchronize versions and ensure no strict result filter (the caller filters locally)
         const url = `${urlBase}/_apis/build/builds?definitions=${definitionId}&$top=${top}&$skip=${skip}&queryOrder=finishTimeDescending`;
 
-        console.log(`📡 [ADO Request] GET ${url}`);
+        // console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, {
                 headers: {
@@ -682,7 +683,7 @@ export class AzureService {
                     'X-TFS-FedAuthRedirect': 'Suppress'
                 }
             });
-            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { value: any[] };
                 return data.value || [];
@@ -742,7 +743,7 @@ export class AzureService {
                 // FALLBACK: Fetch all and match case-insensitive
                 console.warn(`      ⚠️ [ADO] Exact env lookup failed. Trying case-insensitive scan...`);
                 envUrl = `${urlBase}/_apis/distributedtask/environments`;
-                console.log(`📡 [ADO Request] GET ${envUrl} (Fallback)`);
+                // console.log(`📡 [ADO Request] GET ${envUrl} (Fallback)`);
                 envResp = await fetch(envUrl, {
                     headers: {
                         'Authorization': authHeader,
@@ -750,7 +751,7 @@ export class AzureService {
                         'X-TFS-FedAuthRedirect': 'Suppress'
                     }
                 });
-                console.log(`📡 [ADO Response] ${envResp.status} ${envResp.statusText}`);
+                // console.log(`📡 [ADO Response] ${envResp.status} ${envResp.statusText}`);
 
                 if (envResp.ok) {
                     envData = await envResp.json() as { count: number; value: any[] };
@@ -767,7 +768,7 @@ export class AzureService {
 
             // 2. Query Deployment Records for this specific definition and environment (Surgical Step 2)
             const deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords?definitionId=${definitionId}&latestState=succeeded&$top=1`;
-            console.log(`📡 [ADO Request] GET ${deployUrl}`);
+            // console.log(`📡 [ADO Request] GET ${deployUrl}`);
             const deployResp = await fetch(deployUrl, {
                 headers: {
                     'Authorization': authHeader,
@@ -775,7 +776,7 @@ export class AzureService {
                     'X-TFS-FedAuthRedirect': 'Suppress'
                 }
             });
-            console.log(`📡 [ADO Response] ${deployResp.status} ${deployResp.statusText}`);
+            // console.log(`📡 [ADO Response] ${deployResp.status} ${deployResp.statusText}`);
 
             if (!deployResp.ok) return null;
             const deployData = await deployResp.json() as { count: number; value: any[] };
@@ -915,11 +916,10 @@ export class AzureService {
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
         const url = `${urlBase}/_apis/pipelines/${pipelineId}/runs`;
-
-        console.log(`📡 [ADO Request] GET ${url}`);
+        // console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { value: PipelineRun[] };
                 return data.value;
