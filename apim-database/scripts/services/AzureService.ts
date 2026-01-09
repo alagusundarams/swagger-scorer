@@ -807,7 +807,8 @@ export class AzureService {
 
             // 2. Query Deployment Records - MATCH debug-git-logic.ts exactly
             // Fetch ALL deployments for environment (no filters that cause 401), then sort in code
-            const deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords?api-version=7.1`;
+            // User confirmed that removing api-version and using environmentdeploymentrecords works
+            const deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords`;
             console.log(`📡 [ADO Request] GET ${deployUrl}`);
             const deployResp = await fetch(deployUrl, {
                 headers: {
@@ -900,7 +901,7 @@ export class AzureService {
     ): Promise<any[]> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = this.getAuthHeader(pat, bearerToken);
-        const url = `${orgUrl}/${encodeURIComponent(project)}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords?$top=${top}&api-version=6.0-preview.1`;
+        const url = `${orgUrl}/${encodeURIComponent(project)}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords?$top=${top}`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
