@@ -280,64 +280,79 @@ async function main() {
 
                 const envsToSync = targetEnv ? [targetEnv] : prod.environments;
 
-                // --- SURGICAL SYNC ---
+                // --- SURGICAL SYNC (EXACT COPY FROM debug-git-logic.ts) ---
                 for (const envName of envsToSync) {
-                    const deploy = await AzureService.fetchLatestEnvironmentDeployment(
-                        devops.organization, projectId, matchedPipeline.id, envName, devops.pat, devops.baseUrl, bearerToken
-                    );
+                    console.log(`      🔎 Checking ${envName}...`);
 
-                    if (deploy) {
-                        console.log(`\n🔍 [DEBUG] Deployment Response for ${prod.name}/${envName}:`);
-                        console.log(`   deploy.owner.id: ${deploy.owner?.id}`);
-                        console.log(`   deploy.build?.id: ${deploy.build?.id}`);
-                        console.log(`   deploy.build?.sourceVersion: ${deploy.build?.sourceVersion}`);
-                        console.log(`   deploy.finishTime: ${deploy.finishTime}`);
+                    // Step 1: Find environment ID by name (EXACT MATCH to debug script line 222)
+                    const envUrl = `${devops.baseUrl}/${devops.organization}/${encodeURIComponent(projectId)}/_apis/distributedtask/environments?name=${envName}&api-version=7.1`;
+                    let envId: number | null = null;
 
-                        let commitHash = deploy.build?.sourceVersion;
-                        let fullDetails = deploy;
+                    try {
+                        const authHeader = AzureService.getAuthHeader(devops.pat, bearerToken);
+                        const resp = await fetch(envUrl, {
+                            headers: { 'Authorization': authHeader, 'Accept': 'application/json' }
+                        });
+                        if (resp.ok) {
+                            const data = await resp.json() as { count: number; value: any[] };
+                            const match = data.value.find((e: any) => e.name.toUpperCase() === envName.toUpperCase());
+                            if (match) {
+                                envId = match.id;
+                                console.log(`      ✅ Found environment ${envName} (ID: ${envId})`);
 
-                        const ownerId = deploy.owner?.id || deploy.build?.id;
-                        if (ownerId) {
-                            const details = await AzureService.fetchADOBuild(devops.organization, projectId, ownerId, devops.pat, devops.baseUrl, bearerToken);
-                            if (details) {
-                                console.log(`\n🔍 [DEBUG] Build Details for Build ${ownerId}:`);
-                                console.log(`   sourceVersion: ${details.sourceVersion}`);
-                                console.log(`   sourceBranch: ${details.sourceBranch}`);
-                                console.log(`   requestedFor: ${JSON.stringify(details.requestedFor)}`);
-                                console.log(`   requestedBy: ${JSON.stringify(details.requestedBy)}`);
-                                console.log(`   triggerInfo: ${JSON.stringify(details.triggerInfo)}`);
-                                console.log(`   comment: ${details.comment}`);
-                                console.log(`   _links.web.href: ${details._links?.web?.href}`);
+                                // Step 2: Fetch ALL deployments for this environment (EXACT MATCH to debug script line 231)
+                                const envDeploys = await AzureService.fetchEnvironmentDeployments(
+                                    devops.organization, projectId, envId, devops.pat, devops.baseUrl, bearerToken
+                                );
+                                console.log(`      ✅ Found ${envDeploys.length} recent deployments in ${envName}.`);
 
-                                fullDetails = details;
-                                commitHash = commitHash || details.sourceVersion;
+                                // Step 3: Find deployment matching our pipeline (EXACT MATCH to debug script line 234-242)
+                                for (const d of envDeploys) {
+                                    if (d.definition && d.definition.id === matchedPipeline.id) {
+                                        let commitHash = d.definition?.sourceVersion || d.build?.sourceVersion;
+                                        let fullDetails = d;
+
+                                        // Fetch full build details for metadata (EXACT MATCH to debug script line 333-340)
+                                        const ownerId = d.owner?.id || d.build?.id;
+                                        if (ownerId) {
+                                            console.log(`      📡 Fetching full build details (ID: ${ownerId}) for metadata...`);
+                                            const details = await AzureService.fetchADOBuild(devops.organization, projectId, ownerId, devops.pat, devops.baseUrl, bearerToken);
+                                            if (details) {
+                                                fullDetails = details;
+                                                commitHash = commitHash || details.sourceVersion;
+                                            }
+                                        }
+
+                                        if (commitHash && commitHash !== 'unknown') {
+                                            const author = fullDetails.requestedFor?.displayName ||
+                                                fullDetails.requestedBy?.displayName ||
+                                                fullDetails.lastChangedBy?.displayName ||
+                                                d.requestedFor?.displayName || 'Unknown';
+
+                                            const rawBranch = fullDetails.sourceBranch || d.sourceBranch || 'unknown';
+                                            const branch = rawBranch.replace('refs/heads/', '');
+
+                                            const message = fullDetails.triggerInfo?.['ci.message'] ||
+                                                fullDetails.comment ||
+                                                fullDetails.description || 'No message';
+
+                                            meta.deployments[envName] = {
+                                                hash: commitHash,
+                                                date: d.finishTime || d.startTime || fullDetails.finishTime || fullDetails.startTime || new Date().toISOString(),
+                                                branch,
+                                                author,
+                                                message,
+                                                url: fullDetails._links?.web?.href || d.url
+                                            };
+                                            console.log(`      🎯 ${envName.padEnd(5)}: Found deployment ${commitHash.substring(0, 7)}`);
+                                            break; // Found deployment for this env, move to next
+                                        }
+                                    }
+                                }
                             }
                         }
-
-                        if (commitHash && commitHash !== 'unknown') {
-                            const author = fullDetails.requestedFor?.displayName || fullDetails.requestedBy?.displayName || 'Unknown';
-                            const branch = (fullDetails.sourceBranch || 'unknown').replace('refs/heads/', '');
-                            const message = fullDetails.triggerInfo?.['ci.message'] || fullDetails.comment || 'No message';
-
-                            console.log(`\n📝 [FINAL] Extracted Data:`);
-                            console.log(`   hash: ${commitHash}`);
-                            console.log(`   branch: ${branch}`);
-                            console.log(`   author: ${author}`);
-                            console.log(`   message: ${message?.substring(0, 50)}...`);
-
-                            meta.deployments[envName] = {
-                                hash: commitHash,
-                                date: deploy.finishTime || fullDetails.finishTime || new Date().toISOString(),
-                                branch,
-                                author,
-                                message,
-                                url: fullDetails._links?.web?.href
-                            };
-                        } else {
-                            console.warn(`   ⚠️ Skipping ${envName}: commitHash is ${commitHash}`);
-                        }
-                    } else {
-                        console.warn(`   ⚠️ No deployment found for ${envName}`);
+                    } catch (e: any) {
+                        console.warn(`      ⚠️ Environment lookup for ${envName} failed: ${e.message}`);
                     }
                 }
                 results.push(meta);
