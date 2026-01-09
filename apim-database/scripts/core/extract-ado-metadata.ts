@@ -7,9 +7,13 @@
  */
 
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
-import { join, resolve } from 'path';
+import { join, resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { AzureService } from '../services/AzureService.js';
 import pkg from 'pg';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 const { Pool } = pkg;
 
 // --- CONFIG LOADER ---

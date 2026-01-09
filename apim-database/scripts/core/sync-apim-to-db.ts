@@ -18,9 +18,13 @@
 
 import { Pool } from 'pg';
 import { readFileSync, existsSync, appendFileSync, mkdirSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { fork } from 'child_process';
 import { AzureService, AppRegistration } from '../services/AzureService.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // --- CONFIG LOADER ---
 function loadConfig() {
@@ -179,13 +183,21 @@ async function getAzureToken(): Promise<string> {
 }
 
 function getApimConfig(token: string, azConfig: AzureConfig): any {
+    // Merge Env Vars for DevOps Auth (Critical Fix)
+    const effectiveDevOps = {
+        ...config.devops,
+        organization: process.env.AZURE_DEVOPS_ORG || config.devops?.organization,
+        pat: process.env.AZURE_DEVOPS_PAT || config.devops?.pat,
+        baseUrl: process.env.AZURE_DEVOPS_URL || config.devops?.baseUrl || 'https://dev.azure.com'
+    };
+
     return {
         instance: azConfig.serviceName,
         resourceGroup: azConfig.resourceGroup,
         subscriptionId: azConfig.subscriptionId,
         accessToken: token,
         environment: azConfig.environment,
-        devops: config.devops
+        devops: effectiveDevOps
     };
 }
 
