@@ -9,6 +9,7 @@
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join, resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import 'dotenv/config'; // Load .env file if present
 import { AzureService } from '../services/AzureService.js';
 import pkg from 'pg';
 
@@ -94,9 +95,9 @@ async function main() {
     // Critical: Prioritize Env Vars (AZURE_DEVOPS_PAT) as these are often used in Debug/CI
     const devops = {
         ...config.devops,
-        organization: process.env.AZURE_DEVOPS_ORG || config.devops?.organization,
-        pat: process.env.AZURE_DEVOPS_PAT || config.devops?.pat,
-        baseUrl: process.env.AZURE_DEVOPS_URL || config.devops?.baseUrl || 'https://dev.azure.com'
+        organization: (process.env.AZURE_DEVOPS_ORG || config.devops?.organization || '').trim(),
+        pat: (process.env.AZURE_DEVOPS_PAT || config.devops?.pat || '').trim(),
+        baseUrl: (process.env.AZURE_DEVOPS_URL || config.devops?.baseUrl || 'https://dev.azure.com').trim()
     };
 
     // SANITIZE: Remove trailing slashes to prevent "https://org.visualstudio.com//repo" errors

@@ -20,6 +20,7 @@ import { Pool } from 'pg';
 import { readFileSync, existsSync, appendFileSync, mkdirSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import 'dotenv/config'; // Load .env file
 import { fork } from 'child_process';
 import { AzureService, AppRegistration } from '../services/AzureService.js';
 
@@ -196,9 +197,9 @@ function getApimConfig(token: string, azConfig: AzureConfig): any {
     // Merge Env Vars for DevOps Auth (Critical Fix)
     const effectiveDevOps = {
         ...config.devops,
-        organization: process.env.AZURE_DEVOPS_ORG || config.devops?.organization,
-        pat: process.env.AZURE_DEVOPS_PAT || config.devops?.pat,
-        baseUrl: process.env.AZURE_DEVOPS_URL || config.devops?.baseUrl || 'https://dev.azure.com'
+        organization: (process.env.AZURE_DEVOPS_ORG || config.devops?.organization || '').trim(),
+        pat: (process.env.AZURE_DEVOPS_PAT || config.devops?.pat || '').trim(),
+        baseUrl: (process.env.AZURE_DEVOPS_URL || config.devops?.baseUrl || 'https://dev.azure.com').trim()
     };
 
     // SANITIZE: Remove trailing slashes
