@@ -75,6 +75,21 @@ export async function autoPromoteProduct(
         const resolvedIdentityClientId = identityCheck.rows[0].client_id;
         console.log(`[Promotion] Resolved Identity for ${targetEnvironment}: ${resolvedIdentityClientId}`);
 
+        // 1b. Update Identity Metadata (Source of Truth Reconciliation)
+        try {
+            const { AzureService } = await import('../core/AzureService.js');
+            const azureApp = await AzureService.validateAppRegistration(resolvedIdentityClientId);
+            if (azureApp) {
+                await query(`
+                    UPDATE app_registrations 
+                    SET secret_expiry_date = $1, display_name = $2, updated_at = NOW()
+                    WHERE client_id = $3
+                `, [azureApp.secretExpiryDate, azureApp.displayName, resolvedIdentityClientId]);
+            }
+        } catch (err) {
+            console.warn(`[Promotion] Failed to refresh identity metadata for ${resolvedIdentityClientId}:`, err);
+        }
+
         // 2. Prepare Policy (Smart Overlay Merge)
         // In real life we'd fetch from Blob Storage or APIM first
         const { getProductPolicy } = await import('../inventory/ProductsService.js');
@@ -233,6 +248,21 @@ export async function promoteProduct(
 
         const resolvedIdentityClientId = identityCheck.rows[0].client_id;
         console.log(`[Promotion] Resolved Identity for ${targetEnvironment}: ${resolvedIdentityClientId}`);
+
+        // 1b. Update Identity Metadata (Source of Truth Reconciliation)
+        try {
+            const { AzureService } = await import('../core/AzureService.js');
+            const azureApp = await AzureService.validateAppRegistration(resolvedIdentityClientId);
+            if (azureApp) {
+                await query(`
+                    UPDATE app_registrations 
+                    SET secret_expiry_date = $1, display_name = $2, updated_at = NOW()
+                    WHERE client_id = $3
+                `, [azureApp.secretExpiryDate, azureApp.displayName, resolvedIdentityClientId]);
+            }
+        } catch (err) {
+            console.warn(`[Promotion] Failed to refresh identity metadata for ${resolvedIdentityClientId}:`, err);
+        }
 
         // 2. Prepare content for target environment
         const { getProductPolicy } = await import('../inventory/ProductsService.js');

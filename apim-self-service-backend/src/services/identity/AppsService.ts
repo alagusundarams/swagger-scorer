@@ -62,9 +62,13 @@ export async function addAppRegistration(app: {
     environment: string,
     ownerTeamId: string,
     appIdUri?: string,
-    secretExpiryDate?: string,
     productId?: string
 }) {
+    // 1. Validate against Azure to get latest metadata (read-only source of truth)
+    const azureApp = await AzureService.validateAppRegistration(app.clientId);
+    const secretExpiryDate = azureApp?.secretExpiryDate || null;
+    const displayName = azureApp?.displayName || app.displayName;
+
     const id = `app-${Math.random().toString(36).substr(2, 9)}`;
     const res = await query(`
         INSERT INTO app_registrations (
@@ -72,7 +76,7 @@ export async function addAppRegistration(app: {
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *
     `, [
-        id, app.displayName, app.clientId, app.environment, app.ownerTeamId, app.appIdUri, app.secretExpiryDate, app.productId
+        id, displayName, app.clientId, app.environment, app.ownerTeamId, app.appIdUri, secretExpiryDate, app.productId
     ]);
 
     // 3. Log Audit

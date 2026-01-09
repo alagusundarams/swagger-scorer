@@ -187,16 +187,24 @@ export class OnboardingController {
 
                 const identityType = body.appIdentity.type || 'PRODUCT';
 
+                // 2. Validate against Azure (Truth)
+                const { AzureService } = await import('../services/core/AzureService.js');
+                const azureApp = await AzureService.validateAppRegistration(body.appIdentity.clientId);
+                if (!azureApp) {
+                    throw new Error(`Identity '${body.appIdentity.clientId}' not found in Azure.`);
+                }
+
                 // Create App Registration
                 const appRegResult = await this.appRegRepo.createAppRegistration({
                     id: uuidv4(),
                     clientId: body.appIdentity.clientId,
-                    appIdUri: body.appIdentity.appIdUri,
-                    displayName: body.appIdentity.displayName || `${productDisplayName}-Identity`,
+                    appIdUri: body.appIdentity.appIdUri || azureApp.appIdUri || '',
+                    displayName: azureApp.displayName || body.appIdentity.displayName || `${productDisplayName}-Identity`,
                     environment: body.environment,
                     ownerTeamId: body.ownerTeamId,
                     productId: identityType === 'PRODUCT' ? productId : undefined,
                     apiId: identityType === 'API' ? apiId : undefined,
+                    secretExpiryDate: azureApp.secretExpiryDate,
                     type: identityType
                 });
                 appRegistrationId = appRegResult.rows[0].id;
@@ -242,6 +250,13 @@ export class OnboardingController {
                         return reply.status(400).send({ error: 'Missing Identity', message: 'Parent Product is isolated (No Identity). You must provide an API-Level Identity.' });
                     }
 
+                    // 2. Validate against Azure (Truth)
+                    const { AzureService } = await import('../services/core/AzureService.js');
+                    const azureApp = await AzureService.validateAppRegistration(body.appIdentity.clientId);
+                    if (!azureApp) {
+                        throw new Error(`Identity '${body.appIdentity.clientId}' not found in Azure.`);
+                    }
+
                     // Create App Registration (API Level)
                     // We need API ID first? Or we use a UUID?
                     const apiId = `api-${staging.api_name.toLowerCase()}-${body.environment.toLowerCase()}`;
@@ -249,11 +264,12 @@ export class OnboardingController {
                     const appRegResult = await this.appRegRepo.createAppRegistration({
                         id: uuidv4(),
                         clientId: body.appIdentity.clientId,
-                        appIdUri: body.appIdentity.appIdUri,
-                        displayName: body.appIdentity.displayName || `${staging.api_name}-Identity`,
+                        appIdUri: body.appIdentity.appIdUri || azureApp.appIdUri || '',
+                        displayName: azureApp.displayName || body.appIdentity.displayName || `${staging.api_name}-Identity`,
                         environment: body.environment,
                         ownerTeamId: body.ownerTeamId,
                         apiId: apiId, // Link to API (We will create API shortly with this ID)
+                        secretExpiryDate: azureApp.secretExpiryDate,
                         // product_id is null for API-level? or we link both?
                         // Schema: api_id references apis(id).
                         type: 'API'
