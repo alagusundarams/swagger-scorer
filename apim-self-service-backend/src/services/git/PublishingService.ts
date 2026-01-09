@@ -19,11 +19,21 @@ const logger = pino({
  * Follows the organization's folder structure conventions defined in ResourcePaths.
  */
 export class PublishingService {
-    private gitService: GitService;
+    private _gitService: GitService | null = null;
 
     constructor() {
-        const config = getAppConfig();
-        this.gitService = new GitService({ gitLocalPath: config.gitLocalPath });
+        // Dependencies are initialized lazily to avoid module-load configuration errors
+    }
+
+    /**
+     * Lazy initialization of GitService
+     */
+    private get gitService(): GitService {
+        if (!this._gitService) {
+            const config = getAppConfig();
+            this._gitService = new GitService({ gitLocalPath: config.gitLocalPath });
+        }
+        return this._gitService;
     }
 
     /**
@@ -53,12 +63,6 @@ export class PublishingService {
             const contractPath = ResourcePaths.apiContract(productId, apiId, extension);
             const policyPath = ResourcePaths.apiPolicyBase(productId, apiId);
 
-            // 2. Prepare commit payload
-            // In a real GitOps workflow, we might want to commit multiple files.
-            // Our GitService.commitResource handles one file at a time currently.
-            // Let's implement a multi-file commit if needed, or sequence them.
-            // For onboarding fulfillment, we typically commit the spec first.
-
             const commitMessage = `onboard(api): initialize ${apiId} contract and policy`;
 
             // We use a temporary branch for the onboarding pull request
@@ -67,19 +71,7 @@ export class PublishingService {
             // Initialize repo
             await this.gitService.initializeRepo(repoUrl);
 
-            // Implementation note: GitService currently handles single files.
-            // We'll sequence the commits or enhance GitService.
-            // Let's do a sequence of writes and one commit/push if we want to be atomic.
-            // But GitService is designed for single resource commits.
-
-            // Refactoring GitService to handle multi-file would be better, but for now
-            // let's use the primitive to get it working.
-
-            // Actually, I'll update GitService to handle multi-file commits if possible, 
-            // or just use fs to write and then use git.add(.) and git.commit(.) directly here.
-
-            // Let's go with the direct approach for fulfillment as it's a batch operation.
-
+            // Checkout and prepare
             await (this.gitService as any).git.checkout('main'); // Ensure base
             await (this.gitService as any).git.pull();
             await (this.gitService as any).git.checkoutLocalBranch(branchName);
