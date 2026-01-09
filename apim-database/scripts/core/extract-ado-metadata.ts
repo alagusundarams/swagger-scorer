@@ -118,14 +118,14 @@ async function main() {
     }
 
     // --- IDENTITY SETUP ---
-    console.log(`🔐 [AUTH] Attempting Hybrid Identity (Azure CLI + PAT)...`);
-    let bearerToken: string | undefined;
-    try {
-        bearerToken = await AzureService.getAzureAccessToken();
-        console.log(`   ✅ Azure CLI Token Acquired.`);
-    } catch (e: any) {
-        console.warn(`   ⚠️  Azure CLI login failed, using PAT only: ${e.message}`);
-    }
+    console.log(`🔐 [AUTH] Forced PAT Authentication (Skipping Azure CLI to avoid 401s)...`);
+    let bearerToken: string | undefined = undefined;
+    // try {
+    //     bearerToken = await AzureService.getAzureAccessToken();
+    //     console.log(`   ✅ Azure CLI Token Acquired.`);
+    // } catch (e: any) {
+    //     console.warn(`   ⚠️  Azure CLI login failed, using PAT only: ${e.message}`);
+    // }
 
     // --- CONNECTION VERIFICATION WITH FAILOVER ---
     try {

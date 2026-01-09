@@ -633,9 +633,10 @@ async function runWorker(envName: string) {
     const pool = new Pool(DB_CONFIG);
 
     try {
-        const token = await getAzureToken();
+        // Force PAT-only auth by sending empty CLI token
+        const token = ''; // await getAzureToken();
         const apimConfig = getApimConfig(token, AZURE_CONFIG);
-        console.log('✅ Azure Auth Token Acquired');
+        console.log('✅ Azure Auth Configured (Using PAT)');
 
         // [ADO] Init Cache of all Repos
         await initAdoCache(config.devops);
