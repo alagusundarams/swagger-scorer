@@ -726,11 +726,9 @@ export class AzureService {
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
 
-        console.log(`\n🔍 [DEPLOY DEBUG] Fetching deployment for Environment: "${environmentName}" in Pipeline ${definitionId}`);
-
         // 1. Find the Environment ID for the given name (Surgical Step 1)
         let envId: number | null = null;
-        let envUrl = `${urlBase}/_apis/distributedtask/environments?name=${encodeURIComponent(environmentName)}&api-version=7.1`;
+        let envUrl = `${urlBase}/_apis/distributedtask/environments?name=${encodeURIComponent(environmentName)}`;
 
         console.log(`📡 [ADO Request] GET ${envUrl}`);
 
@@ -744,10 +742,8 @@ export class AzureService {
             });
             console.log(`📡 [ADO Response] ${envResp.status} ${envResp.statusText}`);
 
-            // Safety check for 401/404 empty bodies
             if (!envResp.ok && (envResp.status === 401 || envResp.status === 403)) {
                 console.warn(`      ⚠️ [ADO] Auth failed (${envResp.status}) for ${environmentName}. Surgical lookup skipped.`);
-                console.warn(`      💡 Tip: Verify your PAT has 'Environment (Read)' and 'Release (Read)' scopes.`);
                 return null;
             }
 
@@ -755,22 +751,15 @@ export class AzureService {
             if (envResp.ok) {
                 try {
                     envData = await envResp.json() as { count: number; value: any[] };
-                    console.log(`   📊 Environment lookup returned ${envData.count} results`);
-                    if (envData.count > 0) {
-                        console.log(`   📋 Available environments: ${envData.value.map((e: any) => e.name).join(', ')}`);
-                    }
-                } catch (e) {
-                    console.warn(`   ⚠️ Failed to parse environment response as JSON`);
-                }
+                } catch (e) { }
             }
 
             if (envResp.ok && envData.count > 0) {
                 envId = envData.value[0].id;
-                console.log(`   ✅ Matched environment: "${envData.value[0].name}" (ID: ${envId})`);
             } else {
                 // FALLBACK: Fetch all and match case-insensitive
                 console.warn(`      ⚠️ [ADO] Exact env lookup failed. Trying case-insensitive scan...`);
-                envUrl = `${urlBase}/_apis/distributedtask/environments?api-version=7.1`;
+                envUrl = `${urlBase}/_apis/distributedtask/environments`;
                 console.log(`📡 [ADO Request] GET ${envUrl} (Fallback)`);
                 envResp = await fetch(envUrl, {
                     headers: {
@@ -779,39 +768,23 @@ export class AzureService {
                         'X-TFS-FedAuthRedirect': 'Suppress'
                     }
                 });
-                console.log(`📡 [ADO Response] ${envResp.status} ${envResp.statusText}`);
-
                 if (envResp.ok) {
                     envData = await envResp.json() as { count: number; value: any[] };
-                    console.log(`   📊 Found ${envData.count} total environments in project`);
-                    if (envData.count > 0) {
-                        console.log(`   📋 All environments: ${envData.value.map((e: any) => e.name).join(', ')}`);
-                    }
                     const targetLower = environmentName.toLowerCase().trim();
                     const match = envData.value.find((e: any) => e.name.toLowerCase().trim() === targetLower);
                     if (match) {
                         envId = match.id;
                         console.log(`      ✅ Found match: '${match.name}' (ID: ${envId})`);
-                    } else {
-                        console.error(`      ❌ No environment matches "${environmentName}" (case-insensitive)`);
                     }
-                } else {
-                    console.error(`      ❌ Fallback environment list failed: ${envResp.status}`);
                 }
             }
 
-            if (!envId) {
-                console.error(`   ❌ [DEPLOY] Could not resolve environment ID for "${environmentName}" - returning null`);
-                return null;
-            }
+            if (!envId) return null;
 
-            // 2. Query Deployment Records - CORRECTED ENDPOINT
-            // Documentation confirms definitionId is NOT supported as a query param here.
-            // We fetch the latest 100 records and filter locally to ensure narrowing.
-            let deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords?$top=100&api-version=7.1`;
+            // 2. Query Deployments for this specific definition and environment (Surgical Step 2)
+            let deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/deployments?definitionId=${definitionId}&latestState=succeeded&$top=1`;
             console.log(`📡 [ADO Request] GET ${deployUrl}`);
-
-            let deployResp = await fetch(deployUrl, {
+            const deployResp = await fetch(deployUrl, {
                 headers: {
                     'Authorization': authHeader,
                     'Accept': 'application/json',
@@ -820,53 +793,31 @@ export class AzureService {
             });
             console.log(`📡 [ADO Response] ${deployResp.status} ${deployResp.statusText}`);
 
-            if (!deployResp.ok) {
-                console.error(`   ❌ [DEPLOY] Deployment query failed with ${deployResp.status}`);
+            if (deployResp.status === 404) {
+                console.warn(`      ⚠️  404 on 'deployments' endpoint. Trying 'environmentdeploymentrecords' fallback...`);
+                deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords?definitionId=${definitionId}&$top=1`;
+                console.log(`📡 [ADO Request] GET ${deployUrl} (Fallback)`);
+                const fbResp = await fetch(deployUrl, { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } });
+                if (fbResp.ok) {
+                    const fbData = await fbResp.json() as { count: number; value: any[] };
+                    if (fbData.count > 0) return fbData.value[0];
+                }
                 return null;
             }
 
+            if (!deployResp.ok) return null;
             const deployData = await deployResp.json() as { count: number; value: any[] };
-            console.log(`   📊 Total records retrieved from environment: ${deployData.count}`);
 
-            // Perform client-side narrowing (filtering by definitionId)
-            const matching = (deployData.value || [])
-                .filter((d: any) => {
-                    const dId = d.definition?.id;
-                    const oId = d.owner?.definition?.id;
-                    return (dId && Number(dId) === Number(definitionId)) ||
-                        (oId && Number(oId) === Number(definitionId));
-                })
-                .sort((a: any, b: any) => {
-                    const aTime = new Date(a.finishTime || a.startTime || 0).getTime();
-                    const bTime = new Date(b.finishTime || b.startTime || 0).getTime();
-                    return bTime - aTime; // Newest first
-                });
-
-            console.log(`   📊 Narrowed to ${matching.length} records matching pipeline ${definitionId}`);
-
-            if (matching.length > 0) {
-                const deploy = matching[0];
-                console.log(`   ✅ Latest deployment found (ID: ${deploy.id})`);
-                console.log(`      - ID: ${deploy.id}`);
-                console.log(`      - Owner: ${JSON.stringify(deploy.owner)}`);
-                console.log(`      - Build: ${JSON.stringify(deploy.build)}`);
-                console.log(`      - FinishTime: ${deploy.finishTime}`);
-
+            if (deployData.count > 0) {
+                const deploy = deployData.value[0];
                 // If the deployment object doesn't have the build/hash details, try to fetch the owner build
-                if (!deploy.build?.sourceVersion && (deploy.owner?.id || deploy.build?.id)) {
-                    const idToFetch = deploy.owner?.id || deploy.build?.id;
-                    console.log(`   🔄 Fetching full build details for ID ${idToFetch}...`);
-                    const fullBuild = await this.fetchADOBuild(org, project, idToFetch, pat, baseUrl, bearerToken);
-                    if (fullBuild) {
-                        deploy.build = fullBuild;
-                        console.log(`   ✅ Build details merged`);
-                    }
+                if (!deploy.build?.sourceVersion && deploy.owner?.id) {
+                    const fullBuild = await this.fetchADOBuild(org, project, deploy.owner.id, pat, baseUrl, bearerToken);
+                    if (fullBuild) deploy.build = fullBuild;
                 }
                 return deploy;
-            } else {
-                console.warn(`   ⚠️ [DEPLOY] No deployments matched definition ${definitionId} in the broad scan.`);
-                return null;
             }
+            return null;
         } catch (err: any) {
             console.error(`      ❌ [ADO] Surgical environment lookup failed: ${err.message}`);
             return null;
@@ -987,15 +938,14 @@ export class AzureService {
         const results = await this.fetchLatestStageResults(org, project, definitionId, [stageName], pat, baseUrl);
         return results[stageName.toUpperCase()] || null;
     }
+
     static async fetchPipelineRuns(org: string, project: string, pipelineId: number, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<PipelineRun[]> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
         const url = `${urlBase}/_apis/pipelines/${pipelineId}/runs`;
-        // console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { value: PipelineRun[] };
                 return data.value;
@@ -1005,7 +955,6 @@ export class AzureService {
         }
         return [];
     }
-
 
     /**
      * Get MS Graph access token using Azure CLI
@@ -1022,9 +971,6 @@ export class AzureService {
         }
     }
 
-    /**
-     * Fetch Transitive Groups for the logged-in User
-     */
     /**
      * Fetch Transitive Groups for the logged-in User
      */
@@ -1084,10 +1030,8 @@ export class AzureService {
         console.log(`🔍 Resolving ${appIds.length} Client IDs via Graph...`);
         const results: AppRegistration[] = [];
 
-        // Determine names via Graph
         for (const appId of appIds) {
             try {
-                // Skip if not a GUID (e.g. keyVault URL)
                 if (!/^[0-9a-f]{8}-[0-9a-f]{4}/i.test(appId)) continue;
 
                 const response = await fetch(`https://graph.microsoft.com/v1.0/applications?$filter=appId eq '${appId}'&$select=appId,displayName,identifierUris`, {
@@ -1160,6 +1104,7 @@ export class AzureService {
         return [];
     }
 }
+
 
 export interface AzureADGroup {
     id: string;
