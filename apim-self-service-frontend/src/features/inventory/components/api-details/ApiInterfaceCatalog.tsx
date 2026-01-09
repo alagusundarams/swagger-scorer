@@ -67,9 +67,25 @@ export function ApiInterfaceCatalog({ product, onViewContract, onManage, onSelec
                                         >
                                             {api.displayName}
                                         </h3>
-                                        <p className="text-sm text-gray-400 font-medium">
-                                            Base Path: <code className="text-emerald-500 font-mono italic">{api.path || '/'}</code>
+                                        <p className="text-sm text-gray-400 font-medium flex items-center gap-2">
+                                            <span>Base Path:</span>
+                                            <code className="text-emerald-500 font-mono italic">{api.path || '/'}</code>
                                         </p>
+                                        <div className="mt-1 flex items-center gap-2 group/url">
+                                            <code className="text-[10px] font-mono text-gray-400 dark:text-gray-500 truncate max-w-[300px]">
+                                                {`https://api-${(product.environment || 'dev').toLowerCase()}.ionosphere.io${api.path}`}
+                                            </code>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    navigator.clipboard.writeText(`https://api-${(product.environment || 'dev').toLowerCase()}.ionosphere.io${api.path}`);
+                                                }}
+                                                className="opacity-0 group-hover/url:opacity-100 p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded transition-all text-[10px]"
+                                                title="Copy Invocation URL"
+                                            >
+                                                📋
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-8">

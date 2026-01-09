@@ -56,8 +56,8 @@ paths: {}
                             {api.identity && (
                                 <div className="flex items-center gap-3 mt-2">
                                     <span className={`text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest border ${api.identity.type === 'PRODUCT'
-                                            ? 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-800'
-                                            : 'bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/20 dark:border-blue-800'
+                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-800'
+                                        : 'bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/20 dark:border-blue-800'
                                         }`}>
                                         {api.identity.type === 'PRODUCT' ? '🛡️ Shared Identity' : '🔐 Isolated Identity'}
                                     </span>
@@ -98,22 +98,52 @@ paths: {}
                             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Base Invocation URL</span>
                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase ${getEnvironmentTheme(product.environment || '').bg} ${getEnvironmentTheme(product.environment || '').text} ${getEnvironmentTheme(product.environment || '').border}`}>{product.environment || 'DEV'}</span>
                         </div>
-                        <div className="flex items-center gap-2 group">
-                            <code className="text-sm font-mono bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 select-all">
-                                {`https://api-${(product.environment || 'dev').toLowerCase()}.contoso.com${api.path}`}
-                            </code>
-                            <button
-                                onClick={() => {
-                                    navigator.clipboard.writeText(`https://api-${(product.environment || 'dev').toLowerCase()}.contoso.com${api.path}`);
-                                    alert('URL copied!');
-                                }}
-                                className="p-2 text-gray-400 hover:text-blue-600 transition opacity-0 group-hover:opacity-100"
-                                title="Copy to clipboard"
-                            >
-                                📋
-                            </button>
+                        <div className="flex items-center gap-3 group">
+                            <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-3 border border-slate-200 dark:border-slate-700 transition-all group-hover:border-blue-300 dark:group-hover:border-blue-900 shadow-sm">
+                                <code className="text-sm font-mono text-slate-600 dark:text-slate-300 select-all">
+                                    {api.gatewayUrl || `https://api-${(product.environment || 'dev').toLowerCase()}.ionosphere.io${api.path}`}
+                                </code>
+                                <button
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(api.gatewayUrl || `https://api-${(product.environment || 'dev').toLowerCase()}.ionosphere.io${api.path}`);
+                                    }}
+                                    className="ml-4 p-2 text-slate-400 hover:text-blue-600 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all"
+                                    title="Copy to clipboard"
+                                >
+                                    📋
+                                </button>
+                            </div>
+                            <span className="text-[10px] font-black text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity uppercase tracking-tighter">
+                                Click to Copy
+                            </span>
                         </div>
                     </div>
+
+                    {/* Backend Implementation URL */}
+                    {api.serviceUrl && (
+                        <div className="mt-4 mb-2">
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Backend Implementation Node</span>
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold border uppercase bg-amber-50 text-amber-600 border-amber-100">Live Backend</span>
+                            </div>
+                            <div className="flex items-center gap-3 group">
+                                <div className="flex items-center bg-amber-50/30 dark:bg-amber-900/10 rounded-xl px-4 py-3 border border-amber-100 dark:border-amber-900/30 transition-all group-hover:border-amber-300 dark:group-hover:border-amber-700 shadow-sm">
+                                    <code className="text-sm font-mono text-amber-900/70 dark:text-amber-400/70 select-all italic">
+                                        {api.serviceUrl}
+                                    </code>
+                                    <button
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(api.serviceUrl || '');
+                                        }}
+                                        className="ml-4 p-2 text-amber-400 hover:text-amber-600 hover:bg-white dark:hover:bg-amber-900/30 rounded-lg transition-all"
+                                        title="Copy to clipboard"
+                                    >
+                                        📋
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Deployment Context */}
                     <div className="flex flex-wrap items-center gap-8 mt-10 p-6 bg-gray-50/50 dark:bg-slate-800/40 rounded-[2rem] border border-gray-100 dark:border-slate-700/30">

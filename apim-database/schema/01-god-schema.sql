@@ -147,6 +147,8 @@ CREATE TABLE IF NOT EXISTS apis (
     path TEXT NOT NULL,
     origin_team_id TEXT REFERENCES teams(id),
     quality_score DECIMAL(5,2),
+    gateway_url TEXT,
+    service_url TEXT,
     
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

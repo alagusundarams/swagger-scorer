@@ -54,6 +54,15 @@ export class ArmService {
     }
 
     /**
+     * Fetches a single API's full details (including gatewayUrl).
+     */
+    async getApi(apiId: string): Promise<any> {
+        const url = `${this.baseUrl}/apis/${apiId}?api-version=2022-08-01`;
+        const response = await axios.get(url, { headers: this.headers });
+        return response.data;
+    }
+
+    /**
      * Fetches Policy for an API.
      */
     async getApiPolicy(apiId: string): Promise<string | null> {

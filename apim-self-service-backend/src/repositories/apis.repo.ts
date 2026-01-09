@@ -15,6 +15,7 @@ export class ApisRepository {
                    COALESCE(ar_api.client_id, ar_prod.client_id) as identity_client_id,
                    COALESCE(ar_api.display_name, ar_prod.display_name) as identity_display_name,
                    COALESCE(ar_api.app_id_uri, ar_prod.app_id_uri) as identity_app_id_uri,
+                   a.gateway_url, a.service_url,
                    CASE 
                      WHEN ar_api.id IS NOT NULL THEN 'API'
                      WHEN ar_prod.id IS NOT NULL THEN 'PRODUCT'
@@ -65,10 +66,11 @@ export class ApisRepository {
      */
     async getApiById(id: string) {
         return await query(`
-            SELECT a.*, p.display_name as product_display_name,
+            SELECT a.*, p.display_name as product_display_name, o.json_data as operations_json,
                    COALESCE(ar_api.client_id, ar_prod.client_id) as identity_client_id,
                    COALESCE(ar_api.display_name, ar_prod.display_name) as identity_display_name,
                    COALESCE(ar_api.app_id_uri, ar_prod.app_id_uri) as identity_app_id_uri,
+                   a.gateway_url, a.service_url,
                    CASE 
                      WHEN ar_api.id IS NOT NULL THEN 'API'
                      WHEN ar_prod.id IS NOT NULL THEN 'PRODUCT'
@@ -78,6 +80,11 @@ export class ApisRepository {
             JOIN products p ON a.product_id = p.id
             LEFT JOIN app_registrations ar_api ON ar_api.api_id = a.id
             LEFT JOIN app_registrations ar_prod ON ar_prod.product_id = p.id AND ar_prod.api_id IS NULL
+            LEFT JOIN LATERAL (
+                SELECT json_agg(op.*) as json_data
+                FROM operations op
+                WHERE op.api_id = a.id
+            ) o ON true
             WHERE a.id = $1
         `, [id]);
     }
@@ -87,10 +94,11 @@ export class ApisRepository {
      */
     async getAllApisByProductId(productId: string) {
         return await query(`
-            SELECT a.*,
+            SELECT a.*, o.json_data as operations_json,
                    COALESCE(ar_api.client_id, ar_prod.client_id) as identity_client_id,
                    COALESCE(ar_api.display_name, ar_prod.display_name) as identity_display_name,
                    COALESCE(ar_api.app_id_uri, ar_prod.app_id_uri) as identity_app_id_uri,
+                   a.gateway_url, a.service_url,
                    CASE 
                      WHEN ar_api.id IS NOT NULL THEN 'API'
                      WHEN ar_prod.id IS NOT NULL THEN 'PRODUCT'
@@ -100,6 +108,11 @@ export class ApisRepository {
             LEFT JOIN app_registrations ar_api ON ar_api.api_id = a.id
             LEFT JOIN products p ON a.product_id = p.id
             LEFT JOIN app_registrations ar_prod ON ar_prod.product_id = p.id AND ar_prod.api_id IS NULL
+            LEFT JOIN LATERAL (
+                SELECT json_agg(op.*) as json_data
+                FROM operations op
+                WHERE op.api_id = a.id
+            ) o ON true
             WHERE a.product_id = $1
         `, [productId]);
     }
@@ -116,19 +129,30 @@ export class ApisRepository {
         `, [apiId]);
     }
 
-    /**
-     * Create a new API
-     */
     async addApi(api: any) {
         return await query(`
             INSERT INTO apis (
-                id, product_id, name, display_name, description, path, quality_score, origin_team_id, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+                id, product_id, name, display_name, description, path, quality_score, origin_team_id, gateway_url, service_url, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
             RETURNING *
         `, [
             api.id, api.productId, api.name, api.displayName, api.description, api.path,
-            api.qualityScore || 0, api.originTeamId
+            api.qualityScore || 0, api.originTeamId, api.gatewayUrl, api.serviceUrl
         ]);
+    }
+
+    /**
+     * Update API metadata (URLs)
+     */
+    async updateApiMetadata(id: string, gatewayUrl?: string, serviceUrl?: string) {
+        return await query(`
+            UPDATE apis SET 
+                gateway_url = COALESCE($2, gateway_url),
+                service_url = COALESCE($3, service_url),
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+        `, [id, gatewayUrl, serviceUrl]);
     }
 
     /**
@@ -161,7 +185,9 @@ export class ApisRepository {
                     'productId', a.product_id,
                     'environment', p.environment,
                     'qualityScore', a.quality_score,
-                    'originTeamId', a.origin_team_id
+                    'originTeamId', a.origin_team_id,
+                    'gatewayUrl', a.gateway_url,
+                    'serviceUrl', a.service_url
                 )) as deployments
             FROM apis a
             JOIN products p ON a.product_id = p.id

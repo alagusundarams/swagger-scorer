@@ -42,6 +42,8 @@ export interface API {
     description: string;
     path: string;
     operations: Operation[];
+    gatewayUrl?: string;
+    serviceUrl?: string;
     qualityScore?: number;
     originTeamId?: string;
     gitRepoUrl?: string;

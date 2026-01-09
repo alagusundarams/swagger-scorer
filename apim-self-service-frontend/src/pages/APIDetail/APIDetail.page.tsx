@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { SecurityTab, ApiIdentityHeader, OperationCatalog } from '../../features/inventory';
-import { CredentialsTab, useSubscriptionsQuery } from '../../features/consumer';
+import { ApiCredentialsTab } from '../../features/inventory/components/api-details/ApiCredentialsTab';
 
 /**
  * APIDetailPage: Provides a localized view of a specific API Resource.
@@ -27,7 +27,6 @@ export const APIDetailPage = () => {
 
     // --- Store Integration (TanStack Query) ---
     const { user } = useAuth();
-    const { data: allSubscriptions = [] } = useSubscriptionsQuery();
 
     // --- Data Selectors ---
 
@@ -39,10 +38,6 @@ export const APIDetailPage = () => {
         return foundApi;
     }, [product, apiId, operations]);
 
-    // Filtered Subscriptions for this product
-    const productSubscriptions = useMemo(() =>
-        allSubscriptions.filter(s => s.productId === productId),
-        [allSubscriptions, productId]);
 
     // --- Permission Logic ---
     /**
@@ -136,7 +131,7 @@ export const APIDetailPage = () => {
                     <SecurityTab api={api} />
                 )}
                 {activeTab === 'credentials' && (
-                    <CredentialsTab subscriptions={productSubscriptions} />
+                    <ApiCredentialsTab productId={productId!} apiId={apiId!} />
                 )}
             </div>
         </MainLayout>

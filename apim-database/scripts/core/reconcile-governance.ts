@@ -35,7 +35,7 @@ interface MetadataStore {
     backends: Record<string, any[]>;
     apiForensics: Record<string, Record<string, { guids: string[], backends: string[] }>>;
     productForensics: Record<string, Record<string, { guids: string[], nvs: string[] }>>;
-    productApiLinks: Record<string, Record<string, Array<{ name: string, path: string }>>>; // Updated to match extract-apim-inventory
+    productApiLinks: Record<string, Record<string, Array<{ name: string, path: string, gatewayUrl?: string, serviceUrl?: string }>>>;
     subscriptions: Record<string, any[]>;
 }
 
@@ -279,14 +279,16 @@ async function main() {
                     try {
                         if (process.env.DEBUG_SQL) console.log(`[DB] Upserting API: ${uniqueApiId} (Parent: ${targetProductId})`);
                         await client.query(`
-                                INSERT INTO apis (id, product_id, name, display_name, path, updated_at)
-                                VALUES ($1, $2, $3, $4, $5, NOW())
+                                INSERT INTO apis (id, product_id, name, display_name, path, gateway_url, service_url, updated_at)
+                                VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
                                 ON CONFLICT (id) DO UPDATE SET
                                     name = EXCLUDED.name,
                                     display_name = EXCLUDED.display_name,
                                     path = EXCLUDED.path,
+                                    gateway_url = EXCLUDED.gateway_url,
+                                    service_url = EXCLUDED.service_url,
                                     updated_at = NOW();
-                            `, [uniqueApiId, targetProductId, apiName, apiName, apiPath]);
+                            `, [uniqueApiId, targetProductId, apiName, apiName, apiPath, api.gatewayUrl || null, api.serviceUrl || null]);
 
                         // Link to Backends
                         const forensics = apimMeta.apiForensics[envName]?.[apiName];

@@ -30,7 +30,11 @@ const subscriptionsRoutes: FastifyPluginAsync = async (fastify) => {
      */
     fastify.get('/subscriptions/:id/secrets', async (request, reply) => {
         const { id } = request.params as { id: string };
-        const user = (request as any).user || { email: 'local-dev@company.com', role: 'admin', teams: ['admin-group'] };
+        const user = (request as any).user;
+
+        if (!user) {
+            return reply.code(401).send({ error: 'Unauthorized' });
+        }
 
         try {
             const secrets = await getSubscriptionSecrets(
@@ -51,7 +55,11 @@ const subscriptionsRoutes: FastifyPluginAsync = async (fastify) => {
      * Request a new subscription
      */
     fastify.post('/subscriptions', async (request, reply) => {
-        const user = (request as any).user || { name: 'Local Dev', email: 'local-dev@company.com', teams: ['test-team'] };
+        const user = (request as any).user;
+
+        if (!user || !user.teams?.length) {
+            return reply.code(401).send({ error: 'Unauthorized: Missing team context' });
+        }
         const { productId, appId, justification } = request.body as any;
 
         try {

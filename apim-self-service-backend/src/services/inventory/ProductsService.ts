@@ -170,6 +170,8 @@ async function assembleProducts(productRows: any[], apiRows: any[]) {
                         originTeamId: a.origin_team_id,
                         gitRepoUrl: a.git_repo_url,
                         gitFilePath: a.git_file_path,
+                        gatewayUrl: a.gateway_url,
+                        serviceUrl: a.service_url,
                         operations: a.operations_json || [],
                         computedStatus: statusDetails,
                         identity: a.identity_client_id ? {
@@ -365,6 +367,8 @@ export async function getProductById(id: string, environment?: string, userConte
                 originTeamId: a.origin_team_id,
                 gitRepoUrl: a.git_repo_url,
                 gitFilePath: a.git_file_path,
+                gatewayUrl: a.gateway_url,
+                serviceUrl: a.service_url,
                 operations: a.operations_json || [],
                 computedStatus: statusDetails,
                 identity: a.identity_client_id ? {
@@ -473,6 +477,8 @@ export async function getAllApis() {
         displayName: a.display_name,
         productDisplayName: a.product_display_name,
         qualityScore: a.quality_score,
+        gatewayUrl: a.gateway_url,
+        serviceUrl: a.service_url,
         operations: a.operations_json || [] // Include operations!
     }));
 }

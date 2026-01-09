@@ -44,7 +44,7 @@ interface MetadataStore {
     backends: Record<string, any[]>;    // env -> backend[]
     apiForensics: Record<string, Record<string, { guids: string[], backends: string[] }>>; // env -> apiName -> forensics
     productForensics: Record<string, Record<string, { guids: string[], nvs: string[] }>>; // env -> productName -> forensics
-    productApiLinks: Record<string, Record<string, Array<{ name: string, path: string }>>>; // env -> productId -> { name, path }[]
+    productApiLinks: Record<string, Record<string, Array<{ name: string, path: string, gatewayUrl?: string, serviceUrl?: string }>>>; // env -> productId -> { name, path, urls }[]
     subscriptions: Record<string, any[]>; // env -> subscription[]
     apiIdentities: Record<string, Record<string, string>>; // env -> apiName -> clientId (from auth settings)
 }
@@ -352,9 +352,14 @@ async function main() {
                             console.log(`         ⚠️  API "${api.name}" missing path property, using name as fallback`);
                         }
 
+                        // Construct Gateway URL (heuristic if not directly available from list)
+                        const gatewayUrl = `https://${env.instance}.azure-api.net/${apiPath}`.replace(/\/+/g, '/').replace('https:/', 'https://');
+
                         return {
                             name: api.name,
-                            path: apiPath
+                            path: apiPath,
+                            gatewayUrl,
+                            serviceUrl: api.properties?.serviceUrl
                         };
                     });
                     metadata.productApiLinks[env.name][p.name] = apiDetails;

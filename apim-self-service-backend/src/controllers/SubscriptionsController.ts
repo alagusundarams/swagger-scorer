@@ -24,8 +24,11 @@ export class SubscriptionsController {
 
     async getSecrets(request: FastifyRequest, reply: FastifyReply) {
         const { id } = request.params as { id: string };
-        // Valid user context mock
-        const user = (request as any).user || { email: 'local-dev@company.com', role: 'admin', teams: ['admin-group'] };
+        const user = (request as any).user;
+
+        if (!user) {
+            return reply.status(401).send({ error: 'User context not found' });
+        }
 
         try {
             const secrets = await getSubscriptionSecrets(
@@ -42,8 +45,11 @@ export class SubscriptionsController {
     }
 
     async createSubscription(request: FastifyRequest, reply: FastifyReply) {
-        // Valid user context mock
-        const user = (request as any).user || { name: 'Local Dev', email: 'local-dev@company.com', teams: ['test-team'] };
+        const user = (request as any).user;
+
+        if (!user || !user.teams?.length) {
+            return reply.status(401).send({ error: 'User context or teams not found' });
+        }
         const { productId, appId, justification } = request.body as any;
 
         try {

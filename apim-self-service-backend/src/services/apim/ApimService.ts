@@ -1,5 +1,6 @@
 import { ArmService } from './ArmService.js';
 import { getAppConfig } from '../../config/loader.js';
+import { DefaultAzureCredential } from '@azure/identity';
 
 export interface APIMSyncResult {
     success: boolean;
@@ -68,16 +69,24 @@ export async function updateProductMetadata(productId: string, adGroupId: string
 }
 
 /**
- * Helper to get Azure Access Token using CLI (for local dev)
+ * Helper to get Azure Access Token using DefaultAzureCredential (supports MI and CLI)
  */
 async function getAzureAccessToken(): Promise<string> {
-    const { execSync } = await import('node:child_process');
     try {
-        return execSync('az account get-access-token --resource https://management.azure.com --query accessToken -o tsv', {
-            encoding: 'utf-8'
-        }).trim();
-    } catch {
-        return 'mock-token';
+        const credential = new DefaultAzureCredential();
+        const tokenResponse = await credential.getToken('https://management.azure.com/.default');
+        return tokenResponse.token;
+    } catch (error: any) {
+        console.warn(`[APIM] ⚠️ DefaultAzureCredential failed: ${error.message}. Falling back to CLI...`);
+        // Fallback for local dev if they haven't logged in via CLI properly for the library
+        const { execSync } = await import('node:child_process');
+        try {
+            return execSync('az account get-access-token --resource https://management.azure.com --query accessToken -o tsv', {
+                encoding: 'utf-8'
+            }).trim();
+        } catch {
+            return 'mock-token';
+        }
     }
 }
 
