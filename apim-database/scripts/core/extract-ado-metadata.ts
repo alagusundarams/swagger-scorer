@@ -24,6 +24,9 @@ function loadConfig() {
     const repoRoot = resolve(scriptDir, '..', '..', '..');
     const dbRoot = resolve(scriptDir, '..', '..');
 
+    console.log(`\n🔍 [Debug] Loading Configuration...`);
+    console.log(`   ENV ACCOUNTS: ORG=${process.env.AZURE_DEVOPS_ORG || '(empty)'}, PAT=${process.env.AZURE_DEVOPS_PAT ? '(*******)' : '(missing)'}`);
+
     const priorities = [
         join(repoRoot, 'config.json'),                     // 1. Root config
         join(dbRoot, 'config.json'),                       // 2. DB config (Local to these scripts - High Priority)
@@ -36,20 +39,25 @@ function loadConfig() {
                 const content = JSON.parse(readFileSync(p, 'utf8'));
                 // Simple validation to skip placeholders if possible
                 if (content.devops?.pat && content.devops.pat !== 'your-read-only-pat') {
-                    console.log(`📂 [Config] Loaded VALID config from: ${p}`);
+                    console.log(`   ✅ [Config] Valid config found at: ${p}`);
+                    console.log(`       -> Org: ${content.devops.organization}`);
+                    console.log(`       -> PAT: ${content.devops.pat.substring(0, 4)}... (Masked)`);
                     return content;
                 }
+                console.log(`   🔸 [Config] Found but INVALID/PLACEHOLDER at: ${p}`);
                 // Keep track of the fallback (likely placeholder)
                 if (!process.env.FOUND_CONFIG) process.env.FOUND_CONFIG = p;
             } catch (e) {
-                console.warn(`⚠️ [Config] Failed to parse ${p}`);
+                console.warn(`   ⚠️ [Config] Failed to parse ${p}`);
             }
+        } else {
+            console.log(`   ✖️ [Config] Not found at: ${p}`);
         }
     }
 
     // Fallback to the first found one (even if placeholder) to avoid total crash
     if (process.env.FOUND_CONFIG) {
-        console.warn(`⚠️ [Config] Using POTENTIAL PLACEHOLDER from: ${process.env.FOUND_CONFIG}`);
+        console.warn(`   ⚠️ [Config] Defaulting to placeholder: ${process.env.FOUND_CONFIG}`);
         return JSON.parse(readFileSync(process.env.FOUND_CONFIG, 'utf8'));
     }
 

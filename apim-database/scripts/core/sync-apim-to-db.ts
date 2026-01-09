@@ -29,6 +29,8 @@ const __dirname = dirname(__filename);
 
 // --- CONFIG LOADER ---
 function loadConfig() {
+    console.log(`\n🔍 [Debug] Loading Configuration...`);
+    console.log(`   ENV ACCOUNTS: ORG=${process.env.AZURE_DEVOPS_ORG || '(empty)'}, PAT=${process.env.AZURE_DEVOPS_PAT ? '(*******)' : '(missing)'}`);
     const cwd = process.cwd();
     // Priority 1: Exact path override (if passed via env, though not implemented here)
 
@@ -66,9 +68,11 @@ function loadConfig() {
     if (!configPath && existsSync(dbConfig)) configPath = dbConfig;
 
     if (configPath) {
+        console.log(`   ✅ [Config] Resolved Path: ${configPath}`);
         console.log(`📂 Using config from: ${configPath}`);
         return JSON.parse(readFileSync(configPath, 'utf8'));
     }
+    console.warn(`   ❌ [Config] No valid config found! Returning empty.`);
     return {};
 }
 
