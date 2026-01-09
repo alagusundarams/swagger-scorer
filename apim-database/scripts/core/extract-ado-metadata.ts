@@ -45,7 +45,7 @@ interface ADOMetadata {
     productName: string;
     repository?: { id: string; name: string; project: string; projectId: string };
     pipeline?: { id: number; name: string };
-    deployments: Record<string, { hash: string; date: string }>;
+    deployments: Record<string, { hash: string; date: string, branch?: string, author?: string, message?: string, url?: string }>;
     discoveredSpecs?: string[];
     status: 'MATCHED' | 'REPO_MISSING' | 'PIPELINE_MISSING' | 'ORPHAN';
 }
@@ -60,11 +60,28 @@ async function main() {
         process.exit(1);
     }
 
+    // --- IDENTITY SETUP ---
+    console.log(`🔐 [AUTH] Attempting Hybrid Identity (Azure CLI + PAT)...`);
+    let bearerToken: string | undefined;
+    try {
+        bearerToken = await AzureService.getAzureAccessToken();
+        console.log(`   ✅ Azure CLI Token Acquired.`);
+    } catch (e: any) {
+        console.warn(`   ⚠️  Azure CLI login failed, using PAT only: ${e.message}`);
+    }
+
+    try {
+        const connection = await AzureService.verifyAdoConnection(devops.organization, devops.pat, devops.baseUrl, bearerToken);
+        console.log(`   ✅ Connection Verified: ${connection.authenticatedUser?.customDisplayName || connection.authenticatedUser?.id}`);
+    } catch (err: any) {
+        console.error(`❌ [AUTH] Verification failed: ${err.message}`);
+        process.exit(1);
+    }
+
     let inventory: ProductIdentity[] = [];
 
     // 1. Load Discovery Source
     if (sourceMode === 'db') {
-        console.log(`🔌 Fetching unique products from Database...`);
         const pool = new Pool({
             connectionString: process.env.DATABASE_URL || (config.database ? config.database.url : undefined),
             ...(typeof config.database === 'object' ? config.database : {})
@@ -93,224 +110,138 @@ async function main() {
             : join(process.cwd(), 'apim-database', 'scripts', 'data');
         const inventoryPath = join(inventoryDir, 'apim-inventory.json');
         if (!existsSync(inventoryPath)) {
-            console.error(`❌ Inventory file not found: ${inventoryPath}. Run Part 1 first!`);
+            console.error(`❌ Inventory file not found: ${inventoryPath}`);
             process.exit(1);
         }
         inventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
     }
 
-    // Filter by product name if flag is provided
     if (productNameArg) {
         inventory = inventory.filter((p: ProductIdentity) => p.name.toLowerCase() === productNameArg.toLowerCase() || p.id.toLowerCase() === productNameArg.toLowerCase());
-        console.log(`🎯 Filtered to product: ${productNameArg}.\n`);
     }
-
-    // Filter by environment if flag is provided
     if (targetEnv) {
         inventory = inventory.filter((p: ProductIdentity) => p.environments.map(e => e.toUpperCase()).includes(targetEnv));
-        console.log(`🎯 Filtered to ${inventory.length} products for ${targetEnv}.\n`);
     }
+    if (limit > 0) inventory = inventory.slice(0, limit);
 
-    if (limit > 0) {
-        inventory = inventory.slice(0, limit);
-        console.log(`⚠️  LIMIT MODE: Processing only ${limit} product(s) for testing.\n`);
-    } else {
-        console.log(`📊 Loaded ${inventory.length} unique products for discovery.`);
-    }
+    console.log(`📊 Processing ${inventory.length} products...\n`);
 
-    // 2. Setup Auth
-    console.log(`🔐 [AUTH] Verifying PAT for ${devops.organization}...`);
-    try {
-        const connection = await AzureService.verifyAdoConnection(devops.organization, devops.pat, devops.baseUrl);
-        console.log(`   ✅ Connection Verified: ${connection.authenticatedUser?.customDisplayName || connection.authenticatedUser?.id}`);
-    } catch (err: any) {
-        console.error(`❌ [AUTH] PAT Verification failed: ${err.message}`);
-        process.exit(1);
-    }
-
-    // 3. Discovery Loop
+    // 3. Discovery Loop with Batching
     const results: ADOMetadata[] = [];
     const sanitize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    const BATCH_SIZE = 5; // Safe concurrency
 
-    for (const prod of inventory) {
-        await sleep(2000); // Reduced delay slightly as we are being more targeted
+    for (let i = 0; i < inventory.length; i += BATCH_SIZE) {
+        const batch = inventory.slice(i, i + BATCH_SIZE);
+        console.log(`\n📦 Batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(inventory.length / BATCH_SIZE)} (${batch.length} products)`);
 
-        console.log(`\n🔹 Processing: ${prod.name} (${prod.id})`);
-        const meta: ADOMetadata = { productId: prod.id, productName: prod.name, deployments: {}, status: 'ORPHAN' };
+        await Promise.all(batch.map(async (prod) => {
+            const meta: ADOMetadata = { productId: prod.id, productName: prod.name, deployments: {}, status: 'ORPHAN' };
+            try {
+                const cleanProd = sanitize(prod.name);
+                const searchTerm = `"${prod.name}" (ext:tf OR ext:tfvars)`;
+                const searchResp = await AzureService.searchCode(devops.organization, searchTerm, devops.pat, devops.baseUrl, bearerToken);
 
-        try {
-            const cleanProd = sanitize(prod.name);
-            const quotedName = prod.name.includes(' ') ? `"${prod.name}"` : prod.name;
-            const searchTerm = `${quotedName} (ext:tf OR ext:tfvars)`;
-            const searchResp = await AzureService.searchCode(devops.organization, searchTerm, devops.pat, devops.baseUrl);
+                if (!searchResp || searchResp.count === 0) {
+                    meta.status = 'REPO_MISSING';
+                    results.push(meta);
+                    return;
+                }
 
-            if (!searchResp || searchResp.count === 0) {
-                console.log(`   ⚠️  REPO_MISSING: No TF matches for "${prod.name}"`);
-                meta.status = 'REPO_MISSING';
-                results.push(meta);
-                continue;
-            }
+                const repoCandidates = searchResp.results
+                    .filter((r: any) => r.repository?.name)
+                    .map((r: any) => {
+                        const cleanRepo = sanitize(r.repository.name);
+                        let score = 0;
+                        if (cleanRepo === cleanProd) score += 100;
+                        else if (cleanRepo.includes(cleanProd)) score += 50;
+                        if (cleanRepo.includes('grp')) score -= 20;
+                        if (cleanRepo.includes('shared')) score -= 30;
+                        return { repo: r.repository, score };
+                    }).sort((a: any, b: any) => b.score - a.score);
 
-            const repoCandidates = searchResp.results
-                .filter(r => r.repository && r.repository.name)
-                .map(r => {
-                    const rName = r.repository.name;
-                    const cleanRepo = sanitize(rName);
-                    let score = 0;
-                    if (cleanRepo === cleanProd) score += 100;
-                    else if (cleanRepo.includes(cleanProd)) score += 50;
-                    if (cleanRepo.includes('grp')) score -= 20;
-                    if (cleanRepo.includes('shared') || cleanRepo.includes('common')) score -= 30;
-                    return { repo: r.repository, score, name: rName };
-                }).sort((a, b) => b.score - a.score);
+                if (repoCandidates.length === 0) {
+                    meta.status = 'REPO_MISSING';
+                    results.push(meta);
+                    return;
+                }
 
-            if (repoCandidates.length === 0) {
-                meta.status = 'REPO_MISSING';
-                results.push(meta);
-                continue;
-            }
+                const repo = repoCandidates[0].repo;
+                let project = repo.project?.name || "Unknown";
+                let projectId = repo.project?.id || "";
 
-            const repo = repoCandidates[0].repo;
-            const repoId = repo.id || repo.name;
-            let project = repo.project?.name || "Unknown";
-            let projectId = repo.project?.id || "";
-
-            if (project === "Unknown" || !projectId) {
-                try {
-                    const repoDetails = await AzureService.fetchRepoById(devops.organization, repoId, devops.pat, devops.baseUrl);
+                if (project === "Unknown" || !projectId) {
+                    const repoDetails = await AzureService.fetchRepoById(devops.organization, repo.id, devops.pat, devops.baseUrl, bearerToken);
                     project = repoDetails.project.name;
                     projectId = repoDetails.project.id;
-                } catch (e: any) {
-                    console.warn(`      ⚠️  Failed to resolve Repo ID ${repoId}: ${e.message}`);
                 }
-            }
 
-            meta.repository = { id: repoId, name: repo.name, project: project, projectId: projectId || project };
-            console.log(`   ✅ Repo: ${repo.name} (Score: ${repoCandidates[0].score})`);
+                meta.repository = { id: repo.id, name: repo.name, project, projectId };
 
-            const pipelines = await AzureService.fetchADOPipelines(devops.organization, projectId || project, repoId, devops.pat, devops.baseUrl);
-            const pipeCandidates = pipelines.map(p => {
-                const cleanPipe = sanitize(p.name);
-                let score = 0;
-                if (cleanPipe.includes(cleanProd)) score += 50;
-                if (cleanPipe.includes('deploy') || cleanPipe.includes('iac')) score += 10;
-                return { pipe: p, score, name: p.name };
-            }).sort((a, b) => b.score - a.score);
+                const pipelines = await AzureService.fetchADOPipelines(devops.organization, projectId, repo.id, devops.pat, devops.baseUrl, bearerToken);
+                const pipeCandidates = pipelines.map((p: any) => {
+                    const cleanPipe = sanitize(p.name);
+                    let score = 0;
+                    if (cleanPipe.includes(cleanProd)) score += 50;
+                    if (cleanPipe.includes('deploy') || cleanPipe.includes('iac')) score += 10;
+                    return { pipe: p, score };
+                }).sort((a: any, b: any) => b.score - a.score);
 
-            if (pipeCandidates.length === 0 || pipeCandidates[0].score < 10) {
-                meta.status = 'PIPELINE_MISSING';
-                results.push(meta);
-                continue;
-            }
+                if (pipeCandidates.length === 0 || pipeCandidates[0].score < 10) {
+                    meta.status = 'PIPELINE_MISSING';
+                    results.push(meta);
+                    return;
+                }
 
-            const matchedPipeline = pipeCandidates[0].pipe;
-            meta.pipeline = { id: matchedPipeline.id, name: matchedPipeline.name };
-            meta.status = 'MATCHED';
-            console.log(`   ✅ Pipeline: ${matchedPipeline.name}`);
+                const matchedPipeline = pipeCandidates[0].pipe;
+                meta.pipeline = { id: matchedPipeline.id, name: matchedPipeline.name };
+                meta.status = 'MATCHED';
 
-            const envsToSync = targetEnv ? [targetEnv] : prod.environments;
+                const envsToSync = targetEnv ? [targetEnv] : prod.environments;
 
-            // --- HYBRID SURGICAL STRATEGY ---
-            const deployments: Record<string, { hash: string; date: string }> = {};
-            const timelineCache = new Map<number, any[]>();
-
-            console.log(`      🏥 [Surgical] Checking ADO Environments API...`);
-
-            // 1. Surgical Lookup
-            await Promise.all(envsToSync.map(async (envName) => {
-                try {
+                // --- SURGICAL SYNC ---
+                for (const envName of envsToSync) {
                     const deploy = await AzureService.fetchLatestEnvironmentDeployment(
-                        devops.organization, projectId || project, matchedPipeline.id, envName, devops.pat, devops.baseUrl
+                        devops.organization, projectId, matchedPipeline.id, envName, devops.pat, devops.baseUrl, bearerToken
                     );
 
                     if (deploy) {
-                        const commitHash = deploy.build?.sourceVersion || 'unknown';
-                        deployments[envName] = {
-                            hash: commitHash,
-                            date: deploy.finishTime || deploy.startTime || new Date().toISOString()
-                        };
-                        console.log(`      🎯 [HIT] ${envName.padEnd(5)}: Surgical Hit! Captured ${commitHash.substring(0, 7)} (Deployment ${deploy.id})`);
-                        // Update the meta object directly
-                        meta.deployments[envName] = deployments[envName];
-                    }
-                } catch (err: any) {
-                    console.warn(`      ⚠️ [Surgical Fail] ${envName}: ${err.message}`);
-                }
-            }));
+                        let commitHash = deploy.build?.sourceVersion;
+                        let fullDetails = deploy;
 
-            // 2. Deep Scan Fallback
-            const missingEnvs = envsToSync.filter(e => !deployments[e]);
-            if (missingEnvs.length > 0) {
-                console.log(`      🔍 [Deep Scan] Missed ${missingEnvs.length} envs. Scanning timeline (Depth: 100)...`);
-
-                let skip = 0;
-                const pageSize = 20;
-                const maxDepth = 100;
-                const remainingEnvs = new Set(missingEnvs);
-
-                try {
-                    while (remainingEnvs.size > 0 && skip < maxDepth) {
-                        const builds = await AzureService.fetchBuildsByDefinition(
-                            devops.organization, projectId || project, matchedPipeline.id, devops.pat, devops.baseUrl, undefined, pageSize, skip
-                        );
-
-                        if (builds.length === 0) break;
-
-                        for (const run of builds) {
-                            if (remainingEnvs.size === 0) break;
-
-                            let timeline = timelineCache.get(run.id);
-                            if (!timeline) {
-                                timeline = await AzureService.fetchPipelineRunTimeline(
-                                    devops.organization, projectId || project, run.id, devops.pat, devops.baseUrl
-                                );
-                                timelineCache.set(run.id, timeline || []);
-                            }
-
-                            if (!timeline || timeline.length === 0) continue;
-
-                            for (const envName of Array.from(remainingEnvs)) {
-                                // Match stage/phase names
-                                const record = timeline.find((t: any) => {
-                                    const type = (t.type || '').toLowerCase();
-                                    const isContainer = ['stage', 'job', 'phase'].includes(type);
-                                    const nameMatches = t.name?.toLowerCase().includes(envName.toLowerCase().trim());
-                                    const isSuccess = t.result === 'succeeded' || t.result === 'partiallySucceeded';
-                                    return isContainer && nameMatches && isSuccess;
-                                });
-
-                                if (record) {
-                                    const commitHash = (run as any).sourceVersion || 'unknown';
-                                    meta.deployments[envName] = {
-                                        hash: commitHash,
-                                        date: record.finishTime || run.finishedDate
-                                    };
-                                    console.log(`      📍 [HIT] ${envName.padEnd(5)}: Scanner Hit! Captured ${commitHash.substring(0, 7)} (Build ${run.id} via ${record.name})`);
-                                    remainingEnvs.delete(envName);
-                                    deployments[envName] = meta.deployments[envName]; // Update verify map
-                                }
+                        const ownerId = deploy.owner?.id || deploy.build?.id;
+                        if (ownerId) {
+                            const details = await AzureService.fetchADOBuild(devops.organization, projectId, ownerId, devops.pat, devops.baseUrl, bearerToken);
+                            if (details) {
+                                fullDetails = details;
+                                commitHash = commitHash || details.sourceVersion;
                             }
                         }
-                        skip += pageSize;
+
+                        if (commitHash && commitHash !== 'unknown') {
+                            const author = fullDetails.requestedFor?.displayName || fullDetails.requestedBy?.displayName || 'Unknown';
+                            const branch = (fullDetails.sourceBranch || 'unknown').replace('refs/heads/', '');
+                            const message = fullDetails.triggerInfo?.['ci.message'] || fullDetails.comment || 'No message';
+
+                            meta.deployments[envName] = {
+                                hash: commitHash,
+                                date: deploy.finishTime || fullDetails.finishTime || new Date().toISOString(),
+                                branch,
+                                author,
+                                message,
+                                url: fullDetails._links?.web?.href
+                            };
+                        }
                     }
-                } catch (e: any) {
-                    console.error(`      ❌ [Deep Scan] Error: ${e.message}`);
                 }
+                results.push(meta);
+                if (verbose) console.log(`   ✅ ${prod.name}: Synced ${Object.keys(meta.deployments).length}/${envsToSync.length} environments.`);
+
+            } catch (e: any) {
+                console.error(`   ❌ Error processing ${prod.name}: ${e.message}`);
+                results.push(meta);
             }
-
-            // Log misses
-            envsToSync.forEach(env => {
-                if (!meta.deployments[env]) {
-                    console.log(`      ⚠️  [MISS] ${env.padEnd(5)}: Not found in surgical or deep scan.`);
-                }
-            });
-
-            results.push(meta);
-        } catch (e: any) {
-            console.error(`   ❌ Error: ${e.message}`);
-            results.push(meta);
-        }
+        }));
     }
 
     const dataDir = existsSync(join(process.cwd(), 'scripts', 'data'))
