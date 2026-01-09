@@ -44,7 +44,7 @@ export class ProductsRepository {
             ) sub_counts ON true
             ${whereClause}
             ORDER BY p.display_name ASC
-        `, queryParams);
+        `, queryParams, 'GetAllProducts');
     }
 
     async getAllProductsPaginated(
@@ -84,7 +84,7 @@ export class ProductsRepository {
             SELECT COUNT(*) as total
             FROM products p
             ${whereClause}
-        `, queryParams);
+        `, queryParams, 'GetProductsCount');
 
         const total = parseInt(countResult.rows[0]?.total || '0');
 
@@ -110,7 +110,7 @@ export class ProductsRepository {
             ${whereClause}
             ORDER BY p.display_name ASC
             LIMIT ${limitParam} OFFSET ${offsetParam}
-        `, queryParams);
+        `, queryParams, 'GetAllProductsPaginated');
 
         return { rows: dataResult.rows, total };
     }
@@ -118,7 +118,7 @@ export class ProductsRepository {
 
 
     async getRepoUrlForProduct(productId: string) {
-        return await query('SELECT git_repo_url FROM products WHERE id = $1', [productId]);
+        return await query('SELECT git_repo_url FROM products WHERE id = $1', [productId], 'GetRepoUrlForProduct');
     }
 
     async addProduct(product: any) {
@@ -135,7 +135,7 @@ export class ProductsRepository {
             product.id, product.name, product.displayName, product.description, product.state, product.ownerTeamId, product.environment,
             product.managementMode || 'UNTRACKED', product.gitRepoUrl, product.pipelineUrl,
             product.lastDeployedCommitHash || null
-        ]);
+        ], 'AddProduct');
     }
 
     async getProductById(id: string) {
@@ -148,7 +148,7 @@ export class ProductsRepository {
             FROM products p
             LEFT JOIN app_registrations ar ON ar.product_id = p.id AND ar.api_id IS NULL
             WHERE p.id = $1
-        `, [id]);
+        `, [id], 'GetProductById');
     }
 
     async getProductDeployments(id: string) {
@@ -157,7 +157,7 @@ export class ProductsRepository {
             FROM product_deployments
             WHERE product_id = $1
             ORDER BY deployment_date DESC
-        `, [id]);
+        `, [id], 'GetProductDeployments');
     }
 
 
@@ -165,14 +165,14 @@ export class ProductsRepository {
     async updateProductOwner(id: string, ownerTeamId: string) {
         return await query(
             'UPDATE products SET owner_team_id = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
-            [ownerTeamId, id]
+            [ownerTeamId, id], 'UpdateProductOwner'
         );
     }
 
     async cascadeUpdateApiOwner(productId: string, ownerTeamId: string) {
         return await query(
             'UPDATE apis SET origin_team_id = $1, updated_at = NOW() WHERE product_id = $2',
-            [ownerTeamId, productId]
+            [ownerTeamId, productId], 'CascadeUpdateApiOwner'
         );
     }
 
@@ -192,7 +192,7 @@ export class ProductsRepository {
             FROM products p
             GROUP BY p.name, p.display_name, p.owner_team_id, p.description
             ORDER BY p.display_name ASC
-        `);
+        `, [], 'GetGlobalProducts');
     }
 
     async setProductManagementMode(productId: string, mode: string, reconciliationStatus: string) {
@@ -203,7 +203,7 @@ export class ProductsRepository {
                  updated_at = NOW() 
              WHERE id = $3
              RETURNING *`,
-            [mode, reconciliationStatus, productId]
+            [mode, reconciliationStatus, productId], 'SetProductManagementMode'
         );
     }
 
@@ -224,7 +224,7 @@ export class ProductsRepository {
 
         return await query(
             `UPDATE products SET ${setClause}, updated_at = NOW() WHERE id = $${keys.length + 1} RETURNING *`,
-            [...values, id]
+            [...values, id], 'UpdateProduct'
         );
     }
 
@@ -235,11 +235,11 @@ export class ProductsRepository {
             LEFT JOIN teams t ON pm.ad_group_id = t.azure_ad_group_id
             WHERE pm.product_id = $1
             ORDER BY pm.environment, pm.role
-        `, [productId]);
+        `, [productId], 'GetPermissionMatrix');
     }
 
     async deletePermissionMatrix(productId: string) {
-        return await query('DELETE FROM permission_matrix WHERE product_id = $1', [productId]);
+        return await query('DELETE FROM permission_matrix WHERE product_id = $1', [productId], 'DeletePermissionMatrix');
     }
 
     async insertPermissionMatrixEntry(productId: string, adGroupId: string, environment: string, role: string) {
@@ -247,7 +247,7 @@ export class ProductsRepository {
             INSERT INTO permission_matrix (product_id, ad_group_id, environment, role)
             VALUES ($1, $2, $3, $4)
             RETURNING *
-        `, [productId, adGroupId, environment, role]);
+        `, [productId, adGroupId, environment, role], 'InsertPermissionMatrixEntry');
     }
 }
 

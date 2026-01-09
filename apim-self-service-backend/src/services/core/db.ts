@@ -50,24 +50,35 @@ export async function initDb(connectionString: string) {
     }
 }
 
+import { trace, context } from '@opentelemetry/api';
+
 /**
- * Helper to run a query with automatic logging and error handling
+ * Helper to run a query with automatic logging and error handling.
+ * queryName is used to identify the logical operation in logs.
  */
-export async function query(text: string, params?: any[]) {
+export async function query(text: string, params?: any[], queryName: string = 'UnnamedQuery') {
+    // Attempt to get traceId from OpenTelemetry context
+    const spanContext = trace.getSpanContext(context.active());
+    const traceId = spanContext?.traceId || Math.random().toString(36).substring(2, 9);
+
+    // Create a trace label for logs
+    const traceLabel = `[DB:${queryName}:${traceId.substring(0, 8)}]`;
+
     // Global Query Logging for Transparency/Debugging
-    console.log(`[SQL Query] Executing: ${text.replace(/\s+/g, ' ').trim()}`);
+    console.log(`${traceLabel} 🚀 Executing: ${text.replace(/\s+/g, ' ').trim()}`);
     if (params && params.length > 0) {
-        console.log(`[SQL Params] ${JSON.stringify(params)}`);
+        console.log(`${traceLabel} 📦 Params: ${JSON.stringify(params)}`);
     }
 
+    const start = Date.now();
     try {
-        const start = Date.now();
         const res = await pool.query(text, params);
         const duration = Date.now() - start;
-        console.log(`[SQL Result] Rows: ${res.rowCount}, Duration: ${duration}ms`);
+        console.log(`${traceLabel} ✅ Result: ${res.rowCount} rows, Duration: ${duration}ms`);
         return res;
     } catch (err) {
-        console.error('❌ Database Query Error:', { text, error: err });
+        const duration = Date.now() - start;
+        console.error(`${traceLabel} ❌ Error after ${duration}ms:`, { text, error: err });
         throw err;
     }
 }

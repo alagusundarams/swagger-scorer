@@ -44,7 +44,7 @@ export async function getAllSubscriptions(userRole: string = 'admin', teamId?: s
         LEFT JOIN app_registrations ar ON s.app_registration_id = ar.id
         ${whereClause}
         ORDER BY s.created_at DESC
-    `, queryParams);
+    `, queryParams, 'GetAllSubscriptions');
 
     return res.rows.map(s => ({
         ...s,
@@ -88,7 +88,7 @@ export async function getSubscriptionsForProduct(productId: string) {
         LEFT JOIN app_registrations ar ON s.app_registration_id = ar.id
         WHERE LOWER(s.product_id) = LOWER($1)
         ORDER BY s.created_at DESC
-    `, [productId]);
+    `, [productId], 'GetSubscriptionsForProduct');
 
     return res.rows.map(s => ({
         ...s,
@@ -118,7 +118,7 @@ export async function getSubscriptionsForProduct(productId: string) {
  */
 export async function assignSubscriptionTeam(id: string, teamId: string) {
     // 1. Validate Target Team
-    const teamCheck = await query('SELECT id FROM teams WHERE id = $1', [teamId]);
+    const teamCheck = await query('SELECT id FROM teams WHERE id = $1', [teamId], 'CheckTeamExists');
     if (teamCheck.rows.length === 0) throw new Error('Target Team not found.');
 
     // 2. Update Subscription
@@ -127,7 +127,7 @@ export async function assignSubscriptionTeam(id: string, teamId: string) {
         SET subscriber_team_id = $1, updated_at = NOW()
         WHERE id = $2
         RETURNING *
-    `, [teamId, id]);
+    `, [teamId, id], 'AssignSubscriptionTeam');
 
     if (res.rowCount === 0) throw new Error('Subscription not found.');
 
@@ -154,14 +154,14 @@ export async function addSubscription(productId: string, teamId: string, request
     await query(`
         INSERT INTO approval_requests (id, type, status, requester_name, requester_email, requester_team_id, details)
         VALUES ($1, 'SUBSCRIPTION', 'PENDING', $2, $3, $4, $5)
-    `, [approvalId, requester.name, requester.email, teamId, JSON.stringify({ productId, subscriptionId: subId, appId, justification })]);
+    `, [approvalId, requester.name, requester.email, teamId, JSON.stringify({ productId, subscriptionId: subId, appId, justification })], 'CreateApprovalRequest');
 
     // 2. Create Pending Subscription
     const res = await query(`
         INSERT INTO subscriptions (id, product_id, subscriber_team_id, state, app_registration_id)
         VALUES ($1, $2, $3, 'pending', $4)
         RETURNING *
-    `, [subId, productId, teamId, appId]);
+    `, [subId, productId, teamId, appId], 'CreateSubscription');
 
     // 3. Log Audit
     await logAudit({
@@ -188,7 +188,7 @@ export async function updateSubscriptionState(id: string, state: string) {
         UPDATE subscriptions
         SET state = $1, updated_at = NOW()
         WHERE id = $2
-    `, [state, id]);
+    `, [state, id], 'UpdateSubscriptionState');
 
     // 2. Log Audit
     await logAudit({

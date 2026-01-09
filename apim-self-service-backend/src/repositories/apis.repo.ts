@@ -30,7 +30,7 @@ export class ApisRepository {
                 FROM operations op
                 WHERE op.api_id = a.id
             ) o ON true
-        `);
+        `, [], 'GetAllApis');
     }
 
     /**
@@ -58,7 +58,7 @@ export class ApisRepository {
                OR a.description ILIKE $1
             ORDER BY a.display_name ASC
             LIMIT 50
-        `, [`%${queryTerm}%`]);
+        `, [`%${queryTerm}%`], 'SearchApis');
     }
 
     /**
@@ -86,7 +86,7 @@ export class ApisRepository {
                 WHERE op.api_id = a.id
             ) o ON true
             WHERE a.id = $1
-        `, [id]);
+        `, [id], 'GetApiById');
     }
 
     /**
@@ -114,7 +114,7 @@ export class ApisRepository {
                 WHERE op.api_id = a.id
             ) o ON true
             WHERE a.product_id = $1
-        `, [productId]);
+        `, [productId], 'GetAllApisByProductId');
     }
 
     /**
@@ -126,7 +126,7 @@ export class ApisRepository {
             FROM products p
             JOIN apis a ON a.product_id = p.id
             WHERE a.id = $1
-        `, [apiId]);
+        `, [apiId], 'GetRepoUrlForApi');
     }
 
     async addApi(api: any) {
@@ -138,7 +138,7 @@ export class ApisRepository {
         `, [
             api.id, api.productId, api.name, api.displayName, api.description, api.path,
             api.qualityScore || 0, api.originTeamId, api.gatewayUrl, api.serviceUrl
-        ]);
+        ], 'AddApi');
     }
 
     /**
@@ -152,7 +152,7 @@ export class ApisRepository {
                 updated_at = NOW()
             WHERE id = $1
             RETURNING *
-        `, [id, gatewayUrl, serviceUrl]);
+        `, [id, gatewayUrl, serviceUrl], 'UpdateApiMetadata');
     }
 
     /**
@@ -161,7 +161,7 @@ export class ApisRepository {
     async removeApi(apiId: string, productId: string) {
         return await query(
             'DELETE FROM apis WHERE id = $1 AND product_id = $2',
-            [apiId, productId]
+            [apiId, productId], 'RemoveApi'
         );
     }
 
@@ -169,7 +169,7 @@ export class ApisRepository {
      * Check if an API belongs to a specific product
      */
     async checkApiBelongsToProduct(apiId: string, productId: string) {
-        return await query('SELECT EXISTS(SELECT 1 FROM apis WHERE id = $1 AND product_id = $2)', [apiId, productId]);
+        return await query('SELECT EXISTS(SELECT 1 FROM apis WHERE id = $1 AND product_id = $2)', [apiId, productId], 'CheckApiBelongsToProduct');
     }
     /**
      * Get global APIs (for admin/governance)
@@ -199,6 +199,6 @@ export class ApisRepository {
             ) o ON true
             GROUP BY a.name, a.display_name, a.path
             ORDER BY a.display_name ASC
-        `);
+        `, [], 'GetGlobalApis');
     }
 }
