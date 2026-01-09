@@ -355,6 +355,71 @@ async function main() {
                         console.warn(`      ⚠️ Environment lookup for ${envName} failed: ${e.message}`);
                     }
                 }
+
+                // --- SCAN FALLBACK (EXACT COPY FROM debug-git-logic.ts lines 376-447) ---
+                const missingEnvs = envsToSync.filter(e => !meta.deployments[e]);
+                if (missingEnvs.length > 0) {
+                    console.log(`   🔍 Missed ${missingEnvs.length} envs. Falling back to paginated timeline scan (Depth: 100)...`);
+                    const timelineCache = new Map<number, any[]>();
+                    let skip = 0;
+                    const pageSize = 20;
+                    const maxDepth = 100;
+
+                    while (Object.keys(meta.deployments).length < envsToSync.length && skip < maxDepth) {
+                        const builds = await AzureService.fetchBuildsByDefinition(devops.organization, projectId, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken, pageSize, skip);
+                        console.log(`   📡 [Scan] Page ${Math.floor(skip / pageSize) + 1}: Found ${builds.length} builds...`);
+
+                        if (builds.length === 0) break;
+
+                        for (const run of builds) {
+                            if (Object.keys(meta.deployments).length === envsToSync.length) break;
+                            if (!timelineCache.has(run.id)) {
+                                timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectId, run.id, devops.pat, devops.baseUrl, bearerToken));
+                            }
+                            const timeline = timelineCache.get(run.id)!;
+                            if (!timeline || timeline.length === 0) continue;
+
+                            for (const envName of envsToSync) {
+                                if (meta.deployments[envName]) continue;
+
+                                let record = timeline.find((t: any) => {
+                                    const type = (t.type || '').toLowerCase();
+                                    const isContainer = ['stage', 'job', 'phase'].includes(type);
+                                    const nameMatches = sanitize(t.name).includes(sanitize(envName));
+                                    const isSuccess = ['succeeded', 'partiallysucceeded'].includes((t.result || '').toLowerCase());
+                                    return isContainer && nameMatches && isSuccess && (t.status || '').toLowerCase() === 'completed';
+                                });
+
+                                if (!record) {
+                                    record = timeline.find((t: any) => {
+                                        const nameMatches = sanitize(t.name).includes(sanitize(envName));
+                                        const isSuccess = ['succeeded', 'partiallysucceeded'].includes((t.result || '').toLowerCase());
+                                        return nameMatches && isSuccess && (t.status || '').toLowerCase() === 'completed';
+                                    });
+                                }
+
+                                if (record) {
+                                    const hash = run.sourceVersion || 'unknown';
+                                    const author = run.requestedFor?.displayName || run.requestedBy?.displayName || 'Unknown';
+                                    const branch = (run.sourceBranch || 'unknown').replace('refs/heads/', '');
+                                    const message = run.triggerInfo?.['ci.message'] || run.comment || 'No message';
+
+                                    meta.deployments[envName] = {
+                                        hash,
+                                        date: record.finishTime || run.finishedDate || new Date().toISOString(),
+                                        branch,
+                                        author,
+                                        message,
+                                        url: run._links?.web?.href
+                                    };
+                                    console.log(`      📍 ${envName.padEnd(5)}: Scanner Hit! Captured ${hash.substring(0, 7)}`);
+                                }
+                            }
+                        }
+                        skip += pageSize;
+                    }
+                }
+
                 results.push(meta);
                 if (verbose) console.log(`   ✅ ${prod.name}: Synced ${Object.keys(meta.deployments).length}/${envsToSync.length} environments.`);
 
