@@ -118,14 +118,14 @@ async function main() {
     }
 
     // --- IDENTITY SETUP ---
-    console.log(`🔐 [AUTH] Forced PAT Authentication (Skipping Azure CLI to avoid 401s)...`);
+    console.log(`🔐 [AUTH] Initializing ADO Bearer Token (Resource: 499b84a3-100d-4558-8351-c1e149307c81)...`);
     let bearerToken: string | undefined = undefined;
-    // try {
-    //     bearerToken = await AzureService.getAzureAccessToken();
-    //     console.log(`   ✅ Azure CLI Token Acquired.`);
-    // } catch (e: any) {
-    //     console.warn(`   ⚠️  Azure CLI login failed, using PAT only: ${e.message}`);
-    // }
+    try {
+        bearerToken = await AzureService.getAzureAccessToken('499b84a3-100d-4558-8351-c1e149307c81');
+        console.log(`   ✅ Azure CLI Token Acquired.`);
+    } catch (e: any) {
+        console.warn(`   ⚠️  Azure CLI login failed, using PAT only: ${e.message}`);
+    }
 
     // --- CONNECTION VERIFICATION WITH FAILOVER ---
     try {
@@ -221,8 +221,8 @@ async function main() {
             const meta: ADOMetadata = { productId: prod.id, productName: prod.name, deployments: {}, status: 'ORPHAN' };
             try {
                 const cleanProd = sanitize(prod.name);
-                const searchTerm = `"${prod.name}" (ext:tf OR ext:tfvars)`;
-                const searchResp = await AzureService.searchCode(devops.organization, searchTerm, devops.pat, devops.baseUrl, bearerToken);
+                const quotedName = prod.name.includes(' ') ? `"${prod.name}"` : prod.name;
+                const searchResp = await AzureService.searchCode(devops.organization, quotedName, devops.pat, devops.baseUrl, bearerToken);
 
                 if (!searchResp || searchResp.count === 0) {
                     meta.status = 'REPO_MISSING';
@@ -260,12 +260,73 @@ async function main() {
 
                 meta.repository = { id: repo.id, name: repo.name, project, projectId };
 
-                const pipelines = await AzureService.fetchADOPipelines(devops.organization, projectId, repo.id, devops.pat, devops.baseUrl, bearerToken);
-                const pipeCandidates = pipelines.map((p: any) => {
+                // --- PIPELINE DISCOVERY (SYNCED WITH debug-git-logic.ts Step 2) ---
+                const safeFetch = async (fn: () => Promise<any[]>, label: string) => {
+                    try { return await fn(); } catch (e: any) {
+                        if (verbose) console.warn(`      ⚠️  [Discovery] ${label} lookup failed: ${e.message}`);
+                        return [];
+                    }
+                };
+
+                const [yamlPipes, buildDefs, releaseDefs, projPipes, projBuilds] = await Promise.all([
+                    safeFetch(() => AzureService.fetchADOPipelines(devops.organization, projectId, repo.id, devops.pat, devops.baseUrl, bearerToken), 'YAML Pipelines'),
+                    safeFetch(() => AzureService.fetchADOBuildDefinitions(devops.organization, projectId, repo.id, devops.pat, devops.baseUrl, bearerToken), 'Build Definitions'),
+                    safeFetch(() => AzureService.fetchADOReleaseDefinitions(devops.organization, projectId, devops.pat, devops.baseUrl, bearerToken), 'Release Definitions'),
+                    safeFetch(() => AzureService.fetchADOPipelines(devops.organization, projectId, '', devops.pat, devops.baseUrl, bearerToken), 'Proj YAML'),
+                    safeFetch(() => AzureService.fetchADOBuildDefinitions(devops.organization, projectId, '', devops.pat, devops.baseUrl, bearerToken), 'Proj Build')
+                ]);
+
+                // --- SURGICAL DISCOVERY (Synced with debug-git-logic.ts) ---
+                const surgicalPipes: any[] = [];
+                const searchEnvs = ['PROD', 'STAGE', 'QA', 'DEV'];
+                for (const envName of searchEnvs) {
+                    try {
+                        const envUrl = `${devops.baseUrl}/${devops.organization}/${encodeURIComponent(projectId)}/_apis/distributedtask/environments?name=${envName}`;
+                        const authHeader = AzureService.getAuthHeader(devops.pat, bearerToken);
+                        const resp = await fetch(envUrl, { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } });
+                        if (resp.ok) {
+                            const data = await resp.json() as { count: number; value: any[] };
+                            const match = data.value.find((e: any) => e.name.toUpperCase() === envName);
+                            if (match) {
+                                const envDeploys = await AzureService.fetchEnvironmentDeployments(devops.organization, projectId, match.id, devops.pat, devops.baseUrl, bearerToken);
+                                for (const d of envDeploys) {
+                                    if (d.definition?.id) {
+                                        surgicalPipes.push({ ...d.definition, type: 'Surgical (Live)' });
+                                    }
+                                }
+                                if (surgicalPipes.length > 0) break;
+                            }
+                        }
+                    } catch (e) { }
+                }
+
+                const combinedPipelines = [
+                    ...yamlPipes.map(p => ({ ...p, type: 'YAML' })),
+                    ...buildDefs.map(p => ({ ...p, type: 'Classic Build' })),
+                    ...releaseDefs.map(r => ({ ...r, type: 'Classic Release', isRelease: true })),
+                    ...projPipes.map(p => ({ ...p, type: 'YAML (Proj)' })),
+                    ...projBuilds.map(p => ({ ...p, type: 'Classic Build (Proj)' })),
+                    ...surgicalPipes
+                ];
+
+                const seen = new Set();
+                const uniquePipelines = combinedPipelines.filter(p => {
+                    const key = `${p.type}-${p.id}`;
+                    if (seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                });
+
+                const pipeCandidates = uniquePipelines.map((p: any) => {
                     const cleanPipe = sanitize(p.name);
+                    const folder = sanitize(p.folder || '');
                     let score = 0;
+                    if (cleanPipe === cleanProd) score += 100;
                     if (cleanPipe.includes(cleanProd)) score += 50;
+                    if (folder.includes(cleanProd)) score += 20;
                     if (cleanPipe.includes('deploy') || cleanPipe.includes('iac')) score += 10;
+                    if (cleanPipe.includes('apim')) score += 5;
+                    if (cleanPipe === 'main' || cleanPipe === 'ci') score -= 20;
                     return { pipe: p, score };
                 }).sort((a: any, b: any) => b.score - a.score);
 
@@ -306,8 +367,9 @@ async function main() {
                     }
 
                     if (deploy) {
-                        if (verbose) console.log(`      ℹ️ [DEBUG] Raw deploy object: ${JSON.stringify(deploy)}`);
-                        // Expansive lookup for commit hash
+                        if (verbose) console.log(`      ℹ️ [DEBUG] Raw deploy object found (ID: ${deploy.id})`);
+
+                        // INITIAL HASH CAPTURE (Expansive fields)
                         let commitHash = deploy.build?.sourceVersion ||
                             deploy.build?.sourceVersionID ||
                             deploy.owner?.sourceVersion ||
@@ -317,49 +379,51 @@ async function main() {
 
                         let fullDetails = deploy;
 
-                        const ownerId = deploy.owner?.id || deploy.build?.id;
-                        if (ownerId) {
-                            console.log(`      📡 Fetching full build details (ID: ${ownerId}) for metadata...`);
+                        const ownerId = deploy.owner?.id || deploy.build?.id || deploy.id;
+                        if (ownerId && ownerId !== 'unknown') {
+                            if (verbose) console.log(`      📡 Fetching full build details (ID: ${ownerId}) for metadata...`);
                             const details = await AzureService.fetchADOBuild(devops.organization, projectId, ownerId, devops.pat, devops.baseUrl, bearerToken);
                             if (details) {
-                                if (verbose) console.log(`      ℹ️ [DEBUG] Raw build details fetched.`);
                                 fullDetails = details;
 
-                                // MULTI-REPO FIX: If the build's primary repo is NOT our matched repo, look for the correct version in resources
-                                if (details.repository?.name && (meta as any).repository?.name && details.repository.name !== (meta as any).repository.name) {
-                                    if (verbose) console.log(`      ⚠️  Build repo (${details.repository.name}) differs from target (${(meta as any).repository.name}). Searching resources...`);
+                                // --- MULTI-REPO FIX ---
+                                // If the build's primary repo is NOT our matched repo, look for the correct version in resources
+                                if (details.repository?.name && meta.repository?.name &&
+                                    details.repository.name.toLowerCase() !== meta.repository.name.toLowerCase()) {
+
+                                    if (verbose) console.log(`      ⚠️  Build primary repo (${details.repository.name}) != target (${meta.repository.name}). Scanning resources...`);
+
                                     if (details.resources?.repositories) {
                                         const targetRepoRes = Object.values(details.resources.repositories).find((r: any) =>
-                                            r.repository?.name?.toLowerCase() === (meta as any).repository.name.toLowerCase() ||
-                                            r.repository?.id === (meta as any).repository.id
+                                            r.repository?.name?.toLowerCase() === meta.repository!.name.toLowerCase() ||
+                                            r.repository?.id === meta.repository!.id
                                         );
-                                        const resAny = targetRepoRes as any;
-                                        if (resAny?.version) {
-                                            commitHash = resAny.version;
-                                            if (verbose) console.log(`      🎯 [Multi-Repo] Found version from target repository (${(meta as any).repository.name}): ${commitHash}`);
+                                        if ((targetRepoRes as any)?.version) {
+                                            commitHash = (targetRepoRes as any).version;
+                                            if (verbose) console.log(`      🎯 [Multi-Repo] Found version from target repository (${meta.repository.name}): ${commitHash}`);
                                         }
                                     }
-                                } else {
-                                    commitHash = commitHash || details.sourceVersion || details.sourceVersionID || details.commitId;
                                 }
+
+                                // Secondary Fallback if still unset
+                                commitHash = commitHash || details.sourceVersion || details.sourceVersionID || details.commitId;
                             }
                         }
 
                         if (commitHash && commitHash !== 'unknown') {
                             const author = fullDetails.requestedFor?.displayName ||
                                 fullDetails.requestedBy?.displayName ||
-                                deploy.owner?.requestedFor?.displayName ||
-                                deploy.owner?.requestedBy?.displayName ||
+                                fullDetails.lastChangedBy?.displayName ||
+                                deploy.requestedFor?.displayName ||
                                 'Unknown';
 
                             const rawBranch = fullDetails.sourceBranch ||
                                 deploy.sourceBranch ||
                                 deploy.build?.sourceBranch ||
-                                deploy.owner?.sourceBranch ||
                                 'unknown';
 
                             const branch = rawBranch.replace('refs/heads/', '');
-                            const message = fullDetails.triggerInfo?.['ci.message'] || fullDetails.comment || deploy.owner?.comment || 'No message';
+                            const message = fullDetails.triggerInfo?.['ci.message'] || fullDetails.comment || deploy.comment || 'No message';
 
                             meta.deployments[envName] = {
                                 hash: commitHash,
@@ -371,8 +435,7 @@ async function main() {
                             };
                             console.log(`      🎯 ${envName.padEnd(5)}: Surgical Hit! Captured ${commitHash.substring(0, 7)} (Auth: ${author})`);
                         } else {
-                            console.warn(`      ⚠️  ${envName.padEnd(5)}: Deployment found (ID: ${deploy.id}) but commit hash is missing/unknown in all fallback fields.`);
-                            if (verbose) console.log(`      ℹ️ [DEBUG] Full Object checked: ${JSON.stringify({ deploy, fullDetails })}`);
+                            console.warn(`      ⚠️  ${envName.padEnd(5)}: Deployment found but commit hash is missing/unknown.`);
                         }
                     }
                 }
