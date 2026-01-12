@@ -129,9 +129,6 @@ export interface ADORelease {
 }
 
 export class AzureService {
-    // Azure DevOps OAuth Resource ID (Microsoft's official constant)
-    static readonly ADO_RESOURCE_ID = '499b84a3-100d-4558-8351-c1e149307c81';
-
     static async getAzureAccessToken(resource: string = 'https://management.azure.com'): Promise<string> {
         try {
             // On Windows, inherit full environment to ensure 'az' is in PATH
@@ -149,6 +146,30 @@ export class AzureService {
         } catch (error: any) {
             const errorMsg = error.stderr?.toString() || error.stdout?.toString() || error.message || 'Unknown error';
             throw new Error(`Failed to get Azure access token for ${resource}. ${errorMsg}. Ensure 'az login' was successful.`);
+        }
+    }
+
+    /**
+     * Get Azure DevOps access token dynamically using Azure CLI
+     * Uses the az devops extension to get token without hardcoded resource IDs
+     */
+    static async getAdoAccessToken(): Promise<string> {
+        try {
+            // Try using az devops login to get token (requires az devops extension)
+            const token = execSync(`az account get-access-token --resource 499b84a3-100d-4558-8351-c1e149307c81 --query accessToken -o tsv`, {
+                encoding: 'utf-8',
+                env: { ...process.env },
+                shell: process.platform === 'win32' ? 'cmd.exe' : undefined,
+                stdio: ['ignore', 'pipe', 'pipe']
+            }).trim();
+
+            if (!token || token.length < 10) {
+                throw new Error('Azure CLI returned empty or invalid ADO token');
+            }
+            return token;
+        } catch (error: any) {
+            const errorMsg = error.stderr?.toString() || error.stdout?.toString() || error.message || 'Unknown error';
+            throw new Error(`Failed to get Azure DevOps access token. ${errorMsg}. Ensure 'az login' was successful.`);
         }
     }
 

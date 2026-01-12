@@ -118,10 +118,10 @@ async function main() {
     }
 
     // --- IDENTITY SETUP ---
-    console.log(`🔐 [AUTH] Initializing ADO Bearer Token (Resource: Azure DevOps)...`);
+    console.log(`🔐 [AUTH] Initializing ADO Bearer Token via Azure CLI...`);
     let bearerToken: string | undefined = undefined;
     try {
-        bearerToken = await AzureService.getAzureAccessToken(AzureService.ADO_RESOURCE_ID);
+        bearerToken = await AzureService.getAdoAccessToken();
         console.log(`   ✅ Azure CLI Token Acquired.`);
     } catch (e: any) {
         console.warn(`   ⚠️  Azure CLI login failed, using PAT only: ${e.message}`);
