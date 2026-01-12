@@ -129,6 +129,9 @@ export interface ADORelease {
 }
 
 export class AzureService {
+    // Azure DevOps OAuth Resource ID (Microsoft's official constant)
+    static readonly ADO_RESOURCE_ID = '499b84a3-100d-4558-8351-c1e149307c81';
+
     static async getAzureAccessToken(resource: string = 'https://management.azure.com'): Promise<string> {
         try {
             // On Windows, inherit full environment to ensure 'az' is in PATH

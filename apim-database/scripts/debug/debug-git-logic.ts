@@ -64,7 +64,7 @@ async function runDebug() {
     let bearerToken: string | undefined;
     try {
         console.log(`\n🔑 Authenticating...`);
-        bearerToken = await AzureService.getAzureAccessToken('499b84a3-100d-4558-8351-c1e149307c81');
+        bearerToken = await AzureService.getAzureAccessToken(AzureService.ADO_RESOURCE_ID);
         console.log(`   ✅ Acquired Azure CLI Bearer Token for ADO.`);
     } catch (e: any) {
         console.warn(`   ⚠️  Azure CLI login failed or 'az' not found. Falling back to PAT only. (${e.message})`);
