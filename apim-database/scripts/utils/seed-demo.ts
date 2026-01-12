@@ -92,7 +92,7 @@ async function seedDemoData() {
             INSERT INTO products (
                 id, name, display_name, version, state, environment,
                 owner_team_id, management_mode, authorized_teams,
-                detected_anomalies, quality_score, apim_raw_data, policy_xml
+                detected_anomalies, quality_score, apim_raw_data
             ) VALUES (
                 'prod-legacy',
                 'legacy-order-api',
@@ -105,8 +105,7 @@ async function seedDemoData() {
                 '{"PROD": ["team-payments"]}',
                 '["MANUAL_CREATION", "UNOWNED"]'::jsonb,
                 45.00,
-                '{"policyXml": "${jsonSafeXml}"}'::jsonb,
-                '${legacyXml}'
+                '{"policyXml": "${jsonSafeXml}"}'::jsonb
             );
         `);
 

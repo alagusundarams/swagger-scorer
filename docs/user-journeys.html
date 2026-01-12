@@ -358,7 +358,8 @@
 
                     <div class="story-intro">
                         <strong>The Story:</strong> Alex arrives Monday morning with coffee in hand. Opens browser,
-                        navigates to the portal. The dashboard shows a concerning badge: "⚠️ 12 Orphan Products". These
+                        navigates to the portal. The dashboard shows a concerning badge: "⚠️ Orphan Products Detected".
+                        These
                         are legacy APIs migrated from the old APIM instance without team assignments. They can't stay
                         orphaned - security policy requires every product to have an owner.
                     </div>
@@ -433,7 +434,7 @@
    
 13. Frontend navigates
    - Role check: admin = true
-   - Redirect: /admin/governance (Issue #4 fix!)
+   - Redirect: /admin/governance
    - NOT /dashboard (normal users go there)</pre>
 
                                     <div class="mermaid">
@@ -463,9 +464,9 @@
                                     </div>
 
                                     <div class="insight">
-                                        <strong>Why this matters:</strong> Issue #4 was specifically about admin users
-                                        not having a path to governance. Now login automatically detects admin role and
-                                        routes them to the right place.
+                                        <strong>Why this matters:</strong> Administrators are automatically routed to
+                                        the Governance Dashboard upon login, bypassing the standard developer view for
+                                        immediate access to actionable items.
                                     </div>
                                 </div>
                             </div>
@@ -478,14 +479,15 @@
                             <span>Dashboard Load & Orphan Detection</span>
                         </div>
                         <div class="step-body">
-                            <p><strong>What Alex Sees:</strong> Admin Governance page with 5 tabs. "Product Reclamation"
-                                tab shows "Found 12 unassigned APIs requiring governance"</p>
+                            <p><strong>What Alex Sees:</strong> "Platform Portfolio" dashboard with 5 tabs. "Product
+                                Reclamation"
+                                tab shows a list of unassigned APIs requiring governance.</p>
 
                             <div class="screenshot">
-                                <img src="admin_dashboard_orphans_1768228471575.png" alt="Admin Dashboard Orphans"
+                                <img src="admin_governance_realistic.png" alt="Admin Dashboard Orphans"
                                     style="max-width: 100%; border-radius: 8px;">
-                                <p style="font-size: 0.8rem; margin-top: 10px; color: #718096;">Admin Governance -
-                                    Global Overview showing orphaned resources.</p>
+                                <p style="font-size: 0.8rem; margin-top: 10px; color: #718096;">The Admin Dashboard
+                                    highlights APIs that are missing proper ownership.</p>
                             </div>
 
                             <div class="tech-details">
@@ -560,7 +562,7 @@
    - Stats: "Showing 12 of 12 orphans"</pre>
 
                                     <div class="insight">
-                                        <strong>Performance Note:</strong> Issue #2 & #3 fix - we now use server-side
+                                        <strong>Performance Note:</strong> We now use server-side
                                         pagination (20 items/page) instead of fetching all 1435 products at once. 95%
                                         faster initial load!
                                     </div>
@@ -577,13 +579,14 @@
                         <div class="step-body">
                             <p><strong>What Alex Does:</strong> Types "payment" in search box to find payment-related
                                 APIs</p>
-                            <p><strong>What Alex Sees:</strong> Table filters down to 3 products with "payment" in name
+                            <p><strong>What Alex Sees:</strong> Table filters down to products matching the search
+                                terms.
                             </p>
 
                             <div class="tech-details">
                                 <div class="tech-toggle">🔧 Click to see filter implementation</div>
                                 <div class="tech-content">
-                                    <h4>Client-Side Filtering (Issue #3 Enhancement)</h4>
+                                    <h4>Client-Side Filtering (Performance Optimization)</h4>
 
                                     <pre>1. Alex types in search box
    - onChange event fires
@@ -792,24 +795,28 @@
                 </div>
 
                 <div class="story-section">
-                    <h2>The Onboarding Wizard: Actual System Steps</h2>
+                    <h2>The Onboarding Guide: 5 Simple Steps</h2>
 
                     <div class="step">
                         <div class="step-header">
                             <div class="step-number">1</div>
-                            <span>Step 1: Prerequisites Check</span>
+                            <span>Step 1: Get Ready</span>
                         </div>
                         <div class="step-body">
-                            <p><strong>Paula's Action:</strong> Paula starts by reviewing the prerequisites. She
-                                confirms her API is hosted in the enterprise network and that she has the necessary ADO
-                                project permissions.</p>
-                            <p><strong>Actual Component:</strong> <code>OnboardingPrerequisitesStep.tsx</code></p>
+                            <p><strong>Paula's Action:</strong> Paula starts the guide. She verifies that she has
+                                everything ready—her API design file and the required permissions to publish to the
+                                platform.</p>
+                            <div class="screenshot">
+                                <img src="paula_onboarding_step1.png" alt="Onboarding Step 1: Prerequisites"
+                                    style="max-width: 100%; border-radius: 8px;">
+                                <p style="font-size: 0.8rem; margin-top: 10px; color: #718096;">Clear prerequisites
+                                    checklist before starting.</p>
+                            </div>
                             <div class="tech-details">
-                                <div class="tech-toggle">🔧 Technical Details (Access & Compliance)</div>
+                                <div class="tech-toggle">�️ Technical Details (For Developers)</div>
                                 <div class="tech-content">
-                                    <pre>1. System checks: Is API reachable?
-2. Permission verification: az login --> ADO PAT validation.
-3. User must click "I understand and comply" to proceed.</pre>
+                                    <pre>Component: OnboardingPrerequisitesStep.tsx
+Logic: Checks network reachability and ADO project permissions.</pre>
                                 </div>
                             </div>
                         </div>
@@ -818,21 +825,23 @@
                     <div class="step">
                         <div class="step-header">
                             <div class="step-number">2</div>
-                            <span>Step 2: Establish Identity</span>
+                            <span>Step 2: API Identity & Ownership</span>
                         </div>
                         <div class="step-body">
-                            <p><strong>Paula's Action:</strong> Paula types "Customer Profile" for the display name. She
-                                then searches for her existing App Registration by name using the integrated search box.
-                                She selects the correct identity from the dropdown.</p>
-                            <p><strong>Actual Component:</strong> <code>OnboardingIdentityStep.tsx</code></p>
+                            <p><strong>Paula's Action:</strong> She gives her API a friendly name—"Customer Profile".
+                                The system handles the technical IDs in the background. She then links it to her team's
+                                security profile using a simple search.</p>
+                            <div class="screenshot">
+                                <img src="paula_onboarding_step2.png" alt="Onboarding Step 2: Identity"
+                                    style="max-width: 100%; border-radius: 8px;">
+                                <p style="font-size: 0.8rem; margin-top: 10px; color: #718096;">Simplified identity
+                                    linking with auto-generated IDs.</p>
+                            </div>
                             <div class="tech-details">
-                                <div class="tech-toggle">🔧 Technical Details (App ID Binding)</div>
+                                <div class="tech-toggle">�️ Technical Details (For Developers)</div>
                                 <div class="tech-content">
-                                    <p><strong>Action:</strong>
-                                        <code>inventoryApi.searchAzureIdentities(searchTerm)</code></p>
-                                    <pre>1. User Input: "Customer Profile"
-2. Technical Name: "Customer-Profile" (Auto-slugified)
-3. App Registration Match: Client ID (GUID) and App ID URI bound to product metadata.</pre>
+                                    <pre>Component: OnboardingIdentityStep.tsx
+Logic: Bind Client ID and App ID URI to the API metadata.</pre>
                                 </div>
                             </div>
                         </div>
@@ -841,20 +850,23 @@
                     <div class="step">
                         <div class="step-header">
                             <div class="step-number">3</div>
-                            <span>Step 3: Define Contract (Spec Studio)</span>
+                            <span>Step 3: Quality & Governance Check</span>
                         </div>
                         <div class="step-body">
-                            <p><strong>Paula's Action:</strong> She pastes her OpenAPI YAML into the embedded Spec
-                                Studio. The system instantly parses it, showing her the detected operations (GET
-                                /profile, POST /profile/update) and a governance score.</p>
-                            <p><strong>Actual Component:</strong> <code>OnboardingSpecStep.tsx</code> integrating
-                                <code>SpecStudio</code></p>
+                            <p><strong>Paula's Action:</strong> Paula uploads her API design. The portal instantly
+                                checks it against enterprise standards. She sees a "Validated" checkmark, which confirms
+                                her API is ready for the platform.</p>
+                            <div class="screenshot">
+                                <img src="paula_onboarding_step3_quality.png" alt="API Quality Check Results"
+                                    style="max-width: 100%; border-radius: 8px;">
+                                <p style="font-size: 0.8rem; margin-top: 10px; color: #718096;">The portal provides
+                                    instant feedback on API design quality.</p>
+                            </div>
                             <div class="tech-details">
-                                <div class="tech-toggle">🔧 Technical Details (Sparsing & Linting)</div>
+                                <div class="tech-toggle">�️ Technical Details (For Developers)</div>
                                 <div class="tech-content">
-                                    <pre>1. Spec Parsing: Extraction of methods, paths, and operation IDs.
-2. Governance: Spectral linting executed locally in useSpecStudio hook.
-3. Score: Displayed as "VALIDATED" or "IMPROVEMENTS RECOMMENDED".</pre>
+                                    <pre>Component: OnboardingSpecStep.tsx / SpecStudio
+Logic: Real-time Spectral linting for OAS 3.0 compliance.</pre>
                                 </div>
                             </div>
                         </div>
@@ -863,18 +875,23 @@
                     <div class="step">
                         <div class="step-header">
                             <div class="step-number">4</div>
-                            <span>Step 4: Applied Governance (Policies)</span>
+                            <span>Step 4: Traffic Protection Rules</span>
                         </div>
                         <div class="step-body">
-                            <p><strong>Paula's Action:</strong> She applies the "Standard Rate Limit" and "CORS
-                                Enforcement" policies. She can see a preview of the generated XML policies.</p>
-                            <p><strong>Actual Component:</strong> <code>OnboardingApiPolicyStep.tsx</code> using
-                                <code>PolicyStudio</code></p>
+                            <p><strong>Paula's Action:</strong> She sets the rules for how much traffic her API can
+                                handle and enables standard security settings with a few clicks. No code is required.
+                            </p>
+                            <div class="screenshot">
+                                <img src="paula_onboarding_step4_policy.png" alt="Policy Editor with Rate Limit"
+                                    style="max-width: 100%; border-radius: 8px;">
+                                <p style="font-size: 0.8rem; margin-top: 10px; color: #718096;">Visual policy
+                                    configuration.</p>
+                            </div>
                             <div class="tech-details">
-                                <div class="tech-toggle">🔧 Technical Details (XML Generation)</div>
+                                <div class="tech-toggle">�️ Technical Details (For Developers)</div>
                                 <div class="tech-content">
-                                    <pre>1. Template: <code>policyTemplates.ts</code> used to generate structured XML.
-2. Snippets: CORS, Rate-Limit, Quotas, and Header Injection modules.</pre>
+                                    <pre>Component: OnboardingApiPolicyStep.tsx / PolicyStudio
+Logic: Generates enterprise-grade APIM policy XML snippets.</pre>
                                 </div>
                             </div>
                         </div>
@@ -883,21 +900,65 @@
                     <div class="step">
                         <div class="step-header">
                             <div class="step-number">5</div>
-                            <span>Step 5: Fulfillment & Sage Execution</span>
+                            <span>Step 5: Go Live!</span>
                         </div>
                         <div class="step-body">
-                            <p><strong>Paula's Action:</strong> A final summary of all configurations is displayed. Once
-                                she clicks "Provision Resources", she sees a real-time progress bar of the
-                                orchestration.</p>
-                            <p><strong>Actual Component:</strong> <code>OnboardingFulfillmentStep.tsx</code></p>
+                            <p><strong>Paula's Action:</strong> Paula clicks "Provision". She watches a progress bar as
+                                the system automatically sets up her API gateway and code repository.</p>
                             <div class="tech-details">
-                                <div class="tech-toggle">🔧 Technical Details (Orchestration Saga)</div>
+                                <div class="tech-toggle">️ Technical Details (For Developers)</div>
                                 <div class="tech-content">
-                                    <pre>1. POST /api/v1/provisioning/start
-2. Saga 1: Create/Update ADO Repository.
-3. Saga 2: Configure APIM Product & API resources.
-4. Saga 3: Deploy Policy snippets via YAML to Git.</pre>
+                                    <pre>Component: OnboardingFulfillmentStep.tsx
+Saga: Orchestrates ADO repo and APIM resource creation.</pre>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">6</div>
+                            <span>Vision: Product Management Dashboard</span>
+                        </div>
+                        <div class="step-body">
+                            <p><strong>Paula's Action:</strong> After provision, Paula lands on her Product Details
+                                page. Here she can see all her API's vital signs.</p>
+                            <div class="insight">
+                                <strong>Future Capability:</strong> Centralized hub for "Named Values" (secrets),
+                                Subscription management, and Analytics.
+                            </div>
+                            <div class="mermaid">
+                                flowchart LR
+                                P[Product Dashboard] --> I[Inventory]
+                                P --> S[Subscriptions]
+                                P --> NV[Named Values]
+                                P --> M[Metrics]
+                                S --> A[Approve/Reject]
+                                NV --> K[Key Vault Sync]
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">7</div>
+                            <span>Vision: CI/CD Promotion</span>
+                        </div>
+                        <div class="step-body">
+                            <p><strong>Paula's Action:</strong> When ready, Paula promotes her API from DEV to QA using
+                                the "Promote" action, triggering a safe deployment pipeline.</p>
+                            <div class="mermaid">
+                                sequenceDiagram
+                                participant Paula
+                                participant Portal
+                                participant ADO as Azure DevOps
+                                participant QA as QA Environment
+
+                                Paula->>Portal: Click "Promote to QA"
+                                Portal->>ADO: Trigger Release Pipeline
+                                ADO->>QA: Deploy ARM Templates
+                                ADO-->>Portal: Deployment Success
+                                Portal->>Paula: "QA Environment Updated"
                             </div>
                         </div>
                     </div>
@@ -919,38 +980,61 @@
                     <div class="step">
                         <div class="step-header">
                             <div class="step-number">1</div>
-                            <span>Search & Discover</span>
+                            <span>Find your API</span>
                         </div>
                         <div class="step-body">
-                            <p><strong>Connor's Action:</strong> Connor uses the global search on the Catalog page,
-                                filtering by 'Payments' or 'Customer'. He sees cards for available APIs with their
-                                quality scores.</p>
-                            <p><strong>Actual Component:</strong> <code>DiscoveryProductCard.tsx</code></p>
+                            <p><strong>Connor's Action:</strong> Connor uses the global search to find the "Customer
+                                Profile" API. He can see quality scores that help him pick the most stable version for
+                                his app.</p>
+                            <div class="screenshot">
+                                <img src="connor_search.png" alt="Marketplace Search Results"
+                                    style="max-width: 100%; border-radius: 8px;">
+                                <p style="font-size: 0.8rem; margin-top: 10px; color: #718096;">Global search with
+                                    instant results and quality indicators.</p>
+                            </div>
+                            <div class="tech-details">
+                                <div class="tech-toggle">🛠️ Technical Details (For Developers)</div>
+                                <div class="tech-content">
+                                    <pre>Component: DiscoveryProductCard.tsx
+Logic: Server-side search and filtering by metadata.</pre>
+
+                                    <div class="mermaid">
+                                        sequenceDiagram
+                                        participant C as Connor
+                                        participant F as Frontend
+                                        participant BE as Backend
+                                        participant DB as Database
+
+                                        C->>F: Type "Customer"
+                                        F->>BE: GET /products?search=Customer
+                                        BE->>DB: SELECT * FROM products WHERE name LIKE '%Customer%'
+                                        DB-->>BE: Return matches
+                                        BE-->>F: JSON List
+                                        F->>C: Display Product Cards
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="step">
-                        <div class="step-header">
-                            <div class="step-number">2</div>
-                            <span>API Console & Playground</span>
-                        </div>
-                        <div class="step-body">
-                            <p><strong>Connor's Action:</strong> He opens the "Customer Profile API" and reviews the
-                                interactive Swagger UI. He can test calls directly against the DEV gateway using his
-                                team's identity.</p>
-                            <p><strong>Actual Component:</strong> <code>ApiConsole.component.tsx</code></p>
-                        </div>
-                    </div>
+
 
                     <div class="step">
                         <div class="step-header">
                             <div class="step-number">3</div>
-                            <span>Subscription Request</span>
+                            <span>Request Access</span>
                         </div>
                         <div class="step-body">
-                            <p><strong>Connor's Action:</strong> He clicks "Request Access", selects his "Mobile Squad"
-                                team, and provides a justification for the subscription.</p>
-                            <p><strong>Actual Component:</strong> <code>SubscriptionConfirmModal.tsx</code></p>
+                            <p><strong>Connor's Action:</strong> Connor clicks "Request Access". He selects his team and
+                                provides a brief reason. The request is sent instantly to the API's owner for approval.
+                            </p>
+                            <div class="tech-details">
+                                <div class="tech-toggle">🛠️ Technical Details (For Developers)</div>
+                                <div class="tech-content">
+                                    <pre>Component: SubscriptionConfirmModal.tsx
+Logic: Creates a pending subscription record in the database.</pre>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -966,30 +1050,65 @@
                 </div>
 
                 <div class="story-section">
-                    <h2>Governance Journey: Keeping the API Safe</h2>
+                    <h2>Governance Journey: Simple Approvals</h2>
 
                     <div class="step">
                         <div class="step-header">
                             <div class="step-number">1</div>
-                            <span>Approval Queue Monitoring</span>
+                            <span>Check Pending Requests</span>
                         </div>
                         <div class="step-body">
-                            <p><strong>Taylor's Action:</strong> Taylor views the "Team Queue" dashboard. She sees
-                                Connor's request and reviews his justification.</p>
-                            <p><strong>Actual Component:</strong> <code>TeamApprovalQueue (Inventory Feature)</code></p>
+                            <p><strong>Taylor's Action:</strong> Taylor visits her team dashboard and sees a new request
+                                from Connor. She reviews his justification and confirms his team is authorized to use
+                                the data.</p>
+                            <div class="screenshot">
+                                <img src="taylor_approval.png" alt="Team Lead Approval Queue"
+                                    style="max-width: 100%; border-radius: 8px;">
+                                <p style="font-size: 0.8rem; margin-top: 10px; color: #718096;">Streamlined approval
+                                    queue optimized for mobile review.</p>
+                            </div>
+                            <div class="tech-details">
+                                <div class="tech-toggle">🛠️ Technical Details (For Developers)</div>
+                                <div class="tech-content">
+                                    <pre>Context: Team Dashboard / Inventory
+Logic: Fetching pending subscriptions for owner_team_id.</pre>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     <div class="step">
                         <div class="step-header">
                             <div class="step-number">2</div>
-                            <span>Subscription Resolution</span>
+                            <span>Approve for the Team</span>
                         </div>
                         <div class="step-body">
-                            <p><strong>Taylor's Action:</strong> She clicks "Approve". The system instantly provisions
-                                the subscription key in APIM and adds Connor's team to the access control list.</p>
-                            <p><strong>Actual Component:</strong>
-                                <code>OnboardingResolutionStep (Reused/Shared Logic)</code></p>
+                            <p><strong>Taylor's Action:</strong> With one click, she approves the request. the system
+                                automatically sets up the access keys and security permissions for Connor's team.</p>
+                            <div class="tech-details">
+                                <div class="tech-toggle">🛠️ Technical Details (For Developers)</div>
+                                <div class="tech-content">
+                                    <pre>Logic: APIM Subscription provisioning and AD Group mapping.</pre>
+
+                                    <div class="mermaid">
+                                        sequenceDiagram
+                                        participant T as Taylor
+                                        participant F as Frontend
+                                        participant BE as Backend
+                                        participant APIM as Azure APIM
+                                        participant DB as Database
+
+                                        T->>F: Click "Approve"
+                                        F->>BE: POST /approvals/req-1/approve
+                                        BE->>DB: Update request status
+                                        BE->>APIM: Create Subscription (Key Gen)
+                                        APIM-->>BE: Returns API Keys
+                                        BE->>DB: Save Subscription
+                                        BE-->>F: Success
+                                        F->>T: Toast "Access Granted"
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

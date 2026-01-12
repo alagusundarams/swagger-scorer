@@ -45,6 +45,22 @@ export const mockProducts: Product[] = [
         createdAt: '2024-01-15T10:00:00Z',
         updatedAt: '2024-12-15T14:30:00Z',
     },
+    {
+        id: 'prod-customer-api',
+        name: 'Customer API',
+        displayName: 'Customer Profile API',
+        description: 'Provides deep customer insights and profile management.',
+        version: '1.0.0',
+        state: 'published',
+        ownerTeamId: 'team-platform',
+        ownerAdGroupId: 'ad-group-platform',
+        environment: 'PROD',
+        qualityScore: 92,
+        subscriberCount: 5,
+        apis: [],
+        createdAt: '2024-02-01T10:00:00Z',
+        updatedAt: '2024-02-05T14:30:00Z',
+    },
 ];
 
 // Mock subscription keys

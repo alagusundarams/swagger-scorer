@@ -10,8 +10,8 @@ export interface AuthSlice {
 }
 
 export const createAuthSlice: StateCreator<AuthSlice> = (set) => ({
-    user: null,
-    activeTeamId: 'all',
+    user: null, // Not logged in initially
+    activeTeamId: 'team-platform',
 
     setUser: (user: User | null) => set({ user }),
     setActiveTeamId: (activeTeamId: string) => set({ activeTeamId }),

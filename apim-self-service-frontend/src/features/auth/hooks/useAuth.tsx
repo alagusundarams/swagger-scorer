@@ -21,6 +21,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
  * Manages identity and session state.
  */
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    // Initial state: Not logged in
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 

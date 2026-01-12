@@ -17,18 +17,30 @@ const queryClient = new QueryClient({
   },
 });
 
-const rootElement = document.getElementById('root');
+import { USE_MOCKS } from './config/env';
 
-if (rootElement) {
-  createRoot(rootElement).render(
-    <StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <AppDataProvider>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
-        </AppDataProvider>
-      </QueryClientProvider>
-    </StrictMode>
-  );
+async function enableMocking() {
+  if (USE_MOCKS) {
+    const { worker } = await import('./mocks/browser');
+    return worker.start({
+      onUnhandledRequest: 'bypass',
+    });
+  }
 }
+
+enableMocking().then(() => {
+  const rootElement = document.getElementById('root');
+  if (rootElement) {
+    createRoot(rootElement).render(
+      <StrictMode>
+        <QueryClientProvider client={queryClient}>
+          <AppDataProvider>
+            <AuthProvider>
+              <App />
+            </AuthProvider>
+          </AppDataProvider>
+        </QueryClientProvider>
+      </StrictMode>
+    );
+  }
+});

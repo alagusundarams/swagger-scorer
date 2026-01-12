@@ -69,7 +69,7 @@ export const OnboardingIdentityStep: React.FC<OnboardingIdentityStepProps> = ({
             if (searchTerm.length >= 2) {
                 setIsSearching(true);
                 try {
-                    const results = await inventoryApi.searchAzureIdentities(searchTerm);
+                    const results = await inventoryApi.searchAppRegistrations(searchTerm);
                     setSearchResults(results);
                     setShowDropdown(true);
                 } catch (err) {
