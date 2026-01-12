@@ -37,6 +37,7 @@ interface MetadataStore {
     productForensics: Record<string, Record<string, { guids: string[], nvs: string[] }>>;
     productApiLinks: Record<string, Record<string, Array<{ name: string, path: string, gatewayUrl?: string, serviceUrl?: string }>>>;
     subscriptions: Record<string, any[]>;
+    apiOperations: Record<string, Record<string, any[]>>; // env -> apiName -> operations[]
 }
 
 // --- CONFIG LOADER ---
@@ -81,7 +82,8 @@ async function main() {
         apiForensics: {},
         productForensics: {},
         productApiLinks: {},
-        subscriptions: {}
+        subscriptions: {},
+        apiOperations: {}
     };
 
     if (sourceMode === 'db') {
@@ -304,20 +306,44 @@ async function main() {
                         }
 
                         // --- OPERATIONS EXTRACTION ---
-                        const apiContract = apimMeta.apiContracts[apiName];
-                        if (apiContract && apiContract.definition) {
-                            const spec = apiContract.definition;
-                            const paths = spec.paths || {};
-                            for (const [pathTemplate, pathItem] of Object.entries(paths)) {
-                                const methods = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'];
-                                for (const method of methods) {
-                                    const operation = (pathItem as any)[method];
-                                    if (operation) {
-                                        const operationId = `${uniqueApiId}:${method}:${pathTemplate.replace(/\//g, '_')}`;
-                                        const operationName = operation.operationId || `${method}_${pathTemplate.replace(/\//g, '_')}`;
-                                        const summary = operation.summary || operation.description || pathTemplate;
-                                        if (process.env.DEBUG_SQL) console.log(`[DB] Upserting Operation: ${operationId} (API: ${uniqueApiId})`);
-                                        await client.query(`
+                        // Priority 1: Use direct operations data from APIM API
+                        const directOperations = apimMeta.apiOperations[envName]?.[apiName];
+                        if (directOperations && directOperations.length > 0) {
+                            for (const op of directOperations) {
+                                const operationId = `${uniqueApiId}:${op.method}:${op.urlTemplate.replace(/\//g, '_')}`;
+                                if (process.env.DEBUG_SQL) console.log(`[DB] Upserting Operation: ${operationId} (API: ${uniqueApiId})`);
+                                await client.query(`
+                                    INSERT INTO operations (id, api_id, name, display_name, method, url_template, description)
+                                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                                    ON CONFLICT (id) DO UPDATE SET
+                                        name = EXCLUDED.name,
+                                        display_name = EXCLUDED.display_name,
+                                        method = EXCLUDED.method,
+                                        url_template = EXCLUDED.url_template,
+                                        description = EXCLUDED.description;
+                                `, [
+                                    operationId, uniqueApiId, op.id, op.name,
+                                    op.method.toUpperCase(), op.urlTemplate, op.description || ''
+                                ]);
+                            }
+                            if (verbose) console.log(`            🔧 Inserted ${directOperations.length} operations from APIM API`);
+                        } else {
+                            // Priority 2: Fallback to OpenAPI contract parsing
+                            const apiContract = apimMeta.apiContracts[apiName];
+                            if (apiContract && apiContract.definition) {
+                                const spec = apiContract.definition;
+                                const paths = spec.paths || {};
+                                let opsCount = 0;
+                                for (const [pathTemplate, pathItem] of Object.entries(paths)) {
+                                    const methods = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'];
+                                    for (const method of methods) {
+                                        const operation = (pathItem as any)[method];
+                                        if (operation) {
+                                            const operationId = `${uniqueApiId}:${method}:${pathTemplate.replace(/\//g, '_')}`;
+                                            const operationName = operation.operationId || `${method}_${pathTemplate.replace(/\//g, '_')}`;
+                                            const summary = operation.summary || operation.description || pathTemplate;
+                                            if (process.env.DEBUG_SQL) console.log(`[DB] Upserting Operation: ${operationId} (API: ${uniqueApiId})`);
+                                            await client.query(`
                                                 INSERT INTO operations (id, api_id, name, display_name, method, url_template, description)
                                                 VALUES ($1, $2, $3, $4, $5, $6, $7)
                                                 ON CONFLICT (id) DO UPDATE SET
@@ -327,11 +353,14 @@ async function main() {
                                                     url_template = EXCLUDED.url_template,
                                                     description = EXCLUDED.description;
                                             `, [
-                                            operationId, uniqueApiId, operationName, summary,
-                                            method.toUpperCase(), pathTemplate, operation.description || ''
-                                        ]);
+                                                operationId, uniqueApiId, operationName, summary,
+                                                method.toUpperCase(), pathTemplate, operation.description || ''
+                                            ]);
+                                            opsCount++;
+                                        }
                                     }
                                 }
+                                if (verbose && opsCount > 0) console.log(`            🔧 Inserted ${opsCount} operations from OpenAPI contract`);
                             }
                         }
                     } catch (err: any) {

@@ -47,6 +47,7 @@ interface MetadataStore {
     productApiLinks: Record<string, Record<string, Array<{ name: string, path: string, gatewayUrl?: string, serviceUrl?: string }>>>; // env -> productId -> { name, path, urls }[]
     subscriptions: Record<string, any[]>; // env -> subscription[]
     apiIdentities: Record<string, Record<string, string>>; // env -> apiName -> clientId (from auth settings)
+    apiOperations: Record<string, Record<string, any[]>>; // env -> apiName -> operations[]
 }
 const CONCURRENCY_LIMIT = 10;
 
@@ -157,7 +158,8 @@ async function main() {
         productForensics: {},
         productApiLinks: {},
         subscriptions: {},
-        apiIdentities: {}
+        apiIdentities: {},
+        apiOperations: {}
     };
 
     let envConfigs = config.azure?.environments || [];
@@ -448,6 +450,34 @@ async function main() {
                                 definition: contractJson.value || contractJson
                             };
                             if (verbose) console.log(`         ✅ Cached Contract: ${apiName}`);
+                        }
+                    } catch (e) { }
+                }
+
+                // 4c. Operations Extraction (Direct from APIM API)
+                if (!metadata.apiOperations[env.name]) {
+                    metadata.apiOperations[env.name] = {};
+                }
+
+                if (!metadata.apiOperations[env.name][apiName]) {
+                    try {
+                        const apiBaseId = apiFullId.replace(/\/products\/[^/]+\/apis\//, '/apis/');
+                        const opsRes = await fetch(`https://management.azure.com${apiBaseId}/operations?api-version=2022-08-01`, {
+                            headers: { 'Authorization': `Bearer ${azureToken}` }
+                        });
+                        if (opsRes.ok) {
+                            const opsData: any = await opsRes.json();
+                            const operations = (opsData.value || []).map((op: any) => ({
+                                id: op.name,
+                                name: op.properties.displayName || op.name,
+                                method: op.properties.method,
+                                urlTemplate: op.properties.urlTemplate,
+                                description: op.properties.description || ''
+                            }));
+                            metadata.apiOperations[env.name][apiName] = operations;
+                            if (verbose && operations.length > 0) {
+                                console.log(`         🔧 Operations: ${operations.length} found for ${apiName}`);
+                            }
                         }
                     } catch (e) { }
                 }
