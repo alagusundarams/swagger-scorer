@@ -604,6 +604,57 @@ sequenceDiagram
     UI-->>P: Product available in Catalog
 \`\`\`
 
+### 1.4 Governance Remediation (Fixing & Re-scoring)
+The journey of a Producer resolving linting errors to improve their API Quality Score.
+
+\`\`\`mermaid
+sequenceDiagram
+    autonumber
+    participant P as Producer
+    participant UI as Portal Frontend
+    participant SC as Scorer Engine
+    participant BE as Portal Backend
+    participant Blob as Azure Blob Storage
+
+    P->>UI: Review "Governance Findings"
+    UI->>BE: GET /onboarding/:draftId/findings
+    BE-->>UI: List of Spectral Errors (e.g. "Missing Security Scheme")
+    
+    P->>P: Update local OpenAPI Spec
+    P->>UI: Upload Fixed Spec (Re-upload)
+    UI->>BE: POST /onboarding/:draftId/re-validate
+    BE->>SC: Re-run Spectral Analysis
+    SC-->>BE: New Score: 95/100 (Pass)
+    BE->>Blob: Overwrite Draft Spec
+    BE-->>UI: Success (Score Updated)
+    UI-->>P: Displays "Ready for Provisioning"
+\`\`\`
+
+### 1.5 Patch Sync (Metadata Update)
+Updating product-level metadata (Tags, Descriptions, Visibility) without full resource re-provisioning.
+
+\`\`\`mermaid
+sequenceDiagram
+    autonumber
+    participant P as Producer
+    participant UI as Portal Frontend
+    participant BE as Portal Backend
+    participant DB as Postgres DB
+    participant APIM as Azure APIM
+
+    P->>UI: Select "Manage Product"
+    P->>UI: Edit Description/Tags
+    UI->>BE: PATCH /products/:id
+    BE->>DB: UPDATE products SET metadata = ...
+    
+    Note over BE, APIM: Trigger JIT Metadata Push
+    BE->>APIM: PATCH Product (ARM API)
+    APIM-->>BE: 200 OK
+    
+    BE-->>UI: Update Successful
+    UI-->>P: Changes reflected in Catalog
+\`\`\`
+
 ### 1.2 Onboarding Saga: Compensation (Rollback) Flow
 Detailed flow showing how the system handles failures during the multi-system provisioning process.
 
@@ -687,10 +738,72 @@ sequenceDiagram
 
 ---
 
-## 👥 2. Consumer Persona Flows
+## 👔 2. Producer Lead Persona Flows
+The Producer Lead (Team Lead/Manager) provides oversight and authority for team-level changes.
+
+### 2.1 Approval Queue Management
+The journey of a Lead reviewing and acting upon pending promotion or subscription requests.
+
+\`\`\`mermaid
+sequenceDiagram
+    autonumber
+    participant L as Producer Lead
+    participant UI as Portal Frontend
+    participant BE as Portal Backend
+    participant DB as Postgres DB
+    participant APIM as Azure APIM
+
+    L->>UI: Select "Team Approvals" Tab
+    UI->>BE: GET /approvals/team/:teamId/pending
+    BE->>DB: SELECT approvals WHERE status='PENDING'
+    DB-->>BE: List of 3 Requests
+    BE-->>UI: Return Requests
+    UI-->>L: Display Approval Queue
+    
+    L->>UI: Review Promotion (DEV -> QA)
+    L->>UI: Click "Approve"
+    UI->>BE: POST /approvals/:id/decide { action: "APPROVE" }
+    
+    Note over BE, DB: Formal Approval Processing
+    BE->>DB: UPDATE approvals SET status='APPROVED'
+    BE->>BE: Trigger Background Fulfillment
+    
+    Note over BE, APIM: Promotion Technical Step
+    BE->>APIM: Deploy Product to QA
+    APIM-->>BE: 200 OK
+    
+    BE-->>UI: Success (Queue Updated)
+    UI-->>L: Request removed from Pending
+\`\`\`
+
+### 2.2 Team Quality Metrics Oversight
+How a Lead monitors the governance and scoring health across their team's entire API portfolio.
+
+\`\`\`mermaid
+sequenceDiagram
+    autonumber
+    participant L as Producer Lead
+    participant UI as Portal Frontend
+    participant BE as Portal Backend
+    participant DB as Postgres DB
+
+    L->>UI: View "Team Dashboard"
+    UI->>BE: GET /teams/:teamId/metrics
+    BE->>DB: AGGREGATE scores FROM products WHERE team_id = :teamId
+    DB-->>BE: Metrics (Avg Score: 78, 2 Warnings)
+    BE-->>UI: Return Team Metrics
+    UI-->>L: Display "Team Governance Health" Card
+    
+    L->>UI: High-level view of "Red" score product
+    UI-->>L: Drills down into specific product findings
+\`\`\`
+
+---
+
+## 👥 3. Consumer Persona Flows
 The Consumer discovers and integrates with available APIs.
 
-### 2.1 Product Discovery & Documentation
+### 3.1 Product Discovery & Documentation
 How consumers find APIs and understand their technical interface before requesting access.
 
 \`\`\`mermaid
@@ -716,7 +829,7 @@ sequenceDiagram
     UI-->>C: Consumer reviews Schema & Policies
 \`\`\`
 
-### 2.2 Subscription & Access Procurement (Lead Approval)
+### 3.2 Subscription & Access Procurement (Lead Approval)
 The flow of requesting access, specifically highlighting the requirement for approval by the **Producing Team Lead**.
 
 \`\`\`mermaid
@@ -748,12 +861,38 @@ sequenceDiagram
     BE-->>C: Notification: Access Granted
 \`\`\`
 
+### 3.3 Documentation Consumption & Playground
+How consumers interact with API metadata, Swagger UI, and policy documentation to understand integration requirements.
+
+\`\`\`mermaid
+sequenceDiagram
+    autonumber
+    participant C as Consumer
+    participant UI as Portal Frontend
+    participant BE as Portal Backend
+    participant Blob as Azure Blob Storage
+
+    C->>UI: Open "Product Details" page
+    UI->>BE: GET /products/:id/details
+    BE-->>UI: Metadata (ID, Description, Team, Identity)
+    
+    C->>UI: Click on "API Spec" Tab
+    UI->>BE: GET /products/:id/spec/raw
+    BE->>Blob: Fetch stored OpenAPI YAML
+    BE-->>UI: YAML Content
+    UI->>UI: Render Swagger UI (Interactive Playground)
+    
+    C->>UI: Review "Global Policies" Tab
+    UI->>BE: GET /products/:id/policies/effective
+    BE-->>UI: Readable Policy Summary (CORS, Quotas, IP Whitelist)
+\`\`\`
+
 ---
 
-## 🛡️ 3. Admin Persona Flows
+## 🛡️ 4. Admin Persona Flows
 The Platform Admin ensures system health, compliance, and handles infrastructure drift.
 
-### 3.1 Governance & Orphan Management
+### 4.1 Governance & Orphan Management
 How the portal identifies resources in Azure/ADO that are not tracked in the database ("Orphans") and reconciles them.
 
 \`\`\`mermaid
@@ -793,11 +932,57 @@ sequenceDiagram
     end
 \`\`\`
 
+### 4.2 Manual ETL Sync (Force-Reconcile)
+Triggering a full system-wide synchronization between Azure/ADO and the Portal DB outside the scheduled window.
+
+\`\`\`mermaid
+sequenceDiagram
+    autonumber
+    participant A as Admin
+    participant UI as Portal Frontend
+    participant BE as Portal Backend
+    participant ETL as ETL Worker Service
+    participant DB as Postgres DB
+
+    A->>UI: Navigate to "Connectivity & Sync"
+    A->>UI: Click "Trigger Full System Sync"
+    UI->>BE: POST /admin/sync/trigger { scope: "FULL" }
+    BE->>ETL: Start Reconciliation Job
+    
+    loop Per Platform (APIM, ADO, AD)
+        ETL->>ETL: Fetch Inventory & Metadata
+        ETL->>DB: UPSERT Changes / Flag Drift
+    end
+    
+    ETL-->>BE: Sync Job Completed (Logs available)
+    BE-->>UI: Success Toast (Reloading Data)
+    UI-->>A: Dashboard Refreshed
+\`\`\`
+
+### 4.3 Global Template Management
+Updating the enterprise-wide policy and metadata templates that new APIs use during onboarding.
+
+\`\`\`mermaid
+sequenceDiagram
+    autonumber
+    participant A as Admin
+    participant UI as Portal Frontend
+    participant BE as Portal Backend
+    participant DB as Postgres DB
+
+    A->>UI: Open "Global Config" -> "Templates"
+    A->>UI: Edit "Standard OAuth Policy" Template
+    UI->>BE: PUT /admin/templates/:id
+    BE->>DB: UPDATE policy_templates SET content = ...
+    BE-->>UI: Template Saved Globally
+    Note over BE: Future onboardings inherit new version
+\`\`\`
+
 ---
 
-## 🔐 4. Entity-Specific Granular Flows
+## 🔐 5. Entity-Specific Granular Flows
 
-### 4.1 Team Synchronization (AD Group Integration)
+### 5.1 Team Synchronization (AD Group Integration)
 How teams are established from enterprise directory groups.
 
 \`\`\`mermaid
@@ -815,7 +1000,7 @@ sequenceDiagram
     DB-->>RBAC: Return Permissions Dashboard
 \`\`\`
 
-### 4.2 API Key Rotation (Self-Service)
+### 5.2 API Key Rotation (Self-Service)
 The process of rolling credentials without downtime.
 
 \`\`\`mermaid
@@ -839,7 +1024,7 @@ sequenceDiagram
     BE->>AUDIT: Log "KEY_SWAP" (Action=Complete)
 \`\`\`
 
-### 4.3 Approval Request Lifecycle
+### 5.3 Approval Request Lifecycle
 Granular state transitions from submission to implementation.
 
 \`\`\`mermaid
@@ -862,7 +1047,7 @@ sequenceDiagram
     BE->>DB: Log Final Status & Resolution Notes
 \`\`\`
 
-### 4.4 Connectivity Matrix Diagnostics
+### 5.4 Connectivity Matrix Diagnostics
 How the portal verifies network-level connectivity between the Gateway and Backend API endpoints.
 
 \`\`\`mermaid
@@ -892,7 +1077,7 @@ sequenceDiagram
     end
 \`\`\`
 
-### 4.5 Resource Decommissioning (Admin Flow)
+### 5.5 Resource Decommissioning (Admin Flow)
 The end-of-life journey for a Product or API resource.
 
 \`\`\`mermaid
