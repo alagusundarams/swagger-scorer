@@ -87,6 +87,7 @@ graph TD
 
     React --> NodeJS
     NodeJS --> AKS
+    AKS ---|HPA Scaling| AKS
     NodeJS --> Postgres
     NodeJS --> APIM
     NodeJS -.-> Dynatrace
@@ -122,11 +123,16 @@ graph LR
         AuthSvc["fa:fa-shield-alt Auth & RBAC Service"]:::compute
     end
 
+    subgraph "Data Sync & Background Jobs"
+        ETL["fa:fa-database Scheduled ETL Sync"]:::compute
+    end
+
     subgraph "Infrastructure & External"
         DB[("fa:fa-database PostgreSQL")]:::db
         APIM_API["fa:fa-cogs APIM ARM API"]:::azure
         ADO_API["fa:fa-code-branch ADO REST API"]:::azure
         KV["fa:fa-key Azure Key Vault"]:::azure
+        Entra_API["fa:fa-id-card Entra ID (Graph API)"]:::azure
     end
 
     Catalog & Editor & Admin --> ProductSvc
@@ -139,6 +145,7 @@ graph LR
     AuditSvc --> DB
     ProductSvc --> DB
     ProductSvc -->|Resolve Secrets| KV
+    ETL --> APIM_API & ADO_API & DB & Entra_API
 \`\`\`
 
 ---
@@ -166,12 +173,25 @@ graph LR
     end
 
     subgraph Lane3["AKS Cluster (App Zone)"]
-        direction TB
-        FE["fa:fa-laptop-code React MFE (Nginx)"]:::compute
-        BE["fa:fa-server Node.js API (Fastify)"]:::compute
-        Scorer["fa:fa-check-circle Spectral Engine"]:::compute
-        FE --> BE
+        direction LR
+        subgraph RequestPath["Request Path"]
+            direction TB
+            Ingress["fa:fa-network-wired Ingress/Reverse Proxy (Nginx)"]:::compute
+            FE["fa:fa-laptop-code React MFE (Nginx)"]:::compute
+            BE["fa:fa-server Node.js API (Fastify)"]:::compute
+            Ingress -->|Path: /| FE
+            Ingress -->|Path: /api| BE
+        end
+
+        %% Connections to Internal Services (Now on the right due to LR direction of Lane3)
+        subgraph InternalServices["Internal Services"]
+            direction TB
+            Scorer["fa:fa-check-circle Spectral Engine"]:::compute
+            ETL["fa:fa-database Scheduled ETL Sync Pod"]:::compute
+        end
+
         BE <--> Scorer
+        ETL -.-> BE
     end
 
     subgraph Lane4["Data & Observability"]
@@ -190,7 +210,7 @@ graph LR
 
     %% Flows
     User == HTTPS ==> AGW
-    AGW == Routing ==> FE
+    AGW == Routing ==> Ingress
     BE --> DB
     BE --> Storage
     BE --> KV
@@ -198,88 +218,12 @@ graph LR
     BE --> ADO
     BE -.-> Dynatrace
     BE -.-> EntraID
+    ETL -.-> EntraID
 \`\`\`
 
 ---
 
-## 📊 3. Database ER Diagram (Authoritative Model)
-The following ERD captures the authoritative source of truth for the portal, showing relationships between teams, products, APIs, and governance resources.
-
-\`\`\`mermaid
-erDiagram
-    teams ||--o{ products : owns
-    teams ||--o{ user_teams : "has members"
-    users ||--o{ user_teams : "belongs to"
-    users ||--o{ audit_log : "performs actions"
-    
-    products ||--o{ apis : "contains"
-    products ||--o{ subscriptions : "grants access"
-    products ||--o{ named_values : "has config"
-    products ||--o{ permission_matrix : "access rules"
-    products ||--o{ drafts : "has staging files"
-
-    apis ||--o{ operations : "cached endpoints"
-    apis ||--o{ api_backends : "bound to"
-    governance_backends ||--o{ api_backends : "is bound to"
-
-    approval_requests ||--o{ drafts : "references"
-    teams ||--o{ approval_requests : "requests"
-    
-    policy_help_requests ||--o{ policy_help_messages : "contains"
-    users ||--o{ policy_help_messages : "sends"
-    products ||--o{ policy_help_requests : "context"
-
-    teams {
-        text id PK
-        text name
-        text azure_ad_group_id
-        text type "producer/consumer"
-    }
-    users {
-        text id PK
-        text email
-        text role "user/admin"
-    }
-    products {
-        text id PK
-        text display_name
-        text environment "DEV/QA/STAGE/PROD"
-        text dev_hash "Git commit"
-        text qa_hash "Git commit"
-        jsonb authorized_teams
-        text management_mode
-    }
-    apis {
-        text id PK
-        text product_id FK
-        text path
-        decimal quality_score
-    }
-    subscriptions {
-        text id PK
-        text product_id FK
-        text subscriber_team_id FK
-        text state "active/suspended"
-    }
-    named_values {
-        text id PK
-        text product_id FK
-        text system_name
-        text value
-        boolean is_secret
-    }
-    audit_log {
-        serial id PK
-        text entity_type
-        text action
-        jsonb changes
-        timestamptz timestamp
-    }
-\`\`\`
-
----
-
-## 🚀 4. Detailed Onboarding Saga (Sequence)
+## 🚀 3. Detailed Onboarding Saga (Sequence)
 API Onboarding is a distributed transaction ("Saga") ensuring consistency across DB, Git, and Azure APIM.
 
 \`\`\`mermaid
@@ -416,6 +360,653 @@ stateDiagram-v2
     EditorMode --> Saving : Click Save
     Saving --> [*]
 \`\`\`
+\`\`\`
+`,
+
+    database_schema: `# Database Schema & ER Diagram
+
+This document provides a detailed representation of the authoritative database schema used by the APIM Self-Service Portal.
+
+---
+
+## 📊 Entity Relationship Diagram (ERD)
+
+The following diagram captures the relationships between core entities such as Teams, Products, APIs, and Governance logs.
+
+\`\`\`mermaid
+erDiagram
+    teams ||--o{ products : owns
+    teams ||--o{ users : "default team"
+    teams ||--o{ app_registrations : "managed by"
+    users ||--o{ audit_log : "performs"
+    users ||--o{ drafts : "creates"
+    users ||--o{ policy_help_requests : "requests help"
+    
+    products ||--o{ apis : contains
+    products ||--o{ product_deployments : "tracked in"
+    products ||--o{ subscriptions : "grants access"
+    products ||--o{ named_values : "has config"
+    products ||--o{ app_registrations : "authenticated by"
+    products ||--o{ permission_matrix : "access control"
+    products ||--o{ drafts : "staging context"
+    products ||--o{ product_named_values : references
+    products ||--o{ governance_backends : "points to"
+
+    apis ||--o{ operations : defines
+    apis ||--o{ app_registrations : "isolated identities"
+    apis ||--o{ named_values : "api-scoped config"
+    apis ||--o{ governance_backends : "points to"
+    apis ||--o{ api_backends : "bound to"
+
+    named_values ||--o{ product_named_values : "shared across"
+    approval_requests ||--o{ drafts : "triggers"
+    policy_help_requests ||--o{ policy_help_messages : "message thread"
+    drafts ||--o{ blob_history : "lifecycle tracking"
+    
+    governance_backends ||--o{ api_backends : "mapping"
+
+    teams {
+        text id PK
+        text name
+        text azure_ad_group_id
+        text type "producer/consumer"
+        text contact_email
+        int member_count
+    }
+    users {
+        text id PK
+        text email
+        text name
+        text azure_ad_object_id
+        text default_team_id FK
+        text role "user/admin"
+    }
+    products {
+        text id PK
+        text name
+        text display_name
+        text environment "DEV/QA/STAGE/PROD"
+        text region
+        text management_mode "TERRAFORM_MANAGED/HYBRID"
+        text git_repo_url
+        text owner_team_id FK
+        decimal quality_score
+        jsonb detected_anomalies
+    }
+    apis {
+        text id PK
+        text product_id FK
+        text name
+        text path
+        text gateway_url
+        decimal quality_score
+    }
+    operations {
+        text id PK
+        text api_id FK
+        text method "GET/POST/..."
+        text url_template
+    }
+    app_registrations {
+        text id PK
+        text client_id
+        text display_name
+        text product_id FK
+        text api_id FK
+        text type "PRODUCT/API"
+    }
+    subscriptions {
+        text id PK
+        text product_id FK
+        text subscriber_team_id FK
+        text app_registration_id FK
+        text state "active/pending/..."
+    }
+    named_values {
+        text id PK
+        text product_id FK
+        text scope_id FK "API scope"
+        text system_name
+        text value
+        boolean is_secret
+    }
+    governance_backends {
+        text id PK
+        text environment PK
+        text url
+        text scope "API/GLOBAL"
+        text product_id FK
+        text api_id FK
+    }
+    approval_requests {
+        text id PK
+        text type "SUBSCRIPTION/PROMOTION/..."
+        text status "PENDING/APPROVED/..."
+        text requester_team_id FK
+        jsonb details
+    }
+    audit_log {
+        uuid id PK
+        text user_id
+        text action
+        text resource_type
+        jsonb details
+        timestamp created_at
+    }
+\`\`\`
+
+---
+
+## 📖 Data Dictionary
+
+### Core Identity & Access
+| Table | Column | Type | Description |
+| :--- | :--- | :--- | :--- |
+| **teams** | \`id\` | TEXT (PK) | Unique identifier for the team. |
+| | \`name\` | TEXT | Human-readable name of the team. |
+| | \`azure_ad_group_id\` | TEXT | Link to Entra ID (formerly Azure AD) group. |
+| **users** | \`id\` | TEXT (PK) | Unique identifier for the user. |
+| | \`azure_ad_object_id\`| TEXT | Link to Entra ID user object. |
+| | \`role\` | TEXT | Portal role: \`user\` or \`admin\`. |
+| **permission_matrix** | \`product_id\` | TEXT | The logical product the permission applies to. |
+| | \`ad_group_id\` | TEXT | The Entra ID group granted access. |
+| | \`role\` | TEXT | Role level: \`Reader\`, \`Contributor\`, \`Owner\`. |
+
+### Inventory & Management
+| Table | Column | Type | Description |
+| :--- | :--- | :--- | :--- |
+| **products** | \`id\` | TEXT (PK) | Unique identifier (e.g., \`prod-inventory-dev\`). |
+| | \`management_mode\` | TEXT | \`TERRAFORM_MANAGED\`, \`HYBRID\`, or \`UNTRACKED\`. |
+| | \`identity_client_id\` | TEXT | Primary App Registration bound to this product. |
+| **apis** | \`id\` | TEXT (PK) | Unique identifier for the API implementation. |
+| | \`product_id\` | TEXT (FK) | Parent product link. |
+| | \`path\` | TEXT | Gateway relative path (e.g., \`/api/v1/users\`). |
+| **operations** | \`method\` | TEXT | HTTP Verb (GET, POST, etc.). |
+| | \`url_template\` | TEXT | REST path template for the operation. |
+
+### Configuration & Connectivity
+| Table | Column | Type | Description |
+| :--- | :--- | :--- | :--- |
+| **named_values** | \`system_name\` | TEXT | Variable name in APIM (e.g., \`backend-url\`). |
+| | \`value\` | TEXT | Value or KeyVault reference. |
+| | \`scope_id\` | TEXT (FK) | Optional link to a specific API for isolated config. |
+| **governance_backends**| \`url\` | TEXT | The actual backend service URL. |
+| | \`scope\` | TEXT | \`API-level\` or \`GLOBAL\` scope. |
+
+### Lifecycle & Governance
+| Table | Column | Type | Description |
+| :--- | :--- | :--- | :--- |
+| **subscriptions** | \`state\` | TEXT | Lifecycle state: \`active\`, \`pending\`, \`expired\`, etc. |
+| | \`app_registration_id\`| TEXT (FK) | Link to the consumer's App Registration. |
+| **approval_requests** | \`type\` | TEXT | Type of request (e.g., \`PROMOTION_REQUEST\`). |
+| | \`details\` | JSONB | Payload containing the specific changes requested. |
+| **audit_log** | \`action\` | TEXT | Action performed (e.g., \`DELETE\`, \`READ_KEYS\`). |
+| | \`resource_id\` | TEXT | ID of the affected resource. |
+
+---
+
+> [!NOTE]
+> This schema is synchronized with the PostgreSQL database. Any manual changes to the schema must be reflected here.
+`,
+
+    user_flows_and_sequences: `# Detailed User Flows & Sequence Diagrams
+
+Comprehensive documentation of the specific interactions between users, the Portal Backend, and external systems (Azure APIM, ADO, DB).
+
+---
+
+## 👨‍💻 1. Producer Persona Flows
+The Producer manages the lifecycle of their API Products.
+
+### 1.1 API Product Onboarding (Discovery to Provisioning)
+Covers the flow from initial spec upload to a fully provisioned environment in Azure, including identity enforcement.
+
+\`\`\`mermaid
+sequenceDiagram
+    autonumber
+    participant P as Producer
+    participant UI as Portal Frontend
+    participant BE as Portal Backend
+    participant SC as Scorer Engine
+    participant DB as Postgres DB
+    participant AZURE as Entra ID / ARM
+    participant ADO as Azure DevOps
+    participant APIM as Azure APIM
+
+    P->>UI: Select "Onboard New Product"
+    P->>UI: Upload OpenAPI Spec (.yaml/.json)
+    UI->>BE: POST /onboarding/validate
+    BE->>SC: Run Spectral Lint & Scoring
+    SC-->>BE: Score (e.g., 85/100) + Warnings
+    BE-->>UI: Returning Score & Validation Result
+    UI-->>P: Display Score & Governance Feedback
+
+    P->>UI: Provide App Registration (Client ID)
+    Note right of P: Admin/Lead selection (Product vs API Level)
+    UI->>BE: POST /onboarding/check-identity
+    BE->>AZURE: Validate Client ID exists
+    BE->>DB: Check for One-Time Binding (Unicity)
+    BE-->>UI: Identity Validated (Display Name, Scopes)
+
+    P->>UI: Confirm Onboarding & Assign Team
+    UI->>BE: POST /onboarding/finalize
+    BE->>DB: INSERT product (status="PROVISIONING")
+    BE->>DB: INSERT app_registration record
+    
+    par Component Creation (Saga)
+        BE->>ADO: Create Repository & Branch
+        BE->>ADO: Commit openapi.yaml
+        BE->>APIM: Create/Update APIM Product & APIs
+    end
+    
+    BE->>DB: UPDATE product (status="ACTIVE", owner_team_id)
+    BE-->>UI: Onboarding Successful
+    UI-->>P: Product available in Catalog
+\`\`\`
+
+### 1.2 Onboarding Saga: Compensation (Rollback) Flow
+Detailed flow showing how the system handles failures during the multi-system provisioning process.
+
+\`\`\`mermaid
+sequenceDiagram
+    autonumber
+    participant BE as Portal Backend
+    participant DB as Postgres DB
+    participant ADO as Azure DevOps
+    participant APIM as Azure APIM
+
+    BE->>DB: Product State -> "PROVISIONING"
+    
+    BE->>ADO: Create Repository (SUCCESS)
+    
+    BE->>APIM: Create Product (FAILURE - Timeout/Conflict)
+    
+    rect rgb(255, 230, 230)
+        Note over BE, DB: Compensation Logic Triggered
+        BE->>ADO: DELETE Repository (Cleanup)
+        BE->>DB: UPDATE product (status="FAILED", error="APIM_TIMEOUT")
+        BE->>DB: Log Audit: "PROVISIONING_ROLLBACK_COMPLETE"
+    end
+\`\`\`
+
+### 1.3 Identity Inheritance (Existing Product Onboarding)
+Flow for adding a new API to an existing Product while inheriting its security identity.
+
+\`\`\`mermaid
+sequenceDiagram
+    autonumber
+    participant P as Producer
+    participant BE as Portal Backend
+    participant DB as Postgres DB
+    participant APIM as Azure APIM
+
+    P->>BE: Select Existing Product (id="prod-123")
+    BE->>DB: Fetch Product Identity (clientId="...")
+    BE-->>P: Status: Identity "prod-123-identity" will be inherited
+    
+    P->>BE: Submit API Onboarding
+    BE->>DB: INSERT api (product_id="prod-123")
+    BE->>APIM: Bind API to existing Product Identity
+    BE-->>P: API Onboarded (Inherited Security)
+\`\`\`
+
+### 1.2 Environment Promotion (STAGE Approval Flow)
+Detailed flow showing the **Producer Lead** approval logic and technical execution options.
+
+\`\`\`mermaid
+sequenceDiagram
+    autonumber
+    participant PL as Producer Lead
+    participant P as Producer/Dev
+    participant BE as Portal Backend
+    participant DB as Postgres DB
+    participant ADO as Azure DevOps
+    participant APIM as Azure APIM
+
+    P->>BE: Request Promotion (DEV -> QA)
+    Note over BE: Promotion to QA/STAGE requires Lead Approval
+    BE->>DB: Create Approval Request (status="PENDING")
+    BE-->>P: Request Submitted
+    
+    PL->>BE: Review Request & Approve
+    BE->>DB: Update Request (status="APPROVED")
+
+    alt Option A: DevOps Orchestration (GitOps)
+        BE->>ADO: Trigger Promotion Pipeline
+        ADO->>APIM: Apply Infrastructure-as-Code (Terraform)
+        ADO->>BE: Webhook: Deployment Success
+        BE->>DB: Update last_deployed_commit
+    else Option B: Saga Orchestration (Direct)
+        BE->>APIM: Apply ARM Template / REST Calls
+        APIM-->>BE: 200 OK
+        BE->>DB: Update last_deployed_at
+    end
+
+    BE-->>P: Notification: Promotion Successful
+\`\`\`
+
+---
+
+## 👥 2. Consumer Persona Flows
+The Consumer discovers and integrates with available APIs.
+
+### 2.1 Product Discovery & Documentation
+How consumers find APIs and understand their technical interface before requesting access.
+
+\`\`\`mermaid
+sequenceDiagram
+    autonumber
+    participant C as Consumer
+    participant UI as Portal Frontend
+    participant BE as Portal Backend
+    participant DB as Postgres DB
+    participant Blob as Azure Blob Storage
+
+    C->>UI: Global Search (Topic/Team/Feature)
+    UI->>BE: GET /products?search=...
+    BE->>DB: Query Catalog with partial matching
+    DB-->>BE: Return Results (Digital Twin metadata)
+    BE-->>UI: Display List with Quality Scores
+    
+    C->>UI: Select Product -> "View Spec"
+    UI->>BE: GET /products/:id/spec
+    BE->>Blob: Fetch OpenAPI raw content
+    BE-->>UI: Return Spec Template
+    UI->>UI: Render Swagger UI / Documentation Playground
+    UI-->>C: Consumer reviews Schema & Policies
+\`\`\`
+
+### 2.2 Subscription & Access Procurement (Lead Approval)
+The flow of requesting access, specifically highlighting the requirement for approval by the **Producing Team Lead**.
+
+\`\`\`mermaid
+sequenceDiagram
+    autonumber
+    participant C as Consumer
+    participant UI as Portal Frontend
+    participant BE as Portal Backend
+    participant DB as Postgres DB
+    participant PTL as Producing Team Lead
+    participant APIM as Azure APIM
+
+    C->>UI: Request Subscription
+    C->>UI: Select Target Environment & App Registration
+    UI->>BE: POST /subscriptions/request
+    BE->>DB: INSERT subscription (status="PENDING_APPROVAL")
+    BE-->>UI: Request Submitted
+    
+    PTL->>UI: View "Team Approval Queue"
+    PTL->>UI: Approve Request
+    UI->>BE: POST /approvals/:id/decide (action="APPROVE")
+    
+    rect rgb(240, 255, 240)
+        Note over BE, APIM: Fulfillment Phase
+        BE->>APIM: Create/Update Subscription Key
+        BE->>DB: UPDATE subscription (status="ACTIVE")
+    end
+    
+    BE-->>C: Notification: Access Granted
+\`\`\`
+
+---
+
+## 🛡️ 3. Admin Persona Flows
+The Platform Admin ensures system health, compliance, and handles infrastructure drift.
+
+### 3.1 Governance & Orphan Management
+How the portal identifies resources in Azure/ADO that are not tracked in the database ("Orphans") and reconciles them.
+
+\`\`\`mermaid
+sequenceDiagram
+    autonumber
+    participant A as Platform Admin
+    participant ORCH as Sync Orchestrator
+    participant APIM as Azure APIM
+    participant ADO as Azure DevOps
+    participant DB as Postgres DB
+
+    A->>ORCH: Trigger "Orphan Discovery"
+    
+    par Cloud Inventory
+        ORCH->>APIM: Fetch ALL Products/APIs
+        ORCH->>ADO: Fetch ALL Repositories
+    end
+    
+    ORCH->>DB: Compare against current 'Digital Twin'
+    
+    rect rgb(255, 240, 240)
+        Note over ORCH, DB: Drift Detection
+        ORCH->>ORCH: Identify identities in cloud MISSING from DB
+        ORCH->>DB: Flag as "ORPHANED_RESOURCE"
+    end
+    
+    A->>UI: Review Orphan Dashboard
+    
+    alt Remediation: Link
+        A->>BE: Action: "Link to Existing Product"
+        BE->>DB: Associate ORPHAN with product_id
+    else Remediation: Decommission
+        A->>BE: Action: "Cleanup / Decommission"
+        BE->>APIM: DELETE Resource
+        BE->>ADO: Archive Repository
+        BE->>DB: Log Audit: DECOMMISSIONED
+    end
+\`\`\`
+
+---
+
+## 🔐 4. Entity-Specific Granular Flows
+
+### 4.1 Team Synchronization (AD Group Integration)
+How teams are established from enterprise directory groups.
+
+\`\`\`mermaid
+sequenceDiagram
+    participant AD as Active Directory (Graph API)
+    participant SYNC as Scheduled ETL Sync Pod (AKS)
+    participant DB as Postgres DB
+    participant RBAC as Portal RBAC
+
+    Note over SYNC: Runs daily cron job
+    SYNC->>AD: GET /groups (Fetch memberships)
+    SYNC->>DB: UPSERT teams (id = group_id)
+    SYNC->>DB: UPSERT user_teams junction
+    RBAC->>DB: Query Team Membership
+    DB-->>RBAC: Return Permissions Dashboard
+\`\`\`
+
+### 4.2 API Key Rotation (Self-Service)
+The process of rolling credentials without downtime.
+
+\`\`\`mermaid
+sequenceDiagram
+    participant C as Consumer
+    participant BE as Portal Backend
+    participant APIM as Azure APIM
+    participant DB as Postgres DB
+    participant AUDIT as Audit Service
+
+    C->>BE: POST /subscriptions/:id/regenerate-key
+    BE->>APIM: Regenerate Secondary Key
+    APIM-->>BE: New Key Generated
+    BE->>DB: Update subscription metadata
+    BE->>AUDIT: Log "KEY_ROTATION" (Action=Secondary)
+    
+    Note over C, BE: Consumer updates client app with Secondary Key
+    
+    C->>BE: POST /subscriptions/:id/swap-keys
+    BE->>APIM: Swap Primary/Secondary Keys
+    BE->>AUDIT: Log "KEY_SWAP" (Action=Complete)
+\`\`\`
+
+### 4.3 Approval Request Lifecycle
+Granular state transitions from submission to implementation.
+
+\`\`\`mermaid
+sequenceDiagram
+    participant R as Requester
+    participant BE as Portal Backend
+    participant DB as Postgres DB
+    participant App as Approver (Lead/Admin)
+
+    R->>BE: Submit Request (e.g. Quota Increase)
+    BE->>DB: INSERT approval_requests (status="PENDING")
+    BE-->>R: Notified: Stage 1/2 Pending
+    
+    App->>BE: GET /approvals/pending
+    App->>BE: POST /approvals/:id/decide (action="APPROVE")
+    BE->>DB: UPDATE approval_requests (status="APPROVED", resolved_by)
+    
+    Note over BE, DB: Automatic Implementation Trigger
+    BE->>APIM: Update Product Quota
+    BE->>DB: Log Final Status & Resolution Notes
+\`\`\`
+
+### 4.4 Connectivity Matrix Diagnostics
+How the portal verifies network-level connectivity between the Gateway and Backend API endpoints.
+
+\`\`\`mermaid
+sequenceDiagram
+    autonumber
+    participant A as Admin
+    participant BE as Portal Backend
+    participant AGW as Application Gateway
+    participant BND as Backend Node (AKS)
+    participant EXT as External API Endpoint
+
+    A->>BE: Trigger Connectivity Test (Path: /api/v1/user)
+    BE->>AGW: Query Routing Rules
+    AGW-->>BE: Destination IP: 10.0.0.5 (AKS Node)
+    
+    BE->>BND: Request Synthetic Probe (HTTP GET)
+    BND->>EXT: Invoke Endpoint
+    
+    alt Success
+        EXT-->>BND: 200 OK (Latency: 45ms)
+        BND-->>BE: Connectivity Confirmed
+        BE->>A: Display results: ✅ REACHABLE
+    else Failure
+        EXT-->>BND: 504 Timeout / 403 Forbidden
+        BND-->>BE: Error: Connection Refused
+        BE->>A: Display results: ❌ UNREACHABLE (Check NSG/Firewall)
+    end
+\`\`\`
+
+### 4.5 Resource Decommissioning (Admin Flow)
+The end-of-life journey for a Product or API resource.
+
+\`\`\`mermaid
+sequenceDiagram
+    autonumber
+    participant A as Platform Admin
+    participant BE as Portal Backend
+    participant DB as Postgres DB
+    participant APIM as Azure APIM
+    participant ADO as Azure DevOps
+
+    A->>BE: DELETE /products/:id (Decommission)
+    BE->>DB: UPDATE product (status="DECOMMISSIONING")
+    
+    par Cleanup Phase
+        BE->>APIM: DELETE Product & Subscriptions
+        BE->>ADO: Archive Repository (ReadOnly)
+        BE->>ADO: Delete Deployment Pipelines
+    end
+    
+    BE->>DB: UPDATE product (status="ARCHIVED", deleted_at=NOW())
+    BE->>DB: Log Audit: "PRODUCT_DECOMMISSIONED"
+    BE-->>A: Decommissioning Complete
+\`\`\`
+
+`,
+
+    etl_documentation: `# ETL & Synchronization Strategy
+
+The APIM Self-Service Portal maintains an authoritative "Digital Twin" of the enterprise API ecosystem by continuously synchronizing state from Azure APIM and Azure DevOps (ADO) into the Portal Database.
+
+## 🔄 Core Sync Pipeline
+
+The synchronization process is divided into specialized jobs that handle different aspects of the environment state.
+
+### 1. APIM Inventory Sync (\`sync-apim-to-db.ts\`)
+**Purpose:** Primary state synchronization from Azure APIM instances.
+- **Orchestration:** Multi-process runner that forks workers per environment (DEV, QA, STAGE, PROD) for parallel execution.
+- **Data Extracted:**
+    - **Products:** Display names, descriptions, states, and XML policies.
+    - **APIs & Operations:** Full path mapping, protocols, and backend service URLs.
+    - **Subscriptions:** Active keys and owner mappings.
+    - **Named Values:** Configuration constants and Key Vault references.
+- **Logic:** Merges raw ARM metadata with "Governance Tags" (e.g., \`TeamID\`) to establish ownership in the portal.
+
+### 2. ADO Metadata Extraction (\`extract-ado-metadata.ts\`)
+**Purpose:** Linking API Products to their source repositories and CI/CD pipelines.
+- **Discovery Engine:** Uses "Surgical Strikes" (targeted REST calls) to find repositories matching product names.
+- **Deployment Tracking:**
+    - Identifies the specific **Git Commit Hash** currently deployed in each environment.
+    - Captures deployment metadata: Author, Message, Date, and Pipeline execution URL.
+- **Spec Recovery:** Scans repositories for OpenAPI/Swagger specifications to ensure the Portal has the latest contract.
+
+### 3. Governance Reconciliation (\`reconcile-governance.ts\`)
+**Purpose:** Detection of "Drift" and "Orphans".
+- Identifies resources in APIM that lack mandatory governance tags.
+- Flags "Manual Creations" (resources in APIM not tracked by the Portal's GitOps flow).
+- Generates compliance reports for platform admins.
+
+### 4. Azure AD / Identity Sync
+**Purpose:** Synchronizing enterprise team structures into the Portal.
+- **Component:** \`sync-apim-to-db.ts\` (Integrated Logic) or \`fetch-ad-groups.ts\` (Utility).
+- **Process:**
+    - The Scheduled ETL Job authenticates as a Service Principal.
+    - It queries **Microsoft Graph API** (\`/memberOf\` or \`/groups\`) to fetch AD Group memberships.
+    - Upserts records into \`teams\` and \`users\` tables to establish the Portal's RBAC baseline.
+- **Responsibility:** Initiated by the **Scheduled ETL Sync Pod** in AKS.
+
+---
+
+## 🛠️ Execution Model
+
+The ETL jobs are designed to run in two modes:
+
+1.  **Scheduled (Cron):** Full system reconciliation running **once a day** (configurable) as a Background Pod in the AKS Cluster.
+2.  **Just-In-Time (JIT):** Triggered via Webhooks when a user performs an onboarding action in the Portal or pushes code to a managed repository.
+
+---
+
+## 🗺️ Roadmap: Sync Evolution
+
+### Phase 3/4: Individual Resource Sync
+In upcoming phases, the "All-or-Nothing" sync model will be enhanced with:
+- **On-Demand Single Sync:** Button in the Admin/Product view to manually trigger a sync for a *specific* product ID.
+- **Selective Table Sync:** Ability to refresh only "Named Values" or "Subscriptions" without a full inventory sweep.
+- **Granular Error Handling:** If one environment (e.g., PROD) fails, the sync continues for others, reporting status per region.
+
+---
+
+## 📊 Data Flow Block Diagram
+
+\`\`\`mermaid
+graph LR
+    subgraph "External Sources"
+        APIM["Azure APIM"]
+        ADO["Azure DevOps"]
+    end
+
+    subgraph "ETL Layer (Node.js)"
+        Orchestrator["Sync Orchestrator"]
+        WorkerAPIM["APIM Worker"]
+        WorkerADO["ADO Worker"]
+    end
+
+    subgraph "Persistence"
+        DB[("PostgreSQL")]
+    end
+
+    APIM -->|ARM REST API| WorkerAPIM
+    ADO -->|ADO REST API| WorkerADO
+    Orchestrator --> WorkerAPIM
+    Orchestrator --> WorkerADO
+    WorkerAPIM -->|Upsert| DB
+    WorkerADO -->|Update Metadata| DB
 \`\`\`
 `,
 
@@ -636,14 +1227,14 @@ How do we handle traffic spikes?
 
 \`\`\`mermaid
 graph LR
-    Metric[CPU / HTTP Request Count] --> KEDA[KEDA Scaler]
-    KEDA -- "Scale Out (1->10)" --> Pods[Backend Pods]
-    Pods -- "Load Balance" --> DB[Database Connection Pool]
+    Metric["CPU / HTTP Request Count"] --> HPA["HPA / KEDA Scaler"]
+    HPA -- "Scale Out Pods (1->N)" --> Pods["Backend API Pods"]
+    Pods -- "Load Balance" --> DB["Database Connection Pool"]
 \`\`\`
 
-*   **Statelessness:** The backend stores NO session state (JWT only). This means we can scale from 1 replica to 50 instantly.
+*   **Statelessness:** The backend stores NO session state (JWT only). This ensures we can scale from 1 replica to 50 instantly within AKS.
 *   **Database Pooling:** We use \`pg-pool\` to ensure that 50 pods don't exhaust the Postgres connection limit (Max 100 connections).
-*   **Async Processing:** Heavy jobs (Spec Parsing) are candidates for **Azure Functions** triggered by Event Grid, offloading CPU work from the main API.
+*   **Heavy Workloads:** Heavy jobs (Spec Parsing) are offloaded to **Background Worker Pods** within the same AKS cluster, preventing CPU contention with the interactive API.
 
 ---
 
@@ -765,9 +1356,9 @@ stateDiagram-v2
 
     state VisualMode {
         [*] --> Idle
-        Idle --> Dragging : User Starts Drag
-        Dragging --> Dropped : Item Placed
-        Dropped --> Regenerating : Trigger XML Gen
+        Idle --> SelectingTemplate : User selects policy block
+        SelectingTemplate --> Applying : Template applied
+        Applying --> Regenerating : Trigger XML Gen
         Regenerating --> Idle : State Updated
     }
 
@@ -931,10 +1522,11 @@ This backlog outlines the features and capabilities of the APIM Self-Service Por
 50. **[DB] Subscription Model:** Schema for managing Consumer-to-Product relationships.
 51. **[KM] Secret Management:** Secure generation of Subscription Key identifiers.
 52. **[BE] Application Linkage:** Association of Client IDs (App Registrations) to Subscriptions.
-53. **[FE] Key Reveal UI:** Secure "Show/Hide" mechanism for API Keys.
-54. **[BE] Auto-Approval Logic:** Rule engine for "Open" vs "Protected" products.
-55. **[BE] Manual Approval Flow:** Workflow for Producers to grant/deny access.
-56. **[BE] Key Rotation:** Logic to invalidate and regenerate keys via APIM.
+53. **[FE] App Registration Display:** Show linked app registration details (Client ID, Display Name, App ID URI) in product detail view and admin governance pages.
+54. **[FE] Key Reveal UI:** Secure "Show/Hide" mechanism for API Keys.
+55. **[BE] Auto-Approval Logic:** Rule engine for "Open" vs "Protected" products.
+56. **[BE] Manual Approval Flow:** Workflow for Producers to grant/deny access.
+57. **[BE] Key Rotation:** Logic to invalidate and regenerate keys via APIM.
 
 ---
 
@@ -947,7 +1539,8 @@ This backlog outlines the features and capabilities of the APIM Self-Service Por
 60. **[FE] Audit Log UI:** History tab showing chronological changes.
 61. **[BE] Compliance Monitor:** Background job to detect orphaned resources.
 62. **[FE] Compliance Alerts:** Dashboard notifications for ownership issues.
-63. **[BE] Executive Reporting:** Aggregated stats for Platform Administrators.
+63. **[FE] Orphaned API Manager:** Admin UI to identify and assign orphaned APIs that are not linked to any product (Future - currently APIs are tightly coupled to products).
+64. **[BE] Executive Reporting:** Aggregated stats for Platform Administrators.
 
 ---
 
@@ -975,6 +1568,7 @@ This backlog outlines the features and capabilities of the APIM Self-Service Por
 76. **[Doc] Operational Runbooks:** Procedures for Incident Management and Recovery.
 77. **[QA] Performance Profiling:** Load testing of critical paths (Inventory/Sync).
 78. **[QA] Accessibility Audit:** WCAG compliance checks (Contrast/Screen Readers).
+79. **[Ops] Database Script Categorization:** Analyze and categorize existing scripts in \`apim-database\` into Day 1 (Setup/Provisioning) and Day 2 (Maintenance/Operations) workflows (Golden Copy Analysis).
 `,
 
     decision_log: `# Architecture Decision Log (ADR)

@@ -84,7 +84,7 @@ The UI is not a monolith. It is designed for **Module Federation**.
 *   **Stateless API:** No session affinity is required. We can scale from 1 to 50 pods using **KEDA** based on CPU or Request Count triggers.
 *   **Connection Pooling:** We use `pg-pool` to multiplex database connections, allowing thousands of concurrent requests to share a limited number of DB connections.
 *   **Heavy Lifting Offload:**
-    *   **Spec Parsing:** Handled by the generic `ParserService`. For very large specs (10MB+), this logic is designed to be moved to an Azure Function triggered by a Queue, keeping the API fast.
+    *   **Spec Parsing:** Handled by the generic `ParserService`. For very large specs (10MB+), this logic is designed to be moved to a dedicated **Background Worker Pod** in the AKS cluster, keeping the main API fast and responsive.
 
 ---
 
@@ -144,7 +144,8 @@ C4Deployment
     Deployment_Node(sub, "Azure Subscription", "Production") {
         Deployment_Node(vnet, "Virtual Network", "10.0.0.0/16") {
             Deployment_Node(app_subnet, "App Subnet", "10.0.1.0/24") {
-                Container(app_svc, "SELF-SERVICE-PORTAL", "Azure Container App")
+                Container(app_svc, "SELF-SERVICE-PORTAL", "AKS Pod (Autoscaled)")
+                Container(worker_svc, "BACKGROUND-WORKER", "AKS Pod (Heavy Lifting)")
             }
             Deployment_Node(db_subnet, "Database Subnet", "10.0.2.0/24") {
                 ContainerDb(postgres, "Inventory DB", "Azure Database for PostgreSQL", "Private Endpoint")

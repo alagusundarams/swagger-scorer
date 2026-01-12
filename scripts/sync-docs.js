@@ -9,6 +9,9 @@ const OUTPUT_FILE = path.join(DOCS_DIR, 'docs-data.js');
 const FILE_MAP = {
     system_overview: 'system_overview.md',
     architecture_diagrams: 'architecture_diagrams.md',
+    database_schema: 'database_schema.md', // Added
+    user_flows_and_sequences: 'user_flows_and_sequences.md',
+    etl_documentation: 'etl_documentation.md',
     enterprise_access_model: 'enterprise_access_model.md',
     platform_connectivity_matrix: 'platform_connectivity_matrix.md',
     backend_documentation: 'backend_documentation.md',

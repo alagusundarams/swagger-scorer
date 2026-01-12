@@ -51,9 +51,9 @@ stateDiagram-v2
 
     state VisualMode {
         [*] --> Idle
-        Idle --> Dragging : User Starts Drag
-        Dragging --> Dropped : Item Placed
-        Dropped --> Regenerating : Trigger XML Gen
+        Idle --> SelectingTemplate : User selects policy block
+        SelectingTemplate --> Applying : Template applied
+        Applying --> Regenerating : Trigger XML Gen
         Regenerating --> Idle : State Updated
     }
 

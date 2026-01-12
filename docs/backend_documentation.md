@@ -85,14 +85,14 @@ How do we handle traffic spikes?
 
 ```mermaid
 graph LR
-    Metric[CPU / HTTP Request Count] --> KEDA[KEDA Scaler]
-    KEDA -- "Scale Out (1->10)" --> Pods[Backend Pods]
-    Pods -- "Load Balance" --> DB[Database Connection Pool]
+    Metric["CPU / HTTP Request Count"] --> HPA["HPA / KEDA Scaler"]
+    HPA -- "Scale Out Pods (1->N)" --> Pods["Backend API Pods"]
+    Pods -- "Load Balance" --> DB["Database Connection Pool"]
 ```
 
-*   **Statelessness:** The backend stores NO session state (JWT only). This means we can scale from 1 replica to 50 instantly.
+*   **Statelessness:** The backend stores NO session state (JWT only). This ensures we can scale from 1 replica to 50 instantly within AKS.
 *   **Database Pooling:** We use `pg-pool` to ensure that 50 pods don't exhaust the Postgres connection limit (Max 100 connections).
-*   **Async Processing:** Heavy jobs (Spec Parsing) are candidates for **Azure Functions** triggered by Event Grid, offloading CPU work from the main API.
+*   **Heavy Workloads:** Heavy jobs (Spec Parsing) are offloaded to **Background Worker Pods** within the same AKS cluster, preventing CPU contention with the interactive API.
 
 ---
 

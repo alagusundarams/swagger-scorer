@@ -44,6 +44,7 @@ graph TD
 
     React --> NodeJS
     NodeJS --> AKS
+    AKS ---|HPA Scaling| AKS
     NodeJS --> Postgres
     NodeJS --> APIM
     NodeJS -.-> Dynatrace
@@ -79,11 +80,16 @@ graph LR
         AuthSvc["fa:fa-shield-alt Auth & RBAC Service"]:::compute
     end
 
+    subgraph "Data Sync & Background Jobs"
+        ETL["fa:fa-database Scheduled ETL Sync"]:::compute
+    end
+
     subgraph "Infrastructure & External"
         DB[("fa:fa-database PostgreSQL")]:::db
         APIM_API["fa:fa-cogs APIM ARM API"]:::azure
         ADO_API["fa:fa-code-branch ADO REST API"]:::azure
         KV["fa:fa-key Azure Key Vault"]:::azure
+        Entra_API["fa:fa-id-card Entra ID (Graph API)"]:::azure
     end
 
     Catalog & Editor & Admin --> ProductSvc
@@ -96,6 +102,7 @@ graph LR
     AuditSvc --> DB
     ProductSvc --> DB
     ProductSvc -->|Resolve Secrets| KV
+    ETL --> APIM_API & ADO_API & DB & Entra_API
 ```
 
 ---
@@ -123,12 +130,25 @@ graph LR
     end
 
     subgraph Lane3["AKS Cluster (App Zone)"]
-        direction TB
-        FE["fa:fa-laptop-code React MFE (Nginx)"]:::compute
-        BE["fa:fa-server Node.js API (Fastify)"]:::compute
-        Scorer["fa:fa-check-circle Spectral Engine"]:::compute
-        FE --> BE
+        direction LR
+        subgraph RequestPath["Request Path"]
+            direction TB
+            Ingress["fa:fa-network-wired Ingress/Reverse Proxy (Nginx)"]:::compute
+            FE["fa:fa-laptop-code React MFE (Nginx)"]:::compute
+            BE["fa:fa-server Node.js API (Fastify)"]:::compute
+            Ingress -->|Path: /| FE
+            Ingress -->|Path: /api| BE
+        end
+
+        %% Connections to Internal Services (Now on the right due to LR direction of Lane3)
+        subgraph InternalServices["Internal Services"]
+            direction TB
+            Scorer["fa:fa-check-circle Spectral Engine"]:::compute
+            ETL["fa:fa-database Scheduled ETL Sync Pod"]:::compute
+        end
+
         BE <--> Scorer
+        ETL -.-> BE
     end
 
     subgraph Lane4["Data & Observability"]
@@ -147,7 +167,7 @@ graph LR
 
     %% Flows
     User == HTTPS ==> AGW
-    AGW == Routing ==> FE
+    AGW == Routing ==> Ingress
     BE --> DB
     BE --> Storage
     BE --> KV
@@ -155,88 +175,12 @@ graph LR
     BE --> ADO
     BE -.-> Dynatrace
     BE -.-> EntraID
+    ETL -.-> EntraID
 ```
 
 ---
 
-## 📊 3. Database ER Diagram (Authoritative Model)
-The following ERD captures the authoritative source of truth for the portal, showing relationships between teams, products, APIs, and governance resources.
-
-```mermaid
-erDiagram
-    teams ||--o{ products : owns
-    teams ||--o{ user_teams : "has members"
-    users ||--o{ user_teams : "belongs to"
-    users ||--o{ audit_log : "performs actions"
-    
-    products ||--o{ apis : "contains"
-    products ||--o{ subscriptions : "grants access"
-    products ||--o{ named_values : "has config"
-    products ||--o{ permission_matrix : "access rules"
-    products ||--o{ drafts : "has staging files"
-
-    apis ||--o{ operations : "cached endpoints"
-    apis ||--o{ api_backends : "bound to"
-    governance_backends ||--o{ api_backends : "is bound to"
-
-    approval_requests ||--o{ drafts : "references"
-    teams ||--o{ approval_requests : "requests"
-    
-    policy_help_requests ||--o{ policy_help_messages : "contains"
-    users ||--o{ policy_help_messages : "sends"
-    products ||--o{ policy_help_requests : "context"
-
-    teams {
-        text id PK
-        text name
-        text azure_ad_group_id
-        text type "producer/consumer"
-    }
-    users {
-        text id PK
-        text email
-        text role "user/admin"
-    }
-    products {
-        text id PK
-        text display_name
-        text environment "DEV/QA/STAGE/PROD"
-        text dev_hash "Git commit"
-        text qa_hash "Git commit"
-        jsonb authorized_teams
-        text management_mode
-    }
-    apis {
-        text id PK
-        text product_id FK
-        text path
-        decimal quality_score
-    }
-    subscriptions {
-        text id PK
-        text product_id FK
-        text subscriber_team_id FK
-        text state "active/suspended"
-    }
-    named_values {
-        text id PK
-        text product_id FK
-        text system_name
-        text value
-        boolean is_secret
-    }
-    audit_log {
-        serial id PK
-        text entity_type
-        text action
-        jsonb changes
-        timestamptz timestamp
-    }
-```
-
----
-
-## 🚀 4. Detailed Onboarding Saga (Sequence)
+## 🚀 3. Detailed Onboarding Saga (Sequence)
 API Onboarding is a distributed transaction ("Saga") ensuring consistency across DB, Git, and Azure APIM.
 
 ```mermaid
