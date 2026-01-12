@@ -482,8 +482,10 @@
                                 tab shows "Found 12 unassigned APIs requiring governance"</p>
 
                             <div class="screenshot">
-                                📸 Screenshot: Admin Governance - Product Reclamation Tab<br>
-                                Shows: Search bar, environment filter, table with 12 orphan products
+                                <img src="admin_dashboard_orphans_1768228471575.png" alt="Admin Dashboard Orphans"
+                                    style="max-width: 100%; border-radius: 8px;">
+                                <p style="font-size: 0.8rem; margin-top: 10px; color: #718096;">Admin Governance -
+                                    Global Overview showing orphaned resources.</p>
                             </div>
 
                             <div class="tech-details">
@@ -789,31 +791,208 @@
                     do it herself.
                 </div>
 
-                <p><em>Complete onboarding wizard flow with 8 steps, each with collapsible system details...</em></p>
+                <div class="story-section">
+                    <h2>The Onboarding Wizard: Actual System Steps</h2>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">1</div>
+                            <span>Step 1: Prerequisites Check</span>
+                        </div>
+                        <div class="step-body">
+                            <p><strong>Paula's Action:</strong> Paula starts by reviewing the prerequisites. She
+                                confirms her API is hosted in the enterprise network and that she has the necessary ADO
+                                project permissions.</p>
+                            <p><strong>Actual Component:</strong> <code>OnboardingPrerequisitesStep.tsx</code></p>
+                            <div class="tech-details">
+                                <div class="tech-toggle">🔧 Technical Details (Access & Compliance)</div>
+                                <div class="tech-content">
+                                    <pre>1. System checks: Is API reachable?
+2. Permission verification: az login --> ADO PAT validation.
+3. User must click "I understand and comply" to proceed.</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">2</div>
+                            <span>Step 2: Establish Identity</span>
+                        </div>
+                        <div class="step-body">
+                            <p><strong>Paula's Action:</strong> Paula types "Customer Profile" for the display name. She
+                                then searches for her existing App Registration by name using the integrated search box.
+                                She selects the correct identity from the dropdown.</p>
+                            <p><strong>Actual Component:</strong> <code>OnboardingIdentityStep.tsx</code></p>
+                            <div class="tech-details">
+                                <div class="tech-toggle">🔧 Technical Details (App ID Binding)</div>
+                                <div class="tech-content">
+                                    <p><strong>Action:</strong>
+                                        <code>inventoryApi.searchAzureIdentities(searchTerm)</code></p>
+                                    <pre>1. User Input: "Customer Profile"
+2. Technical Name: "Customer-Profile" (Auto-slugified)
+3. App Registration Match: Client ID (GUID) and App ID URI bound to product metadata.</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">3</div>
+                            <span>Step 3: Define Contract (Spec Studio)</span>
+                        </div>
+                        <div class="step-body">
+                            <p><strong>Paula's Action:</strong> She pastes her OpenAPI YAML into the embedded Spec
+                                Studio. The system instantly parses it, showing her the detected operations (GET
+                                /profile, POST /profile/update) and a governance score.</p>
+                            <p><strong>Actual Component:</strong> <code>OnboardingSpecStep.tsx</code> integrating
+                                <code>SpecStudio</code></p>
+                            <div class="tech-details">
+                                <div class="tech-toggle">🔧 Technical Details (Sparsing & Linting)</div>
+                                <div class="tech-content">
+                                    <pre>1. Spec Parsing: Extraction of methods, paths, and operation IDs.
+2. Governance: Spectral linting executed locally in useSpecStudio hook.
+3. Score: Displayed as "VALIDATED" or "IMPROVEMENTS RECOMMENDED".</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">4</div>
+                            <span>Step 4: Applied Governance (Policies)</span>
+                        </div>
+                        <div class="step-body">
+                            <p><strong>Paula's Action:</strong> She applies the "Standard Rate Limit" and "CORS
+                                Enforcement" policies. She can see a preview of the generated XML policies.</p>
+                            <p><strong>Actual Component:</strong> <code>OnboardingApiPolicyStep.tsx</code> using
+                                <code>PolicyStudio</code></p>
+                            <div class="tech-details">
+                                <div class="tech-toggle">🔧 Technical Details (XML Generation)</div>
+                                <div class="tech-content">
+                                    <pre>1. Template: <code>policyTemplates.ts</code> used to generate structured XML.
+2. Snippets: CORS, Rate-Limit, Quotas, and Header Injection modules.</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">5</div>
+                            <span>Step 5: Fulfillment & Sage Execution</span>
+                        </div>
+                        <div class="step-body">
+                            <p><strong>Paula's Action:</strong> A final summary of all configurations is displayed. Once
+                                she clicks "Provision Resources", she sees a real-time progress bar of the
+                                orchestration.</p>
+                            <p><strong>Actual Component:</strong> <code>OnboardingFulfillmentStep.tsx</code></p>
+                            <div class="tech-details">
+                                <div class="tech-toggle">🔧 Technical Details (Orchestration Saga)</div>
+                                <div class="tech-content">
+                                    <pre>1. POST /api/v1/provisioning/start
+2. Saga 1: Create/Update ADO Repository.
+3. Saga 2: Configure APIM Product & API resources.
+4. Saga 3: Deploy Policy snippets via YAML to Git.</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- CONNOR THE CONSUMER -->
             <div id="connor" class="persona-content">
-                <h1>🧑‍💼 Connor the Consumer: Finding and Using APIs</h1>
+                <h1>🧑‍💼 Connor the Consumer: Discovery & Documentation</h1>
 
                 <div class="story-intro">
                     <strong>Meet Connor:</strong> Mobile app developer building a React Native customer-facing app.
                     Needs to find and subscribe to the Customer Profile API that Paula just published.
                 </div>
 
-                <p><em>Complete discovery, subscription, and key management flow...</em></p>
+                <div class="story-section">
+                    <h2>Discovery Journey: Finding the Right API</h2>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">1</div>
+                            <span>Search & Discover</span>
+                        </div>
+                        <div class="step-body">
+                            <p><strong>Connor's Action:</strong> Connor uses the global search on the Catalog page,
+                                filtering by 'Payments' or 'Customer'. He sees cards for available APIs with their
+                                quality scores.</p>
+                            <p><strong>Actual Component:</strong> <code>DiscoveryProductCard.tsx</code></p>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">2</div>
+                            <span>API Console & Playground</span>
+                        </div>
+                        <div class="step-body">
+                            <p><strong>Connor's Action:</strong> He opens the "Customer Profile API" and reviews the
+                                interactive Swagger UI. He can test calls directly against the DEV gateway using his
+                                team's identity.</p>
+                            <p><strong>Actual Component:</strong> <code>ApiConsole.component.tsx</code></p>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">3</div>
+                            <span>Subscription Request</span>
+                        </div>
+                        <div class="step-body">
+                            <p><strong>Connor's Action:</strong> He clicks "Request Access", selects his "Mobile Squad"
+                                team, and provides a justification for the subscription.</p>
+                            <p><strong>Actual Component:</strong> <code>SubscriptionConfirmModal.tsx</code></p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- TAYLOR THE TEAM LEAD -->
             <div id="taylor" class="persona-content">
-                <h1>👔 Taylor the Team Lead: Approvals & Governance</h1>
+                <h1>� Taylor the Team Lead: Approval & Oversight</h1>
 
                 <div class="story-intro">
                     <strong>Meet Taylor:</strong> Team lead for Customer Team. Responsible for approving subscription
                     requests and ensuring only authorized apps access their APIs.
                 </div>
 
-                <p><em>Complete approval workflow with security considerations...</em></p>
+                <div class="story-section">
+                    <h2>Governance Journey: Keeping the API Safe</h2>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">1</div>
+                            <span>Approval Queue Monitoring</span>
+                        </div>
+                        <div class="step-body">
+                            <p><strong>Taylor's Action:</strong> Taylor views the "Team Queue" dashboard. She sees
+                                Connor's request and reviews his justification.</p>
+                            <p><strong>Actual Component:</strong> <code>TeamApprovalQueue (Inventory Feature)</code></p>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">2</div>
+                            <span>Subscription Resolution</span>
+                        </div>
+                        <div class="step-body">
+                            <p><strong>Taylor's Action:</strong> She clicks "Approve". The system instantly provisions
+                                the subscription key in APIM and adds Connor's team to the access control list.</p>
+                            <p><strong>Actual Component:</strong>
+                                <code>OnboardingResolutionStep (Reused/Shared Logic)</code></p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
