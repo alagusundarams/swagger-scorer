@@ -409,7 +409,7 @@ async function main() {
                             is_secret = EXCLUDED.is_secret,
                             kv_secret_expiry = EXCLUDED.kv_secret_expiry,
                             updated_at = NOW();
-                    `, [nvId, null, nv.displayName, nv.name, val, type, nv.isSecret, env, (apimMeta.regions[env] || 'US'), nv.kvSecretExpiry || null]);
+                    `, [nvId, null, nv.displayName, nv.name, val, type, nv.isSecret, env, region, nv.kvSecretExpiry || null]);
 
                     // LINKAGE CLIMB: Find which products use this Named Value via API or Product policies
                     const linkedEnvProductIds = new Set<string>();
