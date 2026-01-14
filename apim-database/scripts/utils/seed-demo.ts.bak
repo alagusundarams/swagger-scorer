@@ -203,19 +203,6 @@ async function seedDemoData() {
         `);
         console.log('✅ Backends Seeded.');
 
-        // 8. Insert Subscriptions (Demo Data)
-        await pool.query(`
-            INSERT INTO subscriptions (id, product_id, subscriber_team_id, display_name, state, created_at, updated_at)
-            VALUES 
-                ('sub-01', 'prod-payment-v2', 'team-platform', 'Platform Team Subscription', 'active', NOW(), NOW()),
-                ('sub-02', 'prod-payment-v2', 'team-mobile', 'Mobile Team Subscription', 'active', NOW(), NOW()),
-                ('sub-03', 'prod-legacy', 'team-platform', 'Platform Legacy Access', 'active', NOW(), NOW())
-            ON CONFLICT (id) DO UPDATE SET
-                state = EXCLUDED.state,
-                updated_at = NOW();
-        `);
-        console.log('✅ Subscriptions Seeded.');
-
     } catch (err) {
         console.error('❌ Seeding Failed:', err);
     } finally {
