@@ -85,12 +85,16 @@ export async function getSubscriptionsForProduct(productId: string) {
                ar.client_id as app_client_id,
                ar.environment as app_environment
         FROM subscriptions s
-        JOIN products p ON s.product_id = p.id
+        LEFT JOIN products p ON (
+            LOWER(p.id) = LOWER(s.product_id)
+            OR LOWER(p.id) LIKE LOWER(s.product_id || ':%')
+        )
         LEFT JOIN teams t ON s.subscriber_team_id = t.id
         LEFT JOIN app_registrations ar ON s.app_registration_id = ar.id
         WHERE LOWER(s.product_id) = LOWER($1)
            OR LOWER(s.product_id) = LOWER($1 || ':Global')
            OR s.product_id LIKE $1 || ':%:Global'
+           OR (LOWER($1) LIKE LOWER(s.product_id || ':%'))
         ORDER BY s.created_at DESC
     `, [productId], 'GetSubscriptionsForProduct');
 
