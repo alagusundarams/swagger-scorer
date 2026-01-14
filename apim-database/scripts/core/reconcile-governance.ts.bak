@@ -225,7 +225,7 @@ async function main() {
                             management_mode = EXCLUDED.management_mode,
                             updated_at = NOW();
                     `, [
-                        targetId, prod.id, prod.name, null, 'published', upperEnv, region,
+                        targetId, prod.id, prod.name, null, 'published', upperEnv, 'Global',
                         pipelineUrl, gitRepoUrl,
                         deployment.hash || null, deployment.date || null,
                         ado.status === 'MATCHED' ? 'TERRAFORM_MANAGED' : 'UNTRACKED'
@@ -408,7 +408,7 @@ async function main() {
                             is_secret = EXCLUDED.is_secret,
                             kv_secret_expiry = EXCLUDED.kv_secret_expiry,
                             updated_at = NOW();
-                    `, [nvId, null, nv.displayName, nv.name, val, type, nv.isSecret, env, region, nv.kvSecretExpiry || null]);
+                    `, [nvId, null, nv.displayName, nv.name, val, type, nv.isSecret, env, 'Global', nv.kvSecretExpiry || null]);
 
                     // LINKAGE CLIMB: Find which products use this Named Value via API or Product policies
                     const linkedEnvProductIds = new Set<string>();

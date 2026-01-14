@@ -48,6 +48,7 @@ interface MetadataStore {
     subscriptions: Record<string, any[]>; // env -> subscription[]
     apiIdentities: Record<string, Record<string, string>>; // env -> apiName -> clientId (from auth settings)
     apiOperations: Record<string, Record<string, any[]>>; // env -> apiName -> operations[]
+    regions: Record<string, string>; // env -> region (US/UK/APAC)
 }
 const CONCURRENCY_LIMIT = 10;
 
@@ -159,7 +160,8 @@ async function main() {
         productApiLinks: {},
         subscriptions: {},
         apiIdentities: {},
-        apiOperations: {}
+        apiOperations: {},
+        regions: {}
     };
 
     let envConfigs = config.azure?.environments || [];
@@ -175,13 +177,45 @@ async function main() {
     for (const env of envConfigs) {
         try {
             console.log(`\n   🔸 Scanning ${env.name} (${env.instance})...`);
+
+            // --- 0. Get APIM Service Properties (for region detection) ---
+            let apimRegion = 'US'; // Default
+            try {
+                const serviceUrl = `https://management.azure.com/subscriptions/${env.subscriptionId}/resourceGroups/${env.resourceGroup}/providers/Microsoft.ApiManagement/service/${env.instance}?api-version=2022-08-01`;
+                const serviceRes = await fetch(serviceUrl, {
+                    headers: { 'Authorization': `Bearer ${azureToken}` }
+                });
+
+                if (serviceRes.ok) {
+                    const serviceData: any = await serviceRes.json();
+                    const location = serviceData.location?.toLowerCase() || '';
+
+                    // Map Azure location to region
+                    if (location.includes('us') || location.includes('east') || location.includes('west') || location.includes('central')) {
+                        apimRegion = 'US';
+                    } else if (location.includes('uk') || location.includes('europe')) {
+                        apimRegion = 'UK';
+                    } else if (location.includes('asia') || location.includes('japan') || location.includes('australia')) {
+                        apimRegion = 'APAC';
+                    }
+
+                    console.log(`      📍 Region detected: ${apimRegion} (from location: ${serviceData.location})`);
+                }
+            } catch (e: any) {
+                console.warn(`      ⚠️  Failed to detect region, using default: ${apimRegion}`);
+            }
+
             const apimConfig = {
                 instance: env.instance,
                 resourceGroup: env.resourceGroup,
                 subscriptionId: env.subscriptionId,
                 accessToken: azureToken,
-                environment: env.name
+                environment: env.name,
+                region: apimRegion
             };
+
+            // Store region for this environment
+            metadata.regions[env.name] = apimRegion;
 
             const envAppIds = new Set<string>();
             const potentialNvs = new Set<string>();
