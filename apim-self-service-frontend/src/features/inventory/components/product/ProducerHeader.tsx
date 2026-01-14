@@ -166,19 +166,26 @@ export function ProducerHeader({
                     <div className="h-8 w-px bg-gray-200 dark:bg-slate-700 mx-2"></div>
 
                     {/* Region Selector (formerly static badge) */}
-                    <div className="relative group">
-                        <select
-                            value={currentEnv}
-                            onChange={handleEnvChange}
-                            className={`appearance-none cursor-pointer pl-3 pr-8 py-1 text-xs font-black rounded-lg border uppercase outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 transition-all ${getEnvironmentTheme(currentEnv).bg} ${getEnvironmentTheme(currentEnv).text} ${getEnvironmentTheme(currentEnv).border}`}
-                        >
-                            <option value="DEV">DEV (Draft)</option>
-                            <option value="QA" disabled={!product.envHashes?.QA}>QA {!product.envHashes?.QA ? ' (Not Deployed)' : ''}</option>
-                            <option value="STAGE" disabled={!product.envHashes?.STAGE}>STAGE {!product.envHashes?.STAGE ? ' (Not Deployed)' : ''}</option>
-                            <option value="PROD" disabled={!product.envHashes?.PROD}>PROD {!product.envHashes?.PROD ? ' (Not Deployed)' : ''}</option>
-                        </select>
-                        <div className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[8px] ${getEnvironmentTheme(currentEnv).text}`}>
-                            ▼
+                    <div className="flex items-center gap-2">
+                        {product.region && (
+                            <span className="px-2 py-1 bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 text-[10px] font-black rounded-lg border border-blue-100 dark:border-blue-800 uppercase tracking-widest">
+                                {product.region}
+                            </span>
+                        )}
+                        <div className="relative group">
+                            <select
+                                value={currentEnv}
+                                onChange={handleEnvChange}
+                                className={`appearance-none cursor-pointer pl-3 pr-8 py-1 text-xs font-black rounded-lg border uppercase outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 transition-all ${getEnvironmentTheme(currentEnv).bg} ${getEnvironmentTheme(currentEnv).text} ${getEnvironmentTheme(currentEnv).border}`}
+                            >
+                                <option value="DEV">DEV (Draft)</option>
+                                <option value="QA" disabled={!product.envHashes?.QA}>QA {!product.envHashes?.QA ? ' (Not Deployed)' : ''}</option>
+                                <option value="STAGE" disabled={!product.envHashes?.STAGE}>STAGE {!product.envHashes?.STAGE ? ' (Not Deployed)' : ''}</option>
+                                <option value="PROD" disabled={!product.envHashes?.PROD}>PROD {!product.envHashes?.PROD ? ' (Not Deployed)' : ''}</option>
+                            </select>
+                            <div className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[8px] ${getEnvironmentTheme(currentEnv).text}`}>
+                                ▼
+                            </div>
                         </div>
                     </div>
 

@@ -23,9 +23,16 @@ export const DiscoveryProductCard: React.FC<DiscoveryProductCardProps> = ({
                     <div className="w-14 h-14 bg-blue-50 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center text-3xl group-hover:scale-110 transition-transform">
                         📦
                     </div>
-                    <span className="bg-gray-50 dark:bg-slate-900 px-3 py-1 rounded-lg text-[9px] font-black text-gray-400 uppercase tracking-widest border border-gray-100 dark:border-slate-800">
-                        {product.version}
-                    </span>
+                    <div className="flex items-center gap-2">
+                        {product.region && (
+                            <span className="bg-blue-50 dark:bg-blue-900/40 px-2 py-1 rounded text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest border border-blue-100 dark:border-blue-800">
+                                {product.region}
+                            </span>
+                        )}
+                        <span className="bg-gray-50 dark:bg-slate-900 px-3 py-1 rounded-lg text-[9px] font-black text-gray-400 uppercase tracking-widest border border-gray-100 dark:border-slate-800">
+                            {product.version}
+                        </span>
+                    </div>
                 </div>
 
                 <h3 className="text-xl font-black text-gray-900 dark:text-white mb-2 leading-tight group-hover:text-blue-600 transition-colors uppercase tracking-tight">{product.displayName}</h3>

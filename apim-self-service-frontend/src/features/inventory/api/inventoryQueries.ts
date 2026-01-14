@@ -46,11 +46,11 @@ export function useProductsQuery() {
 /**
  * Hook to fetch paginated products
  */
-export function usePaginatedProductsQuery(page: number, limit: number) {
+export function usePaginatedProductsQuery(page: number, limit: number, search?: string) {
     return useQuery({
-        queryKey: [...inventoryKeys.products, { page, limit }],
+        queryKey: [...inventoryKeys.products, { page, limit, search }],
         queryFn: async () => {
-            const res = await inventoryApi.getProducts(page, limit);
+            const res = await inventoryApi.getProducts(page, limit, search);
             // Ensure we return the PaginatedResponse structure logic
             // inventoryApi.getProducts guarantees PaginatedResponse if page/limit are passed
             return res as { products: any[], pagination: any };

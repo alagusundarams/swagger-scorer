@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../layouts/MainLayout/MainLayout.view';
 import { useStore } from '../../store/useStore';
-import { useProductsQuery } from '../../features/inventory/api/inventoryQueries';
+import { usePaginatedProductsQuery } from '../../features/inventory/api/inventoryQueries';
 
 /**
  * MarketplacePage Controller
@@ -25,70 +25,61 @@ import { useProductsQuery } from '../../features/inventory/api/inventoryQueries'
  */
 export const MarketplacePage = () => {
     const navigate = useNavigate();
-    const { user, setPageTitle } = useStore();
-    const { data: products = [] } = useProductsQuery();
+    const { setPageTitle } = useStore();
+
+    // --- Pagination & Search State ---
+    const [page, setPage] = useState(1);
+    const [limit] = useState(20);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedType, setSelectedType] = useState<string>('ALL');
     const [selectedEnv, setSelectedEnv] = useState<string>('ALL');
+
+    const { user } = useStore();
 
     useEffect(() => {
         setPageTitle('Marketplace');
     }, [setPageTitle]);
 
+    // --- Store Integration (TanStack Query) ---
+    // Note: Marketplace currently has complex client-side logic for entitlements.
+    // To support full server-side pagination with entitlements, the backend should handle filtering.
+    // For now, we fetch paginated products and apply client-side filtering on the returned batch.
+    const { data: paginatedData, isLoading } = usePaginatedProductsQuery(page, limit, searchTerm);
+    const products = paginatedData?.products || [];
+    const pagination = paginatedData?.pagination;
+
     // --- Entitlement Logic ---
-    /**
-     * Determines which products are visible to the current user.
-     * 
-     * Security Rules:
-     * 1. Ownership: Users always see products they own.
-     * 2. Public: Visible to everyone.
-     * 3. Private: Only visible if the user's team is explicitly in `authorizedTeams`.
-     */
     const accessibleProducts = useMemo(() => {
         if (!user) return [];
-        return products.filter(product => {
-            // 1. Owners always see their own products
+        return products.filter((product: any) => {
             if (user.teams.includes(product.ownerTeamId)) return true;
-
-            // 2. Public products are visible to everyone
             if (product.visibility === 'public') return true;
-
-            // 3. Private products check the Authorized Teams list
-            if (product.visibility === 'private' && product.authorizedTeams?.some(teamId => user.teams.includes(teamId))) {
+            if (product.visibility === 'private' && product.authorizedTeams?.some((teamId: string) => user.teams.includes(teamId))) {
                 return true;
             }
-
-            // 4. Otherwise, hidden
             return false;
         });
     }, [products, user]);
 
     // --- Filter Logic ---
-    const filteredProducts = useMemo(() => {
+    const displayedProducts = useMemo(() => {
         let result = accessibleProducts;
 
         if (selectedType !== 'ALL') {
-            result = result.filter(p => (p.type || 'standard').toUpperCase() === selectedType);
+            result = result.filter((p: any) => (p.type || 'standard').toUpperCase() === selectedType);
         }
 
         if (selectedEnv !== 'ALL') {
-            result = result.filter(p => p.environment === selectedEnv);
+            result = result.filter((p: any) => p.environment === selectedEnv);
         }
 
         return result;
     }, [accessibleProducts, selectedType, selectedEnv]);
 
-    // --- Search Filter ---
-    const displayedProducts = useMemo(() => {
-        if (!searchTerm.trim()) return filteredProducts;
-        const lowerTerm = searchTerm.toLowerCase();
-        return filteredProducts.filter(p =>
-            p.displayName.toLowerCase().includes(lowerTerm) ||
-            p.description.toLowerCase().includes(lowerTerm) ||
-            p.name.toLowerCase().includes(lowerTerm) ||
-            p.apis.some(api => api.path.toLowerCase().includes(lowerTerm) || api.displayName.toLowerCase().includes(lowerTerm))
-        );
-    }, [filteredProducts, searchTerm]);
+    const handleSearchChange = (val: string) => {
+        setSearchTerm(val);
+        setPage(1);
+    };
 
     return (
         <MainLayout>
@@ -111,7 +102,7 @@ export const MarketplacePage = () => {
                         <input
                             type="text"
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e) => handleSearchChange(e.target.value)}
                             placeholder="Search by Business Domain, Capability, or Value Stream..."
                             className="w-full pl-16 pr-6 py-6 bg-white/10 backdrop-blur-md border border-white/30 rounded-3xl text-white placeholder-slate-400 font-bold text-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all shadow-2xl"
                         />
@@ -130,7 +121,7 @@ export const MarketplacePage = () => {
                                     {['ALL', 'STANDARD', 'GRP'].map(type => (
                                         <button
                                             key={type}
-                                            onClick={() => setSelectedType(type)}
+                                            onClick={() => { setSelectedType(type); setPage(1); }}
                                             className={`w-full text-left px-4 py-2 rounded-xl text-sm font-bold transition-all ${selectedType === type
                                                 ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
                                                 : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'
@@ -149,7 +140,7 @@ export const MarketplacePage = () => {
                                     {['ALL', 'DEV', 'QA', 'STAGE', 'PROD'].map(env => (
                                         <button
                                             key={env}
-                                            onClick={() => setSelectedEnv(env)}
+                                            onClick={() => { setSelectedEnv(env); setPage(1); }}
                                             className={`w-full text-left px-4 py-2 rounded-xl text-sm font-bold transition-all ${selectedEnv === env
                                                 ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30'
                                                 : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'
@@ -163,7 +154,7 @@ export const MarketplacePage = () => {
                             </div>
 
                             <button
-                                onClick={() => { setSelectedType('ALL'); setSelectedEnv('ALL'); setSearchTerm(''); }}
+                                onClick={() => { setSelectedType('ALL'); setSelectedEnv('ALL'); setSearchTerm(''); setPage(1); }}
                                 className="w-full mt-8 py-3 text-[10px] font-black uppercase tracking-widest text-blue-600 border border-blue-100 rounded-xl hover:bg-blue-50 transition"
                             >
                                 Reset Filters
@@ -173,9 +164,46 @@ export const MarketplacePage = () => {
 
                     {/* Main Content */}
                     <div className="flex-1">
-                        {displayedProducts.length > 0 ? (
+                        <div className="mb-8 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                    {pagination?.total || displayedProducts.length} Results
+                                </span>
+                            </div>
+
+                            {/* Pagination Controls */}
+                            {pagination && pagination.totalPages > 1 && (
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                                        disabled={page === 1 || isLoading}
+                                        className="w-10 h-10 flex items-center justify-center rounded-xl bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 disabled:opacity-30"
+                                    >
+                                        ←
+                                    </button>
+                                    <span className="px-4 text-xs font-black text-slate-400">
+                                        {page} / {pagination.totalPages}
+                                    </span>
+                                    <button
+                                        onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+                                        disabled={page === pagination.totalPages || isLoading}
+                                        className="w-10 h-10 flex items-center justify-center rounded-xl bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 disabled:opacity-30"
+                                    >
+                                        →
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {isLoading ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-40">
+                                {[1, 2, 4, 5].map(i => (
+                                    <div key={i} className="h-64 bg-white dark:bg-slate-800 rounded-3xl animate-pulse"></div>
+                                ))}
+                            </div>
+                        ) : displayedProducts.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {displayedProducts.map(product => (
+                                {displayedProducts.map((product: any) => (
                                     <div
                                         key={product.id}
                                         onClick={() => navigate(`/products/${product.id}`)}
@@ -192,9 +220,16 @@ export const MarketplacePage = () => {
                                                     }`}>
                                                     {product.visibility || 'Public'}
                                                 </span>
-                                                <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[9px] font-bold rounded uppercase tracking-tighter">
-                                                    {product.environment}
-                                                </span>
+                                                <div className="flex gap-1">
+                                                    {product.region && (
+                                                        <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-black rounded uppercase tracking-tighter border border-blue-100">
+                                                            {product.region}
+                                                        </span>
+                                                    )}
+                                                    <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[9px] font-bold rounded uppercase tracking-tighter">
+                                                        {product.environment}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -223,6 +258,33 @@ export const MarketplacePage = () => {
                                 <p className="text-gray-500 font-medium">
                                     {searchTerm ? `No results match "${searchTerm}" within your permitted scope.` : "Try adjusting your filters to find more services."}
                                 </p>
+                            </div>
+                        )}
+
+                        {/* Pagination Bottom */}
+                        {pagination && pagination.totalPages > 1 && (
+                            <div className="mt-12 flex justify-center items-center gap-4">
+                                <button
+                                    onClick={() => { setPage(1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                    disabled={page === 1}
+                                    className="px-6 py-3 rounded-xl bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 text-[10px] font-black uppercase tracking-widest disabled:opacity-30"
+                                >
+                                    First
+                                </button>
+                                <button
+                                    onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                    disabled={page === 1}
+                                    className="px-6 py-3 rounded-xl bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 text-[10px] font-black uppercase tracking-widest disabled:opacity-30"
+                                >
+                                    Prev
+                                </button>
+                                <button
+                                    onClick={() => { setPage(p => Math.min(pagination.totalPages, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                    disabled={page === pagination.totalPages}
+                                    className="px-6 py-3 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-30 shadow-lg shadow-blue-500/20"
+                                >
+                                    Next
+                                </button>
                             </div>
                         )}
                     </div>

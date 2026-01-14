@@ -36,7 +36,8 @@ async function seedDemoData() {
             VALUES 
                 ('team-platform', 'Platform Engineering', 'producer', 'Core platform services.', 12),
                 ('team-payments', 'Payments Squad', 'both', 'Payment processing and ledger.', 8),
-                ('team-analytics', 'Data Analytics', 'consumer', 'Business intelligence consumption.', 5)
+                ('team-analytics', 'Data Analytics', 'consumer', 'Business intelligence consumption.', 5),
+                ('team-mobile', 'Mobile App Team', 'consumer', 'Consumer mobile applications.', 4)
             ON CONFLICT (id) DO UPDATE SET
                 name = EXCLUDED.name,
                 type = EXCLUDED.type,

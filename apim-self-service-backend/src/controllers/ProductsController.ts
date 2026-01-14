@@ -22,7 +22,7 @@ export class ProductsController {
      */
     async getProducts(request: FastifyRequest, reply: FastifyReply) {
         try {
-            const { environment, role, teamId, groups, page, limit } = request.query as any;
+            const { environment, role, teamId, groups, page, limit, search } = request.query as any;
             const userGroups = groups ? groups.split(',') : [];
 
             // Parse pagination params
@@ -30,7 +30,7 @@ export class ProductsController {
             const limitNum = limit ? parseInt(limit) : undefined;
 
             const result = await getAllProducts(
-                environment, role, teamId, userGroups, pageNum, limitNum
+                environment, role, teamId, userGroups, pageNum, limitNum, search
             );
 
             return result;

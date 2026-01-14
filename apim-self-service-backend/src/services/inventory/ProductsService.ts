@@ -54,7 +54,8 @@ export async function getAllProducts(
     teamId?: string,
     userGroups: string[] = [],
     page?: number,
-    limit?: number
+    limit?: number,
+    search?: string
 ) {
     const usePagination = page !== undefined && limit !== undefined;
 
@@ -62,7 +63,7 @@ export async function getAllProducts(
     if (usePagination) {
         const offset = ((page || 1) - 1) * (limit || 20);
         const paginatedResult = await productsRepo.getAllProductsPaginated(
-            environment, userRole, teamId, userGroups, limit!, offset
+            environment, userRole, teamId, userGroups, limit!, offset, search
         );
 
         const productRes = paginatedResult;
@@ -84,7 +85,7 @@ export async function getAllProducts(
     }
 
     // Otherwise, use original non-paginated query (backward compatibility)
-    const productRes = await productsRepo.getAllProducts(environment, userRole, teamId, userGroups);
+    const productRes = await productsRepo.getAllProducts(environment, userRole, teamId, userGroups, search);
     const apiRes = await apisRepo.getAllApis();
 
     const products = await assembleProducts(productRes.rows, apiRes.rows);

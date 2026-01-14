@@ -1,7 +1,7 @@
 import { query } from '../services/core/db.js';
 
 export class ProductsRepository {
-    async getAllProducts(environment?: string, userRole: string = 'admin', teamId?: string, userGroups: string[] = []) {
+    async getAllProducts(environment?: string, userRole: string = 'admin', teamId?: string, userGroups: string[] = [], search?: string) {
         // Build WHERE clauses
         const whereConditions: string[] = [];
         const queryParams: any[] = [];
@@ -10,6 +10,13 @@ export class ProductsRepository {
         if (environment && environment !== 'ALL') {
             whereConditions.push(`p.environment = $${paramIndex++}`);
             queryParams.push(environment);
+        }
+
+        if (search) {
+            const searchPattern = `%${search}%`;
+            whereConditions.push(`(p.display_name ILIKE $${paramIndex} OR p.description ILIKE $${paramIndex})`);
+            queryParams.push(searchPattern);
+            paramIndex++;
         }
 
         if (userRole !== 'admin') {
@@ -53,7 +60,8 @@ export class ProductsRepository {
         teamId?: string,
         userGroups: string[] = [],
         limit: number = 20,
-        offset: number = 0
+        offset: number = 0,
+        search?: string
     ) {
         const whereConditions: string[] = [];
         const queryParams: any[] = [];
@@ -62,6 +70,13 @@ export class ProductsRepository {
         if (environment && environment !== 'ALL') {
             whereConditions.push(`p.environment = $${paramIndex++}`);
             queryParams.push(environment);
+        }
+
+        if (search) {
+            const searchPattern = `%${search}%`;
+            whereConditions.push(`(p.display_name ILIKE $${paramIndex} OR p.description ILIKE $${paramIndex})`);
+            queryParams.push(searchPattern);
+            paramIndex++;
         }
 
         if (userRole !== 'admin') {
