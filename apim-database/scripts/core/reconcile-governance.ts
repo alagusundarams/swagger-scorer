@@ -396,15 +396,16 @@ async function main() {
                 try {
                     if (process.env.DEBUG_SQL) console.log(`[DB] Upserting Named Value: ${nvId} (Display: ${nv.displayName}, Env: ${env})`);
                     await client.query(`
-                        INSERT INTO named_values (id, product_id, display_name, system_name, value, type, is_secret, environment, region, updated_at)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+                        INSERT INTO named_values (id, product_id, display_name, system_name, value, type, is_secret, environment, region, kv_secret_expiry, updated_at)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
                         ON CONFLICT (id) DO UPDATE SET
                             display_name = EXCLUDED.display_name,
                             value = EXCLUDED.value,
                             type = EXCLUDED.type,
                             is_secret = EXCLUDED.is_secret,
+                            kv_secret_expiry = EXCLUDED.kv_secret_expiry,
                             updated_at = NOW();
-                    `, [nvId, null, nv.displayName, nv.name, val, type, nv.isSecret, env, 'Global']);
+                    `, [nvId, null, nv.displayName, nv.name, val, type, nv.isSecret, env, 'Global', nv.kvSecretExpiry || null]);
 
                     // LINKAGE CLIMB: Find which products use this Named Value via API or Product policies
                     const linkedEnvProductIds = new Set<string>();

@@ -300,18 +300,63 @@ async function main() {
             console.log(`      🌏 Fetching Named Values...`);
             const nvRes = await AzureService.fetchAPIM<any>(apimConfig, '/namedValues');
             const envNvs = (nvRes.value || []);
-            metadata.namedValues[env.name] = envNvs.map((nv: any) => ({
-                name: nv.name,
-                displayName: nv.properties.displayName,
-                value: nv.properties.value,
-                isSecret: nv.properties.secret,
-                keyVaultUrl: nv.properties.keyVault ? nv.properties.keyVault.secretIdentifier : null
+
+            // Get Key Vault token for expiry lookups
+            let kvToken: string | undefined;
+            try {
+                kvToken = await AzureService.getAzureAccessToken('https://vault.azure.net');
+            } catch (e) {
+                console.warn(`      ⚠️  Failed to get Key Vault token, expiry dates will not be fetched`);
+            }
+
+            metadata.namedValues[env.name] = await Promise.all(envNvs.map(async (nv: any) => {
+                const nvData: any = {
+                    name: nv.name,
+                    displayName: nv.properties.displayName,
+                    value: nv.properties.value,
+                    isSecret: nv.properties.secret,
+                    keyVaultUrl: nv.properties.keyVault ? nv.properties.keyVault.secretIdentifier : null,
+                    kvSecretExpiry: null
+                };
+
+                // Fetch KV secret expiry if it's a Key Vault reference
+                if (nv.properties.keyVault && kvToken) {
+                    try {
+                        const kvUrl = nv.properties.keyVault.secretIdentifier;
+                        // Parse: https://{vault}.vault.azure.net/secrets/{secret}/{version}
+                        const kvMatch = kvUrl.match(/https:\/\/([^.]+)\.vault\.azure\.net\/secrets\/([^/]+)(?:\/([^/]+))?/);
+
+                        if (kvMatch) {
+                            const [, vaultName, secretName, secretVersion] = kvMatch;
+                            const secretUrl = secretVersion
+                                ? `https://${vaultName}.vault.azure.net/secrets/${secretName}/${secretVersion}?api-version=7.4`
+                                : `https://${vaultName}.vault.azure.net/secrets/${secretName}?api-version=7.4`;
+
+                            const secretRes = await fetch(secretUrl, {
+                                headers: { 'Authorization': `Bearer ${kvToken}` }
+                            });
+
+                            if (secretRes.ok) {
+                                const secretData: any = await secretRes.json();
+                                if (secretData.attributes?.exp) {
+                                    nvData.kvSecretExpiry = new Date(secretData.attributes.exp * 1000).toISOString();
+                                }
+                            }
+                        }
+                    } catch (e: any) {
+                        if (verbose) console.warn(`         ⚠️  Failed to fetch KV expiry for ${nv.name}: ${e.message}`);
+                    }
+                }
+
+                return nvData;
             }));
+
             console.log(`         ✅ Found ${envNvs.length} Named Values`);
             if (verbose) {
-                envNvs.forEach((nv: any) => {
-                    const type = nv.properties.keyVault ? '🔐 KeyVault' : nv.properties.secret ? '🔒 Secret' : '📝 PlainText';
-                    console.log(`            ${type}: ${nv.name}`);
+                metadata.namedValues[env.name].forEach((nv: any) => {
+                    const type = nv.keyVaultUrl ? '🔐 KeyVault' : nv.isSecret ? '🔒 Secret' : '📝 PlainText';
+                    const expiry = nv.kvSecretExpiry ? ` (Expires: ${new Date(nv.kvSecretExpiry).toLocaleDateString()})` : '';
+                    console.log(`            ${type}: ${nv.name}${expiry}`);
                 });
             }
 

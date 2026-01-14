@@ -358,6 +358,9 @@ CREATE TABLE IF NOT EXISTS named_values (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     
+    -- Key Vault secret expiry tracking
+    kv_secret_expiry TIMESTAMPTZ,
+    
     -- APIM source data
     apim_raw_data JSONB,
     
