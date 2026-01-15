@@ -534,8 +534,15 @@ export class AzureService {
 
             if (response.ok) {
                 try {
-                    const data = JSON.parse(text) as { value: ADOPipeline[] };
-                    return data.value || [];
+                    const data = JSON.parse(text) as { value: any[] };
+                    return (data.value || []).map(p => ({
+                        id: p.id,
+                        name: p.name,
+                        folder: p.folder,
+                        url: p.url,
+                        project: p.project, // Preservation
+                        _links: p._links
+                    }));
                 } catch (e) {
                     console.warn(`      ⚠️  Failed to parse JSON response. Content: ${text.substring(0, 200)}...`);
                 }
@@ -577,6 +584,7 @@ export class AzureService {
                     name: r.name,
                     folder: r.path || '',
                     url: r.url,
+                    project: r.project, // Preservation
                     _links: r._links
                 }));
             }

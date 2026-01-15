@@ -314,7 +314,7 @@ async function runDebug() {
         console.log(`      ℹ️  Pipeline belongs to a different project: ${pipelineProject}. Switching context for Step 4.`);
     }
 
-    console.log(`   ⏳ Attempting surgical strikes for ${matchedPipeline.name} (ID: ${matchedPipeline.id}, Project: ${pipelineProject})...`);
+    console.log(`   ⏳ Attempting surgical strikes for Pipeline Definition ID: ${matchedPipeline.id} (${matchedPipeline.name}) in Project: ${pipelineProject}...`);
     for (const envName of envsToSync) {
         let deploy: any = null;
         console.log(`      🔎 Checking ${envName} in project ${pipelineProject}...`);
@@ -347,7 +347,7 @@ async function runDebug() {
             // ALWAYS try to get full details if we have an owner ID to get Author/Branch/Message
             const ownerId = deploy.owner?.id || deploy.build?.id || deploy.id;
             if (ownerId && ownerId !== 'unknown') {
-                console.log(`      📡 Fetching full build details (ID: ${ownerId}) from project ${buildProject} for metadata...`);
+                console.log(`      📡 Checking Deployment Record Owner (Build ID: ${ownerId}) in project ${buildProject}...`);
                 const details = await AzureService.fetchADOBuild(devops.organization, buildProject, ownerId, devops.pat, devops.baseUrl, bearerToken);
                 if (details) {
                     fullDetails = details;
