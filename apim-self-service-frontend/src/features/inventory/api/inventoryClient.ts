@@ -69,7 +69,7 @@ export const createProduct = async (data: Partial<Product>): Promise<Product> =>
 };
 
 export const updateProduct = async (productId: string, data: Partial<Product>): Promise<Product> => {
-    const res = await baseClient.put(`/products/${productId}`, data);
+    const res = await baseClient.patch(`/products/${productId}`, data);
     return res.data;
 };
 
@@ -79,7 +79,7 @@ export const getPermissionMatrix = async (productId: string, environment?: strin
 };
 
 export const updatePermissionMatrix = async (id: string, data: unknown, environment?: string): Promise<unknown> => {
-    const res = await baseClient.put(`/admin/permissions/${id}${environment ? `?env=${environment}` : ''}`, data);
+    const res = await baseClient.patch(`/admin/permissions/${id}${environment ? `?env=${environment}` : ''}`, data);
     return res.data;
 };
 

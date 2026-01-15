@@ -17,7 +17,7 @@ export const createTeam = async (data: Partial<Team>): Promise<Team> => {
 };
 
 export const updateTeam = async (teamId: string, updates: Partial<Team>): Promise<Team> => {
-    const res = await baseClient.put(`/teams/${teamId}`, updates);
+    const res = await baseClient.patch(`/teams/${teamId}`, updates);
     return res.data;
 };
 

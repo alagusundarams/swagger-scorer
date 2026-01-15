@@ -244,7 +244,7 @@ export const MarketplacePage = () => {
                                             <div className="flex items-center gap-2 text-xs font-black text-gray-400 uppercase tracking-widest">
                                                 <span>v{product.version}</span>
                                                 <span>•</span>
-                                                <span>{product.ownerTeamId.replace('team-', '').toUpperCase()}</span>
+                                                <span title={`Team ID: ${product.ownerTeamId}`}>{product.ownerTeamName || product.ownerTeamId.replace('team-', '').toUpperCase()}</span>
                                             </div>
                                             <span className="text-blue-600 font-bold group-hover:translate-x-2 transition-transform">→</span>
                                         </div>

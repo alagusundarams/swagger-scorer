@@ -159,9 +159,16 @@ export class ProductsRepository {
                    ar.client_id as identity_client_id,
                    ar.display_name as identity_display_name,
                    ar.app_id_uri as identity_app_id_uri,
-                   ar.type as identity_type
+                   ar.type as identity_type,
+                   COALESCE(sub_counts.active_subscribers, 0) as calculated_subscriber_count
             FROM products p
             LEFT JOIN app_registrations ar ON ar.product_id = p.id AND ar.api_id IS NULL
+            LEFT JOIN LATERAL (
+                SELECT COUNT(*) as active_subscribers
+                FROM subscriptions
+                WHERE subscriptions.product_id = p.id
+                AND subscriptions.state = 'active'
+            ) sub_counts ON true
             WHERE p.id = $1
         `, [id], 'GetProductById');
     }

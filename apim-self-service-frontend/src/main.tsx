@@ -17,10 +17,14 @@ const queryClient = new QueryClient({
   },
 });
 
-import { USE_MOCKS } from './config/env';
+import { ENABLE_MOCKS } from './config/env';
 
+/**
+ * Mocking Setup
+ * Only enabled for the login component/flow or demo stability
+ */
 async function enableMocking() {
-  if (USE_MOCKS) {
+  if (ENABLE_MOCKS) {
     const { worker } = await import('./mocks/browser');
     return worker.start({
       onUnhandledRequest: 'bypass',

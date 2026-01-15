@@ -114,6 +114,12 @@ async function runDebug() {
             if (cleanRepo === cleanProd) score += 100;
             else if (cleanRepo.includes(cleanProd)) score += 50;
             else if (cleanProd.includes(cleanRepo)) score += 30;
+
+            // Penalize DevOps specific repositories
+            if (cleanRepo.includes('devops') || cleanRepo.includes('pipeline') || cleanRepo.includes('iac') || cleanRepo.includes('-gitops')) {
+                score -= 40;
+            }
+
             if (cleanRepo.includes('grp') && cleanRepo !== cleanProd) score -= 20;
             if ((cleanRepo.includes('shared') || cleanRepo.includes('common')) && cleanRepo !== cleanProd) score -= 30;
             if (r.path?.toLowerCase().includes('terraform') || r.path?.toLowerCase().includes('.tf')) score += 10;
@@ -330,13 +336,36 @@ async function runDebug() {
             let fullDetails = deploy;
 
             // ALWAYS try to get full details if we have an owner ID to get Author/Branch/Message
-            const ownerId = deploy.owner?.id || deploy.build?.id;
-            if (ownerId) {
+            const ownerId = deploy.owner?.id || deploy.build?.id || deploy.id;
+            if (ownerId && ownerId !== 'unknown') {
                 console.log(`      📡 Fetching full build details (ID: ${ownerId}) for metadata...`);
                 const details = await AzureService.fetchADOBuild(devops.organization, projectIdentifier, ownerId, devops.pat, devops.baseUrl, bearerToken);
                 if (details) {
                     fullDetails = details;
-                    commitHash = commitHash || details.sourceVersion;
+
+                    // --- MULTI-REPO RESOLUTION ---
+                    // If the build's primary repo doesn't match our target, search in resources
+                    const primaryRepoName = details.repository?.name?.toLowerCase();
+                    const targetRepoName = primaryRepoName; // Default to primary
+                    const targetRepoId = finalRepo.id;
+                    const targetRepoNameMatch = finalRepo.name.toLowerCase();
+
+                    if (primaryRepoName !== targetRepoNameMatch) {
+                        console.log(`      ⚠️  Build primary repo (${primaryRepoName}) != target (${targetRepoNameMatch}). Scanning resources...`);
+                        if (details.resources?.repositories) {
+                            const repoResources = Object.values(details.resources.repositories);
+                            const targetRes = repoResources.find((r: any) =>
+                                r.repository?.name?.toLowerCase() === targetRepoNameMatch ||
+                                r.repository?.id === targetRepoId
+                            );
+                            if ((targetRes as any)?.version) {
+                                commitHash = (targetRes as any).version;
+                                console.log(`      🎯 [Multi-Repo] Found version from target repository (${targetRepoNameMatch}): ${commitHash}`);
+                            }
+                        }
+                    }
+
+                    commitHash = commitHash || details.sourceVersion || details.sourceVersionID || details.commitId;
                 }
             }
 
@@ -423,7 +452,25 @@ async function runDebug() {
                     }
 
                     if (record) {
-                        const hash = run.sourceVersion || 'unknown';
+                        let hash = run.sourceVersion || 'unknown';
+
+                        // --- MULTI-REPO SCANNER FIX ---
+                        if (run.repository?.name?.toLowerCase() !== finalRepo.name.toLowerCase()) {
+                            console.log(`      ⚠️  Build ${run.id} primary repo (${run.repository?.name}) != target (${finalRepo.name}). Checking resources...`);
+                            // Since we don't have full details in the build list usually, we might need a fetchADOBuild here or rely on run.resources
+                            // but usually run list doesn't have it. Let's try to find it if possible.
+                            if (run.resources?.repositories) {
+                                const targetRes = Object.values(run.resources.repositories).find((r: any) =>
+                                    r.repository?.name?.toLowerCase() === finalRepo.name.toLowerCase() ||
+                                    r.repository?.id === finalRepo.id
+                                );
+                                if ((targetRes as any)?.version) {
+                                    hash = (targetRes as any).version;
+                                    console.log(`      🎯 [Multi-Repo Scan] Found version in run resources: ${hash}`);
+                                }
+                            }
+                        }
+
                         const author = run.requestedFor?.displayName || run.requestedBy?.displayName || 'Unknown';
                         const branch = (run.sourceBranch || 'unknown').replace('refs/heads/', '');
                         const message = run.triggerInfo?.['ci.message'] || run.comment || 'No message';

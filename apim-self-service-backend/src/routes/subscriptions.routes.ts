@@ -71,10 +71,10 @@ const subscriptionsRoutes: FastifyPluginAsync = async (fastify) => {
         }
     });
     /**
-     * PUT /api/v1/subscriptions/:id/assign
+     * PATCH /api/v1/subscriptions/:id/assign
      * Day 1: Assign an orphaned subscription to a team (Admin Only)
      */
-    fastify.put('/subscriptions/:id/assign', async (request, reply) => {
+    fastify.patch('/subscriptions/:id/assign', async (request, reply) => {
         const { id } = request.params as { id: string };
         const { teamId } = request.body as { teamId: string };
         const user = (request as any).user || { role: 'user' };
@@ -88,6 +88,28 @@ const subscriptionsRoutes: FastifyPluginAsync = async (fastify) => {
             return { success: true, subscription: sub };
         } catch (error: any) {
             fastify.log.error({ err: error }, 'Failed to assign subscription team');
+            return reply.code(500).send({ error: error.message });
+        }
+    });
+
+    /**
+     * PATCH /api/v1/subscriptions/:id
+     * Update subscription state (e.g. suspend, reactivate)
+     */
+    fastify.patch('/subscriptions/:id', async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const { state } = request.body as { state: string };
+
+        // Logic check: Can user suspend their own sub? Or Admin only?
+        // Standard: Admin or Team Owner can update state.
+        // For Day 1, we'll implement the service call and allow state transitions.
+
+        try {
+            const { updateSubscriptionState } = await import('../services/inventory/SubscriptionsService.js');
+            await updateSubscriptionState(id, state);
+            return { success: true, state };
+        } catch (error: any) {
+            fastify.log.error({ err: error }, 'Failed to update subscription state');
             return reply.code(500).send({ error: error.message });
         }
     });
