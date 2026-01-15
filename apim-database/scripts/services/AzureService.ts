@@ -33,6 +33,7 @@ export interface ADOPipeline {
     name: string;
     folder: string;
     url: string;
+    project?: { name: string; id: string };
     _links: {
         web: { href: string };
     };
@@ -54,6 +55,7 @@ export interface PipelineRun {
     triggerInfo?: {
         "ci.message"?: string;
     };
+    project?: { name: string; id: string };
     _links: {
         web: { href: string };
     };
@@ -107,6 +109,7 @@ export interface ADORelease {
     createdBy: {
         displayName: string;
     };
+    project?: { name: string; id: string };
     environments: {
         id: number;
         name: string;
@@ -657,6 +660,7 @@ export class AzureService {
                     'X-TFS-FedAuthRedirect': 'Suppress'
                 }
             });
+            console.log(`📡 [ADO Response] ${resp.status} ${resp.statusText}`);
             if (resp.ok) return await resp.json();
         } catch (e) {
             console.error(`❌ [ADO] Failed to fetch build ${buildId}:`, e);
@@ -685,7 +689,7 @@ export class AzureService {
                     'X-TFS-FedAuthRedirect': 'Suppress'
                 }
             });
-            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { value: any[] };
                 return data.value || [];
@@ -726,7 +730,7 @@ export class AzureService {
                     'X-TFS-FedAuthRedirect': 'Suppress'
                 }
             });
-            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { value: any[] };
                 return data.value || [];
@@ -1116,8 +1120,10 @@ export class AzureService {
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
         const url = `${urlBase}/_apis/build/builds/${runId}/timeline`;
 
+        console.log(`📡 [ADO Request] Timeline GET ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             if (response.ok) {
                 const data = await response.json() as { records: any[] };
                 return data.records;
