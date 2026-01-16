@@ -584,14 +584,34 @@ export class AzureService {
     /**
      * Fetch Build Definitions (Fallback for Pipelines API)
      */
-    static async fetchADOBuildDefinitions(org: string, project: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<ADOPipeline[]> {
+    static async fetchADOBuildDefinitions(
+        org: string,
+        project: string,
+        repoId: string | undefined,
+        pat: string,
+        baseUrl: string = 'https://dev.azure.com',
+        bearerToken?: string,
+        repoName?: string
+    ): Promise<ADOPipeline[]> {
         const orgUrl = this.getAdoOrgUrl(baseUrl, org);
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
-        let url = `${urlBase}/_apis/build/definitions?api-version=7.1`;
-        if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
 
-        console.log(`📡 [ADO Request] GET ${url}`);
+        const params = new URLSearchParams({ 'api-version': '7.1' });
+        if (repoId) {
+            params.append('repositoryId', repoId);
+            params.append('repositoryType', 'TfsGit');
+        }
+        if (repoName) {
+            params.append('name', repoName);
+        }
+
+        const url = `${urlBase}/_apis/build/definitions?${params.toString()}`;
+
+        console.log(`📡 [ADO Request] Build Definitions GET ${url}`);
+        if (repoId) console.log(`   🎯 Filter: repositoryId=${repoId}, repositoryType=TfsGit`);
+        if (repoName) console.log(`   🎯 Filter: name=${repoName}`);
+
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
             console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
@@ -600,7 +620,14 @@ export class AzureService {
             if (response.ok) {
                 try {
                     const data = JSON.parse(text) as { value: any[] };
-                    return (data.value || []).map(b => ({ id: b.id, name: b.name, folder: b.path || '', url: b.url, _links: b._links }));
+                    return (data.value || []).map(b => ({
+                        id: b.id,
+                        name: b.name,
+                        folder: b.path || '',
+                        url: b.url,
+                        _links: b._links,
+                        repositoryId: repoId // Tag for validation
+                    }));
                 } catch (e) {
                     console.warn(`      ⚠️  Failed to parse JSON response. Content: ${text.substring(0, 200)}...`);
                 }

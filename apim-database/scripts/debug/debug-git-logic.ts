@@ -219,10 +219,10 @@ async function runDebug() {
     }
 
     const runDiscovery = async () => {
-        console.log(`   ⏳ Using Build Definitions API (proven to filter by repository)...`);
+        console.log(`   ⏳ Step 2.1: ID-Based Surgical Search (repositoryId=${primaryRepoId})...`);
 
-        // Build Definitions API properly filters by repositoryId
-        const buildDefs = await AzureService.fetchADOBuildDefinitions(
+        // 1. Try ID-based surgical strike
+        let buildDefs = await AzureService.fetchADOBuildDefinitions(
             devops.organization,
             projectIdentifier,
             primaryRepoId,
@@ -231,10 +231,26 @@ async function runDebug() {
             bearerToken
         );
 
-        console.log(`   📊 Found ${buildDefs.length} build definition(s) for repository`);
+        if (buildDefs.length === 0) {
+            console.log(`   ⚠️  ID-based search returned 0 results. Trying Step 2.2: Name-Based Surgical Search...`);
+            console.log(`   ⏳ Step 2.2: Name-Based Surgical Search (name=${primaryRepoName})...`);
+
+            // 2. Try Name-based surgical strike (fallback)
+            buildDefs = await AzureService.fetchADOBuildDefinitions(
+                devops.organization,
+                projectIdentifier,
+                undefined, // repoId
+                devops.pat,
+                devops.baseUrl,
+                bearerToken,
+                primaryRepoName // repoName
+            );
+        }
+
+        console.log(`   📊 Result: Found ${buildDefs.length} build definition(s)`);
 
         if (buildDefs.length === 0) {
-            console.log(`   ℹ️  Note: Repository may use YAML pipelines instead of classic build definitions`);
+            console.log(`   ❌ No build definitions found for this repository using surgical methods.`);
         }
 
         return buildDefs.map(p => ({ ...p, type: 'Build Definition', repositoryId: primaryRepoId }));
