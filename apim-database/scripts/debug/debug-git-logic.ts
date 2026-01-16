@@ -219,40 +219,19 @@ async function runDebug() {
     }
 
     const runDiscovery = async () => {
-        console.log(`   ⏳ Fetching pipelines for repository ${primaryRepoName}...`);
+        console.log(`   ⏳ SURGICAL: Discovering pipelines via build history for ${primaryRepoName}...`);
 
-        const safeFetch = async (fn: () => Promise<any[]>, label: string) => {
-            try {
-                return await fn();
-            } catch (e: any) {
-                console.warn(`      ⚠️  [Discovery] ${label} lookup failed: ${e.message}`);
-                return [];
-            }
-        };
+        // Use the surgical Builds API approach
+        const pipelines = await AzureService.fetchPipelinesByRepositoryBuilds(
+            devops.organization,
+            projectIdentifier,
+            primaryRepoId,
+            devops.pat,
+            devops.baseUrl,
+            bearerToken
+        );
 
-        // Fetch ONLY repository-specific pipelines (not project-wide)
-        const [yamlPipes, buildDefs] = await Promise.all([
-            safeFetch(() => AzureService.fetchADOPipelines(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl, bearerToken), 'YAML Pipelines (Repo-Specific)'),
-            safeFetch(() => AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl, bearerToken), 'Build Definitions (Repo-Specific)'),
-        ]);
-
-        console.log(`      📊 Found ${yamlPipes.length} YAML pipelines and ${buildDefs.length} build definitions for this repository`);
-
-        let combined = [
-            ...yamlPipes.map(p => ({ ...p, type: 'YAML', repositoryId: primaryRepoId })),
-            ...buildDefs.map(p => ({ ...p, type: 'Classic Build', repositoryId: primaryRepoId })),
-        ];
-
-        const seen = new Set();
-        const filtered = combined.filter(p => {
-            const key = `${p.type}-${p.id}`;
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-        });
-
-        console.log(`      ✅ ${filtered.length} unique pipelines found for repository`);
-        return filtered;
+        return pipelines.map(p => ({ ...p, type: 'Build Definition', repositoryId: primaryRepoId }));
     };
 
     const runSurgicalDiscovery = async (): Promise<any[]> => {

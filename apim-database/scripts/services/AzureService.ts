@@ -712,6 +712,84 @@ export class AzureService {
     }
 
     /**
+     * SURGICAL: Discover active pipelines for a repository by analyzing recent builds
+     * This is the most reliable way to find pipelines that actually build a specific repository
+     */
+    static async fetchPipelinesByRepositoryBuilds(
+        org: string,
+        project: string,
+        repoId: string,
+        pat: string,
+        baseUrl: string = 'https://dev.azure.com',
+        bearerToken?: string
+    ): Promise<ADOPipeline[]> {
+        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
+        const authHeader = this.getAuthHeader(pat, bearerToken);
+        const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
+
+        // Query recent builds for this repository
+        const url = `${urlBase}/_apis/build/builds?repositoryId=${repoId}&repositoryType=TfsGit&$top=100&queryOrder=finishTimeDescending&api-version=7.1`;
+
+        console.log(`📡 [ADO Request] GET ${url}`);
+        console.log(`   🎯 Surgical: Finding pipelines via build history for repository`);
+
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': authHeader,
+                    'Accept': 'application/json',
+                    'X-TFS-FedAuthRedirect': 'Suppress'
+                }
+            });
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+
+            if (response.ok) {
+                const data = await response.json() as { value: any[] };
+                const builds = data.value || [];
+                console.log(`   📊 Found ${builds.length} recent builds for repository`);
+
+                if (builds.length === 0) {
+                    console.log(`   ⚠️  No builds found for this repository`);
+                    return [];
+                }
+
+                // Extract unique pipeline definitions from builds
+                const pipelineMap = new Map<number, ADOPipeline>();
+
+                builds.forEach((build: any) => {
+                    if (build.definition && build.definition.id) {
+                        const defId = build.definition.id;
+                        if (!pipelineMap.has(defId)) {
+                            pipelineMap.set(defId, {
+                                id: defId,
+                                name: build.definition.name,
+                                folder: build.definition.path || '',
+                                url: build.definition.url,
+                                project: build.definition.project || build.project,
+                                _links: build.definition._links || { web: { href: `${baseUrl}/${org}/${project}/_build?definitionId=${defId}` } }
+                            });
+                        }
+                    }
+                });
+
+                const pipelines = Array.from(pipelineMap.values());
+                console.log(`   ✅ Discovered ${pipelines.length} unique active pipeline(s) from build history:`);
+                pipelines.forEach(p => console.log(`      - ${p.name} (ID: ${p.id})`));
+
+                return pipelines;
+            } else {
+                const errorText = await response.text();
+                console.error(`   ❌ Failed to fetch builds: ${response.status} ${response.statusText}`);
+                console.error(`   Error: ${errorText.substring(0, 200)}`);
+            }
+        } catch (err: any) {
+            console.error(`   ❌ Network error: ${err.message}`);
+        }
+
+        return [];
+    }
+
+    /**
      * Fetch the LATEST SUCCESSFUL build for a specific Pipeline Definition
      * Uses server-side filtering for efficiency - no local filtering needed!
      * 
