@@ -301,12 +301,12 @@ async function main() {
                 }
 
                 const combinedPipelines = [
-                    ...yamlPipes.map(p => ({ ...p, type: 'YAML' })),
-                    ...buildDefs.map(p => ({ ...p, type: 'Classic Build' })),
-                    ...releaseDefs.map(r => ({ ...r, type: 'Classic Release', isRelease: true })),
-                    ...projPipes.map(p => ({ ...p, type: 'YAML (Proj)' })),
-                    ...projBuilds.map(p => ({ ...p, type: 'Classic Build (Proj)' })),
-                    ...surgicalPipes
+                    ...yamlPipes.map(p => ({ ...p, type: 'YAML', priority: 200 })),
+                    ...buildDefs.map(p => ({ ...p, type: 'Classic Build', priority: 200 })),
+                    ...releaseDefs.map(r => ({ ...r, type: 'Classic Release', isRelease: true, priority: 200 })),
+                    ...projPipes.map(p => ({ ...p, type: 'YAML (Proj)', priority: 0 })),
+                    ...projBuilds.map(p => ({ ...p, type: 'Classic Build (Proj)', priority: 0 })),
+                    ...surgicalPipes.map(p => ({ ...p, priority: 500 }))
                 ];
 
                 const seen = new Set();
@@ -320,7 +320,7 @@ async function main() {
                 const pipeCandidates = uniquePipelines.map((p: any) => {
                     const cleanPipe = sanitize(p.name);
                     const folder = sanitize(p.folder || '');
-                    let score = 0;
+                    let score = p.priority || 0; // Start with priority bonus
                     if (cleanPipe === cleanProd) score += 100;
                     if (cleanPipe.includes(cleanProd)) score += 50;
                     if (folder.includes(cleanProd)) score += 20;

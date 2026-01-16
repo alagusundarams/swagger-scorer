@@ -202,11 +202,11 @@ async function runDebug() {
         ]);
 
         let combined = [
-            ...yamlPipes.map(p => ({ ...p, type: 'YAML' })),
-            ...buildDefs.map(p => ({ ...p, type: 'Classic Build' })),
-            ...releaseDefs.map(r => ({ ...r, type: 'Classic Release', isRelease: true })),
-            ...projPipes.map(p => ({ ...p, type: 'YAML (Proj)' })),
-            ...projBuilds.map(p => ({ ...p, type: 'Classic Build (Proj)' }))
+            ...yamlPipes.map(p => ({ ...p, type: 'YAML', priority: 200 })),
+            ...buildDefs.map(p => ({ ...p, type: 'Classic Build', priority: 200 })),
+            ...releaseDefs.map(r => ({ ...r, type: 'Classic Release', isRelease: true, priority: 200 })),
+            ...projPipes.map(p => ({ ...p, type: 'YAML (Proj)', priority: 0 })),
+            ...projBuilds.map(p => ({ ...p, type: 'Classic Build (Proj)', priority: 0 }))
         ];
 
         const seen = new Set();
@@ -242,6 +242,7 @@ async function runDebug() {
                                 const pipe = {
                                     ...d.definition,
                                     type: 'Surgical (Live)',
+                                    priority: 500,
                                     _links: { web: { href: `${devops.baseUrl}/${devops.organization}/${projectIdentifier}/_build?definitionId=${d.definition.id}` } }
                                 };
                                 foundPipes.set(d.definition.id, pipe);
@@ -279,7 +280,7 @@ async function runDebug() {
         const pName = p.name;
         const cleanPipe = sanitize(pName);
         const folder = sanitize(p.folder || '');
-        let score = 0;
+        let score = (p as any).priority || 0; // Start with priority bonus
         if (cleanPipe === cleanProduct) score += 100;
         if (cleanPipe.includes(cleanProduct)) score += 50;
         if (folder.includes(cleanProduct)) score += 20;
