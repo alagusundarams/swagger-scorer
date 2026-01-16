@@ -815,44 +815,61 @@ export class AzureService {
                 }
             }
 
-            if (!envId) return null;
-
-            // 2. Query Deployments for this specific definition and environment (Surgical Step 2)
-            let deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/deployments?definitionId=${definitionId}&latestState=succeeded&$top=1`;
-            console.log(`📡 [ADO Request] GET ${deployUrl}`);
-            const deployResp = await fetch(deployUrl, {
-                headers: {
-                    'Authorization': authHeader,
-                    'Accept': 'application/json',
-                    'X-TFS-FedAuthRedirect': 'Suppress'
-                }
-            });
-            console.log(`📡 [ADO Response] ${deployResp.status} ${deployResp.statusText}`);
-
-            if (deployResp.status === 404) {
-                console.warn(`      ⚠️  404 on 'deployments' endpoint. Trying 'environmentdeploymentrecords' fallback...`);
-                deployUrl = `${urlBase}/_apis/distributedtask/environments/${envId}/environmentdeploymentrecords?definitionId=${definitionId}&$top=1`;
-                console.log(`📡 [ADO Request] GET ${deployUrl} (Fallback)`);
-                const fbResp = await fetch(deployUrl, { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } });
-                if (fbResp.ok) {
-                    const fbData = await fbResp.json() as { count: number; value: any[] };
-                    if (fbData.count > 0) return fbData.value[0];
-                }
+            if (!envId) {
+                console.warn(`      ⚠️ [ADO] Environment '${environmentName}' not found in project ${project}.`);
                 return null;
             }
 
-            if (!deployResp.ok) return null;
-            const deployData = await deployResp.json() as { count: number; value: any[] };
+            // 2. Query Deployments for this specific definition and environment (Surgical Step 2)
+            const tryFetch = async (endpoint: string) => {
+                const url = `${urlBase}/_apis/distributedtask/environments/${envId}/${endpoint}`;
+                console.log(`📡 [ADO Request] GET ${url}`);
+                const resp = await fetch(url, { headers: { 'Authorization': authHeader, 'Accept': 'application/json', 'X-TFS-FedAuthRedirect': 'Suppress' } });
+                console.log(`📡 [ADO Response] ${resp.status} ${resp.statusText}`);
+                if (resp.ok) return await resp.json();
+                return null;
+            };
 
-            if (deployData.count > 0) {
-                const deploy = deployData.value[0];
-                // If the deployment object doesn't have the build/hash details, try to fetch the owner build
-                if (!deploy.build?.sourceVersion && deploy.owner?.id) {
-                    const fullBuild = await this.fetchADOBuild(org, project, deploy.owner.id, pat, baseUrl, bearerToken);
-                    if (fullBuild) deploy.build = fullBuild;
+            let deployData = await tryFetch(`deployments?definitionId=${definitionId}&latestState=succeeded&$top=1`);
+
+            if (!deployData || deployData.count === 0) {
+                console.warn(`      ⚠️  Surgical strike with definitionId ${definitionId} failed. Trying broader environment scan...`);
+                deployData = await tryFetch(`deployments?$top=50`);
+                if (!deployData || deployData.count === 0) {
+                    deployData = await tryFetch(`environmentdeploymentrecords?$top=50`);
                 }
-                return deploy;
             }
+
+            if (deployData && deployData.count > 0) {
+                // Locally filter for definitionId and success
+                const match = deployData.value.find((d: any) =>
+                    (Number(d.definitionId) === Number(definitionId) ||
+                        Number(d.owner?.definition?.id) === Number(definitionId) ||
+                        Number(d.definition?.id) === Number(definitionId)) &&
+                    (['succeeded', 'partiallysucceeded'].includes((d.status || '').toLowerCase()) ||
+                        ['succeeded', 'partiallysucceeded'].includes((d.result || '').toLowerCase()))
+                );
+
+                if (match) {
+                    console.log(`      ✅ Found matching deployment! (Build ID: ${match.owner?.id || match.id})`);
+
+                    // Ensure project info is captured if present in the record
+                    if (!match.project && (match.owner?.project || match.definition?.project)) {
+                        match.project = match.owner?.project || match.definition?.project;
+                    }
+
+                    // If the deployment object doesn't have the build/hash details, try to fetch the owner build
+                    if (!match.build?.sourceVersion && (match.owner?.id || match.id)) {
+                        const buildId = match.owner?.id || match.id;
+                        const buildProject = match.project?.id || match.project?.name || project;
+                        console.log(`      📡 Fetching supplementary build details (ID: ${buildId}) from project ${buildProject}...`);
+                        const fullBuild = await this.fetchADOBuild(org, buildProject, buildId, pat, baseUrl, bearerToken);
+                        if (fullBuild) match.build = fullBuild;
+                    }
+                    return match;
+                }
+            }
+
             return null;
         } catch (err: any) {
             console.error(`      ❌ [ADO] Surgical environment lookup failed: ${err.message}`);

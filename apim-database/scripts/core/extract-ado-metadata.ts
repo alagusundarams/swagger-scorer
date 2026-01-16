@@ -343,14 +343,19 @@ async function main() {
                 const envsToSync = targetEnv ? [targetEnv] : prod.environments;
 
                 // --- DEPLOYMENT EXTRACTION (SYNCED WITH debug-git-logic.ts Step 4) ---
-                console.log(`   ⏳ Attempting surgical strikes for ${matchedPipeline.name} (ID: ${matchedPipeline.id})...`);
+                const pipelineProject = (matchedPipeline as any).project?.id || (matchedPipeline as any).project?.name || projectId;
+                if (pipelineProject !== projectId) {
+                    console.log(`      ℹ️  Pipeline belongs to a different project: ${pipelineProject}. Switching context for Step 4.`);
+                }
+
+                console.log(`   ⏳ Attempting surgical strikes for ${matchedPipeline.name} (ID: ${matchedPipeline.id}) in project ${pipelineProject}...`);
                 for (const envName of envsToSync) {
                     let deploy: any = null;
                     console.log(`      🔎 Checking ${envName}...`);
 
                     // 1. Surgical Strike
                     if ((matchedPipeline as any).isRelease) {
-                        const releases = await AzureService.fetchADOReleases(devops.organization, projectId, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken);
+                        const releases = await AzureService.fetchADOReleases(devops.organization, pipelineProject, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken);
                         const latest = releases.find(r => r.environments?.some(e => e.name.toUpperCase() === envName.toUpperCase() && ['succeeded', 'partiallysucceeded'].includes((e.status || '').toLowerCase())));
                         if (latest) {
                             const env = latest.environments.find(e => e.name.toUpperCase() === envName.toUpperCase());
@@ -359,11 +364,12 @@ async function main() {
                                 finishTime: env?.deploySteps?.[0]?.queuedOn || latest.modifiedOn,
                                 sourceBranch: latest.artifacts?.[0]?.definitionReference?.branch?.name || 'unknown',
                                 requestedFor: latest.createdBy,
-                                url: latest._links?.web?.href
+                                url: latest._links?.web?.href,
+                                project: latest.project // Capture project if available
                             };
                         }
                     } else {
-                        deploy = await AzureService.fetchLatestEnvironmentDeployment(devops.organization, projectId, matchedPipeline.id, envName, devops.pat, devops.baseUrl, bearerToken);
+                        deploy = await AzureService.fetchLatestEnvironmentDeployment(devops.organization, pipelineProject, matchedPipeline.id, envName, devops.pat, devops.baseUrl, bearerToken);
                     }
 
                     if (deploy) {
@@ -379,10 +385,11 @@ async function main() {
 
                         let fullDetails = deploy;
 
+                        const buildProject = deploy.project?.id || deploy.project?.name || pipelineProject;
                         const ownerId = deploy.owner?.id || deploy.build?.id || deploy.id;
                         if (ownerId && ownerId !== 'unknown') {
-                            if (verbose) console.log(`      📡 Fetching full build details (ID: ${ownerId}) for metadata...`);
-                            const details = await AzureService.fetchADOBuild(devops.organization, projectId, ownerId, devops.pat, devops.baseUrl, bearerToken);
+                            if (verbose) console.log(`      📡 Fetching full build details (ID: ${ownerId}) from project ${buildProject}...`);
+                            const details = await AzureService.fetchADOBuild(devops.organization, buildProject, ownerId, devops.pat, devops.baseUrl, bearerToken);
                             if (details) {
                                 fullDetails = details;
 
@@ -443,22 +450,23 @@ async function main() {
                 // 2. Scan Fallback (if envs missing)
                 const missingEnvs = envsToSync.filter(e => !meta.deployments[e]);
                 if (missingEnvs.length > 0) {
-                    console.log(`   🔍 Missed ${missingEnvs.length} envs. Falling back to paginated timeline scan (Depth: 100)...`);
+                    console.log(`   🔍 Missed ${missingEnvs.length} envs. Falling back to paginated timeline scan (PipeProject: ${pipelineProject}, Depth: 100)...`);
                     const timelineCache = new Map<number, any[]>();
                     let skip = 0;
                     const pageSize = 20;
                     const maxDepth = 100;
 
                     while (Object.keys(meta.deployments).length < envsToSync.length && skip < maxDepth) {
-                        const builds = await AzureService.fetchBuildsByDefinition(devops.organization, projectId, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken, pageSize, skip);
+                        const builds = await AzureService.fetchBuildsByDefinition(devops.organization, pipelineProject, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken, pageSize, skip);
                         console.log(`   📡 [Scan] Page ${Math.floor(skip / pageSize) + 1}: Found ${builds.length} builds...`);
 
                         if (builds.length === 0) break;
 
                         for (const run of builds) {
                             if (Object.keys(meta.deployments).length === envsToSync.length) break;
+                            const buildProject = run.project?.id || run.project?.name || pipelineProject;
                             if (!timelineCache.has(run.id)) {
-                                timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, projectId, run.id, devops.pat, devops.baseUrl, bearerToken));
+                                timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, buildProject, run.id, devops.pat, devops.baseUrl, bearerToken));
                             }
                             const timeline = timelineCache.get(run.id)!;
                             if (!timeline || timeline.length === 0) {
