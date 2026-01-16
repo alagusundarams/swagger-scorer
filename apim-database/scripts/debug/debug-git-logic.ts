@@ -73,71 +73,104 @@ async function runDebug() {
     const authHeader = AzureService.getAuthHeader(devops.pat, bearerToken);
 
     // --- STEP 1: REPOSITORY DISCOVERY ---
-    console.log(`\n➡️  Step 1: Repository Ranking & Selection...`);
+    console.log(`\n➡️  Step 1: Repository Discovery (Searching Terraform Files)...`);
 
     let finalRepo: any = null;
     const cleanProd = sanitize(productNameArg!);
 
     if (repoOverride) {
         console.log(`   ⚙️ Using override repository: "${repoOverride}"...`);
-        const searchRes = await AzureService.searchCode(devops.organization, `repo:${repoOverride} ext:tf`, devops.pat, devops.baseUrl, bearerToken);
+        const searchQuery = `repo:${repoOverride} ext:tf`;
+        console.log(`   🔍 Search Query: "${searchQuery}"`);
+        const searchRes = await AzureService.searchCode(devops.organization, searchQuery, devops.pat, devops.baseUrl, bearerToken);
+        console.log(`   📦 Search Response: ${searchRes.count} results`);
+        if (searchRes.count > 0) {
+            console.log(`   📦 Full Response:`, JSON.stringify(searchRes, null, 2));
+        }
         finalRepo = searchRes.results?.[0]?.repository;
         if (!finalRepo) {
-            const repos = await AzureService.searchCode(devops.organization, `${repoOverride}`, devops.pat, devops.baseUrl, bearerToken);
+            const fallbackQuery = `${repoOverride}`;
+            console.log(`   🔍 Fallback Search Query: "${fallbackQuery}"`);
+            const repos = await AzureService.searchCode(devops.organization, fallbackQuery, devops.pat, devops.baseUrl, bearerToken);
+            console.log(`   📦 Fallback Response: ${repos.count} results`);
+            if (repos.count > 0) {
+                console.log(`   📦 Full Fallback Response:`, JSON.stringify(repos, null, 2));
+            }
             finalRepo = repos.results?.find((r: any) => sanitize(r.repository.name) === sanitize(repoOverride))?.repository;
         }
+        if (!finalRepo) {
+            console.error(`   ❌ FATAL: Repository override "${repoOverride}" not found. Cannot proceed.`);
+            return;
+        }
     } else {
-        const quotedName = productNameArg!.includes(' ') ? `"${productNameArg}"` : productNameArg;
-        console.log(`   📡 Searching for: ${quotedName}`);
-        const res = await AzureService.searchCode(devops.organization, quotedName!, devops.pat, devops.baseUrl, bearerToken);
+        // Search specifically in terraform files for the product name
+        const tfSearchQuery = `${productNameArg} ext:tf`;
+        console.log(`   📡 Primary Search: Looking for product in Terraform files...`);
+        console.log(`   🔍 Search Query: "${tfSearchQuery}"`);
 
+        const res = await AzureService.searchCode(devops.organization, tfSearchQuery, devops.pat, devops.baseUrl, bearerToken);
+        console.log(`   📦 Search Response: ${res.count} results found`);
+        if (res.count > 0) {
+            console.log(`   📦 Full Search Response:`, JSON.stringify(res, null, 2));
+        }
+
+        // If nothing found in .tf files, try without extension filter
         if (res.count === 0) {
-            console.log(`   ❌ No repositories found for "${productNameArg}".`);
-            console.log(`   🔎 Trying fallback (sanitized name)...`);
-            const fallback = await AzureService.searchCode(devops.organization, cleanProd, devops.pat, devops.baseUrl, bearerToken);
-            if (fallback.count > 0) {
-                res.results = fallback.results;
-                res.count = fallback.count;
+            const broadQuery = productNameArg!.includes(' ') ? `"${productNameArg}"` : productNameArg;
+            console.log(`   ⚠️  No results in .tf files. Trying broader search...`);
+            console.log(`   🔍 Broad Search Query: "${broadQuery}"`);
+            const broadRes = await AzureService.searchCode(devops.organization, broadQuery, devops.pat, devops.baseUrl, bearerToken);
+            console.log(`   📦 Broad Search Response: ${broadRes.count} results found`);
+            if (broadRes.count > 0) {
+                console.log(`   📦 Full Broad Response:`, JSON.stringify(broadRes, null, 2));
+                res.results = broadRes.results;
+                res.count = broadRes.count;
             }
         }
 
         if (!res.results || res.results.length === 0) {
-            console.log(`   ❌ Discovery failed to find any candidate repositories.`);
+            console.error(`   ❌ FATAL: No repository found containing product "${productNameArg}".`);
+            console.error(`   💡 Searched in: Terraform files (.tf) and code content`);
+            console.error(`   💡 This product may not exist in Azure DevOps or may use a different name.`);
+            console.error(`   💡 Stopping here - please verify product name and try again.`);
             return;
         }
 
-        const candidates = res.results.map((r: any) => {
-            const rName = r.repository?.name;
-            if (!rName) return { score: -1000 };
-            const cleanRepo = sanitize(rName);
-            let score = 20;
-            if (cleanRepo === cleanProd) score += 100;
-            else if (cleanRepo.includes(cleanProd)) score += 50;
-            else if (cleanProd.includes(cleanRepo)) score += 30;
+        console.log(`   ✅ Found ${res.count} file(s) containing product name`);
 
-            // Penalize DevOps specific repositories
-            if (cleanRepo.includes('devops') || cleanRepo.includes('pipeline') || cleanRepo.includes('iac') || cleanRepo.includes('-gitops')) {
-                score -= 40;
+        // Extract unique repositories from results
+        const repoMap = new Map<string, any>();
+        res.results.forEach((r: any) => {
+            const repoId = r.repository?.id;
+            if (repoId && !repoMap.has(repoId)) {
+                repoMap.set(repoId, {
+                    repo: r.repository,
+                    name: r.repository?.name,
+                    path: r.path || '',
+                    fileName: r.fileName || ''
+                });
             }
+        });
 
-            if (cleanRepo.includes('grp') && cleanRepo !== cleanProd) score -= 20;
-            if ((cleanRepo.includes('shared') || cleanRepo.includes('common')) && cleanRepo !== cleanProd) score -= 30;
-            if (r.path?.toLowerCase().includes('terraform') || r.path?.toLowerCase().includes('.tf')) score += 10;
-            return { repo: r.repository, score, name: rName, path: r.path };
-        }).sort((a: any, b: any) => b.score - a.score);
+        const candidates = Array.from(repoMap.values());
+        console.log(`   📊 Found ${candidates.length} unique repository/repositories:`);
+        candidates.forEach((c: any, idx: number) => {
+            console.log(`      ${idx + 1}. ${c.name} (found in: ${c.path || c.fileName})`);
+        });
 
         if (candidates.length === 0) {
-            console.log(`   ⚠️  No candidates found in search results.`);
+            console.error(`   ❌ FATAL: Search returned results but no valid repositories extracted.`);
             return;
         }
 
-        if (verbose) {
-            console.log(`\n   📊 Candidate Ranking:`);
-            candidates.slice(0, 5).forEach((c: any) => console.log(`      - [${c.score.toString().padStart(3)}] ${c.name} (${c.path})`));
+        // If multiple repos found, pick the first one (most relevant)
+        if (candidates.length > 1) {
+            console.log(`   ⚠️  Multiple repositories contain this product. Selecting first match: ${candidates[0].name}`);
+            console.log(`   💡 If this is incorrect, use --repo="${candidates[0].name}" to specify a different one.`);
         }
 
         finalRepo = candidates[0].repo;
-        console.log(`   🎯 Selected Winner: ${finalRepo.name} (Score: ${candidates[0].score})`);
+        console.log(`   🎯 Selected Repository: ${finalRepo.name}`);
     }
 
     if (!finalRepo) return;
@@ -150,7 +183,9 @@ async function runDebug() {
 
     try {
         console.log(`\n🔎 Authorizing Repository Metadata: ${primaryRepoName}...`);
+        console.log(`   📡 [ADO Request] GET ${devops.baseUrl}/${devops.organization}/_apis/git/repositories/${primaryRepoId || primaryRepoName}`);
         const details = await AzureService.fetchRepoById(devops.organization, primaryRepoId || primaryRepoName, devops.pat, devops.baseUrl, bearerToken);
+        console.log(`   📦 [ADO Response]:`, JSON.stringify(details, null, 2));
         project = details.project.name;
         projectIdent = details.project.id;
         (finalRepo as any).webUrl = details.webUrl;
@@ -219,41 +254,73 @@ async function runDebug() {
     };
 
     const runSurgicalDiscovery = async (): Promise<any[]> => {
-        console.log(`   ⏳ Attempting Surgical Pipeline Discovery (Environment -> Deployment -> Pipeline)...`);
-        const searchEnvs = ['PROD', 'STAGE', 'QA', 'DEV'];
+        console.log(`   ⏳ Attempting Surgical Pipeline Discovery (Smart Pattern + Builds API Validation)...`);
         const foundPipes = new Map<number, any>();
 
-        for (const envName of searchEnvs) {
-            console.log(`      🔎 Checking environment: ${envName}...`);
-            const envUrl = `${devops.baseUrl}/${devops.organization}/${encodeURIComponent(projectIdentifier)}/_apis/distributedtask/environments?name=${envName}`;
+        // Common pipeline naming patterns based on repository structure
+        const repoBaseName = finalRepo.name.replace(/[-_]/g, ' ').split(' ').filter((w: string) => w.length > 0).join('-');
+        const candidatePatterns = [
+            finalRepo.name,                           // Exact repo name
+            `${finalRepo.name}-CI`,                   // Repo-CI
+            `${finalRepo.name}-CD`,                   // Repo-CD
+            `${repoBaseName}-Pipeline`,                // Repo-Pipeline
+            `CI-${finalRepo.name}`,                   // CI-Repo
+            `Deploy-${finalRepo.name}`,               // Deploy-Repo
+        ];
+
+        console.log(`      🔎 Testing ${candidatePatterns.length} pipeline naming patterns...`);
+
+        // Try to find pipelines using common naming patterns
+        for (const pattern of candidatePatterns) {
             try {
-                const resp = await fetch(envUrl, {
+                const yamlUrl = `${devops.baseUrl}/${devops.organization}/${encodeURIComponent(projectIdentifier)}/_apis/pipelines?api-version=7.1`;
+                console.log(`      📡 [ADO Request] GET ${yamlUrl}`);
+                const resp = await fetch(yamlUrl, {
                     headers: { 'Authorization': authHeader, 'Accept': 'application/json' }
                 });
+
                 if (resp.ok) {
                     const data = await resp.json() as { count: number; value: any[] };
-                    const match = data.value.find((e: any) => e.name.toUpperCase() === envName);
-                    if (match) {
-                        const envDeploys = await AzureService.fetchEnvironmentDeployments(devops.organization, projectIdentifier, match.id, devops.pat, devops.baseUrl, bearerToken);
-                        console.log(`      ✅ Found ${envDeploys.length} recent deployments in ${envName}.`);
+                    const matches = data.value.filter((p: any) =>
+                        p.name && p.name.toLowerCase().includes(pattern.toLowerCase())
+                    );
 
-                        for (const d of envDeploys) {
-                            if (d.definition && d.definition.id) {
-                                const pipe = {
-                                    ...d.definition,
-                                    type: 'Surgical (Live)',
-                                    _links: { web: { href: `${devops.baseUrl}/${devops.organization}/${projectIdentifier}/_build?definitionId=${d.definition.id}` } }
-                                };
-                                foundPipes.set(d.definition.id, pipe);
+                    // Validate each match has recent successful builds
+                    for (const pipe of matches) {
+                        try {
+                            const build = await AzureService.fetchLatestSuccessfulBuild(
+                                devops.organization,
+                                projectIdentifier,
+                                pipe.id,
+                                devops.pat,
+                                devops.baseUrl,
+                                bearerToken
+                            );
+
+                            if (build) {
+                                console.log(`      ✅ [Surgical] Found active pipeline: ${pipe.name} (ID: ${pipe.id})`);
+                                foundPipes.set(pipe.id, {
+                                    ...pipe,
+                                    type: 'Surgical (Pattern Match)',
+                                    _links: { web: { href: `${devops.baseUrl}/${devops.organization}/${projectIdentifier}/_build?definitionId=${pipe.id}` } }
+                                });
                             }
+                        } catch (e) {
+                            // Pipeline has no successful builds, skip
                         }
-                        if (foundPipes.size > 0) break; // Found something, stop looking at other envs
                     }
                 }
             } catch (e) {
-                console.warn(`      ⚠️  Surgical lookup for ${envName} failed.`);
+                // Pattern search failed, continue
             }
+
+            if (foundPipes.size > 0) break; // Found active pipelines, stop searching
         }
+
+        if (foundPipes.size === 0) {
+            console.log(`      ℹ️  No pipelines found via pattern matching. Will fall back to general discovery.`);
+        }
+
         return Array.from(foundPipes.values());
     };
 
@@ -315,13 +382,17 @@ async function runDebug() {
     }
 
     console.log(`   ⏳ Fetching latest successful build for Pipeline Definition ID: ${matchedPipeline.id} (${matchedPipeline.name}) in Project: ${pipelineProject}...`);
+    const buildsApiUrl = `${devops.baseUrl}/${devops.organization}/${encodeURIComponent(pipelineProject)}/_apis/build/builds?definitions=${matchedPipeline.id}&resultFilter=succeeded&statusFilter=completed&$top=1&queryOrder=finishTimeDescending`;
+    console.log(`   📡 [ADO Request] GET ${buildsApiUrl}`);
 
     let latestBuild: any = null;
 
     if ((matchedPipeline as any).isRelease) {
         // Handle Classic Release Pipelines separately
-        console.log(`      📡 [Classic Release] Fetching releases for definition ${matchedPipeline.id}...`);
+        const releasesUrl = `${devops.baseUrl}/${devops.organization}/${encodeURIComponent(pipelineProject)}/_apis/release/releases?definitionId=${matchedPipeline.id}`;
+        console.log(`      📡 [ADO Request] [Classic Release] GET ${releasesUrl}`);
         const releases = await AzureService.fetchADOReleases(devops.organization, pipelineProject, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken);
+        console.log(`      📦 [ADO Response]:`, JSON.stringify(releases, null, 2));
         const successfulRelease = releases.find(r => r.environments?.some(e => e.status?.toLowerCase() === 'succeeded'));
         if (successfulRelease) {
             latestBuild = {
@@ -344,6 +415,11 @@ async function runDebug() {
             devops.baseUrl,
             bearerToken
         );
+        if (latestBuild) {
+            console.log(`   📦 [ADO Response] Latest Build:`, JSON.stringify(latestBuild, null, 2));
+        } else {
+            console.log(`   📦 [ADO Response]: No build found (null)`);
+        }
     }
 
     if (latestBuild) {
@@ -420,8 +496,10 @@ async function runDebug() {
         const maxDepth = 100;
 
         while (Object.keys(deployments).length < envsToSync.length && skip < maxDepth) {
+            const scanUrl = `${devops.baseUrl}/${devops.organization}/${encodeURIComponent(pipelineProject)}/_apis/build/builds?definitions=${matchedPipeline.id}&$top=${pageSize}&$skip=${skip}`;
+            console.log(`   📡 [ADO Request] [Scan Page ${Math.floor(skip / pageSize) + 1}] GET ${scanUrl}`);
             const builds = await AzureService.fetchBuildsByDefinition(devops.organization, pipelineProject, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken, pageSize, skip);
-            console.log(`   📡 [Scan] Page ${Math.floor(skip / pageSize) + 1}: Found ${builds.length} builds...`);
+            console.log(`   📦 [ADO Response] [Scan] Page ${Math.floor(skip / pageSize) + 1}: Found ${builds.length} builds`);
 
             if (builds.length === 0 && skip === 0) {
                 console.log(`   ⚠️ No builds found for definition in project ${pipelineProject}. Trying broader search...`);
@@ -440,7 +518,11 @@ async function runDebug() {
                 const runProject = run.project?.id || run.project?.name || pipelineProject;
 
                 if (!timelineCache.has(run.id)) {
-                    timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, runProject, run.id, devops.pat, devops.baseUrl, bearerToken));
+                    const timelineUrl = `${devops.baseUrl}/${devops.organization}/${encodeURIComponent(runProject)}/_apis/build/builds/${run.id}/timeline`;
+                    console.log(`      📡 [ADO Request] [Timeline] GET ${timelineUrl}`);
+                    const timeline = await AzureService.fetchPipelineRunTimeline(devops.organization, runProject, run.id, devops.pat, devops.baseUrl, bearerToken);
+                    console.log(`      📦 [ADO Response] [Timeline] Build ${run.id}: ${timeline.length} records`);
+                    timelineCache.set(run.id, timeline);
                 }
                 const timeline = timelineCache.get(run.id)!;
                 if (!timeline || timeline.length === 0) continue;
