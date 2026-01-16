@@ -219,10 +219,10 @@ async function runDebug() {
     }
 
     const runDiscovery = async () => {
-        console.log(`   ⏳ SURGICAL: Discovering pipelines via build history for ${primaryRepoName}...`);
+        console.log(`   ⏳ Using Build Definitions API (proven to filter by repository)...`);
 
-        // Use the surgical Builds API approach
-        const pipelines = await AzureService.fetchPipelinesByRepositoryBuilds(
+        // Build Definitions API properly filters by repositoryId
+        const buildDefs = await AzureService.fetchADOBuildDefinitions(
             devops.organization,
             projectIdentifier,
             primaryRepoId,
@@ -231,7 +231,13 @@ async function runDebug() {
             bearerToken
         );
 
-        return pipelines.map(p => ({ ...p, type: 'Build Definition', repositoryId: primaryRepoId }));
+        console.log(`   📊 Found ${buildDefs.length} build definition(s) for repository`);
+
+        if (buildDefs.length === 0) {
+            console.log(`   ℹ️  Note: Repository may use YAML pipelines instead of classic build definitions`);
+        }
+
+        return buildDefs.map(p => ({ ...p, type: 'Build Definition', repositoryId: primaryRepoId }));
     };
 
     const runSurgicalDiscovery = async (): Promise<any[]> => {
