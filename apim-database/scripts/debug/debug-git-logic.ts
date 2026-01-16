@@ -218,6 +218,53 @@ async function runDebug() {
         });
     };
 
+    const runRepoBasedDiscovery = async (): Promise<any[]> => {
+        console.log(`   🎯 Attempting Repo-Name-Based Pipeline Discovery...`);
+
+        // Extract search term from repo name: "Alerts-IaC" -> "Alerts"
+        let searchTerm = primaryRepoName.replace(/-IaC$/i, '').replace(/-Deploy$/i, '').replace(/-GitOps$/i, '');
+
+        // Also try product name as fallback
+        const productSearchTerm = productNameArg!.replace(/-IaC$/i, '').replace(/-Deploy$/i, '');
+
+        console.log(`      🔎 Searching for pipelines matching: "${searchTerm}" (from repo: ${primaryRepoName})`);
+
+        const safeFetch = async (fn: () => Promise<any[]>, label: string) => {
+            try {
+                return await fn();
+            } catch (e: any) {
+                console.warn(`      ⚠️  [Repo Discovery] ${label} lookup failed: ${e.message}`);
+                return [];
+            }
+        };
+
+        // Fetch all pipelines in the project
+        const [yamlPipes, buildDefs] = await Promise.all([
+            safeFetch(() => AzureService.fetchADOPipelines(devops.organization, projectIdentifier, '', devops.pat, devops.baseUrl, bearerToken), 'YAML Pipelines'),
+            safeFetch(() => AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, '', devops.pat, devops.baseUrl, bearerToken), 'Build Definitions')
+        ]);
+
+        const allPipelines = [
+            ...yamlPipes.map(p => ({ ...p, type: 'Repo-Based YAML' })),
+            ...buildDefs.map(p => ({ ...p, type: 'Repo-Based Build' }))
+        ];
+
+        // Filter by name match
+        const cleanSearch = sanitize(searchTerm);
+        const cleanProduct = sanitize(productSearchTerm);
+
+        const matchedPipelines = allPipelines.filter(p => {
+            const cleanName = sanitize(p.name);
+            return cleanName.includes(cleanSearch) ||
+                cleanName.includes(cleanProduct) ||
+                (cleanSearch.length > 3 && cleanName.includes(cleanSearch.substring(0, cleanSearch.length - 1)));
+        });
+
+        console.log(`      ✅ Found ${matchedPipelines.length} pipelines matching repo/product name.`);
+
+        return matchedPipelines.map(p => ({ ...p, priority: 400 }));
+    };
+
     const runSurgicalDiscovery = async (): Promise<any[]> => {
         console.log(`   ⏳ Attempting Surgical Pipeline Discovery (Environment -> Deployment -> Pipeline)...`);
         const searchEnvs = ['PROD', 'STAGE', 'QA', 'DEV'];
@@ -242,7 +289,7 @@ async function runDebug() {
                                 const pipe = {
                                     ...d.definition,
                                     type: 'Surgical (Live)',
-                                    priority: 500,
+                                    priority: 300,
                                     _links: { web: { href: `${devops.baseUrl}/${devops.organization}/${projectIdentifier}/_build?definitionId=${d.definition.id}` } }
                                 };
                                 foundPipes.set(d.definition.id, pipe);
@@ -258,13 +305,19 @@ async function runDebug() {
         return Array.from(foundPipes.values());
     };
 
-    let pipelines = await runSurgicalDiscovery();
+    // STRATEGY: Repo-Name-Based -> Surgical -> General Discovery
+    let pipelines = await runRepoBasedDiscovery();
+
+    if (pipelines.length === 0) {
+        console.log(`   ⚠️  Repo-based discovery found no matches. Trying surgical discovery...`);
+        pipelines = await runSurgicalDiscovery();
+    } else {
+        console.log(`   ✅ Repo-based discovery found ${pipelines.length} matching pipelines.`);
+    }
 
     if (pipelines.length === 0) {
         console.log(`   ⚠️  Surgical discovery failed or returned no results. Falling back to general discovery...`);
         pipelines = await runDiscovery();
-    } else {
-        console.log(`   ✅ Surgical discovery found ${pipelines.length} likely live pipelines.`);
     }
 
     if (pipelines.length === 0) {
