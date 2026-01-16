@@ -12,6 +12,7 @@ import { fileURLToPath } from 'url';
 import 'dotenv/config'; // Load .env file if present
 import { AzureService } from '../services/AzureService.js';
 import pkg from 'pg';
+import * as XLSX from 'xlsx';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -548,6 +549,113 @@ async function main() {
 
     const outputPath = join(dataDir, 'ado-metadata.json');
     writeFileSync(outputPath, JSON.stringify(results, null, 2));
+
+    // --- GENERATE EXCEL EXPORT ---
+    console.log(`\n📊 Generating Excel reports...`);
+
+    // Sheet 1: Deployments Summary (one row per product-environment combination)
+    const deploymentRows: any[] = [];
+    results.forEach(r => {
+        if (r.status === 'MATCHED' && Object.keys(r.deployments).length > 0) {
+            Object.entries(r.deployments).forEach(([env, deployment]) => {
+                deploymentRows.push({
+                    'Product Name': r.productName,
+                    'Product ID': r.productId,
+                    'Environment': env,
+                    'Commit Hash': deployment.hash,
+                    'Short Hash': deployment.hash?.substring(0, 7) || 'N/A',
+                    'Author': deployment.author || 'Unknown',
+                    'Branch': deployment.branch || 'unknown',
+                    'Date': deployment.date,
+                    'Commit Message': deployment.message || 'No message',
+                    'Repository': r.repository?.name || 'N/A',
+                    'Pipeline': r.pipeline?.name || 'N/A',
+                    'Pipeline ID': r.pipeline?.id || 'N/A',
+                    'Build URL': deployment.url || 'N/A',
+                    'Status': r.status
+                });
+            });
+        }
+    });
+
+    // Sheet 2: Products Overview (one row per product)
+    const productRows: any[] = [];
+    results.forEach(r => {
+        const envCount = Object.keys(r.deployments).length;
+        const envList = Object.keys(r.deployments).join(', ') || 'None';
+        productRows.push({
+            'Product Name': r.productName,
+            'Product ID': r.productId,
+            'Status': r.status,
+            'Repository': r.repository?.name || 'N/A',
+            'Repository ID': r.repository?.id || 'N/A',
+            'Project': r.repository?.project || 'N/A',
+            'Pipeline': r.pipeline?.name || 'N/A',
+            'Pipeline ID': r.pipeline?.id || 'N/A',
+            'Environments Found': envCount,
+            'Environment List': envList
+        });
+    });
+
+    // Sheet 3: Missing/Issues Report
+    const issueRows: any[] = [
+        ...missingStats.repoMissing.map(name => ({ 'Product': name, 'Issue': 'Repository Missing', 'Severity': 'High' })),
+        ...missingStats.pipelineMissing.map(name => ({ 'Product': name, 'Issue': 'Pipeline Missing', 'Severity': 'High' })),
+        ...missingStats.noDeployments.map(name => ({ 'Product': name, 'Issue': 'No Deployments Found', 'Severity': 'Medium' }))
+    ];
+
+    // Create workbook with multiple sheets
+    const workbook = XLSX.utils.book_new();
+
+    const deploymentsSheet = XLSX.utils.json_to_sheet(deploymentRows);
+    const productsSheet = XLSX.utils.json_to_sheet(productRows);
+    const issuesSheet = XLSX.utils.json_to_sheet(issueRows.length > 0 ? issueRows : [{ 'Product': 'N/A', 'Issue': 'No issues found!', 'Severity': 'N/A' }]);
+
+    // Set column widths for better readability
+    deploymentsSheet['!cols'] = [
+        { wch: 30 }, // Product Name
+        { wch: 15 }, // Product ID
+        { wch: 10 }, // Environment
+        { wch: 42 }, // Commit Hash
+        { wch: 10 }, // Short Hash
+        { wch: 20 }, // Author
+        { wch: 15 }, // Branch
+        { wch: 20 }, // Date
+        { wch: 50 }, // Commit Message
+        { wch: 25 }, // Repository
+        { wch: 30 }, // Pipeline
+        { wch: 10 }, // Pipeline ID
+        { wch: 60 }, // Build URL
+        { wch: 12 }  // Status
+    ];
+
+    productsSheet['!cols'] = [
+        { wch: 30 }, // Product Name
+        { wch: 15 }, // Product ID
+        { wch: 15 }, // Status
+        { wch: 25 }, // Repository
+        { wch: 38 }, // Repository ID
+        { wch: 20 }, // Project
+        { wch: 30 }, // Pipeline
+        { wch: 10 }, // Pipeline ID
+        { wch: 15 }, // Environments Found
+        { wch: 40 }  // Environment List
+    ];
+
+    issuesSheet['!cols'] = [
+        { wch: 30 }, // Product
+        { wch: 30 }, // Issue
+        { wch: 10 }  // Severity
+    ];
+
+    XLSX.utils.book_append_sheet(workbook, deploymentsSheet, 'Deployments');
+    XLSX.utils.book_append_sheet(workbook, productsSheet, 'Products Overview');
+    XLSX.utils.book_append_sheet(workbook, issuesSheet, 'Issues');
+
+    const excelPath = join(dataDir, 'ado-metadata.xlsx');
+    XLSX.writeFile(workbook, excelPath);
+    console.log(`   ✅ Excel report saved to: ${excelPath}`);
+    console.log(`   📊 Sheets: Deployments (${deploymentRows.length} rows), Products Overview (${productRows.length} rows), Issues (${issueRows.length} rows)`);
 
     console.log(`\n✅ ADO Metadata Extraction Complete! Saved to: ${outputPath}`);
     console.log(`\n📋 Missing Report Generated:`);
