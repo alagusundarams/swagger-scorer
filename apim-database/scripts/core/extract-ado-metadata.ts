@@ -301,12 +301,12 @@ async function main() {
                 }
 
                 const combinedPipelines = [
-                    ...yamlPipes.map(p => ({ ...p, type: 'YAML', priority: 200 })),
-                    ...buildDefs.map(p => ({ ...p, type: 'Classic Build', priority: 200 })),
-                    ...releaseDefs.map(r => ({ ...r, type: 'Classic Release', isRelease: true, priority: 200 })),
-                    ...projPipes.map(p => ({ ...p, type: 'YAML (Proj)', priority: 0 })),
-                    ...projBuilds.map(p => ({ ...p, type: 'Classic Build (Proj)', priority: 0 })),
-                    ...surgicalPipes.map(p => ({ ...p, priority: 500 }))
+                    ...yamlPipes.map(p => ({ ...p, type: 'YAML' })),
+                    ...buildDefs.map(p => ({ ...p, type: 'Classic Build' })),
+                    ...releaseDefs.map(r => ({ ...r, type: 'Classic Release', isRelease: true })),
+                    ...projPipes.map(p => ({ ...p, type: 'YAML (Proj)' })),
+                    ...projBuilds.map(p => ({ ...p, type: 'Classic Build (Proj)' })),
+                    ...surgicalPipes
                 ];
 
                 const seen = new Set();
@@ -320,7 +320,7 @@ async function main() {
                 const pipeCandidates = uniquePipelines.map((p: any) => {
                     const cleanPipe = sanitize(p.name);
                     const folder = sanitize(p.folder || '');
-                    let score = p.priority || 0; // Start with priority bonus
+                    let score = 0;
                     if (cleanPipe === cleanProd) score += 100;
                     if (cleanPipe.includes(cleanProd)) score += 50;
                     if (folder.includes(cleanProd)) score += 20;
@@ -342,92 +342,107 @@ async function main() {
 
                 const envsToSync = targetEnv ? [targetEnv] : prod.environments;
 
-                // --- STEP 4: EFFICIENT BUILD-BASED HASH SYNC (Replaces Surgical Environment Discovery) ---
+                // --- DEPLOYMENT EXTRACTION (SYNCED WITH debug-git-logic.ts Step 4) ---
                 const pipelineProject = (matchedPipeline as any).project?.id || (matchedPipeline as any).project?.name || projectId;
                 if (pipelineProject !== projectId) {
                     console.log(`      ℹ️  Pipeline belongs to a different project: ${pipelineProject}. Switching context for Step 4.`);
                 }
 
-                console.log(`   ⏳ Fetching latest successful build for ${matchedPipeline.name} (ID: ${matchedPipeline.id}) in project ${pipelineProject}...`);
+                console.log(`   ⏳ Attempting surgical strikes for ${matchedPipeline.name} (ID: ${matchedPipeline.id}) in project ${pipelineProject}...`);
+                for (const envName of envsToSync) {
+                    let deploy: any = null;
+                    console.log(`      🔎 Checking ${envName}...`);
 
-                let latestBuild: any = null;
-
-                // Handle Classic Release Pipelines differently
-                if ((matchedPipeline as any).isRelease) {
-                    console.log(`      ℹ️  Classic Release Pipeline detected. Fetching latest release...`);
-                    const releases = await AzureService.fetchADOReleases(devops.organization, pipelineProject, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken);
-                    const successfulRelease = releases.find(r => r.environments?.some(e => e.status?.toLowerCase() === 'succeeded'));
-                    if (successfulRelease) {
-                        latestBuild = {
-                            id: successfulRelease.id,
-                            sourceVersion: successfulRelease.artifacts?.[0]?.definitionReference?.version?.id,
-                            sourceBranch: successfulRelease.artifacts?.[0]?.definitionReference?.branch?.name || 'unknown',
-                            requestedFor: successfulRelease.createdBy,
-                            finishTime: successfulRelease.modifiedOn,
-                            _links: successfulRelease._links,
-                            project: successfulRelease.project || (matchedPipeline as any).project
-                        };
+                    // 1. Surgical Strike
+                    if ((matchedPipeline as any).isRelease) {
+                        const releases = await AzureService.fetchADOReleases(devops.organization, pipelineProject, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken);
+                        const latest = releases.find(r => r.environments?.some(e => e.name.toUpperCase() === envName.toUpperCase() && ['succeeded', 'partiallysucceeded'].includes((e.status || '').toLowerCase())));
+                        if (latest) {
+                            const env = latest.environments.find(e => e.name.toUpperCase() === envName.toUpperCase());
+                            deploy = {
+                                build: { sourceVersion: latest.artifacts?.[0]?.definitionReference?.version?.id },
+                                finishTime: env?.deploySteps?.[0]?.queuedOn || latest.modifiedOn,
+                                sourceBranch: latest.artifacts?.[0]?.definitionReference?.branch?.name || 'unknown',
+                                requestedFor: latest.createdBy,
+                                url: latest._links?.web?.href,
+                                project: latest.project // Capture project if available
+                            };
+                        }
+                    } else {
+                        deploy = await AzureService.fetchLatestEnvironmentDeployment(devops.organization, pipelineProject, matchedPipeline.id, envName, devops.pat, devops.baseUrl, bearerToken);
                     }
-                } else {
-                    // Use the new efficient Builds API for YAML and Classic Build pipelines
-                    latestBuild = await AzureService.fetchLatestSuccessfulBuild(
-                        devops.organization,
-                        pipelineProject,
-                        matchedPipeline.id,
-                        devops.pat,
-                        devops.baseUrl,
-                        bearerToken
-                    );
-                }
 
-                if (!latestBuild) {
-                    console.warn(`      ⚠️  No successful build found for pipeline ${matchedPipeline.id}. Skipping environment sync.`);
-                } else {
-                    console.log(`      ✅ Latest build found (ID: ${latestBuild.id}, Finished: ${latestBuild.finishTime})`);
+                    if (deploy) {
+                        if (verbose) console.log(`      ℹ️ [DEBUG] Raw deploy object found (ID: ${deploy.id})`);
 
-                    // --- EXTRACT COMMIT HASH with Multi-Repo Resolution ---
-                    let commitHash = latestBuild.sourceVersion || latestBuild.sourceVersionID;
+                        // INITIAL HASH CAPTURE (Expansive fields)
+                        let commitHash = deploy.build?.sourceVersion ||
+                            deploy.build?.sourceVersionID ||
+                            deploy.owner?.sourceVersion ||
+                            deploy.owner?.sourceVersionID ||
+                            deploy.owner?.commitId ||
+                            (deploy.owner?.triggerInfo ? (deploy.owner.triggerInfo['ci.sourceSha'] || deploy.owner.triggerInfo['ci.sourceVersion']) : null);
 
-                    // Multi-Repo Resolution: Check if build's primary repo matches our target repo
-                    if (latestBuild.repository?.name && meta.repository?.name &&
-                        latestBuild.repository.name.toLowerCase() !== meta.repository.name.toLowerCase()) {
+                        let fullDetails = deploy;
 
-                        if (verbose) console.log(`      ⚠️  Build primary repo (${latestBuild.repository.name}) != target (${meta.repository.name}). Scanning resources...`);
+                        const buildProject = deploy.project?.id || deploy.project?.name || pipelineProject;
+                        const ownerId = deploy.owner?.id || deploy.build?.id || deploy.id;
+                        if (ownerId && ownerId !== 'unknown') {
+                            if (verbose) console.log(`      📡 Fetching full build details (ID: ${ownerId}) from project ${buildProject}...`);
+                            const details = await AzureService.fetchADOBuild(devops.organization, buildProject, ownerId, devops.pat, devops.baseUrl, bearerToken);
+                            if (details) {
+                                fullDetails = details;
 
-                        if (latestBuild.resources?.repositories) {
-                            const targetRepoRes = Object.values(latestBuild.resources.repositories).find((r: any) =>
-                                r.repository?.name?.toLowerCase() === meta.repository!.name.toLowerCase() ||
-                                r.repository?.id === meta.repository!.id
-                            );
-                            if ((targetRepoRes as any)?.version) {
-                                commitHash = (targetRepoRes as any).version;
-                                if (verbose) console.log(`      🎯 [Multi-Repo] Using commit from target repository (${meta.repository.name}): ${commitHash}`);
+                                // --- MULTI-REPO FIX ---
+                                // If the build's primary repo is NOT our matched repo, look for the correct version in resources
+                                if (details.repository?.name && meta.repository?.name &&
+                                    details.repository.name.toLowerCase() !== meta.repository.name.toLowerCase()) {
+
+                                    if (verbose) console.log(`      ⚠️  Build primary repo (${details.repository.name}) != target (${meta.repository.name}). Scanning resources...`);
+
+                                    if (details.resources?.repositories) {
+                                        const targetRepoRes = Object.values(details.resources.repositories).find((r: any) =>
+                                            r.repository?.name?.toLowerCase() === meta.repository!.name.toLowerCase() ||
+                                            r.repository?.id === meta.repository!.id
+                                        );
+                                        if ((targetRepoRes as any)?.version) {
+                                            commitHash = (targetRepoRes as any).version;
+                                            if (verbose) console.log(`      🎯 [Multi-Repo] Found version from target repository (${meta.repository.name}): ${commitHash}`);
+                                        }
+                                    }
+                                }
+
+                                // Secondary Fallback if still unset
+                                commitHash = commitHash || details.sourceVersion || details.sourceVersionID || details.commitId;
                             }
                         }
-                    }
 
-                    if (!commitHash || commitHash === 'unknown') {
-                        console.warn(`      ⚠️  Build found but commit hash is missing. Cannot sync environments.`);
-                    } else {
-                        // --- APPLY SAME COMMIT TO ALL ENVIRONMENTS ---
-                        const author = latestBuild.requestedFor?.displayName || latestBuild.requestedBy?.displayName || 'Unknown';
-                        const rawBranch = latestBuild.sourceBranch || 'unknown';
-                        const branch = rawBranch.replace('refs/heads/', '');
-                        const message = latestBuild.triggerInfo?.['ci.message'] || latestBuild.sourceVersionMessage || 'No message';
-                        const buildUrl = latestBuild._links?.web?.href || latestBuild.url;
+                        if (commitHash && commitHash !== 'unknown') {
+                            const author = fullDetails.requestedFor?.displayName ||
+                                fullDetails.requestedBy?.displayName ||
+                                fullDetails.lastChangedBy?.displayName ||
+                                deploy.requestedFor?.displayName ||
+                                'Unknown';
 
-                        console.log(`      📦 Applying commit ${commitHash.substring(0, 7)} to ${envsToSync.length} environment(s)...`);
+                            const rawBranch = fullDetails.sourceBranch ||
+                                deploy.sourceBranch ||
+                                deploy.build?.sourceBranch ||
+                                'unknown';
 
-                        for (const envName of envsToSync) {
+                            const branch = rawBranch.replace('refs/heads/', '');
+                            const message = fullDetails.triggerInfo?.['ci.message'] || fullDetails.comment || deploy.comment || 'No message';
+
                             meta.deployments[envName] = {
                                 hash: commitHash,
-                                date: latestBuild.finishTime || new Date().toISOString(),
+                                date: deploy.finishTime || deploy.startTime || fullDetails.finishTime || fullDetails.startTime || new Date().toISOString(),
                                 branch,
                                 author,
                                 message,
-                                url: buildUrl
+                                url: fullDetails._links?.web?.href || deploy._links?.web?.href || deploy.url
                             };
-                            console.log(`      ✅ ${envName.padEnd(5)}: Applied ${commitHash.substring(0, 7)} (Author: ${author})`);
+                            console.log(`      🎯 ${envName.padEnd(5)}: Surgical Hit! Captured ${commitHash.substring(0, 7)} (Auth: ${author})`);
+                        } else {
+                            console.warn(`      ⚠️  ${envName.padEnd(5)}: Deployment found but commit hash is missing/unknown.`);
                         }
                     }
                 }
@@ -548,92 +563,6 @@ async function main() {
 
     const outputPath = join(dataDir, 'ado-metadata.json');
     writeFileSync(outputPath, JSON.stringify(results, null, 2));
-
-    // --- GENERATE CSV EXPORTS ---
-    console.log(`\n📊 Generating CSV reports...`);
-
-    // Helper function to convert array of objects to CSV
-    const arrayToCSV = (data: any[]): string => {
-        if (data.length === 0) return '';
-        const headers = Object.keys(data[0]);
-        const escapeCsvValue = (val: any): string => {
-            const str = String(val ?? '');
-            // Escape quotes and wrap in quotes if contains comma, quote, or newline
-            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-                return `"${str.replace(/"/g, '""')}"`;
-            }
-            return str;
-        };
-        const csvRows = [
-            headers.join(','),
-            ...data.map(row => headers.map(h => escapeCsvValue(row[h])).join(','))
-        ];
-        return csvRows.join('\n');
-    };
-
-    // CSV 1: Deployments Summary (one row per product-environment combination)
-    const deploymentRows: any[] = [];
-    results.forEach(r => {
-        if (r.status === 'MATCHED' && Object.keys(r.deployments).length > 0) {
-            Object.entries(r.deployments).forEach(([env, deployment]) => {
-                deploymentRows.push({
-                    'Product Name': r.productName,
-                    'Product ID': r.productId,
-                    'Environment': env,
-                    'Commit Hash': deployment.hash,
-                    'Short Hash': deployment.hash?.substring(0, 7) || 'N/A',
-                    'Author': deployment.author || 'Unknown',
-                    'Branch': deployment.branch || 'unknown',
-                    'Date': deployment.date,
-                    'Commit Message': deployment.message || 'No message',
-                    'Repository': r.repository?.name || 'N/A',
-                    'Pipeline': r.pipeline?.name || 'N/A',
-                    'Pipeline ID': r.pipeline?.id || 'N/A',
-                    'Build URL': deployment.url || 'N/A',
-                    'Status': r.status
-                });
-            });
-        }
-    });
-
-    // CSV 2: Products Overview (one row per product)
-    const productRows: any[] = [];
-    results.forEach(r => {
-        const envCount = Object.keys(r.deployments).length;
-        const envList = Object.keys(r.deployments).join(', ') || 'None';
-        productRows.push({
-            'Product Name': r.productName,
-            'Product ID': r.productId,
-            'Status': r.status,
-            'Repository': r.repository?.name || 'N/A',
-            'Repository ID': r.repository?.id || 'N/A',
-            'Project': r.repository?.project || 'N/A',
-            'Pipeline': r.pipeline?.name || 'N/A',
-            'Pipeline ID': r.pipeline?.id || 'N/A',
-            'Environments Found': envCount,
-            'Environment List': envList
-        });
-    });
-
-    // CSV 3: Missing/Issues Report
-    const issueRows: any[] = [
-        ...missingStats.repoMissing.map(name => ({ 'Product': name, 'Issue': 'Repository Missing', 'Severity': 'High' })),
-        ...missingStats.pipelineMissing.map(name => ({ 'Product': name, 'Issue': 'Pipeline Missing', 'Severity': 'High' })),
-        ...missingStats.noDeployments.map(name => ({ 'Product': name, 'Issue': 'No Deployments Found', 'Severity': 'Medium' }))
-    ];
-
-    // Write CSV files
-    const deploymentsCSV = join(dataDir, 'ado-deployments.csv');
-    const productsCSV = join(dataDir, 'ado-products.csv');
-    const issuesCSV = join(dataDir, 'ado-issues.csv');
-
-    writeFileSync(deploymentsCSV, arrayToCSV(deploymentRows));
-    writeFileSync(productsCSV, arrayToCSV(productRows));
-    writeFileSync(issuesCSV, arrayToCSV(issueRows.length > 0 ? issueRows : [{ 'Product': 'N/A', 'Issue': 'No issues found!', 'Severity': 'N/A' }]));
-
-    console.log(`   ✅ Deployments CSV: ${deploymentsCSV} (${deploymentRows.length} rows)`);
-    console.log(`   ✅ Products CSV: ${productsCSV} (${productRows.length} rows)`);
-    console.log(`   ✅ Issues CSV: ${issuesCSV} (${issueRows.length} rows)`);
 
     console.log(`\n✅ ADO Metadata Extraction Complete! Saved to: ${outputPath}`);
     console.log(`\n📋 Missing Report Generated:`);
