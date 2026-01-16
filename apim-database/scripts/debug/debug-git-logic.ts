@@ -116,7 +116,7 @@ async function runDebug() {
 
         // If nothing found in .tf files, try without extension filter
         if (res.count === 0) {
-            const broadQuery = productNameArg!.includes(' ') ? `"${productNameArg}"` : productNameArg;
+            const broadQuery = productNameArg!.includes(' ') ? `"${productNameArg}"` : productNameArg!;
             console.log(`   ⚠️  No results in .tf files. Trying broader search...`);
             console.log(`   🔍 Broad Search Query: "${broadQuery}"`);
             const broadRes = await AzureService.searchCode(devops.organization, broadQuery, devops.pat, devops.baseUrl, bearerToken);
