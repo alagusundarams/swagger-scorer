@@ -512,51 +512,12 @@ export class AzureService {
 
     /**
      * Fetch Pipelines for a specific repository
+     * NOTE: This API endpoint does NOT properly filter by repositoryId - returns all project pipelines
+     * Use fetchADOBuildDefinitions instead which DOES filter correctly
      */
     static async fetchADOPipelines(org: string, project: string, repoId: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<ADOPipeline[]> {
-        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
-        const authHeader = this.getAuthHeader(pat, bearerToken);
-        const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
-        let url = `${urlBase}/_apis/pipelines?api-version=7.1`;
-        if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
-
-        console.log(`📡 [ADO Request] GET ${url}`);
-        try {
-            const response = await fetch(url, {
-                headers: {
-                    'Authorization': authHeader,
-                    'Accept': 'application/json',
-                    'X-TFS-FedAuthRedirect': 'Suppress'
-                }
-            });
-            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
-            const text = await response.text();
-
-            if (response.ok) {
-                try {
-                    const data = JSON.parse(text) as { value: any[] };
-                    return (data.value || []).map(p => ({
-                        id: p.id,
-                        name: p.name,
-                        folder: p.folder,
-                        url: p.url,
-                        project: p.project, // Preservation
-                        _links: p._links
-                    }));
-                } catch (e) {
-                    console.warn(`      ⚠️  Failed to parse JSON response. Content: ${text.substring(0, 200)}...`);
-                }
-            } else {
-                console.warn(`      ⚠️  HTTP ${response.status}: ${text.substring(0, 100)}...`);
-                if (response.status === 401) {
-                    console.warn(`      💡 Tip: 401 Unauthorized. Ensure your PAT has 'Pipeline (Read)' and 'Build (Read)' scopes.`);
-                    throw new Error("401 Unauthorized - Check PAT Scopes (Build/Pipeline Read)");
-                }
-            }
-        } catch (err: any) {
-            console.error(`      ❌ Network Error:`, err.message);
-            if (err.message.includes("401")) throw err;
-        }
+        console.log(`   ⚠️  Skipping Pipelines API - it doesn't filter by repository (would return all ${391}+ project pipelines)`);
+        console.log(`   ℹ️  Using Build Definitions API instead (proper repository filtering)`);
         return [];
     }
 
