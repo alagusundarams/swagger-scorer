@@ -749,6 +749,64 @@ export class AzureService {
         return [];
     }
 
+    /**
+     * Fetch the LATEST SUCCESSFUL build for a specific Pipeline Definition
+     * Uses server-side filtering for efficiency - no local filtering needed!
+     * 
+     * @returns Build object with full details including:
+     *   - sourceVersion (commit hash)
+     *   - sourceBranch
+     *   - requestedFor (author)
+     *   - resources.repositories (multi-repo builds)
+     *   - project (pipeline's project context)
+     */
+    static async fetchLatestSuccessfulBuild(
+        org: string,
+        project: string,
+        definitionId: number,
+        pat: string,
+        baseUrl: string = 'https://dev.azure.com',
+        bearerToken?: string
+    ): Promise<any | null> {
+        const orgUrl = this.getAdoOrgUrl(baseUrl, org);
+        const authHeader = this.getAuthHeader(pat, bearerToken);
+        const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
+
+        // Server-side filtering: only succeeded, completed, sorted by finish time, top 1
+        const url = `${urlBase}/_apis/build/builds?definitions=${definitionId}&resultFilter=succeeded&statusFilter=completed&$top=1&queryOrder=finishTimeDescending&api-version=7.1`;
+
+        console.log(`📡 [ADO Request] Latest Successful Build GET ${url}`);
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': authHeader,
+                    'Accept': 'application/json',
+                    'X-TFS-FedAuthRedirect': 'Suppress'
+                }
+            });
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+
+            if (response.ok) {
+                const data = await response.json() as { count?: number; value: any[] };
+                if (data.value && data.value.length > 0) {
+                    const build = data.value[0];
+                    console.log(`      ✅ Found latest successful build: ID ${build.id}, Commit ${build.sourceVersion?.substring(0, 7) || 'N/A'}`);
+                    return build;
+                } else {
+                    console.warn(`      ⚠️  No successful builds found for definition ${definitionId} in project ${project}.`);
+                    return null;
+                }
+            } else {
+                const errorText = await response.text();
+                console.error(`      ❌ Failed to fetch latest successful build (${response.status}): ${errorText.substring(0, 200)}`);
+                return null;
+            }
+        } catch (err: any) {
+            console.error(`      ❌ [ADO] Network error fetching latest successful build: ${err.message}`);
+            return null;
+        }
+    }
+
     static async fetchLatestEnvironmentDeployment(
         org: string,
         project: string,
