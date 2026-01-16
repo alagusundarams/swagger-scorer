@@ -12,7 +12,6 @@ import { fileURLToPath } from 'url';
 import 'dotenv/config'; // Load .env file if present
 import { AzureService } from '../services/AzureService.js';
 import pkg from 'pg';
-import * as XLSX from 'xlsx';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -550,10 +549,29 @@ async function main() {
     const outputPath = join(dataDir, 'ado-metadata.json');
     writeFileSync(outputPath, JSON.stringify(results, null, 2));
 
-    // --- GENERATE EXCEL EXPORT ---
-    console.log(`\n📊 Generating Excel reports...`);
+    // --- GENERATE CSV EXPORTS ---
+    console.log(`\n📊 Generating CSV reports...`);
 
-    // Sheet 1: Deployments Summary (one row per product-environment combination)
+    // Helper function to convert array of objects to CSV
+    const arrayToCSV = (data: any[]): string => {
+        if (data.length === 0) return '';
+        const headers = Object.keys(data[0]);
+        const escapeCsvValue = (val: any): string => {
+            const str = String(val ?? '');
+            // Escape quotes and wrap in quotes if contains comma, quote, or newline
+            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+        };
+        const csvRows = [
+            headers.join(','),
+            ...data.map(row => headers.map(h => escapeCsvValue(row[h])).join(','))
+        ];
+        return csvRows.join('\n');
+    };
+
+    // CSV 1: Deployments Summary (one row per product-environment combination)
     const deploymentRows: any[] = [];
     results.forEach(r => {
         if (r.status === 'MATCHED' && Object.keys(r.deployments).length > 0) {
@@ -578,7 +596,7 @@ async function main() {
         }
     });
 
-    // Sheet 2: Products Overview (one row per product)
+    // CSV 2: Products Overview (one row per product)
     const productRows: any[] = [];
     results.forEach(r => {
         const envCount = Object.keys(r.deployments).length;
@@ -597,65 +615,25 @@ async function main() {
         });
     });
 
-    // Sheet 3: Missing/Issues Report
+    // CSV 3: Missing/Issues Report
     const issueRows: any[] = [
         ...missingStats.repoMissing.map(name => ({ 'Product': name, 'Issue': 'Repository Missing', 'Severity': 'High' })),
         ...missingStats.pipelineMissing.map(name => ({ 'Product': name, 'Issue': 'Pipeline Missing', 'Severity': 'High' })),
         ...missingStats.noDeployments.map(name => ({ 'Product': name, 'Issue': 'No Deployments Found', 'Severity': 'Medium' }))
     ];
 
-    // Create workbook with multiple sheets
-    const workbook = XLSX.utils.book_new();
+    // Write CSV files
+    const deploymentsCSV = join(dataDir, 'ado-deployments.csv');
+    const productsCSV = join(dataDir, 'ado-products.csv');
+    const issuesCSV = join(dataDir, 'ado-issues.csv');
 
-    const deploymentsSheet = XLSX.utils.json_to_sheet(deploymentRows);
-    const productsSheet = XLSX.utils.json_to_sheet(productRows);
-    const issuesSheet = XLSX.utils.json_to_sheet(issueRows.length > 0 ? issueRows : [{ 'Product': 'N/A', 'Issue': 'No issues found!', 'Severity': 'N/A' }]);
+    writeFileSync(deploymentsCSV, arrayToCSV(deploymentRows));
+    writeFileSync(productsCSV, arrayToCSV(productRows));
+    writeFileSync(issuesCSV, arrayToCSV(issueRows.length > 0 ? issueRows : [{ 'Product': 'N/A', 'Issue': 'No issues found!', 'Severity': 'N/A' }]));
 
-    // Set column widths for better readability
-    deploymentsSheet['!cols'] = [
-        { wch: 30 }, // Product Name
-        { wch: 15 }, // Product ID
-        { wch: 10 }, // Environment
-        { wch: 42 }, // Commit Hash
-        { wch: 10 }, // Short Hash
-        { wch: 20 }, // Author
-        { wch: 15 }, // Branch
-        { wch: 20 }, // Date
-        { wch: 50 }, // Commit Message
-        { wch: 25 }, // Repository
-        { wch: 30 }, // Pipeline
-        { wch: 10 }, // Pipeline ID
-        { wch: 60 }, // Build URL
-        { wch: 12 }  // Status
-    ];
-
-    productsSheet['!cols'] = [
-        { wch: 30 }, // Product Name
-        { wch: 15 }, // Product ID
-        { wch: 15 }, // Status
-        { wch: 25 }, // Repository
-        { wch: 38 }, // Repository ID
-        { wch: 20 }, // Project
-        { wch: 30 }, // Pipeline
-        { wch: 10 }, // Pipeline ID
-        { wch: 15 }, // Environments Found
-        { wch: 40 }  // Environment List
-    ];
-
-    issuesSheet['!cols'] = [
-        { wch: 30 }, // Product
-        { wch: 30 }, // Issue
-        { wch: 10 }  // Severity
-    ];
-
-    XLSX.utils.book_append_sheet(workbook, deploymentsSheet, 'Deployments');
-    XLSX.utils.book_append_sheet(workbook, productsSheet, 'Products Overview');
-    XLSX.utils.book_append_sheet(workbook, issuesSheet, 'Issues');
-
-    const excelPath = join(dataDir, 'ado-metadata.xlsx');
-    XLSX.writeFile(workbook, excelPath);
-    console.log(`   ✅ Excel report saved to: ${excelPath}`);
-    console.log(`   📊 Sheets: Deployments (${deploymentRows.length} rows), Products Overview (${productRows.length} rows), Issues (${issueRows.length} rows)`);
+    console.log(`   ✅ Deployments CSV: ${deploymentsCSV} (${deploymentRows.length} rows)`);
+    console.log(`   ✅ Products CSV: ${productsCSV} (${productRows.length} rows)`);
+    console.log(`   ✅ Issues CSV: ${issuesCSV} (${issueRows.length} rows)`);
 
     console.log(`\n✅ ADO Metadata Extraction Complete! Saved to: ${outputPath}`);
     console.log(`\n📋 Missing Report Generated:`);
