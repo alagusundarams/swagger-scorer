@@ -208,7 +208,9 @@ async function runDebug() {
     console.log(`   🔗 Repo URL: ${repoWebUrl}`);
 
     // --- STEP 2: PIPELINE DISCOVERY ---
-    console.log(`\n➡️  Step 2: Pipeline Discovery...`);
+    console.log(`\n➡️  Step 2: Pipeline Discovery (Repository-Filtered)...`);
+    console.log(`   🎯 Target Repository: ${primaryRepoName} (ID: ${primaryRepoId})`);
+
     try {
         await AzureService.verifyAdoConnection(devops.organization, devops.pat, devops.baseUrl, bearerToken);
     } catch (err: any) {
@@ -217,7 +219,7 @@ async function runDebug() {
     }
 
     const runDiscovery = async () => {
-        console.log(`   ⏳ Fetching all pipeline types...`);
+        console.log(`   ⏳ Fetching pipelines for repository ${primaryRepoName}...`);
 
         const safeFetch = async (fn: () => Promise<any[]>, label: string) => {
             try {
@@ -228,34 +230,44 @@ async function runDebug() {
             }
         };
 
-        const [yamlPipes, buildDefs, releaseDefs, projPipes, projBuilds] = await Promise.all([
-            safeFetch(() => AzureService.fetchADOPipelines(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl, bearerToken), 'YAML Pipelines'),
-            safeFetch(() => AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl, bearerToken), 'Build Definitions'),
-            safeFetch(() => AzureService.fetchADOReleaseDefinitions(devops.organization, projectIdentifier, devops.pat, devops.baseUrl, bearerToken), 'Release Definitions'),
-            safeFetch(() => AzureService.fetchADOPipelines(devops.organization, projectIdentifier, '', devops.pat, devops.baseUrl, bearerToken), 'Proj YAML'),
-            safeFetch(() => AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, '', devops.pat, devops.baseUrl, bearerToken), 'Proj Build')
+        // Fetch ONLY repository-specific pipelines (not project-wide)
+        const [yamlPipes, buildDefs] = await Promise.all([
+            safeFetch(() => AzureService.fetchADOPipelines(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl, bearerToken), 'YAML Pipelines (Repo-Specific)'),
+            safeFetch(() => AzureService.fetchADOBuildDefinitions(devops.organization, projectIdentifier, primaryRepoId, devops.pat, devops.baseUrl, bearerToken), 'Build Definitions (Repo-Specific)'),
         ]);
 
+        console.log(`      📊 Found ${yamlPipes.length} YAML pipelines and ${buildDefs.length} build definitions for this repository`);
+
         let combined = [
-            ...yamlPipes.map(p => ({ ...p, type: 'YAML' })),
-            ...buildDefs.map(p => ({ ...p, type: 'Classic Build' })),
-            ...releaseDefs.map(r => ({ ...r, type: 'Classic Release', isRelease: true })),
-            ...projPipes.map(p => ({ ...p, type: 'YAML (Proj)' })),
-            ...projBuilds.map(p => ({ ...p, type: 'Classic Build (Proj)' }))
+            ...yamlPipes.map(p => ({ ...p, type: 'YAML', repositoryId: primaryRepoId })),
+            ...buildDefs.map(p => ({ ...p, type: 'Classic Build', repositoryId: primaryRepoId })),
         ];
 
         const seen = new Set();
-        return combined.filter(p => {
+        const filtered = combined.filter(p => {
             const key = `${p.type}-${p.id}`;
             if (seen.has(key)) return false;
             seen.add(key);
             return true;
         });
+
+        console.log(`      ✅ ${filtered.length} unique pipelines found for repository`);
+        return filtered;
     };
 
     const runSurgicalDiscovery = async (): Promise<any[]> => {
-        console.log(`   ⏳ Attempting Surgical Pipeline Discovery (Smart Pattern + Builds API Validation)...`);
+        console.log(`   ⏳ Attempting Surgical Pipeline Discovery (Repo-Filtered Patterns)...`);
         const foundPipes = new Map<number, any>();
+
+        // First, get all pipelines for this specific repository
+        const repoPipelines = await runDiscovery();
+
+        if (repoPipelines.length === 0) {
+            console.log(`      ⚠️  No pipelines found for repository ${primaryRepoName}`);
+            return [];
+        }
+
+        console.log(`      📊 Found ${repoPipelines.length} pipelines for this repository`);
 
         // Common pipeline naming patterns based on repository structure
         const repoBaseName = finalRepo.name.replace(/[-_]/g, ' ').split(' ').filter((w: string) => w.length > 0).join('-');
@@ -263,62 +275,52 @@ async function runDebug() {
             finalRepo.name,                           // Exact repo name
             `${finalRepo.name}-CI`,                   // Repo-CI
             `${finalRepo.name}-CD`,                   // Repo-CD
-            `${repoBaseName}-Pipeline`,                // Repo-Pipeline
+            `${repoBaseName}-Pipeline`,               // Repo-Pipeline
             `CI-${finalRepo.name}`,                   // CI-Repo
             `Deploy-${finalRepo.name}`,               // Deploy-Repo
         ];
 
-        console.log(`      🔎 Testing ${candidatePatterns.length} pipeline naming patterns...`);
+        console.log(`      🔎 Testing ${candidatePatterns.length} naming patterns against ${repoPipelines.length} repo pipelines...`);
 
         // Try to find pipelines using common naming patterns
         for (const pattern of candidatePatterns) {
-            try {
-                const yamlUrl = `${devops.baseUrl}/${devops.organization}/${encodeURIComponent(projectIdentifier)}/_apis/pipelines?api-version=7.1`;
-                console.log(`      📡 [ADO Request] GET ${yamlUrl}`);
-                const resp = await fetch(yamlUrl, {
-                    headers: { 'Authorization': authHeader, 'Accept': 'application/json' }
-                });
+            const matches = repoPipelines.filter((p: any) =>
+                p.name && p.name.toLowerCase().includes(pattern.toLowerCase())
+            );
 
-                if (resp.ok) {
-                    const data = await resp.json() as { count: number; value: any[] };
-                    const matches = data.value.filter((p: any) =>
-                        p.name && p.name.toLowerCase().includes(pattern.toLowerCase())
+            console.log(`      🔍 Pattern "${pattern}": ${matches.length} matches`);
+
+            // Validate each match has recent successful builds
+            for (const pipe of matches) {
+                try {
+                    const build = await AzureService.fetchLatestSuccessfulBuild(
+                        devops.organization,
+                        projectIdentifier,
+                        pipe.id,
+                        devops.pat,
+                        devops.baseUrl,
+                        bearerToken
                     );
 
-                    // Validate each match has recent successful builds
-                    for (const pipe of matches) {
-                        try {
-                            const build = await AzureService.fetchLatestSuccessfulBuild(
-                                devops.organization,
-                                projectIdentifier,
-                                pipe.id,
-                                devops.pat,
-                                devops.baseUrl,
-                                bearerToken
-                            );
-
-                            if (build) {
-                                console.log(`      ✅ [Surgical] Found active pipeline: ${pipe.name} (ID: ${pipe.id})`);
-                                foundPipes.set(pipe.id, {
-                                    ...pipe,
-                                    type: 'Surgical (Pattern Match)',
-                                    _links: { web: { href: `${devops.baseUrl}/${devops.organization}/${projectIdentifier}/_build?definitionId=${pipe.id}` } }
-                                });
-                            }
-                        } catch (e) {
-                            // Pipeline has no successful builds, skip
-                        }
+                    if (build) {
+                        console.log(`      ✅ [Surgical] Found active pipeline: ${pipe.name} (ID: ${pipe.id})`);
+                        foundPipes.set(pipe.id, {
+                            ...pipe,
+                            type: 'Surgical (Pattern Match)',
+                            _links: { web: { href: `${devops.baseUrl}/${devops.organization}/${projectIdentifier}/_build?definitionId=${pipe.id}` } }
+                        });
                     }
+                } catch (e) {
+                    // Pipeline has no successful builds, skip
                 }
-            } catch (e) {
-                // Pattern search failed, continue
             }
 
             if (foundPipes.size > 0) break; // Found active pipelines, stop searching
         }
 
         if (foundPipes.size === 0) {
-            console.log(`      ℹ️  No pipelines found via pattern matching. Will fall back to general discovery.`);
+            console.log(`      ℹ️  No pipelines matched naming patterns. Returning all ${repoPipelines.length} repo pipelines for scoring.`);
+            return repoPipelines;
         }
 
         return Array.from(foundPipes.values());
@@ -327,16 +329,13 @@ async function runDebug() {
     let pipelines = await runSurgicalDiscovery();
 
     if (pipelines.length === 0) {
-        console.log(`   ⚠️  Surgical discovery failed or returned no results. Falling back to general discovery...`);
-        pipelines = await runDiscovery();
-    } else {
-        console.log(`   ✅ Surgical discovery found ${pipelines.length} likely live pipelines.`);
-    }
-
-    if (pipelines.length === 0) {
-        console.log(`   ❌ No pipelines found for this repository.`);
+        console.error(`   ❌ FATAL: No pipelines found for repository "${primaryRepoName}".`);
+        console.error(`   💡 This repository may not have any pipelines configured.`);
+        console.error(`   💡 Please verify the repository has build/release pipelines in Azure DevOps.`);
         return;
     }
+
+    console.log(`   ✅ Discovery complete: ${pipelines.length} pipeline(s) found for repository`);
 
     // --- STEP 3: PIPELINE MATCHING ---
     console.log(`\n➡️  Step 3: Matching Pipeline...`);
