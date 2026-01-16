@@ -518,7 +518,7 @@ export class AzureService {
         const authHeader = this.getAuthHeader(pat, bearerToken);
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
         let url = `${urlBase}/_apis/pipelines?api-version=7.1`;
-        if (repoId) url += `&repositoryId=${repoId}&repositoryType=azureRepo`;
+        if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         try {
@@ -629,10 +629,11 @@ export class AzureService {
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
         let url = `${urlBase}/_apis/build/definitions?api-version=7.1`;
         if (repoId) url += `&repositoryId=${repoId}&repositoryType=TfsGit`;
-        // console.log(`📡 [ADO Request] GET ${url}`);
+
+        console.log(`📡 [ADO Request] GET ${url}`);
         try {
             const response = await fetch(url, { headers: { 'Authorization': authHeader } });
-            // console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+            console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
             const text = await response.text();
 
             if (response.ok) {
