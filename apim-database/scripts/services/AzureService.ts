@@ -1177,21 +1177,29 @@ export class AzureService {
     static async searchCode(org: string, query: string, pat: string, baseUrl: string = 'https://dev.azure.com', bearerToken?: string): Promise<any> {
         const url = this.getAdoSearchUrl(baseUrl, org);
         const authHeader = bearerToken ? `Bearer ${bearerToken}` : `Basic ${Buffer.from(`:${pat}`).toString('base64')}`;
+        const requestBody = { searchText: query, $top: 50 };
 
         console.log(`📡 [ADO Request] POST ${url}`);
+        console.log(`📤 [Request Body]:`, JSON.stringify(requestBody, null, 2));
+
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ searchText: query, $top: 50 })
+            body: JSON.stringify(requestBody)
         });
 
         console.log(`📡 [ADO Response] ${response.status} ${response.statusText}`);
+
         if (!response.ok) {
             const txt = await response.text();
             console.error(`❌ [ADO] Search Failed: ${txt.substring(0, 100)}`);
             return { count: 0, results: [] };
         }
-        return await response.json();
+
+        const data = await response.json();
+        console.log(`📥 [Response Data]: ${data.count || 0} results`);
+
+        return data;
     }
 
     /**
