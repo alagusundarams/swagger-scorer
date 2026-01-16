@@ -728,7 +728,7 @@ export class AzureService {
         const urlBase = `${orgUrl}/${encodeURIComponent(project)}`;
 
         // Query recent builds for this repository
-        const url = `${urlBase}/_apis/build/builds?repositoryId=${repoId}&repositoryType=TfsGit&$top=100&queryOrder=finishTimeDescending&api-version=7.1`;
+        const url = `${urlBase}/_apis/build/builds?repositoryId=${repoId}&repositoryType=TfsGit&$top=100&api-version=7.1`;
 
         console.log(`📡 [ADO Request] GET ${url}`);
         console.log(`   🎯 Surgical: Finding pipelines via build history for repository`);
