@@ -200,110 +200,84 @@ async function main() {
     if (productNameArg) {
         inventory = inventory.filter((p: ProductIdentity) => p.name.toLowerCase() === productNameArg.toLowerCase() || p.id.toLowerCase() === productNameArg.toLowerCase());
     }
+    if (targetEnv) {
+        inventory = inventory.filter((p: ProductIdentity) => p.environments.map(e => e.toUpperCase()).includes(targetEnv));
+    }
+    if (limit > 0) inventory = inventory.slice(0, limit);
 
-    // Helper functions and state
-    const sanitize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+    console.log(`📊 Processing ${inventory.length} products...\n`);
+
+    // 3. Discovery Loop with Batching
     const results: ADOMetadata[] = [];
-    const repoLessProducts: { name: string; searchTerm: string }[] = [];
-    const allDiscoveredRepos = new Set<string>();
+    const sanitize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const BATCH_SIZE = 5; // Safe concurrency
 
-    // Batch processing setup
-    const batchSize = limit > 0 ? limit : inventory.length;
-    const batch = inventory.slice(0, batchSize);
-    console.log(`\n📦 Processing ${batch.length} product(s)...\n`);
+    for (let i = 0; i < inventory.length; i += BATCH_SIZE) {
+        const batch = inventory.slice(i, i + BATCH_SIZE);
+        console.log(`\n📦 Batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(inventory.length / BATCH_SIZE)} (${batch.length} products)`);
 
-    await Promise.all(batch.map(async (prod) => {
-        console.log(`\n🔍 Processing: ${prod.name}`);
-        const meta: ADOMetadata = { productId: prod.id, productName: prod.name, deployments: {}, status: 'ORPHAN' };
-        try {
-            const cleanProd = sanitize(prod.name);
-            const quotedName = prod.name.includes(' ') ? `"${prod.name}"` : prod.name;
-            const searchResp = await AzureService.searchCode(devops.organization, quotedName, devops.pat, devops.baseUrl, bearerToken);
-
-            if (!searchResp || searchResp.count === 0) {
-                meta.status = 'REPO_MISSING';
-                repoLessProducts.push({ name: prod.name, searchTerm: quotedName });
-                results.push(meta);
-                return;
-            }
-
-            // Track all repos discovered during search
-            searchResp.results.forEach((r: any) => {
-                if (r.repository?.name) allDiscoveredRepos.add(r.repository.name);
-            });
-
-            const repoCandidates = searchResp.results
-                .filter((r: any) => r.repository?.name)
-                .map((r: any) => {
-                    const cleanRepo = sanitize(r.repository.name);
-                    let score = 0;
-                    if (cleanRepo === cleanProd) score += 100;
-                    else if (cleanRepo.includes(cleanProd)) score += 50;
-                    if (cleanRepo.includes('grp')) score -= 20;
-                    if (cleanRepo.includes('shared')) score -= 30;
-                    return { repo: r.repository, score };
-                }).sort((a: any, b: any) => b.score - a.score);
-
-            if (repoCandidates.length === 0) {
-                meta.status = 'REPO_MISSING';
-                repoLessProducts.push({ name: prod.name, searchTerm: quotedName });
-                results.push(meta);
-                return;
-            }
-
-            const repo = repoCandidates[0].repo;
-            let project = repo.project?.name || "Unknown";
-            let projectId = repo.project?.id || "";
-
-            if (project === "Unknown" || !projectId) {
-                const repoDetails = await AzureService.fetchRepoById(devops.organization, repo.id, devops.pat, devops.baseUrl, bearerToken);
-                project = repoDetails.project.name;
-                projectId = repoDetails.project.id;
-            }
-
-            meta.repository = { id: repo.id, name: repo.name, project, projectId };
-
-            // --- PIPELINE DISCOVERY (SYNCED WITH debug-git-logic.ts Step 2) ---
-            const safeFetch = async (fn: () => Promise<any[]>, label: string) => {
-                try { return await fn(); } catch (e: any) {
-                    if (verbose) console.warn(`      ⚠️  [Discovery] ${label} lookup failed: ${e.message}`);
-                    return [];
-                }
-            };
-
-            // STRATEGY 1: REPO-NAME-BASED DISCOVERY (Primary, +400)
-            const repoBasedPipes: any[] = [];
+        await Promise.all(batch.map(async (prod) => {
+            console.log(`\n🔍 Processing: ${prod.name}`);
+            const meta: ADOMetadata = { productId: prod.id, productName: prod.name, deployments: {}, status: 'ORPHAN' };
             try {
-                const searchTerm = repo.name.replace(/-IaC$/i, '').replace(/-Deploy$/i, '').replace(/-GitOps$/i, '');
-                const productSearchTerm = prod.name.replace(/-IaC$/i, '').replace(/-Deploy$/i, '');
+                const cleanProd = sanitize(prod.name);
+                const quotedName = prod.name.includes(' ') ? `"${prod.name}"` : prod.name;
+                const searchResp = await AzureService.searchCode(devops.organization, quotedName, devops.pat, devops.baseUrl, bearerToken);
 
-                const [yamlAll, buildAll] = await Promise.all([
-                    safeFetch(() => AzureService.fetchADOPipelines(devops.organization, projectId, '', devops.pat, devops.baseUrl, bearerToken), 'YAML All'),
-                    safeFetch(() => AzureService.fetchADOBuildDefinitions(devops.organization, projectId, '', devops.pat, devops.baseUrl, bearerToken), 'Build All')
+                if (!searchResp || searchResp.count === 0) {
+                    meta.status = 'REPO_MISSING';
+                    results.push(meta);
+                    return;
+                }
+
+                const repoCandidates = searchResp.results
+                    .filter((r: any) => r.repository?.name)
+                    .map((r: any) => {
+                        const cleanRepo = sanitize(r.repository.name);
+                        let score = 0;
+                        if (cleanRepo === cleanProd) score += 100;
+                        else if (cleanRepo.includes(cleanProd)) score += 50;
+                        if (cleanRepo.includes('grp')) score -= 20;
+                        if (cleanRepo.includes('shared')) score -= 30;
+                        return { repo: r.repository, score };
+                    }).sort((a: any, b: any) => b.score - a.score);
+
+                if (repoCandidates.length === 0) {
+                    meta.status = 'REPO_MISSING';
+                    results.push(meta);
+                    return;
+                }
+
+                const repo = repoCandidates[0].repo;
+                let project = repo.project?.name || "Unknown";
+                let projectId = repo.project?.id || "";
+
+                if (project === "Unknown" || !projectId) {
+                    const repoDetails = await AzureService.fetchRepoById(devops.organization, repo.id, devops.pat, devops.baseUrl, bearerToken);
+                    project = repoDetails.project.name;
+                    projectId = repoDetails.project.id;
+                }
+
+                meta.repository = { id: repo.id, name: repo.name, project, projectId };
+
+                // --- PIPELINE DISCOVERY (SYNCED WITH debug-git-logic.ts Step 2) ---
+                const safeFetch = async (fn: () => Promise<any[]>, label: string) => {
+                    try { return await fn(); } catch (e: any) {
+                        if (verbose) console.warn(`      ⚠️  [Discovery] ${label} lookup failed: ${e.message}`);
+                        return [];
+                    }
+                };
+
+                const [yamlPipes, buildDefs, releaseDefs, projPipes, projBuilds] = await Promise.all([
+                    safeFetch(() => AzureService.fetchADOPipelines(devops.organization, projectId, repo.id, devops.pat, devops.baseUrl, bearerToken), 'YAML Pipelines'),
+                    safeFetch(() => AzureService.fetchADOBuildDefinitions(devops.organization, projectId, repo.id, devops.pat, devops.baseUrl, bearerToken), 'Build Definitions'),
+                    safeFetch(() => AzureService.fetchADOReleaseDefinitions(devops.organization, projectId, devops.pat, devops.baseUrl, bearerToken), 'Release Definitions'),
+                    safeFetch(() => AzureService.fetchADOPipelines(devops.organization, projectId, '', devops.pat, devops.baseUrl, bearerToken), 'Proj YAML'),
+                    safeFetch(() => AzureService.fetchADOBuildDefinitions(devops.organization, projectId, '', devops.pat, devops.baseUrl, bearerToken), 'Proj Build')
                 ]);
 
-                const allPipes = [...yamlAll, ...buildAll];
-                const cleanSearch = sanitize(searchTerm);
-                const cleanProduct = sanitize(productSearchTerm);
-
-                const matched = allPipes.filter((p: any) => {
-                    const cleanName = sanitize(p.name);
-                    return cleanName.includes(cleanSearch) ||
-                        cleanName.includes(cleanProduct) ||
-                        (cleanSearch.length > 3 && cleanName.includes(cleanSearch.substring(0, cleanSearch.length - 1)));
-                });
-
-                repoBasedPipes.push(...matched.map((p: any) => ({ ...p, type: 'Repo-Based', priority: 400 })));
-                if (repoBasedPipes.length > 0 && verbose) {
-                    console.log(`      ✅ Repo-Based Discovery: Found ${repoBasedPipes.length} pipelines matching "${searchTerm}"`);
-                }
-            } catch (e: any) {
-                if (verbose) console.warn(`      ⚠️  Repo-based discovery failed: ${e.message}`);
-            }
-
-            // STRATEGY 2: SURGICAL DISCOVERY (Fallback, +300)
-            const surgicalPipes: any[] = [];
-            if (repoBasedPipes.length === 0) {
+                // --- SURGICAL DISCOVERY (Synced with debug-git-logic.ts) ---
+                const surgicalPipes: any[] = [];
                 const searchEnvs = ['PROD', 'STAGE', 'QA', 'DEV'];
                 for (const envName of searchEnvs) {
                     try {
@@ -317,7 +291,7 @@ async function main() {
                                 const envDeploys = await AzureService.fetchEnvironmentDeployments(devops.organization, projectId, match.id, devops.pat, devops.baseUrl, bearerToken);
                                 for (const d of envDeploys) {
                                     if (d.definition?.id) {
-                                        surgicalPipes.push({ ...d.definition, type: 'Surgical (Live)', priority: 300 });
+                                        surgicalPipes.push({ ...d.definition, type: 'Surgical (Live)' });
                                     }
                                 }
                                 if (surgicalPipes.length > 0) break;
@@ -325,209 +299,173 @@ async function main() {
                         }
                     } catch (e) { }
                 }
-                if (surgicalPipes.length > 0 && verbose) {
-                    console.log(`      ✅ Surgical Discovery: Found ${surgicalPipes.length} live pipelines`);
-                }
-            }
 
-            // STRATEGY 3: GENERAL DISCOVERY (Last Resort, +200 repo-specific, +0 project-wide)
-            let generalPipes: any[] = [];
-            if (repoBasedPipes.length === 0 && surgicalPipes.length === 0) {
-                const [yamlPipes, buildDefs, releaseDefs, projPipes, projBuilds] = await Promise.all([
-                    safeFetch(() => AzureService.fetchADOPipelines(devops.organization, projectId, repo.id, devops.pat, devops.baseUrl, bearerToken), 'YAML Pipelines'),
-                    safeFetch(() => AzureService.fetchADOBuildDefinitions(devops.organization, projectId, repo.id, devops.pat, devops.baseUrl, bearerToken), 'Build Definitions'),
-                    safeFetch(() => AzureService.fetchADOReleaseDefinitions(devops.organization, projectId, devops.pat, devops.baseUrl, bearerToken), 'Release Definitions'),
-                    safeFetch(() => AzureService.fetchADOPipelines(devops.organization, projectId, '', devops.pat, devops.baseUrl, bearerToken), 'Proj YAML'),
-                    safeFetch(() => AzureService.fetchADOBuildDefinitions(devops.organization, projectId, '', devops.pat, devops.baseUrl, bearerToken), 'Proj Build')
-                ]);
-
-                generalPipes = [
+                const combinedPipelines = [
                     ...yamlPipes.map(p => ({ ...p, type: 'YAML', priority: 200 })),
                     ...buildDefs.map(p => ({ ...p, type: 'Classic Build', priority: 200 })),
                     ...releaseDefs.map(r => ({ ...r, type: 'Classic Release', isRelease: true, priority: 200 })),
                     ...projPipes.map(p => ({ ...p, type: 'YAML (Proj)', priority: 0 })),
-                    ...projBuilds.map(p => ({ ...p, type: 'Classic Build (Proj)', priority: 0 }))
+                    ...projBuilds.map(p => ({ ...p, type: 'Classic Build (Proj)', priority: 0 })),
+                    ...surgicalPipes.map(p => ({ ...p, priority: 500 }))
                 ];
-            }
 
-            const combinedPipelines = [
-                ...repoBasedPipes,
-                ...surgicalPipes,
-                ...generalPipes
-            ];
+                const seen = new Set();
+                const uniquePipelines = combinedPipelines.filter(p => {
+                    const key = `${p.type}-${p.id}`;
+                    if (seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                });
 
-            const seen = new Set();
-            const uniquePipelines = combinedPipelines.filter(p => {
-                const key = `${p.type}-${p.id}`;
-                if (seen.has(key)) return false;
-                seen.add(key);
-                return true;
-            });
+                const pipeCandidates = uniquePipelines.map((p: any) => {
+                    const cleanPipe = sanitize(p.name);
+                    const folder = sanitize(p.folder || '');
+                    let score = p.priority || 0; // Start with priority bonus
+                    if (cleanPipe === cleanProd) score += 100;
+                    if (cleanPipe.includes(cleanProd)) score += 50;
+                    if (folder.includes(cleanProd)) score += 20;
+                    if (cleanPipe.includes('deploy') || cleanPipe.includes('iac')) score += 10;
+                    if (cleanPipe.includes('apim')) score += 5;
+                    if (cleanPipe === 'main' || cleanPipe === 'ci') score -= 20;
+                    return { pipe: p, score };
+                }).sort((a: any, b: any) => b.score - a.score);
 
-            const pipeCandidates = uniquePipelines.map((p: any) => {
-                const cleanPipe = sanitize(p.name);
-                const folder = sanitize(p.folder || '');
-                let score = p.priority || 0; // Start with priority bonus
-                if (cleanPipe === cleanProd) score += 100;
-                if (cleanPipe.includes(cleanProd)) score += 50;
-                if (folder.includes(cleanProd)) score += 20;
-                if (cleanPipe.includes('deploy') || cleanPipe.includes('iac')) score += 10;
-                if (cleanPipe.includes('apim')) score += 5;
-                if (cleanPipe === 'main' || cleanPipe === 'ci') score -= 20;
-                return { pipe: p, score };
-            }).sort((a: any, b: any) => b.score - a.score);
-
-            if (pipeCandidates.length === 0 || pipeCandidates[0].score < 10) {
-                meta.status = 'PIPELINE_MISSING';
-                results.push(meta);
-                return;
-            }
-
-            const matchedPipeline = pipeCandidates[0].pipe;
-            meta.pipeline = { id: matchedPipeline.id, name: matchedPipeline.name };
-            meta.status = 'MATCHED';
-
-            const envsToSync = targetEnv ? [targetEnv] : prod.environments;
-
-            // --- STEP 4: EFFICIENT BUILD-BASED HASH SYNC (Replaces Surgical Environment Discovery) ---
-            const pipelineProject = (matchedPipeline as any).project?.id || (matchedPipeline as any).project?.name || projectId;
-            if (pipelineProject !== projectId) {
-                console.log(`      ℹ️  Pipeline belongs to a different project: ${pipelineProject}. Switching context for Step 4.`);
-            }
-
-            console.log(`   ⏳ Fetching latest successful build for ${matchedPipeline.name} (ID: ${matchedPipeline.id}) in project ${pipelineProject}...`);
-
-            let latestBuild: any = null;
-
-            // Handle Classic Release Pipelines differently
-            if ((matchedPipeline as any).isRelease) {
-                console.log(`      ℹ️  Classic Release Pipeline detected. Fetching latest release...`);
-                const releases = await AzureService.fetchADOReleases(devops.organization, pipelineProject, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken);
-                const successfulRelease = releases.find(r => r.environments?.some(e => e.status?.toLowerCase() === 'succeeded'));
-                if (successfulRelease) {
-                    latestBuild = {
-                        id: successfulRelease.id,
-                        sourceVersion: successfulRelease.artifacts?.[0]?.definitionReference?.version?.id,
-                        sourceBranch: successfulRelease.artifacts?.[0]?.definitionReference?.branch?.name || 'unknown',
-                        requestedFor: successfulRelease.createdBy,
-                        finishTime: successfulRelease.modifiedOn,
-                        _links: successfulRelease._links,
-                        project: successfulRelease.project || (matchedPipeline as any).project
-                    };
-                }
-            } else {
-                // Use the new efficient Builds API for YAML and Classic Build pipelines
-                latestBuild = await AzureService.fetchLatestSuccessfulBuild(
-                    devops.organization,
-                    pipelineProject,
-                    matchedPipeline.id,
-                    devops.pat,
-                    devops.baseUrl,
-                    bearerToken
-                );
-            }
-
-            if (!latestBuild) {
-                console.warn(`      ⚠️  No successful build found for pipeline ${matchedPipeline.id}. Skipping environment sync.`);
-            } else {
-                console.log(`      ✅ Latest build found (ID: ${latestBuild.id}, Finished: ${latestBuild.finishTime})`);
-
-                // --- EXTRACT COMMIT HASH with Multi-Repo Resolution ---
-                let commitHash = latestBuild.sourceVersion || latestBuild.sourceVersionID;
-
-                // Multi-Repo Resolution: Check if build's primary repo matches our target repo
-                if (latestBuild.repository?.name && meta.repository?.name &&
-                    latestBuild.repository.name.toLowerCase() !== meta.repository.name.toLowerCase()) {
-
-                    if (verbose) console.log(`      ⚠️  Build primary repo (${latestBuild.repository.name}) != target (${meta.repository.name}). Scanning resources...`);
-
-                    if (latestBuild.resources?.repositories) {
-                        const targetRepoRes = Object.values(latestBuild.resources.repositories).find((r: any) =>
-                            r.repository?.name?.toLowerCase() === meta.repository!.name.toLowerCase() ||
-                            r.repository?.id === meta.repository!.id
-                        );
-                        if ((targetRepoRes as any)?.version) {
-                            commitHash = (targetRepoRes as any).version;
-                            if (verbose) console.log(`      🎯 [Multi-Repo] Using commit from target repository (${meta.repository.name}): ${commitHash}`);
-                        }
-                    }
+                if (pipeCandidates.length === 0 || pipeCandidates[0].score < 10) {
+                    meta.status = 'PIPELINE_MISSING';
+                    results.push(meta);
+                    return;
                 }
 
-                if (!commitHash || commitHash === 'unknown') {
-                    console.warn(`      ⚠️  Build found but commit hash is missing. Cannot sync environments.`);
-                } else {
-                    // --- APPLY SAME COMMIT TO ALL ENVIRONMENTS ---
-                    const author = latestBuild.requestedFor?.displayName || latestBuild.requestedBy?.displayName || 'Unknown';
-                    const rawBranch = latestBuild.sourceBranch || 'unknown';
-                    const branch = rawBranch.replace('refs/heads/', '');
-                    const message = latestBuild.triggerInfo?.['ci.message'] || latestBuild.sourceVersionMessage || 'No message';
-                    const buildUrl = latestBuild._links?.web?.href || latestBuild.url;
+                const matchedPipeline = pipeCandidates[0].pipe;
+                meta.pipeline = { id: matchedPipeline.id, name: matchedPipeline.name };
+                meta.status = 'MATCHED';
 
-                    console.log(`      📦 Applying commit ${commitHash.substring(0, 7)} to ${envsToSync.length} environment(s)...`);
+                const envsToSync = targetEnv ? [targetEnv] : prod.environments;
 
-                    for (const envName of envsToSync) {
-                        meta.deployments[envName] = {
-                            hash: commitHash,
-                            date: latestBuild.finishTime || new Date().toISOString(),
-                            branch,
-                            author,
-                            message,
-                            url: buildUrl
+                // --- STEP 4: EFFICIENT BUILD-BASED HASH SYNC (Replaces Surgical Environment Discovery) ---
+                const pipelineProject = (matchedPipeline as any).project?.id || (matchedPipeline as any).project?.name || projectId;
+                if (pipelineProject !== projectId) {
+                    console.log(`      ℹ️  Pipeline belongs to a different project: ${pipelineProject}. Switching context for Step 4.`);
+                }
+
+                console.log(`   ⏳ Fetching latest successful build for ${matchedPipeline.name} (ID: ${matchedPipeline.id}) in project ${pipelineProject}...`);
+
+                let latestBuild: any = null;
+
+                // Handle Classic Release Pipelines differently
+                if ((matchedPipeline as any).isRelease) {
+                    console.log(`      ℹ️  Classic Release Pipeline detected. Fetching latest release...`);
+                    const releases = await AzureService.fetchADOReleases(devops.organization, pipelineProject, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken);
+                    const successfulRelease = releases.find(r => r.environments?.some(e => e.status?.toLowerCase() === 'succeeded'));
+                    if (successfulRelease) {
+                        latestBuild = {
+                            id: successfulRelease.id,
+                            sourceVersion: successfulRelease.artifacts?.[0]?.definitionReference?.version?.id,
+                            sourceBranch: successfulRelease.artifacts?.[0]?.definitionReference?.branch?.name || 'unknown',
+                            requestedFor: successfulRelease.createdBy,
+                            finishTime: successfulRelease.modifiedOn,
+                            _links: successfulRelease._links,
+                            project: successfulRelease.project || (matchedPipeline as any).project
                         };
-                        console.log(`      ✅ ${envName.padEnd(5)}: Applied ${commitHash.substring(0, 7)} (Author: ${author})`);
                     }
+                } else {
+                    // Use the new efficient Builds API for YAML and Classic Build pipelines
+                    latestBuild = await AzureService.fetchLatestSuccessfulBuild(
+                        devops.organization,
+                        pipelineProject,
+                        matchedPipeline.id,
+                        devops.pat,
+                        devops.baseUrl,
+                        bearerToken
+                    );
                 }
-            }
 
-            // 2. Scan Fallback (if envs missing)
-            const missingEnvs = envsToSync.filter(e => !meta.deployments[e]);
-            if (missingEnvs.length > 0) {
-                console.log(`   🔍 Missed ${missingEnvs.length} envs. Falling back to paginated timeline scan (PipeProject: ${pipelineProject}, Depth: 100)...`);
-                const timelineCache = new Map<number, any[]>();
-                let skip = 0;
-                const pageSize = 20;
-                const maxDepth = 100;
+                if (!latestBuild) {
+                    console.warn(`      ⚠️  No successful build found for pipeline ${matchedPipeline.id}. Skipping environment sync.`);
+                } else {
+                    console.log(`      ✅ Latest build found (ID: ${latestBuild.id}, Finished: ${latestBuild.finishTime})`);
 
-                while (Object.keys(meta.deployments).length < envsToSync.length && skip < maxDepth) {
-                    const builds = await AzureService.fetchBuildsByDefinition(devops.organization, pipelineProject, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken, pageSize, skip);
-                    console.log(`   📡 [Scan] Page ${Math.floor(skip / pageSize) + 1}: Found ${builds.length} builds...`);
+                    // --- EXTRACT COMMIT HASH with Multi-Repo Resolution ---
+                    let commitHash = latestBuild.sourceVersion || latestBuild.sourceVersionID;
 
-                    if (builds.length === 0) break;
+                    // Multi-Repo Resolution: Check if build's primary repo matches our target repo
+                    if (latestBuild.repository?.name && meta.repository?.name &&
+                        latestBuild.repository.name.toLowerCase() !== meta.repository.name.toLowerCase()) {
 
-                    for (const run of builds) {
-                        if (Object.keys(meta.deployments).length === envsToSync.length) break;
-                        const buildProject = run.project?.id || run.project?.name || pipelineProject;
-                        if (!timelineCache.has(run.id)) {
-                            timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, buildProject, run.id, devops.pat, devops.baseUrl, bearerToken));
+                        if (verbose) console.log(`      ⚠️  Build primary repo (${latestBuild.repository.name}) != target (${meta.repository.name}). Scanning resources...`);
+
+                        if (latestBuild.resources?.repositories) {
+                            const targetRepoRes = Object.values(latestBuild.resources.repositories).find((r: any) =>
+                                r.repository?.name?.toLowerCase() === meta.repository!.name.toLowerCase() ||
+                                r.repository?.id === meta.repository!.id
+                            );
+                            if ((targetRepoRes as any)?.version) {
+                                commitHash = (targetRepoRes as any).version;
+                                if (verbose) console.log(`      🎯 [Multi-Repo] Using commit from target repository (${meta.repository.name}): ${commitHash}`);
+                            }
                         }
-                        const timeline = timelineCache.get(run.id)!;
-                        if (!timeline || timeline.length === 0) {
-                            if (verbose) console.log(`      ⚠️ Build ${run.id} has no timeline records.`);
-                            continue;
-                        }
+                    }
+
+                    if (!commitHash || commitHash === 'unknown') {
+                        console.warn(`      ⚠️  Build found but commit hash is missing. Cannot sync environments.`);
+                    } else {
+                        // --- APPLY SAME COMMIT TO ALL ENVIRONMENTS ---
+                        const author = latestBuild.requestedFor?.displayName || latestBuild.requestedBy?.displayName || 'Unknown';
+                        const rawBranch = latestBuild.sourceBranch || 'unknown';
+                        const branch = rawBranch.replace('refs/heads/', '');
+                        const message = latestBuild.triggerInfo?.['ci.message'] || latestBuild.sourceVersionMessage || 'No message';
+                        const buildUrl = latestBuild._links?.web?.href || latestBuild.url;
+
+                        console.log(`      📦 Applying commit ${commitHash.substring(0, 7)} to ${envsToSync.length} environment(s)...`);
 
                         for (const envName of envsToSync) {
-                            if (meta.deployments[envName]) continue;
+                            meta.deployments[envName] = {
+                                hash: commitHash,
+                                date: latestBuild.finishTime || new Date().toISOString(),
+                                branch,
+                                author,
+                                message,
+                                url: buildUrl
+                            };
+                            console.log(`      ✅ ${envName.padEnd(5)}: Applied ${commitHash.substring(0, 7)} (Author: ${author})`);
+                        }
+                    }
+                }
 
-                            // Pass 1: Container match (Stage/Job/Phase)
-                            let record = timeline.find((t: any) => {
-                                const type = (t.type || t.recordType || '').toLowerCase();
-                                const isContainer = ['stage', 'job', 'phase'].includes(type);
-                                const cleanName = sanitize(t.name || '');
-                                const cleanEnv = sanitize(envName);
-                                const nameMatches = cleanName.includes(cleanEnv) || cleanEnv.includes(cleanName);
-                                const isSuccess = ['succeeded', 'partiallysucceeded'].includes((t.result || '').toLowerCase());
-                                const isCompleted = (t.status || '').toLowerCase() === 'completed';
+                // 2. Scan Fallback (if envs missing)
+                const missingEnvs = envsToSync.filter(e => !meta.deployments[e]);
+                if (missingEnvs.length > 0) {
+                    console.log(`   🔍 Missed ${missingEnvs.length} envs. Falling back to paginated timeline scan (PipeProject: ${pipelineProject}, Depth: 100)...`);
+                    const timelineCache = new Map<number, any[]>();
+                    let skip = 0;
+                    const pageSize = 20;
+                    const maxDepth = 100;
 
-                                if (verbose && (nameMatches || t.name?.toLowerCase().includes(envName.toLowerCase()))) {
-                                    console.log(`      🔍 [Scan Pass 1] ${envName} vs "${t.name}" | Type: ${type} | Result: ${t.result} | Match: ${nameMatches}`);
-                                }
-                                return isContainer && nameMatches && isSuccess && isCompleted;
-                            });
+                    while (Object.keys(meta.deployments).length < envsToSync.length && skip < maxDepth) {
+                        const builds = await AzureService.fetchBuildsByDefinition(devops.organization, pipelineProject, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken, pageSize, skip);
+                        console.log(`   📡 [Scan] Page ${Math.floor(skip / pageSize) + 1}: Found ${builds.length} builds...`);
 
-                            // Pass 2: Generous match
-                            if (!record) {
-                                record = timeline.find((t: any) => {
+                        if (builds.length === 0) break;
+
+                        for (const run of builds) {
+                            if (Object.keys(meta.deployments).length === envsToSync.length) break;
+                            const buildProject = run.project?.id || run.project?.name || pipelineProject;
+                            if (!timelineCache.has(run.id)) {
+                                timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, buildProject, run.id, devops.pat, devops.baseUrl, bearerToken));
+                            }
+                            const timeline = timelineCache.get(run.id)!;
+                            if (!timeline || timeline.length === 0) {
+                                if (verbose) console.log(`      ⚠️ Build ${run.id} has no timeline records.`);
+                                continue;
+                            }
+
+                            for (const envName of envsToSync) {
+                                if (meta.deployments[envName]) continue;
+
+                                // Pass 1: Container match (Stage/Job/Phase)
+                                let record = timeline.find((t: any) => {
+                                    const type = (t.type || t.recordType || '').toLowerCase();
+                                    const isContainer = ['stage', 'job', 'phase'].includes(type);
                                     const cleanName = sanitize(t.name || '');
                                     const cleanEnv = sanitize(envName);
                                     const nameMatches = cleanName.includes(cleanEnv) || cleanEnv.includes(cleanName);
@@ -535,94 +473,64 @@ async function main() {
                                     const isCompleted = (t.status || '').toLowerCase() === 'completed';
 
                                     if (verbose && (nameMatches || t.name?.toLowerCase().includes(envName.toLowerCase()))) {
-                                        console.log(`      🔍 [Scan Pass 2] ${envName} vs "${t.name}" | Result: ${t.result} | Match: ${nameMatches}`);
+                                        console.log(`      🔍 [Scan Pass 1] ${envName} vs "${t.name}" | Type: ${type} | Result: ${t.result} | Match: ${nameMatches}`);
                                     }
-                                    return nameMatches && isSuccess && isCompleted;
+                                    return isContainer && nameMatches && isSuccess && isCompleted;
                                 });
-                            }
 
-                            if (record) {
-                                if (verbose) console.log(`      ℹ️ [DEBUG] Scanner matched build ${run.id}. Raw run: ${JSON.stringify(run)}`);
-                                const hash = run.sourceVersion || run.sourceVersionID || 'unknown';
-                                const author = run.requestedFor?.displayName || run.requestedBy?.displayName || 'Unknown';
-                                const branch = (run.sourceBranch || 'unknown').replace('refs/heads/', '');
-                                const message = run.triggerInfo?.['ci.message'] || run.comment || 'No message';
+                                // Pass 2: Generous match
+                                if (!record) {
+                                    record = timeline.find((t: any) => {
+                                        const cleanName = sanitize(t.name || '');
+                                        const cleanEnv = sanitize(envName);
+                                        const nameMatches = cleanName.includes(cleanEnv) || cleanEnv.includes(cleanName);
+                                        const isSuccess = ['succeeded', 'partiallysucceeded'].includes((t.result || '').toLowerCase());
+                                        const isCompleted = (t.status || '').toLowerCase() === 'completed';
 
-                                meta.deployments[envName] = {
-                                    hash,
-                                    date: record.finishTime || run.finishedDate || new Date().toISOString(),
-                                    branch,
-                                    author,
-                                    message,
-                                    url: run._links?.web?.href
-                                };
-                                console.log(`      📍 ${envName.padEnd(5)}: Scanner Hit! Captured ${hash.substring(0, 7)} (Auth: ${author})`);
+                                        if (verbose && (nameMatches || t.name?.toLowerCase().includes(envName.toLowerCase()))) {
+                                            console.log(`      🔍 [Scan Pass 2] ${envName} vs "${t.name}" | Result: ${t.result} | Match: ${nameMatches}`);
+                                        }
+                                        return nameMatches && isSuccess && isCompleted;
+                                    });
+                                }
+
+                                if (record) {
+                                    if (verbose) console.log(`      ℹ️ [DEBUG] Scanner matched build ${run.id}. Raw run: ${JSON.stringify(run)}`);
+                                    const hash = run.sourceVersion || run.sourceVersionID || 'unknown';
+                                    const author = run.requestedFor?.displayName || run.requestedBy?.displayName || 'Unknown';
+                                    const branch = (run.sourceBranch || 'unknown').replace('refs/heads/', '');
+                                    const message = run.triggerInfo?.['ci.message'] || run.comment || 'No message';
+
+                                    meta.deployments[envName] = {
+                                        hash,
+                                        date: record.finishTime || run.finishedDate || new Date().toISOString(),
+                                        branch,
+                                        author,
+                                        message,
+                                        url: run._links?.web?.href
+                                    };
+                                    console.log(`      📍 ${envName.padEnd(5)}: Scanner Hit! Captured ${hash.substring(0, 7)} (Auth: ${author})`);
+                                }
                             }
                         }
+                        skip += pageSize;
                     }
-                    skip += pageSize;
                 }
+
+                results.push(meta);
+                if (verbose) console.log(`   ✅ ${prod.name}: Synced ${Object.keys(meta.deployments).length}/${envsToSync.length} environments.`);
+
+            } catch (e: any) {
+                console.error(`   ❌ Error processing ${prod.name}: ${e.message}`);
+                results.push(meta);
             }
+        }));
+    }
 
-            results.push(meta);
-            if (verbose) console.log(`   ✅ ${prod.name}: Synced ${Object.keys(meta.deployments).length}/${envsToSync.length} environments.`);
-
-        } catch (e: any) {
-            console.error(`   ❌ Error processing ${prod.name}: ${e.message}`);
-            results.push(meta);
-        }
-    }));
-
-    // --- OUTPUT & REPORTING (moved inside main()) ---
     const dataDir = existsSync(join(process.cwd(), 'scripts', 'data'))
         ? join(process.cwd(), 'scripts', 'data')
         : join(process.cwd(), 'apim-database', 'scripts', 'data');
     if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true });
-
-    // --- DIAGNOSTIC: UNMAPPED REPOSITORIES ---
-    console.log(`\n🔍 Scanning for unmapped repositories in organization "${devops.organization}"...`);
-    const usedRepoNames = new Set(results.filter(r => r.repository).map(r => r.repository!.name));
-    const unmappedRepos: { name: string; project: string; url: string }[] = [];
-
-    try {
-        // Get all projects in the organization
-        const projectsUrl = `${devops.baseUrl}/${devops.organization}/_apis/projects?api-version=7.1`;
-        const authHeader = AzureService.getAuthHeader(devops.pat, bearerToken);
-        const projResp = await fetch(projectsUrl, { headers: { 'Authorization': authHeader } });
-
-        if (projResp.ok) {
-            const projData = await projResp.json();
-            const projects = projData.value || [];
-
-            console.log(`   📦 Found ${projects.length} projects. Scanning repositories...`);
-
-            for (const proj of projects) {
-                try {
-                    const reposUrl = `${devops.baseUrl}/${devops.organization}/${proj.id}/_apis/git/repositories?api-version=7.1`;
-                    const reposResp = await fetch(reposUrl, { headers: { 'Authorization': authHeader } });
-
-                    if (reposResp.ok) {
-                        const reposData = await reposResp.json();
-                        const repos = reposData.value || [];
-
-                        for (const repo of repos) {
-                            if (!usedRepoNames.has(repo.name)) {
-                                unmappedRepos.push({
-                                    name: repo.name,
-                                    project: proj.name,
-                                    url: repo.webUrl || repo.url
-                                });
-                            }
-                        }
-                    }
-                } catch (e) {
-                    console.warn(`      ⚠️  Failed to fetch repos for project ${proj.name}`);
-                }
-            }
-        }
-    } catch (e: any) {
-        console.warn(`   ⚠️  Failed to fetch unmapped repositories: ${e.message}`);
-    }
 
     // --- GENERATE MISSING REPORT ---
     const missingStats = {
@@ -733,39 +641,6 @@ async function main() {
     if (missingStats.pipelineMissing.length > 0) console.log(`   ❌ Pipeline Missing: ${missingStats.pipelineMissing.length}`);
     if (missingStats.noDeployments.length > 0) console.log(`   ❌ No Deployments Found: ${missingStats.noDeployments.length}`);
     console.log(`   📄 Saved to: ${reportPath}`);
-
-    // --- DIAGNOSTIC REPORTS ---
-    console.log(`\n🔬 DIAGNOSTIC REPORTS:`);
-
-    if (repoLessProducts.length > 0) {
-        console.log(`\n   ⚠️  REPO-LESS PRODUCTS (${repoLessProducts.length}):`);
-        repoLessProducts.slice(0, 10).forEach(p => {
-            console.log(`      - \"${p.name}\" (searched: ${p.searchTerm})`);
-        });
-        if (repoLessProducts.length > 10) {
-            console.log(`      ... and ${repoLessProducts.length - 10} more`);
-        }
-        const repoLessPath = join(dataDir, 'ado-repoless-products.json');
-        writeFileSync(repoLessPath, JSON.stringify(repoLessProducts, null, 2));
-        console.log(`      📄 Full list: ${repoLessPath}`);
-    } else {
-        console.log(`   ✅ No repo-less products found!`);
-    }
-
-    if (unmappedRepos.length > 0) {
-        console.log(`\n   📦 UNMAPPED REPOSITORIES in org \"${devops.organization}\" (${unmappedRepos.length}):`);
-        unmappedRepos.slice(0, 10).forEach(r => {
-            console.log(`      - \"${r.name}\" (Project: ${r.project})`);
-        });
-        if (unmappedRepos.length > 10) {
-            console.log(`      ... and ${unmappedRepos.length - 10} more`);
-        }
-        const unmappedPath = join(dataDir, 'ado-unmapped-repos.json');
-        writeFileSync(unmappedPath, JSON.stringify(unmappedRepos, null, 2));
-        console.log(`      📄 Full list: ${unmappedPath}`);
-    } else {
-        console.log(`   ✅ All repositories are mapped to products!`);
-    }
 }
 
 main().catch(err => {
