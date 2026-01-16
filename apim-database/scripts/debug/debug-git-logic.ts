@@ -5,7 +5,7 @@
  * Use this to verify logic for a single product before running the full sync.
  */
 
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { AzureService } from '../services/AzureService.js';
 
@@ -589,8 +589,40 @@ async function runDebug() {
         }
     }
 
+    // --- FINAL OUTPUT ---
     console.log(`\n✅ Final Seed Data:`);
-    console.log(JSON.stringify({ product: productNameArg, repo: primaryRepoName, project, pipeline: matchedPipeline.name, deployments }, null, 2));
+    const finalOutput = {
+        product: productNameArg,
+        repo: primaryRepoName,
+        repoUrl: repoWebUrl,
+        project,
+        projectId: projectIdent,
+        pipeline: matchedPipeline.name,
+        pipelineId: matchedPipeline.id,
+        pipelineUrl: matchedPipeline._links?.web?.href || 'N/A',
+        deployments
+    };
+    console.log(JSON.stringify(finalOutput, null, 2));
+
+    // --- WRITE JSON OUTPUT ---
+    const jsonFileName = `debug-output-${sanitize(productNameArg!)}.json`;
+    const jsonPath = join(process.cwd(), jsonFileName);
+    writeFileSync(jsonPath, JSON.stringify(finalOutput, null, 2), 'utf8');
+    console.log(`\n📄 JSON Output: ${jsonPath}`);
+
+    // --- WRITE CSV OUTPUT ---
+    const csvFileName = `debug-output-${sanitize(productNameArg!)}.csv`;
+    const csvPath = join(process.cwd(), csvFileName);
+
+    const csvHeaders = 'Environment,CommitHash,Branch,Author,Date,Message,BuildURL\n';
+    const csvRows = Object.entries(deployments).map(([env, data]) => {
+        const d = data as any;
+        return `${env},${d.hash || 'N/A'},${d.branch || 'N/A'},"${(d.author || 'N/A').replace(/"/g, '""')}",${d.date || 'N/A'},"${(d.message || 'N/A').replace(/"/g, '""')}",${d.url || 'N/A'}`;
+    }).join('\n');
+
+    writeFileSync(csvPath, csvHeaders + csvRows, 'utf8');
+    console.log(`📊 CSV Output: ${csvPath}`);
+    console.log(`\n✅ Debug complete! Results saved to JSON and CSV files.`);
 }
 
 runDebug().catch(err => console.error(`\n💥 Fatal Error:`, err));
