@@ -1015,11 +1015,15 @@ export class AzureService {
     static async getGraphAccessToken(): Promise<string> {
         try {
             const token = execSync('az account get-access-token --resource https://graph.microsoft.com --query accessToken -o tsv', {
-                encoding: 'utf-8'
+                encoding: 'utf-8',
+                env: { ...process.env },
+                shell: process.platform === 'win32' ? 'cmd.exe' : undefined,
+                stdio: ['ignore', 'pipe', 'pipe']
             }).trim();
             return token;
-        } catch (error) {
-            console.warn('⚠️ Could not get Graph Token. Ensure "az login" has permissions.');
+        } catch (error: any) {
+            const errorMsg = error.stderr?.toString() || error.stdout?.toString() || error.message || 'Unknown error';
+            console.warn(`⚠️ Could not get Graph Token. ${errorMsg}. Ensure "az login" has permissions.`);
             return '';
         }
     }
