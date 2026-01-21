@@ -954,9 +954,9 @@ export class AzureService {
                 return null;
             }
 
-            // 2. Query Deployments for this specific definition and environment (Surgical Strike)
+            // 2. Query Deployments for this specific definition and environment
             const tryFetch = async (query: string) => {
-                const url = `${urlBase}/_apis/distributedtask/environments/${envId}/deployments?${query}&api-version=7.1-preview.1`;
+                const url = `${urlBase}/_apis/distributedtask/environments/${envId}/deployments?${query}`;
                 console.log(`      📡 [ADO Request] GET ${url}`);
                 const resp = await fetch(url, { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } });
                 if (resp.ok) return await resp.json();
@@ -964,17 +964,17 @@ export class AzureService {
                 return null;
             };
 
-            // Step 1: Try TRUE surgical strike (Filtered by ownerId/definitionId at the source)
+            // Attempt 1: Surgical Strike (Filtered by ownerId/definitionId)
             let deployData = await tryFetch(`ownerId=${definitionId}&ownerType=build&$top=5`);
 
-            // Step 2: Fallback to broad search if Step 1 returned nothing
+            // Attempt 2: Fallback to broad search if surgical strike fails
             if (!deployData || deployData.count === 0) {
                 console.log(`      ℹ️  Surgical strike (ownerId) returned no results. Falling back to broad environment scan...`);
-                deployData = await tryFetch(`$top=50`);
+                deployData = await tryFetch(`$top=20`);
             }
 
             if (deployData && deployData.count > 0) {
-                // Locally filter for definitionId and success
+                // Find the latest successful deployment for this definition
                 const matches = deployData.value.filter((d: any) => {
                     const build = d.build || d.owner;
                     const dId = Number(d.definitionId) || Number(build?.definition?.id) || Number(d.definition?.id);
@@ -985,7 +985,7 @@ export class AzureService {
 
                 if (matches.length > 0) {
                     const match = matches[0];
-                    console.log(`      ✅ Found matching deployment! (Build ID: ${match.owner?.id || match.id})`);
+                    console.log(`      ✅ [ADO] Match found via Environment API! (Build ID: ${match.owner?.id || match.id})`);
 
                     if (!match.project && (match.owner?.project || match.definition?.project)) {
                         match.project = match.owner?.project || match.definition?.project;
