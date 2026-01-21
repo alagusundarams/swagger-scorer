@@ -1,0 +1,703 @@
+
+≡ƒò╡∩╕ÅΓÇìΓÖÇ∩╕Å DEBUG: Git/Pipeline Discovery Test
+   Target Product: "AHelevate-GRP"
+   Target Env:     DEV
+
+≡ƒöæ Authenticating...
+
+Γ₧í∩╕Å  Step 1: Repository Discovery (Searching Terraform Files)...
+   ≡ƒöì Primary Search: Looking for product in Terraform files...
+   ≡ƒöì Search Query: "AHelevate-GRP ext:tf"
+≡ƒôí [ADO Request] POST https://myorg.almsearch.visualstudio.com/_apis/search/codesearchresults?api-version=7.1
+≡ƒôñ [Request Body]: {
+  "searchText": "AHelevate-GRP ext:tf",
+  "$top": 50
+}
+≡ƒôí [ADO Response] 200 OK
+≡ƒôÑ [Response Data]: 0 results
+   ≡ƒôí Search Response: 0 results found
+   ΓÜá∩╕Å  No results in .tf files. Trying broader search...
+   ≡ƒöì Broad Search Query: "AHelevate-GRP"
+≡ƒôí [ADO Request] POST https://myorg.almsearch.visualstudio.com/_apis/search/codesearchresults?api-version=7.1
+≡ƒôñ [Request Body]: {
+  "searchText": "AHelevate-GRP",
+  "$top": 50
+}
+≡ƒôí [ADO Response] 200 OK
+≡ƒôÑ [Response Data]: 6 results
+   ≡ƒôí Broad Search Response: 6 results found
+   ≡ƒôí Full Broad Response: {
+  "count": 6,
+  "results": [
+    {
+      "fileName": "terraform_dev.tfvars",
+      "path": "/IAC/maintain_AHelevate_GRP/terraform_dev.tfvars",
+      "matches": {
+        "content": [
+          {
+            "charOffset": 255,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 305,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 342,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 854,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 1221,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 1407,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          }
+        ],
+        "fileName": []
+      },
+      "collection": {
+        "name": "DefaultCollection"
+      },
+      "project": {
+        "name": "APIM_IntegrationAPIS",
+        "id": "50ce1beb-fc81-42e1-8fa8-7cee30cf3197"
+      },
+      "repository": {
+        "name": "APIM-AHelevate_GRP",
+        "id": "128a0a89-d168-4ef6-a311-047c08ebc985",
+        "type": "git"
+      },
+      "versions": [
+        {
+          "branchName": "master",
+          "changeId": "45bade56320063bfb9c9993ce88f8ee2d95d73ba"
+        }
+      ],
+      "contentId": "a84cf5c6fa1876727deabdead897c482b7c01183"
+    },
+    {
+      "fileName": "terraform_prod.tfvars",
+      "path": "/IAC/maintain_AHelevate_GRP/terraform_prod.tfvars",
+      "matches": {
+        "content": [
+          {
+            "charOffset": 259,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 309,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 346,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 860,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 1229,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 1415,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          }
+        ],
+        "fileName": []
+      },
+      "collection": {
+        "name": "DefaultCollection"
+      },
+      "project": {
+        "name": "APIM_IntegrationAPIS",
+        "id": "50ce1beb-fc81-42e1-8fa8-7cee30cf3197"
+      },
+      "repository": {
+        "name": "APIM-AHelevate_GRP",
+        "id": "128a0a89-d168-4ef6-a311-047c08ebc985",
+        "type": "git"
+      },
+      "versions": [
+        {
+          "branchName": "master",
+          "changeId": "45bade56320063bfb9c9993ce88f8ee2d95d73ba"
+        }
+      ],
+      "contentId": "9291b77fb56820c76f3b7b97a00e5d4c87ca7018"
+    },
+    {
+      "fileName": "terraform_qa.tfvars",
+      "path": "/IAC/maintain_AHelevate_GRP/terraform_qa.tfvars",
+      "matches": {
+        "content": [
+          {
+            "charOffset": 251,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 301,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 338,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 848,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 1213,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 1399,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          }
+        ],
+        "fileName": []
+      },
+      "collection": {
+        "name": "DefaultCollection"
+      },
+      "project": {
+        "name": "APIM_IntegrationAPIS",
+        "id": "50ce1beb-fc81-42e1-8fa8-7cee30cf3197"
+      },
+      "repository": {
+        "name": "APIM-AHelevate_GRP",
+        "id": "128a0a89-d168-4ef6-a311-047c08ebc985",
+        "type": "git"
+      },
+      "versions": [
+        {
+          "branchName": "master",
+          "changeId": "45bade56320063bfb9c9993ce88f8ee2d95d73ba"
+        }
+      ],
+      "contentId": "8f3066e0f149826617cfb537a96d868d4716c408"
+    },
+    {
+      "fileName": "terraform_stage.tfvars",
+      "path": "/IAC/maintain_AHelevate_GRP/terraform_stage.tfvars",
+      "matches": {
+        "content": [
+          {
+            "charOffset": 263,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 313,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 350,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 866,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 1237,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 1423,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          }
+        ],
+        "fileName": []
+      },
+      "collection": {
+        "name": "DefaultCollection"
+      },
+      "project": {
+        "name": "APIM_IntegrationAPIS",
+        "id": "50ce1beb-fc81-42e1-8fa8-7cee30cf3197"
+      },
+      "repository": {
+        "name": "APIM-AHelevate_GRP",
+        "id": "128a0a89-d168-4ef6-a311-047c08ebc985",
+        "type": "git"
+      },
+      "versions": [
+        {
+          "branchName": "master",
+          "changeId": "45bade56320063bfb9c9993ce88f8ee2d95d73ba"
+        }
+      ],
+      "contentId": "c40d5252581f5920713ecd57db457a06c78c9604"
+    },
+    {
+      "fileName": "product_policy.xml",
+      "path": "/Policy/Product/product_policy.xml",
+      "matches": {
+        "content": [
+          {
+            "charOffset": 827,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 901,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          }
+        ],
+        "fileName": []
+      },
+      "collection": {
+        "name": "DefaultCollection"
+      },
+      "project": {
+        "name": "APIM_IntegrationAPIS",
+        "id": "50ce1beb-fc81-42e1-8fa8-7cee30cf3197"
+      },
+      "repository": {
+        "name": "APIM-AHelevate_GRP",
+        "id": "128a0a89-d168-4ef6-a311-047c08ebc985",
+        "type": "git"
+      },
+      "versions": [
+        {
+          "branchName": "master",
+          "changeId": "cc575db7296968cd5e9d02ebbea78959f3499e59"
+        }
+      ],
+      "contentId": "6b419f15269c233b7cd470ab8858bd991186da42"
+    },
+    {
+      "fileName": "service-config.yaml",
+      "path": "/IAC/maintain_AHelevate_GRP/service-config.yaml",
+      "matches": {
+        "content": [
+          {
+            "charOffset": 180,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          }
+        ],
+        "fileName": []
+      },
+      "collection": {
+        "name": "DefaultCollection"
+      },
+      "project": {
+        "name": "APIM_IntegrationAPIS",
+        "id": "50ce1beb-fc81-42e1-8fa8-7cee30cf3197"
+      },
+      "repository": {
+        "name": "APIM-AHelevate_GRP",
+        "id": "128a0a89-d168-4ef6-a311-047c08ebc985",
+        "type": "git"
+      },
+      "versions": [
+        {
+          "branchName": "master",
+          "changeId": "45bade56320063bfb9c9993ce88f8ee2d95d73ba"
+        }
+      ],
+      "contentId": "82865e66e056c9bea0ffd783f72770ee14045b43"
+    }
+  ],
+  "infoCode": 0,
+  "facets": {}
+}
+   Γ£à Selected Repository: APIM-AHelevate_GRP
+
+≡ƒöæ Authorizing Repository Metadata: APIM-AHelevate_GRP...
+   Γ£à Authorized: Project="APIM_IntegrationAPIS" (ID: 50ce1beb-fc81-42e1-8fa8-7cee30cf3197)
+
+Γ₧í∩╕Å  Step 2: Pipeline Discovery (Repository-Filtered)...
+≡ƒôí [ADO Request] Build Definitions GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/definitions?api-version=7.1&repositoryId=128a0a89-d168-4ef6-a311-047c08ebc985&repositoryType=TfsGit
+   ≡ƒÄ» Filter: repositoryId=128a0a89-d168-4ef6-a311-047c08ebc985, repositoryType=TfsGit
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Build Definitions GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/definitions?api-version=7.1&name=APIM-AHelevate_GRP
+   ≡ƒÄ» Filter: name=APIM-AHelevate_GRP
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Latest Successful Build GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&resultFilter=succeeded&statusFilter=completed&$top=1&queryOrder=finishTimeDescending&api-version=7.1
+≡ƒôí [ADO Response] 200 OK
+      Γ£à Found latest successful build: ID 363954, Commit fd34b49
+
+Γ₧í∩╕Å  Step 3: Matching Pipeline...
+   Γ£à Best Match: APIM-AHelevate_GRP (ID: 5767)
+
+Γ₧í∩╕Å  Step 4: Fetch Latest Successful Deployments (Hybrid Mode)...
+
+   ≡ƒôì Checking Environment: DEV...
+≡ƒôí [ADO Request] GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/distributedtask/environments?name=DEV
+≡ƒôí [ADO Response] 200 OK
+      ΓÜá∩╕Å  Strike failed. Falling back to deep scan...
+      ≡ƒöÄ [Deep Scan] Searching for stages: [DEV] in Pipeline 5767...
+≡ƒôí [ADO Request] Build List (By Definition) GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&$top=20&$skip=0&queryOrder=finishTimeDescending
+≡ƒôí [ADO Response] 200 OK
+      ΓÅ│ [Deep Scan] Scanning builds 1 to 4...
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/378142/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/361624/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/335070/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Build List (By Definition) GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&$top=20&$skip=20&queryOrder=finishTimeDescending
+≡ƒôí [ADO Response] 200 OK
+      ΓÅ│ [Deep Scan] Scanning builds 21 to 24...
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/378142/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/361624/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/335070/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Build List (By Definition) GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&$top=20&$skip=40&queryOrder=finishTimeDescending
+≡ƒôí [ADO Response] 200 OK
+      ΓÅ│ [Deep Scan] Scanning builds 41 to 44...
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/378142/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/361624/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/335070/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Build List (By Definition) GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&$top=20&$skip=60&queryOrder=finishTimeDescending
+≡ƒôí [ADO Response] 200 OK
+      ΓÅ│ [Deep Scan] Scanning builds 61 to 64...
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/378142/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/361624/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/335070/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Build List (By Definition) GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&$top=20&$skip=80&queryOrder=finishTimeDescending
+≡ƒôí [ADO Response] 200 OK
+      ΓÅ│ [Deep Scan] Scanning builds 81 to 84...
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/378142/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/361624/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/335070/timeline
+≡ƒôí [ADO Response] 200 OK
+      ΓÜá∩╕Å  [Deep Scan] Could not find remaining stages: [dev] after 100 builds.
+
+   ≡ƒôì Checking Environment: QA...
+≡ƒôí [ADO Request] GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/distributedtask/environments?name=QA
+≡ƒôí [ADO Response] 200 OK
+      ΓÜá∩╕Å  Strike failed. Falling back to deep scan...
+      ≡ƒöÄ [Deep Scan] Searching for stages: [QA] in Pipeline 5767...
+≡ƒôí [ADO Request] Build List (By Definition) GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&$top=20&$skip=0&queryOrder=finishTimeDescending
+≡ƒôí [ADO Response] 200 OK
+      ΓÅ│ [Deep Scan] Scanning builds 1 to 4...
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/378142/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/361624/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/335070/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Build List (By Definition) GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&$top=20&$skip=20&queryOrder=finishTimeDescending
+≡ƒôí [ADO Response] 200 OK
+      ΓÅ│ [Deep Scan] Scanning builds 21 to 24...
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/378142/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/361624/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/335070/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Build List (By Definition) GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&$top=20&$skip=40&queryOrder=finishTimeDescending
+≡ƒôí [ADO Response] 200 OK
+      ΓÅ│ [Deep Scan] Scanning builds 41 to 44...
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/378142/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/361624/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/335070/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Build List (By Definition) GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&$top=20&$skip=60&queryOrder=finishTimeDescending
+≡ƒôí [ADO Response] 200 OK
+      ΓÅ│ [Deep Scan] Scanning builds 61 to 64...
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/378142/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/361624/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/335070/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Build List (By Definition) GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&$top=20&$skip=80&queryOrder=finishTimeDescending
+≡ƒôí [ADO Response] 200 OK
+      ΓÅ│ [Deep Scan] Scanning builds 81 to 84...
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/378142/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/361624/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/335070/timeline
+≡ƒôí [ADO Response] 200 OK
+      ΓÜá∩╕Å  [Deep Scan] Could not find remaining stages: [qa] after 100 builds.
+
+   ≡ƒôì Checking Environment: STAGE...
+≡ƒôí [ADO Request] GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/distributedtask/environments?name=STAGE
+≡ƒôí [ADO Response] 200 OK
+      ΓÜá∩╕Å  Strike failed. Falling back to deep scan...
+      ≡ƒöÄ [Deep Scan] Searching for stages: [STAGE] in Pipeline 5767...
+≡ƒôí [ADO Request] Build List (By Definition) GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&$top=20&$skip=0&queryOrder=finishTimeDescending
+≡ƒôí [ADO Response] 200 OK
+      ΓÅ│ [Deep Scan] Scanning builds 1 to 4...
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/378142/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/361624/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/335070/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Build List (By Definition) GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&$top=20&$skip=20&queryOrder=finishTimeDescending
+≡ƒôí [ADO Response] 200 OK
+      ΓÅ│ [Deep Scan] Scanning builds 21 to 24...
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/378142/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/361624/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/335070/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Build List (By Definition) GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&$top=20&$skip=40&queryOrder=finishTimeDescending
+≡ƒôí [ADO Response] 200 OK
+      ΓÅ│ [Deep Scan] Scanning builds 41 to 44...
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/378142/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/361624/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/335070/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Build List (By Definition) GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&$top=20&$skip=60&queryOrder=finishTimeDescending
+≡ƒôí [ADO Response] 200 OK
+      ΓÅ│ [Deep Scan] Scanning builds 61 to 64...
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/378142/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/361624/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/335070/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Build List (By Definition) GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&$top=20&$skip=80&queryOrder=finishTimeDescending
+≡ƒôí [ADO Response] 200 OK
+      ΓÅ│ [Deep Scan] Scanning builds 81 to 84...
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/378142/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/361624/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/335070/timeline
+≡ƒôí [ADO Response] 200 OK
+      ΓÜá∩╕Å  [Deep Scan] Could not find remaining stages: [stage] after 100 builds.
+
+   ≡ƒôì Checking Environment: PROD...
+≡ƒôí [ADO Request] GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/distributedtask/environments?name=PROD
+≡ƒôí [ADO Response] 200 OK
+      ΓÜá∩╕Å  Strike failed. Falling back to deep scan...
+      ≡ƒöÄ [Deep Scan] Searching for stages: [PROD] in Pipeline 5767...
+≡ƒôí [ADO Request] Build List (By Definition) GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&$top=20&$skip=0&queryOrder=finishTimeDescending
+≡ƒôí [ADO Response] 200 OK
+      ΓÅ│ [Deep Scan] Scanning builds 1 to 4...
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/378142/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/361624/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/335070/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Build List (By Definition) GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&$top=20&$skip=20&queryOrder=finishTimeDescending
+≡ƒôí [ADO Response] 200 OK
+      ΓÅ│ [Deep Scan] Scanning builds 21 to 24...
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/378142/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/361624/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/335070/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Build List (By Definition) GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&$top=20&$skip=40&queryOrder=finishTimeDescending
+≡ƒôí [ADO Response] 200 OK
+      ΓÅ│ [Deep Scan] Scanning builds 41 to 44...
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/378142/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/361624/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/335070/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Build List (By Definition) GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&$top=20&$skip=60&queryOrder=finishTimeDescending
+≡ƒôí [ADO Response] 200 OK
+      ΓÅ│ [Deep Scan] Scanning builds 61 to 64...
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/378142/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/361624/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/335070/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Build List (By Definition) GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&$top=20&$skip=80&queryOrder=finishTimeDescending
+≡ƒôí [ADO Response] 200 OK
+      ΓÅ│ [Deep Scan] Scanning builds 81 to 84...
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/378142/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/361624/timeline
+≡ƒôí [ADO Response] 200 OK
+≡ƒôí [ADO Request] Timeline GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/335070/timeline
+≡ƒôí [ADO Response] 200 OK
+      ΓÜá∩╕Å  [Deep Scan] Could not find remaining stages: [prod] after 100 builds.
+
+Γ£à Final Seed Data:
+{
+  "product": "AHelevate-GRP",
+  "repo": "APIM-AHelevate_GRP",
+  "repoUrl": "https://myorg.visualstudio.com/APIM_IntegrationAPIS/_git/APIM-AHelevate_GRP",
+  "project": "APIM_IntegrationAPIS",
+  "projectId": "50ce1beb-fc81-42e1-8fa8-7cee30cf3197",
+  "pipeline": "APIM-AHelevate_GRP",
+  "pipelineId": 5767,
+  "deployments": {}
+}
+
+≡ƒôä JSON Output: C:\APIM_self_service_design\swagger-scorer-main\apim-database\debug-output-ahelevategrp.json
+
+Γ£à Debug complete!
