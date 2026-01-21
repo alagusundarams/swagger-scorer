@@ -271,42 +271,50 @@ async function runDebug() {
         if (buildToProcess) {
             console.log(`      ✅ Found build targeting ${envName}: ID ${buildToProcess.id} (found via ${sourceMethod})`);
 
-            // --- 4.3: MULTI-REPO DISAMBIGUATION ---
+            // --- 4.3: MULTI-REPO DISAMBIGUATION (Breadth-First Scan) ---
             let primaryHash = buildToProcess.sourceVersion;
-            const buildRepoId = buildToProcess.repository?.id;
             const extraHashes: Record<string, string> = {};
+            const buildRepoId = buildToProcess.repository?.id;
 
-            if (buildRepoId !== targetRepoId) {
-                console.log(`      ⚠️  Multi-repo detected. Disambiguating resources for project code...`);
-                // Ensure we have full build details (including resources)
-                const buildDetails = buildToProcess.resources ? buildToProcess : await AzureService.fetchADOBuild(devops.organization, buildToProcess.project?.id || pipelineProject, buildToProcess.id, devops.pat, devops.baseUrl, bearerToken);
+            // Ensure we have full build details (including resources)
+            const buildDetails = buildToProcess.resources ? buildToProcess : await AzureService.fetchADOBuild(devops.organization, buildToProcess.project?.id || pipelineProject, buildToProcess.id, devops.pat, devops.baseUrl, bearerToken);
 
-                if (buildDetails?.resources?.repositories) {
-                    const matchedResources = Object.entries(buildDetails.resources.repositories).filter(([alias, r]: [string, any]) =>
-                        r.repository?.id === targetRepoId || r.repository?.name?.toLowerCase() === finalRepo.name.toLowerCase()
-                    );
+            if (buildDetails?.resources?.repositories) {
+                const targetProjectPrefix = projectIdentifier.toLowerCase();
+                const targetProductName = sanitize(productNameArg!).toLowerCase();
 
-                    if (matchedResources.length > 0) {
-                        // Use the most likely "source" alias as primary if multiple exist, otherwise take the first
-                        const primaryRes = matchedResources.find(([alias]) => alias.toLowerCase().includes('source') || alias.toLowerCase() === 'self') || matchedResources[0];
-                        primaryHash = (primaryRes[1] as any).version;
+                // Scan ALL repository resources in the build
+                const matchedResources: [string, any][] = Object.entries(buildDetails.resources.repositories).filter(([alias, r]: [string, any]) => {
+                    const rName = (r.repository?.name || '').toLowerCase();
+                    const rId = r.repository?.id;
 
-                        console.log(`         ✅ Resolved Primary Hash: ${primaryHash.substring(0, 7)} (Alias: ${primaryRes[0]})`);
+                    // Match by ID, exact name, or name contains product/project
+                    return rId === targetRepoId ||
+                        rName === finalRepo.name.toLowerCase() ||
+                        rName.includes(targetProductName) ||
+                        (targetProjectPrefix !== 'defaultcollection' && rName.includes(targetProjectPrefix));
+                });
 
-                        // Collect ALL project-related hashes (source, config, etc.)
-                        matchedResources.forEach(([alias, r]) => {
-                            extraHashes[alias] = (r as any).version;
-                            if (alias !== primaryRes[0]) {
-                                console.log(`         📂 Additional Config/Resource: ${alias} -> ${(r as any).version?.substring(0, 7)}`);
-                            }
-                        });
-                    } else {
-                        console.warn(`         ⚠️  Target project repo (${finalRepo.name}) NOT found in build resources.`);
-                        console.log(`         ℹ️  Using pipeline repo hash as fallback: ${primaryHash.substring(0, 7)}`);
-                    }
+                if (matchedResources.length > 0) {
+                    console.log(`      📦 Found ${matchedResources.length} relevant repository resources in build:`);
+
+                    // Prioritize "source" or "self" for primary hash, fallback to first match
+                    const primaryRes = matchedResources.find(([alias]) =>
+                        alias.toLowerCase().includes('source') ||
+                        alias.toLowerCase() === 'self' ||
+                        alias.toLowerCase().includes('data')
+                    ) || matchedResources[0];
+
+                    primaryHash = (primaryRes[1] as any).version;
+
+                    matchedResources.forEach(([alias, r]: [string, any]) => {
+                        const hash = (r as any).version;
+                        extraHashes[alias] = hash;
+                        console.log(`         - ${alias.padEnd(10)}: ${hash.substring(0, 7)} (${r.repository?.name})`);
+                    });
+                } else {
+                    console.log(`      ℹ️  No matching repository resources found in build. Using default sourceVersion.`);
                 }
-            } else {
-                console.log(`      ✅ Build repository matches project repository direct.`);
             }
 
             deployments[envName] = {
@@ -314,13 +322,13 @@ async function runDebug() {
                 hashes: Object.keys(extraHashes).length > 0 ? extraHashes : undefined,
                 date: (deploy && deploy.finishTime) || buildToProcess.finishTime || buildToProcess.queueTime || new Date().toISOString(),
                 branch: (buildToProcess.sourceBranch || 'unknown').replace('refs/heads/', ''),
-                author: buildToProcess.requestedFor?.displayName || 'Unknown',
-                message: buildToProcess.triggerInfo?.['ci.message'] || buildToProcess.sourceVersionMessage || 'No message',
+                author: (buildToProcess.requestedFor?.displayName || 'Unknown'),
+                message: (buildToProcess.triggerInfo?.['ci.message'] || buildToProcess.sourceVersionMessage || 'No message'),
                 url: buildToProcess._links?.web?.href,
                 discoverySource: sourceMethod
             };
         } else {
-            console.log(`      ❌ No deployment found for ${envName} in recent history.`);
+            console.log(`      ❌ No successful deployment found for ${envName} in the last 100 builds.`);
         }
     }
 

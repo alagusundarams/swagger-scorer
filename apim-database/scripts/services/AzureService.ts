@@ -954,25 +954,25 @@ export class AzureService {
                 return null;
             }
 
-            // 2. Query Deployments for this specific definition and environment (Surgical Step 2)
+            // 2. Query Deployments for this specific definition and environment (Surgical Strike)
             const tryFetch = async (endpoint: string) => {
+                // ownerId={definitionId} allows searching specifically for this pipeline's deployments
+                // ownerType='build' ensures we only look at build-based deployments
                 const url = `${urlBase}/_apis/distributedtask/environments/${envId}/${endpoint}`;
                 const resp = await fetch(url, { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } });
                 if (resp.ok) return await resp.json();
                 return null;
             };
 
-            // Fetch recent deployments (broaden search to catch more types)
-            let deployData = await tryFetch(`deployments?$top=20`);
+            // Fetch deployments specifically for this pipeline (ownerId)
+            // This is a TRUE surgical strike that finds the latest success regardless of how old it is
+            let deployData = await tryFetch(`deployments?ownerId=${definitionId}&ownerType=build&$top=10`);
 
             if (deployData && deployData.count > 0) {
-                // Locally filter for definitionId and success
-                // We search both the direct definitionId and nested owner objects
+                // Double check for success status (partiallySucceeded counts)
                 const matches = deployData.value.filter((d: any) => {
-                    const dId = Number(d.definitionId) || Number(d.owner?.definition?.id) || Number(d.definition?.id);
-                    const isTargetPipeline = dId === Number(definitionId);
                     const isSuccess = ['succeeded', 'partiallysucceeded'].includes((d.status || d.result || '').toLowerCase());
-                    return isTargetPipeline && isSuccess;
+                    return isSuccess;
                 });
 
                 if (matches.length > 0) {
