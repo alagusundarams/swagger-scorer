@@ -84,18 +84,12 @@ async function runDebug() {
         console.log(`   🔍 Search Query: "${searchQuery}"`);
         const searchRes = await AzureService.searchCode(devops.organization, searchQuery, devops.pat, devops.baseUrl, bearerToken);
         console.log(`   📡 Search Response: ${searchRes.count} results`);
-        if (searchRes.count > 0) {
-            console.log(`   📡 Full Response:`, JSON.stringify(searchRes, null, 2));
-        }
         finalRepo = searchRes.results?.[0]?.repository;
         if (!finalRepo) {
             const fallbackQuery = `${repoOverride}`;
             console.log(`   🔍 Fallback Search Query: "${fallbackQuery}"`);
             const repos = await AzureService.searchCode(devops.organization, fallbackQuery, devops.pat, devops.baseUrl, bearerToken);
             console.log(`   📡 Fallback Response: ${repos.count} results`);
-            if (repos.count > 0) {
-                console.log(`   📡 Full Fallback Response:`, JSON.stringify(repos, null, 2));
-            }
             finalRepo = repos.results?.find((r: any) => sanitize(r.repository.name) === sanitize(repoOverride))?.repository;
         }
         if (!finalRepo) {
@@ -109,9 +103,6 @@ async function runDebug() {
 
         const res = await AzureService.searchCode(devops.organization, tfSearchQuery, devops.pat, devops.baseUrl, bearerToken);
         console.log(`   📡 Search Response: ${res.count} results found`);
-        if (res.count > 0) {
-            console.log(`   📡 Full Search Response:`, JSON.stringify(res, null, 2));
-        }
 
         if (res.count === 0) {
             const broadQuery = productNameArg!.includes(' ') ? `"${productNameArg}"` : productNameArg!;
@@ -120,7 +111,6 @@ async function runDebug() {
             const broadRes = await AzureService.searchCode(devops.organization, broadQuery, devops.pat, devops.baseUrl, bearerToken);
             console.log(`   📡 Broad Search Response: ${broadRes.count} results found`);
             if (broadRes.count > 0) {
-                console.log(`   📡 Full Broad Response:`, JSON.stringify(broadRes, null, 2));
                 res.results = broadRes.results;
                 res.count = broadRes.count;
             }
@@ -246,13 +236,53 @@ async function runDebug() {
     const deployments: Record<string, { hash: string; date: string; branch?: string; author?: string; message?: string; url?: string }> = {};
     const pipelineProject = (matchedPipeline as any).project?.id || (matchedPipeline as any).project?.name || projectIdentifier;
 
+    // 4.1: CAPTURE BASELINE HASH (Fastest & Guaranteed)
+    console.log(`   ⏳ Step 4.1: Capturing Baseline Global Hash from Pipeline...`);
+    let baselineHash: string | undefined;
+    let baselineData: any | undefined;
+
+    try {
+        const latestBuild = await AzureService.fetchLatestSuccessfulBuild(devops.organization, pipelineProject, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken);
+        if (latestBuild) {
+            let commitHash = latestBuild.sourceVersion;
+            // Multi-repo resolution for baseline
+            if (latestBuild.repository?.name?.toLowerCase() !== finalRepo.name.toLowerCase()) {
+                const details = await AzureService.fetchADOBuild(devops.organization, latestBuild.project?.id || pipelineProject, latestBuild.id, devops.pat, devops.baseUrl, bearerToken);
+                if (details?.resources?.repositories) {
+                    const targetRes = Object.values(details.resources.repositories).find((r: any) => r.repository?.name?.toLowerCase() === finalRepo.name.toLowerCase());
+                    if ((targetRes as any)?.version) commitHash = (targetRes as any).version;
+                }
+            }
+            if (commitHash && commitHash !== 'unknown') {
+                baselineHash = commitHash;
+                baselineData = {
+                    hash: commitHash,
+                    date: latestBuild.finishTime || latestBuild.queueTime || new Date().toISOString(),
+                    branch: (latestBuild.sourceBranch || 'unknown').replace('refs/heads/', ''),
+                    author: latestBuild.requestedFor?.displayName || 'Unknown',
+                    message: latestBuild.triggerInfo?.['ci.message'] || latestBuild.sourceVersionMessage || 'No message',
+                    url: latestBuild._links?.web?.href
+                };
+                console.log(`      ✅ Captured Baseline: ${baselineHash.substring(0, 7)} (Build ID: ${latestBuild.id})`);
+            }
+        }
+    } catch (e) {
+        console.warn(`      ⚠️  Failed to capture baseline: ${e.message}`);
+    }
+
+    // 4.2: SURGICAL ENRICHMENT (Per Environment)
+    console.log(`\n   ⏳ Step 4.2: Attempting Surgical Enrichment per Environment...`);
     for (const envName of envsToSync) {
         console.log(`\n   📍 Checking Environment: ${envName}...`);
 
-        // 1. Surgical Strike: Environment API
+        // Use baseline as a starting point
+        if (baselineData) {
+            deployments[envName] = { ...baselineData };
+        }
+
+        // Try to "Sharpen" the data with a specific Strike
         let deploy = await AzureService.fetchLatestEnvironmentDeployment(devops.organization, pipelineProject, matchedPipeline.id, envName, devops.pat, devops.baseUrl, bearerToken);
         if (!deploy && pipelineProject !== projectIdentifier) {
-            console.log(`      ℹ️  Not found in ${pipelineProject}. Trying repository project: ${projectIdentifier}...`);
             deploy = await AzureService.fetchLatestEnvironmentDeployment(devops.organization, projectIdentifier, matchedPipeline.id, envName, devops.pat, devops.baseUrl, bearerToken);
         }
 
@@ -261,7 +291,6 @@ async function runDebug() {
             if (build) {
                 let commitHash = build.sourceVersion;
                 if (build.repository?.name?.toLowerCase() !== finalRepo.name.toLowerCase()) {
-                    console.log(`      ⚠️  Multi-repo detected. Resolving version...`);
                     const details = await AzureService.fetchADOBuild(devops.organization, build.project?.id || pipelineProject, build.id, devops.pat, devops.baseUrl, bearerToken);
                     if (details?.resources?.repositories) {
                         const targetRes = Object.values(details.resources.repositories).find((r: any) => r.repository?.name?.toLowerCase() === finalRepo.name.toLowerCase());
@@ -278,14 +307,14 @@ async function runDebug() {
                         message: build.triggerInfo?.['ci.message'] || 'No message',
                         url: build._links?.web?.href
                     };
-                    console.log(`      🎯 ${envName.padEnd(5)}: Strike Hit! Captured ${commitHash.substring(0, 7)}`);
+                    console.log(`      🎯 ${envName.padEnd(5)}: Strike Hit! Sharpened hash to ${commitHash.substring(0, 7)}`);
                     continue;
                 }
             }
         }
 
-        // 2. Fallback: Deep Scanner
-        console.log(`      ⚠️  Strike failed. Falling back to deep scan...`);
+        // Try to "Sharpen" with Stage Scanner
+        console.log(`      ℹ️  No surgical strike match. Trying Stage Scanner...`);
         const stageResults = await AzureService.fetchLatestStageResults(devops.organization, pipelineProject, matchedPipeline.id, [envName], devops.pat, devops.baseUrl, bearerToken);
         const result = stageResults[envName.toUpperCase()];
         if (result && result.buildId) {
@@ -304,7 +333,13 @@ async function runDebug() {
                     message: details.triggerInfo?.['ci.message'] || 'No message',
                     url: details._links?.web?.href
                 };
-                console.log(`      🎯 ${envName.padEnd(5)}: Scanner Hit! Captured ${commitHash.substring(0, 7)}`);
+                console.log(`      🎯 ${envName.padEnd(5)}: Scanner Hit! Sharpened hash to ${commitHash.substring(0, 7)}`);
+            }
+        } else {
+            if (baselineData) {
+                console.log(`      ✅ No specific result found. Keeping Baseline hash: ${baselineHash?.substring(0, 7)}`);
+            } else {
+                console.warn(`      ⚠️  No baseline and no surgical result found for ${envName}.`);
             }
         }
     }

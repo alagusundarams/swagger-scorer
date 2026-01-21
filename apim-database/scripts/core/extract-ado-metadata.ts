@@ -5,7 +5,7 @@ import { AzureService } from '../services/AzureService.js';
 const sanitize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 export async function extractADOMetadata(products: any[], targetProduct?: string, targetEnv?: string, verbose = false) {
-    console.log(`\n🚀 Starting ADO Metadata Extraction...`);
+    if (verbose) console.log(`\n🚀 Starting ADO Metadata Extraction...`);
 
     // --- AUTH ---
     let bearerToken: string | undefined;
@@ -77,8 +77,39 @@ export async function extractADOMetadata(products: any[], targetProduct?: string
             const envsToSync = targetEnv ? [targetEnv] : prod.environments || ['DEV', 'QA', 'STAGE', 'PROD'];
             const pipelineProject = matchedPipeline.project?.id || projectId;
 
+            // 3.1: CAPTURE BASELINE HASH
+            let baselineData: any | undefined;
+            try {
+                const latestBuild = await AzureService.fetchLatestSuccessfulBuild(devops.organization, pipelineProject, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken);
+                if (latestBuild) {
+                    let commitHash = latestBuild.sourceVersion;
+                    if (latestBuild.repository?.name?.toLowerCase() !== repo.name.toLowerCase()) {
+                        const details = await AzureService.fetchADOBuild(devops.organization, latestBuild.project?.id || pipelineProject, latestBuild.id, devops.pat, devops.baseUrl, bearerToken);
+                        if (details?.resources?.repositories) {
+                            const targetRes = Object.values(details.resources.repositories).find((r: any) => r.repository?.name?.toLowerCase() === repo.name.toLowerCase());
+                            if ((targetRes as any)?.version) commitHash = (targetRes as any).version;
+                        }
+                    }
+                    if (commitHash && commitHash !== 'unknown') {
+                        baselineData = {
+                            hash: commitHash,
+                            date: latestBuild.finishTime || latestBuild.queueTime || new Date().toISOString(),
+                            branch: (latestBuild.sourceBranch || 'unknown').replace('refs/heads/', ''),
+                            author: latestBuild.requestedFor?.displayName || 'Unknown',
+                            message: latestBuild.triggerInfo?.['ci.message'] || latestBuild.sourceVersionMessage || 'No message',
+                            url: latestBuild._links?.web?.href
+                        };
+                    }
+                }
+            } catch (e) { }
+
             for (const envName of envsToSync) {
-                // 1. Surgical Strike: Environment API
+                // Initialize with baseline if available
+                if (baselineData) {
+                    meta.deployments[envName] = { ...baselineData };
+                }
+
+                // Try Surgical Strike (Environment API)
                 let deploy = await AzureService.fetchLatestEnvironmentDeployment(devops.organization, pipelineProject, matchedPipeline.id, envName, devops.pat, devops.baseUrl, bearerToken);
                 if (!deploy && pipelineProject !== projectId) {
                     deploy = await AzureService.fetchLatestEnvironmentDeployment(devops.organization, projectId, matchedPipeline.id, envName, devops.pat, devops.baseUrl, bearerToken);
@@ -110,7 +141,7 @@ export async function extractADOMetadata(products: any[], targetProduct?: string
                     }
                 }
 
-                // 2. Fallback: Stage Scanner
+                // Try Stage Scanner (Fall back to it if Baseline exists or as a last resort)
                 const stageResults = await AzureService.fetchLatestStageResults(devops.organization, pipelineProject, matchedPipeline.id, [envName], devops.pat, devops.baseUrl, bearerToken);
                 const result = stageResults[envName.toUpperCase()];
                 if (result && result.buildId) {
@@ -135,7 +166,7 @@ export async function extractADOMetadata(products: any[], targetProduct?: string
 
             results.push(meta);
         } catch (e: any) {
-            console.error(`❌ Error processing ${prod.name}: ${e.message}`);
+            if (verbose) console.error(`❌ Error processing ${prod.name}: ${e.message}`);
             results.push(meta);
         }
     }
