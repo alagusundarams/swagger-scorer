@@ -263,10 +263,10 @@ async function runDebug() {
                     message: latestBuild.triggerInfo?.['ci.message'] || latestBuild.sourceVersionMessage || 'No message',
                     url: latestBuild._links?.web?.href
                 };
-                console.log(`      ✅ Captured Baseline: ${baselineHash.substring(0, 7)} (Build ID: ${latestBuild.id})`);
+                console.log(`      ✅ Captured Baseline: ${commitHash.substring(0, 7)} (Build ID: ${latestBuild.id})`);
             }
         }
-    } catch (e) {
+    } catch (e: any) {
         console.warn(`      ⚠️  Failed to capture baseline: ${e.message}`);
     }
 
