@@ -1067,17 +1067,18 @@ export class AzureService {
                 console.log(`      ⏳ [Deep Scan] Scanning builds ${offset + 1} to ${offset + builds.length}...`);
 
                 for (const build of builds) {
-                    const timeline = await this.fetchPipelineRunTimeline(org, project, build.id, pat, baseUrl);
+                    const timeline = await this.fetchPipelineRunTimeline(org, project, build.id, pat, baseUrl, bearerToken);
                     if (!timeline) continue;
 
                     // Check each remaining stage against this build's timeline
                     for (const stageName of Array.from(remainingStages)) {
-                        const stage = timeline.find(r =>
-                            r.type?.toLowerCase() === 'stage' &&
-                            r.name?.toLowerCase().includes(stageName) &&
-                            r.status?.toLowerCase() === 'completed' &&
-                            r.result?.toLowerCase() === 'succeeded'
-                        );
+                        const stage = timeline.find(r => {
+                            const type = (r.recordType || r.type || '').toLowerCase();
+                            const nameMatches = (r.name || '').toLowerCase().includes(stageName);
+                            const isSuccess = ['succeeded', 'partiallysucceeded'].includes((r.result || '').toLowerCase());
+                            const isCompleted = (r.status || '').toLowerCase() === 'completed';
+                            return type === 'stage' && nameMatches && isSuccess && isCompleted;
+                        });
 
                         if (stage) {
                             results[stageName.toUpperCase()] = {
