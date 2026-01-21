@@ -291,6 +291,7 @@ async function runDebug() {
             if (build) {
                 let commitHash = build.sourceVersion;
                 if (build.repository?.name?.toLowerCase() !== finalRepo.name.toLowerCase()) {
+                    console.log(`      ⚠️  Multi-repo detected for ${envName}. Resolving version...`);
                     const details = await AzureService.fetchADOBuild(devops.organization, build.project?.id || pipelineProject, build.id, devops.pat, devops.baseUrl, bearerToken);
                     if (details?.resources?.repositories) {
                         const targetRes = Object.values(details.resources.repositories).find((r: any) => r.repository?.name?.toLowerCase() === finalRepo.name.toLowerCase());
@@ -307,40 +308,38 @@ async function runDebug() {
                         message: build.triggerInfo?.['ci.message'] || 'No message',
                         url: build._links?.web?.href
                     };
-                    console.log(`      🎯 ${envName.padEnd(5)}: Strike Hit! Sharpened hash to ${commitHash.substring(0, 7)}`);
+                    console.log(`      🎯 ${envName.padEnd(5)}: Strike Hit! Precision match: ${commitHash.substring(0, 7)}`);
                     continue;
                 }
             }
         }
 
-        // Try to "Sharpen" with Stage Scanner
-        console.log(`      ℹ️  No surgical strike match. Trying Stage Scanner...`);
-        const stageResults = await AzureService.fetchLatestStageResults(devops.organization, pipelineProject, matchedPipeline.id, [envName], devops.pat, devops.baseUrl, bearerToken);
-        const result = stageResults[envName.toUpperCase()];
-        if (result && result.buildId) {
-            const details = await AzureService.fetchADOBuild(devops.organization, pipelineProject, result.buildId, devops.pat, devops.baseUrl, bearerToken);
-            if (details) {
-                let commitHash = details.sourceVersion;
-                if (details.repository?.name?.toLowerCase() !== finalRepo.name.toLowerCase() && details.resources?.repositories) {
-                    const targetRes = Object.values(details.resources.repositories).find((r: any) => r.repository?.name?.toLowerCase() === finalRepo.name.toLowerCase());
-                    if ((targetRes as any)?.version) commitHash = (targetRes as any).version;
+        // 3. Fallback: Only Deep Scan if Baseline is missing
+        if (!baselineData) {
+            console.log(`      ⚠️  No surgical strike match and no baseline. Falling back to deep scan...`);
+            const stageResults = await AzureService.fetchLatestStageResults(devops.organization, pipelineProject, matchedPipeline.id, [envName], devops.pat, devops.baseUrl, bearerToken);
+            const result = stageResults[envName.toUpperCase()];
+            if (result && result.buildId) {
+                const details = await AzureService.fetchADOBuild(devops.organization, pipelineProject, result.buildId, devops.pat, devops.baseUrl, bearerToken);
+                if (details) {
+                    let commitHash = details.sourceVersion;
+                    if (details.repository?.name?.toLowerCase() !== finalRepo.name.toLowerCase() && details.resources?.repositories) {
+                        const targetRes = Object.values(details.resources.repositories).find((r: any) => r.repository?.name?.toLowerCase() === finalRepo.name.toLowerCase());
+                        if ((targetRes as any)?.version) commitHash = (targetRes as any).version;
+                    }
+                    deployments[envName] = {
+                        hash: commitHash,
+                        date: result.date || details.finishTime || new Date().toISOString(),
+                        branch: (details.sourceBranch || 'unknown').replace('refs/heads/', ''),
+                        author: details.requestedFor?.displayName || 'Unknown',
+                        message: details.triggerInfo?.['ci.message'] || 'No message',
+                        url: details._links?.web?.href
+                    };
+                    console.log(`      🎯 ${envName.padEnd(5)}: Scanner Hit! Precision match: ${commitHash.substring(0, 7)}`);
                 }
-                deployments[envName] = {
-                    hash: commitHash,
-                    date: result.date || details.finishTime || new Date().toISOString(),
-                    branch: (details.sourceBranch || 'unknown').replace('refs/heads/', ''),
-                    author: details.requestedFor?.displayName || 'Unknown',
-                    message: details.triggerInfo?.['ci.message'] || 'No message',
-                    url: details._links?.web?.href
-                };
-                console.log(`      🎯 ${envName.padEnd(5)}: Scanner Hit! Sharpened hash to ${commitHash.substring(0, 7)}`);
             }
         } else {
-            if (baselineData) {
-                console.log(`      ✅ No specific result found. Keeping Baseline hash: ${baselineHash?.substring(0, 7)}`);
-            } else {
-                console.warn(`      ⚠️  No baseline and no surgical result found for ${envName}.`);
-            }
+            console.log(`      ✅ Regional info not found. Using baseline: ${baselineHash?.substring(0, 7)}`);
         }
     }
 

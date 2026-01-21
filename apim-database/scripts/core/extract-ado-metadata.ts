@@ -141,25 +141,27 @@ export async function extractADOMetadata(products: any[], targetProduct?: string
                     }
                 }
 
-                // Try Stage Scanner (Fall back to it if Baseline exists or as a last resort)
-                const stageResults = await AzureService.fetchLatestStageResults(devops.organization, pipelineProject, matchedPipeline.id, [envName], devops.pat, devops.baseUrl, bearerToken);
-                const result = stageResults[envName.toUpperCase()];
-                if (result && result.buildId) {
-                    const details = await AzureService.fetchADOBuild(devops.organization, pipelineProject, result.buildId, devops.pat, devops.baseUrl, bearerToken);
-                    if (details) {
-                        let commitHash = details.sourceVersion;
-                        if (details.repository?.name?.toLowerCase() !== repo.name.toLowerCase() && details.resources?.repositories) {
-                            const targetRes = Object.values(details.resources.repositories).find((r: any) => r.repository?.name?.toLowerCase() === repo.name.toLowerCase());
-                            if ((targetRes as any)?.version) commitHash = (targetRes as any).version;
+                // 2. Fallback: Only Scan if no Baseline
+                if (!baselineData) {
+                    const stageResults = await AzureService.fetchLatestStageResults(devops.organization, pipelineProject, matchedPipeline.id, [envName], devops.pat, devops.baseUrl, bearerToken);
+                    const result = stageResults[envName.toUpperCase()];
+                    if (result && result.buildId) {
+                        const details = await AzureService.fetchADOBuild(devops.organization, pipelineProject, result.buildId, devops.pat, devops.baseUrl, bearerToken);
+                        if (details) {
+                            let commitHash = details.sourceVersion;
+                            if (details.repository?.name?.toLowerCase() !== repo.name.toLowerCase() && details.resources?.repositories) {
+                                const targetRes = Object.values(details.resources.repositories).find((r: any) => r.repository?.name?.toLowerCase() === repo.name.toLowerCase());
+                                if ((targetRes as any)?.version) commitHash = (targetRes as any).version;
+                            }
+                            meta.deployments[envName] = {
+                                hash: commitHash,
+                                date: result.date || details.finishTime || new Date().toISOString(),
+                                branch: (details.sourceBranch || 'unknown').replace('refs/heads/', ''),
+                                author: details.requestedFor?.displayName || 'Unknown',
+                                message: details.triggerInfo?.['ci.message'] || 'No message',
+                                url: details._links?.web?.href
+                            };
                         }
-                        meta.deployments[envName] = {
-                            hash: commitHash,
-                            date: result.date || details.finishTime || new Date().toISOString(),
-                            branch: (details.sourceBranch || 'unknown').replace('refs/heads/', ''),
-                            author: details.requestedFor?.displayName || 'Unknown',
-                            message: details.triggerInfo?.['ci.message'] || 'No message',
-                            url: details._links?.web?.href
-                        };
                     }
                 }
             }
@@ -175,3 +177,22 @@ export async function extractADOMetadata(products: any[], targetProduct?: string
     if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true });
     writeFileSync(join(dataDir, 'ado-metadata.json'), JSON.stringify(results, null, 2), 'utf8');
 }
+
+async function main() {
+    const args = process.argv.slice(2);
+    const targetProduct = args.find(a => a.startsWith('--product='))?.split('=')[1];
+    const targetEnv = args.find(a => a.startsWith('--env='))?.split('=')[1];
+    const verbose = !args.includes('--quiet');
+
+    // Load products from inventory
+    const inventoryPath = join(process.cwd(), 'scripts', 'data', 'apim-inventory.json');
+    if (!existsSync(inventoryPath)) {
+        console.error(`❌ Inventory not found at ${inventoryPath}. Run extract-apim-inventory first.`);
+        process.exit(1);
+    }
+
+    const products = JSON.parse(readFileSync(inventoryPath, 'utf8'));
+    await extractADOMetadata(products, targetProduct, targetEnv, verbose);
+}
+
+main().catch(err => console.error(`\n💥 Fatal Error:`, err));
