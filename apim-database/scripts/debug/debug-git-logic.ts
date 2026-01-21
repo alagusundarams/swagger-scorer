@@ -280,19 +280,27 @@ async function runDebug() {
             const buildDetails = buildToProcess.resources ? buildToProcess : await AzureService.fetchADOBuild(devops.organization, buildToProcess.project?.id || pipelineProject, buildToProcess.id, devops.pat, devops.baseUrl, bearerToken);
 
             if (buildDetails?.resources?.repositories) {
-                const targetProjectPrefix = projectIdentifier.toLowerCase();
-                const targetProductName = sanitize(productNameArg!).toLowerCase();
-
                 // Scan ALL repository resources in the build
                 const matchedResources: [string, any][] = Object.entries(buildDetails.resources.repositories).filter(([alias, r]: [string, any]) => {
                     const rName = (r.repository?.name || '').toLowerCase();
                     const rId = r.repository?.id;
+                    const finalRepoName = finalRepo.name.toLowerCase();
+                    const targetProduct = sanitize(productNameArg!).toLowerCase();
 
-                    // Match by ID, exact name, or name contains product/project
-                    return rId === targetRepoId ||
-                        rName === finalRepo.name.toLowerCase() ||
-                        rName.includes(targetProductName) ||
-                        (targetProjectPrefix !== 'defaultcollection' && rName.includes(targetProjectPrefix));
+                    // 1. Match by ID (Highest Confidence)
+                    if (rId === targetRepoId) return true;
+
+                    // 2. Match by Name Exact
+                    if (rName === finalRepoName) return true;
+
+                    // 3. Match by Name Substring (Fuzzy)
+                    if (rName.includes(targetProduct) || finalRepoName.includes(rName)) return true;
+
+                    // 4. Match by Alias Substring (e.g., alias 'AH_elevate' matches project code)
+                    const aliasLower = alias.toLowerCase();
+                    if (aliasLower.includes(targetProduct) || aliasLower.includes('source')) return true;
+
+                    return false;
                 });
 
                 if (matchedResources.length > 0) {

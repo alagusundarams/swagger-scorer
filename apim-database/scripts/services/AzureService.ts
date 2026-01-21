@@ -955,41 +955,45 @@ export class AzureService {
             }
 
             // 2. Query Deployments for this specific definition and environment (Surgical Strike)
-            const tryFetch = async (endpoint: string) => {
-                // ownerId={definitionId} allows searching specifically for this pipeline's deployments
-                // ownerType='build' ensures we only look at build-based deployments
-                const url = `${urlBase}/_apis/distributedtask/environments/${envId}/${endpoint}`;
+            const tryFetch = async (query: string) => {
+                const url = `${urlBase}/_apis/distributedtask/environments/${envId}/deployments?${query}&api-version=7.1-preview.1`;
+                console.log(`      📡 [ADO Request] GET ${url}`);
                 const resp = await fetch(url, { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } });
                 if (resp.ok) return await resp.json();
+                console.warn(`      ⚠️ [ADO Response] ${resp.status} ${resp.statusText} for ${url}`);
                 return null;
             };
 
-            // Fetch deployments specifically for this pipeline (ownerId)
-            // This is a TRUE surgical strike that finds the latest success regardless of how old it is
-            let deployData = await tryFetch(`deployments?ownerId=${definitionId}&ownerType=build&$top=10`);
+            // Step 1: Try TRUE surgical strike (Filtered by ownerId/definitionId at the source)
+            let deployData = await tryFetch(`ownerId=${definitionId}&ownerType=build&$top=5`);
+
+            // Step 2: Fallback to broad search if Step 1 returned nothing
+            if (!deployData || deployData.count === 0) {
+                console.log(`      ℹ️  Surgical strike (ownerId) returned no results. Falling back to broad environment scan...`);
+                deployData = await tryFetch(`$top=50`);
+            }
 
             if (deployData && deployData.count > 0) {
-                // Double check for success status (partiallySucceeded counts)
+                // Locally filter for definitionId and success
                 const matches = deployData.value.filter((d: any) => {
+                    const build = d.build || d.owner;
+                    const dId = Number(d.definitionId) || Number(build?.definition?.id) || Number(d.definition?.id);
+                    const isTargetPipeline = dId === Number(definitionId);
                     const isSuccess = ['succeeded', 'partiallysucceeded'].includes((d.status || d.result || '').toLowerCase());
-                    return isSuccess;
+                    return isTargetPipeline && isSuccess;
                 });
 
                 if (matches.length > 0) {
-                    // Get the absolute latest successful one
                     const match = matches[0];
                     console.log(`      ✅ Found matching deployment! (Build ID: ${match.owner?.id || match.id})`);
 
-                    // Ensure project info is captured if present in the record
                     if (!match.project && (match.owner?.project || match.definition?.project)) {
                         match.project = match.owner?.project || match.definition?.project;
                     }
 
-                    // If the deployment object doesn't have the build/hash details, try to fetch the owner build
                     if (!match.build?.sourceVersion && (match.owner?.id || match.id)) {
                         const buildId = match.owner?.id || match.id;
                         const buildProject = match.project?.id || match.project?.name || project;
-                        console.log(`      📡 Fetching supplementary build details (ID: ${buildId}) from project ${buildProject}...`);
                         const fullBuild = await this.fetchADOBuild(org, buildProject, buildId, pat, baseUrl, bearerToken);
                         if (fullBuild) match.build = fullBuild;
                     }
