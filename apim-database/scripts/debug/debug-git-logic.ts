@@ -230,114 +230,95 @@ async function runDebug() {
     const matchedPipeline = pipelineCandidates[0].pipe;
     console.log(`   ✅ Best Match: ${matchedPipeline.name} (ID: ${matchedPipeline.id})`);
 
-    // --- STEP 4: HYBRID DEPLOYMENT EXTRACTION (Environment-First) ---
-    console.log(`\n⏳ Step 4: Discovering Latest Deployments per Environment...`);
+    // --- STEP 4: RELIABLE DEPLOYMENT DISCOVERY (Build-History Scan) ---
+    console.log(`\n⏳ Step 4: Discovering Latest Deployments via Build History Scan...`);
 
     // Choose environments based on args
     const envsToSync = envArg === 'ALL' ? ['DEV', 'QA', 'STAGE', 'PROD'] : [envArg];
     const deployments: Record<string, { hash: string; date: string; branch?: string; author?: string; message?: string; url?: string; hashes?: Record<string, string>; discoverySource?: string }> = {};
     const pipelineProject = (matchedPipeline as any).project?.id || (matchedPipeline as any).project?.name || projectIdentifier;
 
-    const targetRepoId = finalRepo.id;
-    console.log(`   🎯 Target Project Repository: ${finalRepo.name} (ID: ${targetRepoId})`);
     console.log(`   📂 Scanning Environments: ${envsToSync.join(', ')}`);
+    console.log(`   🎯 Target Project Repository: ${finalRepo.name} (ID: ${primaryRepoId})`);
 
-    for (const envName of envsToSync) {
-        console.log(`\n   📍 Checking Environment: ${envName}...`);
+    // Fetch up to 100 builds in one go to categorize them
+    const builds = await AzureService.fetchBuildsByDefinition(devops.organization, pipelineProject, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken, 100);
+    console.log(`   📡 Fetched ${builds.length} recent builds for classification...`);
 
-        // --- 4.1: SURGICAL STRIKE (Environment API) ---
-        let deploy = await AzureService.fetchLatestEnvironmentDeployment(devops.organization, pipelineProject, matchedPipeline.id, envName, devops.pat, devops.baseUrl, bearerToken);
-        if (!deploy && pipelineProject !== projectIdentifier) {
-            deploy = await AzureService.fetchLatestEnvironmentDeployment(devops.organization, projectIdentifier, matchedPipeline.id, envName, devops.pat, devops.baseUrl, bearerToken);
-        }
+    const envMap: Record<string, any> = {};
+    const remainingEnvs = new Set(envsToSync.map(e => e.toUpperCase()));
 
-        let buildToProcess: any = null;
-        let sourceMethod = "";
+    for (const build of builds) {
+        if (remainingEnvs.size === 0) break;
 
-        if (deploy) {
-            buildToProcess = deploy.build || deploy.owner;
-            sourceMethod = "Environment API Strike";
-        } else {
-            // --- 4.2: FALLBACK: STAGE SCANNER (Build Timeline) ---
-            console.log(`      ⚠️  Environment API strike failed for ${envName}. Trying stage scanner...`);
-            const stageResults = await AzureService.fetchLatestStageResults(devops.organization, pipelineProject, matchedPipeline.id, [envName], devops.pat, devops.baseUrl, bearerToken);
-            const scanResult = stageResults[envName.toUpperCase()];
-            if (scanResult && scanResult.buildId) {
-                buildToProcess = await AzureService.fetchADOBuild(devops.organization, pipelineProject, scanResult.buildId, devops.pat, devops.baseUrl, bearerToken);
-                sourceMethod = "Stage Scanner Hit";
-            }
-        }
+        const timeline = await AzureService.fetchPipelineRunTimeline(devops.organization, pipelineProject, build.id, devops.pat, devops.baseUrl, bearerToken);
+        if (!timeline) continue;
 
-        if (buildToProcess) {
-            console.log(`      ✅ Found build targeting ${envName}: ID ${buildToProcess.id} (found via ${sourceMethod})`);
+        for (const envName of Array.from(remainingEnvs)) {
+            const stage = timeline.find((r: any) => {
+                const type = (r.recordType || r.type || '').toLowerCase();
+                const name = (r.name || '').toLowerCase();
+                const isSuccess = ['succeeded', 'partiallysucceeded'].includes((r.result || '').toLowerCase());
+                const isCompleted = (r.status || '').toLowerCase() === 'completed';
+                // Precision match for environment name in stage record
+                return type === 'stage' && name.includes(envName.toLowerCase()) && isSuccess && isCompleted;
+            });
 
-            // --- 4.3: MULTI-REPO DISAMBIGUATION (Breadth-First Scan) ---
-            let primaryHash = buildToProcess.sourceVersion;
-            const extraHashes: Record<string, string> = {};
-            const buildRepoId = buildToProcess.repository?.id;
+            if (stage) {
+                console.log(`      ✅ Found Stage Hit: ${envName} -> Build ${build.id} (${build.sourceVersion?.substring(0, 7)})`);
 
-            // Ensure we have full build details (including resources)
-            const buildDetails = buildToProcess.resources ? buildToProcess : await AzureService.fetchADOBuild(devops.organization, buildToProcess.project?.id || pipelineProject, buildToProcess.id, devops.pat, devops.baseUrl, bearerToken);
+                // --- MULTI-REPO DISAMBIGUATION for this specific build ---
+                let primaryHash = build.sourceVersion;
+                const extraHashes: Record<string, string> = {};
 
-            if (buildDetails?.resources?.repositories) {
-                // Scan ALL repository resources in the build
-                const matchedResources: [string, any][] = Object.entries(buildDetails.resources.repositories).filter(([alias, r]: [string, any]) => {
-                    const rName = (r.repository?.name || '').toLowerCase();
-                    const rId = r.repository?.id;
-                    const finalRepoName = finalRepo.name.toLowerCase();
-                    const targetProduct = sanitize(productNameArg!).toLowerCase();
+                // Ensure we have full details for multi-repo resolution
+                const details = await AzureService.fetchADOBuild(devops.organization, build.project?.id || pipelineProject, build.id, devops.pat, devops.baseUrl, bearerToken);
+                if (details?.resources?.repositories) {
+                    const matchedResources: [string, any][] = Object.entries(details.resources.repositories).filter(([alias, r]: [string, any]) => {
+                        const rName = (r.repository?.name || '').toLowerCase();
+                        const rId = r.repository?.id;
+                        const targetProduct = sanitize(productNameArg!).toLowerCase();
+                        const finalRepoName = finalRepo.name.toLowerCase();
 
-                    // 1. Match by ID (Highest Confidence)
-                    if (rId === targetRepoId) return true;
-
-                    // 2. Match by Name Exact
-                    if (rName === finalRepoName) return true;
-
-                    // 3. Match by Name Substring (Fuzzy)
-                    if (rName.includes(targetProduct) || finalRepoName.includes(rName)) return true;
-
-                    // 4. Match by Alias Substring (e.g., alias 'AH_elevate' matches project code)
-                    const aliasLower = alias.toLowerCase();
-                    if (aliasLower.includes(targetProduct) || aliasLower.includes('source')) return true;
-
-                    return false;
-                });
-
-                if (matchedResources.length > 0) {
-                    console.log(`      📦 Found ${matchedResources.length} relevant repository resources in build:`);
-
-                    // Prioritize "source" or "self" for primary hash, fallback to first match
-                    const primaryRes = matchedResources.find(([alias]) =>
-                        alias.toLowerCase().includes('source') ||
-                        alias.toLowerCase() === 'self' ||
-                        alias.toLowerCase().includes('data')
-                    ) || matchedResources[0];
-
-                    primaryHash = (primaryRes[1] as any).version;
-
-                    matchedResources.forEach(([alias, r]: [string, any]) => {
-                        const hash = (r as any).version;
-                        extraHashes[alias] = hash;
-                        console.log(`         - ${alias.padEnd(10)}: ${hash.substring(0, 7)} (${r.repository?.name})`);
+                        return rId === primaryRepoId ||
+                            rName === finalRepoName ||
+                            rName.includes(targetProduct) ||
+                            finalRepoName.includes(rName) ||
+                            alias.toLowerCase().includes(targetProduct) ||
+                            alias.toLowerCase().includes('source');
                     });
-                } else {
-                    console.log(`      ℹ️  No matching repository resources found in build. Using default sourceVersion.`);
-                }
-            }
 
-            deployments[envName] = {
-                hash: primaryHash,
-                hashes: Object.keys(extraHashes).length > 0 ? extraHashes : undefined,
-                date: (deploy && deploy.finishTime) || buildToProcess.finishTime || buildToProcess.queueTime || new Date().toISOString(),
-                branch: (buildToProcess.sourceBranch || 'unknown').replace('refs/heads/', ''),
-                author: (buildToProcess.requestedFor?.displayName || 'Unknown'),
-                message: (buildToProcess.triggerInfo?.['ci.message'] || buildToProcess.sourceVersionMessage || 'No message'),
-                url: buildToProcess._links?.web?.href,
-                discoverySource: sourceMethod
-            };
-        } else {
-            console.log(`      ❌ No successful deployment found for ${envName} in the last 100 builds.`);
+                    if (matchedResources.length > 0) {
+                        const primaryRes = matchedResources.find(([alias]) =>
+                            alias.toLowerCase().includes('source') || alias.toLowerCase() === 'self'
+                        ) || matchedResources[0];
+
+                        primaryHash = (primaryRes[1] as any).version;
+                        matchedResources.forEach(([alias, r]: [string, any]) => {
+                            extraHashes[alias] = (r as any).version;
+                        });
+                        console.log(`         📦 Components: ${Object.keys(extraHashes).join(', ')}`);
+                    }
+                }
+
+                deployments[envName] = {
+                    hash: primaryHash,
+                    hashes: Object.keys(extraHashes).length > 0 ? extraHashes : undefined,
+                    date: stage.finishTime || build.finishTime || new Date().toISOString(),
+                    branch: (build.sourceBranch || 'unknown').replace('refs/heads/', ''),
+                    author: build.requestedFor?.displayName || 'Unknown',
+                    message: build.triggerInfo?.['ci.message'] || build.sourceVersionMessage || 'No message',
+                    url: build._links?.web?.href,
+                    discoverySource: 'Build-History Scan'
+                };
+                remainingEnvs.delete(envName);
+            }
         }
+    }
+
+    // Report misses
+    for (const envName of Array.from(remainingEnvs)) {
+        console.log(`      ❌ No successful deployment found for ${envName} in the last ${builds.length} builds.`);
     }
 
     // --- FINAL OUTPUT ---
