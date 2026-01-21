@@ -1,0 +1,726 @@
+
+∩┐╜∩╕ÅΓÇìΓÖÇ∩╕Å DEBUG: Git/Pipeline Discovery Test
+   Target Product: "AHelevate-GRP"
+   Target Env:     DEV
+
+∩┐╜ Authenticating...
+
+Γ₧í∩╕Å  Step 1: Repository Discovery (Searching Terraform Files)...
+   ∩┐╜ Primary Search: Looking for product in Terraform files...
+   ∩┐╜ Search Query: "AHelevate-GRP ext:tf"
+≡ƒôí [ADO Request] POST https://myorg.almsearch.visualstudio.com/_apis/search/codesearchresults?api-version=7.1
+≡ƒôñ [Request Body]: {
+  "searchText": "AHelevate-GRP ext:tf",
+  "$top": 50
+}
+≡ƒôí [ADO Response] 200 OK
+≡ƒôÑ [Response Data]: 0 results
+   ∩┐╜ Search Response: 0 results found
+   ΓÜá∩╕Å  No results in .tf files. Trying broader search...
+   ∩┐╜ Broad Search Query: "AHelevate-GRP"
+≡ƒôí [ADO Request] POST https://myorg.almsearch.visualstudio.com/_apis/search/codesearchresults?api-version=7.1
+≡ƒôñ [Request Body]: {
+  "searchText": "AHelevate-GRP",
+  "$top": 50
+}
+≡ƒôí [ADO Response] 200 OK
+≡ƒôÑ [Response Data]: 6 results
+   ∩┐╜ Broad Search Response: 6 results found
+   ∩┐╜ Full Broad Response: {
+  "count": 6,
+  "results": [
+    {
+      "fileName": "terraform_dev.tfvars",
+      "path": "/IAC/maintain_AHelevate_GRP/terraform_dev.tfvars",
+      "matches": {
+        "content": [
+          {
+            "charOffset": 255,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 305,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 342,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 854,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 1221,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 1407,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          }
+        ],
+        "fileName": []
+      },
+      "collection": {
+        "name": "DefaultCollection"
+      },
+      "project": {
+        "name": "APIM_IntegrationAPIS",
+        "id": "50ce1beb-fc81-42e1-8fa8-7cee30cf3197"
+      },
+      "repository": {
+        "name": "APIM-AHelevate_GRP",
+        "id": "128a0a89-d168-4ef6-a311-047c08ebc985",
+        "type": "git"
+      },
+      "versions": [
+        {
+          "branchName": "master",
+          "changeId": "45bade56320063bfb9c9993ce88f8ee2d95d73ba"
+        }
+      ],
+      "contentId": "a84cf5c6fa1876727deabdead897c482b7c01183"
+    },
+    {
+      "fileName": "terraform_prod.tfvars",
+      "path": "/IAC/maintain_AHelevate_GRP/terraform_prod.tfvars",
+      "matches": {
+        "content": [
+          {
+            "charOffset": 259,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 309,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 346,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 860,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 1229,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 1415,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          }
+        ],
+        "fileName": []
+      },
+      "collection": {
+        "name": "DefaultCollection"
+      },
+      "project": {
+        "name": "APIM_IntegrationAPIS",
+        "id": "50ce1beb-fc81-42e1-8fa8-7cee30cf3197"
+      },
+      "repository": {
+        "name": "APIM-AHelevate_GRP",
+        "id": "128a0a89-d168-4ef6-a311-047c08ebc985",
+        "type": "git"
+      },
+      "versions": [
+        {
+          "branchName": "master",
+          "changeId": "45bade56320063bfb9c9993ce88f8ee2d95d73ba"
+        }
+      ],
+      "contentId": "9291b77fb56820c76f3b7b97a00e5d4c87ca7018"
+    },
+    {
+      "fileName": "terraform_qa.tfvars",
+      "path": "/IAC/maintain_AHelevate_GRP/terraform_qa.tfvars",
+      "matches": {
+        "content": [
+          {
+            "charOffset": 251,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 301,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 338,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 848,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 1213,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 1399,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          }
+        ],
+        "fileName": []
+      },
+      "collection": {
+        "name": "DefaultCollection"
+      },
+      "project": {
+        "name": "APIM_IntegrationAPIS",
+        "id": "50ce1beb-fc81-42e1-8fa8-7cee30cf3197"
+      },
+      "repository": {
+        "name": "APIM-AHelevate_GRP",
+        "id": "128a0a89-d168-4ef6-a311-047c08ebc985",
+        "type": "git"
+      },
+      "versions": [
+        {
+          "branchName": "master",
+          "changeId": "45bade56320063bfb9c9993ce88f8ee2d95d73ba"
+        }
+      ],
+      "contentId": "8f3066e0f149826617cfb537a96d868d4716c408"
+    },
+    {
+      "fileName": "terraform_stage.tfvars",
+      "path": "/IAC/maintain_AHelevate_GRP/terraform_stage.tfvars",
+      "matches": {
+        "content": [
+          {
+            "charOffset": 263,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 313,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 350,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 866,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 1237,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 1423,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          }
+        ],
+        "fileName": []
+      },
+      "collection": {
+        "name": "DefaultCollection"
+      },
+      "project": {
+        "name": "APIM_IntegrationAPIS",
+        "id": "50ce1beb-fc81-42e1-8fa8-7cee30cf3197"
+      },
+      "repository": {
+        "name": "APIM-AHelevate_GRP",
+        "id": "128a0a89-d168-4ef6-a311-047c08ebc985",
+        "type": "git"
+      },
+      "versions": [
+        {
+          "branchName": "master",
+          "changeId": "45bade56320063bfb9c9993ce88f8ee2d95d73ba"
+        }
+      ],
+      "contentId": "c40d5252581f5920713ecd57db457a06c78c9604"
+    },
+    {
+      "fileName": "product_policy.xml",
+      "path": "/Policy/Product/product_policy.xml",
+      "matches": {
+        "content": [
+          {
+            "charOffset": 827,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          },
+          {
+            "charOffset": 901,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          }
+        ],
+        "fileName": []
+      },
+      "collection": {
+        "name": "DefaultCollection"
+      },
+      "project": {
+        "name": "APIM_IntegrationAPIS",
+        "id": "50ce1beb-fc81-42e1-8fa8-7cee30cf3197"
+      },
+      "repository": {
+        "name": "APIM-AHelevate_GRP",
+        "id": "128a0a89-d168-4ef6-a311-047c08ebc985",
+        "type": "git"
+      },
+      "versions": [
+        {
+          "branchName": "master",
+          "changeId": "cc575db7296968cd5e9d02ebbea78959f3499e59"
+        }
+      ],
+      "contentId": "6b419f15269c233b7cd470ab8858bd991186da42"
+    },
+    {
+      "fileName": "service-config.yaml",
+      "path": "/IAC/maintain_AHelevate_GRP/service-config.yaml",
+      "matches": {
+        "content": [
+          {
+            "charOffset": 180,
+            "length": 13,
+            "line": 0,
+            "column": 0,
+            "codeSnippet": null,
+            "type": "content"
+          }
+        ],
+        "fileName": []
+      },
+      "collection": {
+        "name": "DefaultCollection"
+      },
+      "project": {
+        "name": "APIM_IntegrationAPIS",
+        "id": "50ce1beb-fc81-42e1-8fa8-7cee30cf3197"
+      },
+      "repository": {
+        "name": "APIM-AHelevate_GRP",
+        "id": "128a0a89-d168-4ef6-a311-047c08ebc985",
+        "type": "git"
+      },
+      "versions": [
+        {
+          "branchName": "master",
+          "changeId": "45bade56320063bfb9c9993ce88f8ee2d95d73ba"
+        }
+      ],
+      "contentId": "82865e66e056c9bea0ffd783f72770ee14045b43"
+    }
+  ],
+  "infoCode": 0,
+  "facets": {}
+}
+   Γ£à Found 6 file(s) containing product name
+   ∩┐╜ Found 1 unique repository/repositories:
+      1. APIM-AHelevate_GRP (found in: /IAC/maintain_AHelevate_GRP/terraform_dev.tfvars)
+   ∩┐╜ Selected Repository: APIM-AHelevate_GRP
+
+∩┐╜ Authorizing Repository Metadata: APIM-AHelevate_GRP...
+   ∩┐╜ [ADO Request] GET https://myorg.visualstudio.com//APIM_IntegrationAPIS/_apis/git/repositories/128a0a89-d168-4ef6-a311-047c08ebc985
+   ∩┐╜ [ADO Response]: {
+  "id": "128a0a89-d168-4ef6-a311-047c08ebc985",
+  "name": "APIM-AHelevate_GRP",
+  "url": "https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/git/repositories/128a0a89-d168-4ef6-a311-047c08ebc985",
+  "project": {
+    "id": "50ce1beb-fc81-42e1-8fa8-7cee30cf3197",
+    "name": "APIM_IntegrationAPIS",
+    "description": "Created via Script on 03/27/2024 for TASK0687857 by sthokala",
+    "url": "https://myorg.visualstudio.com/_apis/projects/50ce1beb-fc81-42e1-8fa8-7cee30cf3197",
+    "state": "wellFormed",
+    "revision": 438275206,
+    "visibility": "private",
+    "lastUpdateTime": "2024-03-27T18:31:27.89Z"
+  },
+  "defaultBranch": "refs/heads/master",
+  "size": 27120,
+  "remoteUrl": "https://myorg.visualstudio.com/APIM_IntegrationAPIS/_git/APIM-AHelevate_GRP",
+  "sshUrl": "myorg@vs-ssh.visualstudio.com:v3/myorg/APIM_IntegrationAPIS/APIM-AHelevate_GRP",
+  "webUrl": "https://myorg.visualstudio.com/APIM_IntegrationAPIS/_git/APIM-AHelevate_GRP",
+  "_links": {
+    "self": {
+      "href": "https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/git/repositories/128a0a89-d168-4ef6-a311-047c08ebc985"
+    },
+    "project": {
+      "href": "vstfs:///Classification/TeamProject/50ce1beb-fc81-42e1-8fa8-7cee30cf3197"
+    },
+    "web": {
+      "href": "https://myorg.visualstudio.com/APIM_IntegrationAPIS/_git/APIM-AHelevate_GRP"
+    },
+    "ssh": {
+      "href": "myorg@vs-ssh.visualstudio.com:v3/myorg/APIM_IntegrationAPIS/APIM-AHelevate_GRP"
+    },
+    "commits": {
+      "href": "https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/git/repositories/128a0a89-d168-4ef6-a311-047c08ebc985/commits"
+    },
+    "refs": {
+      "href": "https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/git/repositories/128a0a89-d168-4ef6-a311-047c08ebc985/refs"
+    },
+    "pullRequests": {
+      "href": "https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/git/repositories/128a0a89-d168-4ef6-a311-047c08ebc985/pullRequests"
+    },
+    "items": {
+      "href": "https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/git/repositories/128a0a89-d168-4ef6-a311-047c08ebc985/items"
+    },
+    "pushes": {
+      "href": "https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/git/repositories/128a0a89-d168-4ef6-a311-047c08ebc985/pushes"
+    }
+  },
+  "isDisabled": false,
+  "isInMaintenance": false
+}
+   Γ£à Authorized: Project="APIM_IntegrationAPIS"
+   ∩┐╜ Project ID: 50ce1beb-fc81-42e1-8fa8-7cee30cf3197
+   ∩┐╜ Repo URL: https://myorg.visualstudio.com/APIM_IntegrationAPIS/_git/APIM-AHelevate_GRP
+
+Γ₧í∩╕Å  Step 2: Pipeline Discovery (Repository-Filtered)...
+   ∩┐╜ Target Repository: APIM-AHelevate_GRP (ID: 128a0a89-d168-4ef6-a311-047c08ebc985)
+   ΓÅ│ Attempting Surgical Pipeline Discovery (Repo-Filtered Patterns)...
+   ΓÅ│ Step 2.1: ID-Based Surgical Search (repositoryId=128a0a89-d168-4ef6-a311-047c08ebc985)...
+≡ƒôí [ADO Request] Build Definitions GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/definitions?api-version=7.1&repositoryId=128a0a89-d168-4ef6-a311-047c08ebc985&repositoryType=TfsGit
+   ≡ƒÄ» Filter: repositoryId=128a0a89-d168-4ef6-a311-047c08ebc985, repositoryType=TfsGit
+≡ƒôí [ADO Response] 200 OK
+   ΓÜá∩╕Å  ID-based search returned 0 results. Trying Step 2.2: Name-Based Surgical Search...
+   ΓÅ│ Step 2.2: Name-Based Surgical Search (name=APIM-AHelevate_GRP)...
+≡ƒôí [ADO Request] Build Definitions GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/definitions?api-version=7.1&name=APIM-AHelevate_GRP
+   ≡ƒÄ» Filter: name=APIM-AHelevate_GRP
+≡ƒôí [ADO Response] 200 OK
+   ∩┐╜ Result: Found 1 build definition(s)
+      ∩┐╜ Found 1 pipelines for this repository
+      ∩┐╜ Testing 6 naming patterns against 1 repo pipelines...
+      ∩┐╜ Pattern "APIM-AHelevate_GRP": 1 matches
+≡ƒôí [ADO Request] Latest Successful Build GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&resultFilter=succeeded&statusFilter=completed&$top=1&queryOrder=finishTimeDescending&api-version=7.1
+≡ƒôí [ADO Response] 200 OK
+      Γ£à Found latest successful build: ID 363954, Commit fd34b49
+      Γ£à [Surgical] Found active pipeline: APIM-AHelevate_GRP (ID: 5767)
+   Γ£à Discovery complete: 1 pipeline(s) found for repository
+
+Γ₧í∩╕Å  Step 3: Matching Pipeline...
+   ∩┐╜ Found 1 candidates. Top Picks:
+       1. [Surgical (Pattern Match)] APIM-AHelevate_GRP                       (Score:  75, ID: 5767)
+   Γ£à Best Match: APIM-AHelevate_GRP (ID: 5767, Type: Surgical (Pattern Match))
+      ∩┐╜ URL: https://myorg.visualstudio.com//APIM_IntegrationAPIS/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_build?definitionId=5767
+
+Γ₧í∩╕Å  Step 4: Fetch Latest Successful Build...
+   ΓÅ│ Fetching latest successful build for Pipeline Definition ID: 5767 (APIM-AHelevate_GRP) in Project: 50ce1beb-fc81-42e1-8fa8-7cee30cf3197...
+   ∩┐╜ [ADO Request] GET https://myorg.visualstudio.com//APIM_IntegrationAPIS/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&resultFilter=succeeded&statusFilter=completed&$top=1&queryOrder=finishTimeDescending
+≡ƒôí [ADO Request] Latest Successful Build GET https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds?definitions=5767&resultFilter=succeeded&statusFilter=completed&$top=1&queryOrder=finishTimeDescending&api-version=7.1
+≡ƒôí [ADO Response] 200 OK
+      Γ£à Found latest successful build: ID 363954, Commit fd34b49
+   ∩┐╜ [ADO Response] Latest Build: {
+  "_links": {
+    "self": {
+      "href": "https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/Builds/363954"
+    },
+    "web": {
+      "href": "https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_build/results?buildId=363954"
+    },
+    "sourceVersionDisplayUri": {
+      "href": "https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/sources"
+    },
+    "timeline": {
+      "href": "https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/Timeline"
+    },
+    "badge": {
+      "href": "https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/status/5767"
+    }
+  },
+  "properties": {},
+  "tags": [],
+  "validationResults": [
+    {
+      "result": "warning",
+      "message": "The build number format string Set Default Value:.$(_buildNumber) generated a build number Set Default Value:. $(date:yyyyMMdd)$(rev:.r) which contains invalid character(s), is too long, or ends with '.'. The maximum length of a build number is 255 characters. Characters which are not allowed include '\"', '/', ':', '<', '>', '\\', '|', '?', '@', and '*'."
+    }
+  ],
+  "plans": [
+    {
+      "planId": "90e24a36-a152-41ad-9fb9-3fc224a77595"
+    }
+  ],
+  "templateParameters": {
+    "Environments": "- Dev\n- QA \n- Stage\n- Prod",
+    "SourceBranch": "master",
+    "DEST_SSISDB_PATH": "n/a",
+    "SOURCE_ISPAC_PATH": "n/a"
+  },
+  "triggerInfo": {},
+  "id": 363954,
+  "buildNumber": "20250702.1",
+  "status": "completed",
+  "result": "succeeded",
+  "queueTime": "2025-07-02T16:37:02.4025202Z",
+  "startTime": "2025-07-02T16:37:08.0014026Z",
+  "finishTime": "2025-08-01T16:46:28.2102997Z",
+  "url": "https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/Builds/363954",
+  "definition": {
+    "drafts": [],
+    "id": 5767,
+    "name": "APIM-AHelevate_GRP",
+    "url": "https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/Definitions/5767?revision=2",
+    "uri": "vstfs:///Build/Definition/5767",
+    "path": "\\APIM-AHelevate_GRP",
+    "type": "build",
+    "queueStatus": "enabled",
+    "revision": 2,
+    "project": {
+      "id": "50ce1beb-fc81-42e1-8fa8-7cee30cf3197",
+      "name": "APIM_IntegrationAPIS",
+      "description": "Created via Script on 03/27/2024 for TASK0687857 by sthokala",
+      "url": "https://myorg.visualstudio.com/_apis/projects/50ce1beb-fc81-42e1-8fa8-7cee30cf3197",
+      "state": "wellFormed",
+      "revision": 438275206,
+      "visibility": "private",
+      "lastUpdateTime": "2024-03-27T18:31:27.89Z"
+    }
+  },
+  "buildNumberRevision": 1,
+  "project": {
+    "id": "50ce1beb-fc81-42e1-8fa8-7cee30cf3197",
+    "name": "APIM_IntegrationAPIS",
+    "description": "Created via Script on 03/27/2024 for TASK0687857 by sthokala",
+    "url": "https://myorg.visualstudio.com/_apis/projects/50ce1beb-fc81-42e1-8fa8-7cee30cf3197",
+    "state": "wellFormed",
+    "revision": 438275206,
+    "visibility": "private",
+    "lastUpdateTime": "2024-03-27T18:31:27.89Z"
+  },
+  "uri": "vstfs:///Build/Build/363954",
+  "sourceBranch": "refs/heads/master",
+  "sourceVersion": "fd34b49cfdc4185849575bcf568b3c99b1e926fa",
+  "queue": {
+    "id": 9756,
+    "name": "VMSS-Runners-Linux",
+    "pool": {
+      "id": 72,
+      "name": "VMSS-Runners-Linux"
+    }
+  },
+  "priority": "normal",
+  "reason": "manual",
+  "requestedFor": {
+    "displayName": "Suneeth Kalluri",
+    "url": "https://spsprodeus23.vssps.visualstudio.com/A3e658ee6-86e7-40d5-8a09-9a88a29294e5/_apis/Identities/8e725f9c-ed52-64b8-bbab-61892fefaa19",
+    "_links": {
+      "avatar": {
+        "href": "https://myorg.visualstudio.com/_apis/GraphProfile/MemberAvatars/aad.OGU3MjVmOWMtZWQ1Mi03NGI4LWJiYWItNjE4OTJmZWZhYTE5"
+      }
+    },
+    "id": "8e725f9c-ed52-64b8-bbab-61892fefaa19",
+    "uniqueName": "suneeth.kalluri@myorg.com",
+    "imageUrl": "https://myorg.visualstudio.com/_apis/GraphProfile/MemberAvatars/aad.OGU3MjVmOWMtZWQ1Mi03NGI4LWJiYWItNjE4OTJmZWZhYTE5",
+    "descriptor": "aad.OGU3MjVmOWMtZWQ1Mi03NGI4LWJiYWItNjE4OTJmZWZhYTE5"
+  },
+  "requestedBy": {
+    "displayName": "Suneeth Kalluri",
+    "url": "https://spsprodeus23.vssps.visualstudio.com/A3e658ee6-86e7-40d5-8a09-9a88a29294e5/_apis/Identities/8e725f9c-ed52-64b8-bbab-61892fefaa19",
+    "_links": {
+      "avatar": {
+        "href": "https://myorg.visualstudio.com/_apis/GraphProfile/MemberAvatars/aad.OGU3MjVmOWMtZWQ1Mi03NGI4LWJiYWItNjE4OTJmZWZhYTE5"
+      }
+    },
+    "id": "8e725f9c-ed52-64b8-bbab-61892fefaa19",
+    "uniqueName": "suneeth.kalluri@myorg.com",
+    "imageUrl": "https://myorg.visualstudio.com/_apis/GraphProfile/MemberAvatars/aad.OGU3MjVmOWMtZWQ1Mi03NGI4LWJiYWItNjE4OTJmZWZhYTE5",
+    "descriptor": "aad.OGU3MjVmOWMtZWQ1Mi03NGI4LWJiYWItNjE4OTJmZWZhYTE5"
+  },
+  "lastChangedDate": "2025-08-01T16:46:28.333Z",
+  "lastChangedBy": {
+    "displayName": "Microsoft.VisualStudio.Services.TFS",
+    "url": "https://spsprodeus23.vssps.visualstudio.com/A3e658ee6-86e7-40d5-8a09-9a88a29294e5/_apis/Identities/00000002-0000-8888-8000-000000000000",
+    "_links": {
+      "avatar": {
+        "href": "https://myorg.visualstudio.com/_apis/GraphProfile/MemberAvatars/s2s.MDAwMDAwMDItMDAwMC04ODg4LTgwMDAtMDAwMDAwMDAwMDAwQDJjODk1OTA4LTA0ZTAtNDk1Mi04OWZkLTU0YjAwNDZkNjI4OA"
+      }
+    },
+    "id": "00000002-0000-8888-8000-000000000000",
+    "uniqueName": "00000002-0000-8888-8000-000000000000@2c895908-04e0-4952-89fd-54b0046d6288",
+    "imageUrl": "https://myorg.visualstudio.com/_apis/GraphProfile/MemberAvatars/s2s.MDAwMDAwMDItMDAwMC04ODg4LTgwMDAtMDAwMDAwMDAwMDAwQDJjODk1OTA4LTA0ZTAtNDk1Mi04OWZkLTU0YjAwNDZkNjI4OA",
+    "descriptor": "s2s.MDAwMDAwMDItMDAwMC04ODg4LTgwMDAtMDAwMDAwMDAwMDAwQDJjODk1OTA4LTA0ZTAtNDk1Mi04OWZkLTU0YjAwNDZkNjI4OA"
+  },
+  "orchestrationPlan": {
+    "planId": "90e24a36-a152-41ad-9fb9-3fc224a77595"
+  },
+  "logs": {
+    "id": 0,
+    "type": "Container",
+    "url": "https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_apis/build/builds/363954/logs"
+  },
+  "repository": {
+    "id": "37ea0919-7a95-4fc9-aa27-a949ef60ba00",
+    "type": "TfsGit",
+    "name": "DevOps.Foundational.Pipelines",
+    "url": "https://myorg.visualstudio.com/DevOps/_git/DevOps.Foundational.Pipelines",
+    "clean": null,
+    "checkoutSubmodules": false
+  },
+  "retainedByRelease": false,
+  "triggeredByBuild": null,
+  "appendCommitMessageToRunName": true
+}
+      ΓÜá∩╕Å  Build primary repo (devops.foundational.pipelines) != target (apim-ahelevate_grp). Scanning resources...
+
+   ∩┐╜ Latest Successful Build Found!
+      ∩┐╜ Build ID: 363954
+      ∩┐╜ Commit: fd34b49
+      ∩┐╜ Author: Suneeth Kalluri
+      ∩┐╜ Branch: master
+      ∩┐╜ Date: 2025-08-01T16:46:28.2102997Z
+      ∩┐╜ URL: https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_build/results?buildId=363954
+
+Γ£à Final Seed Data:
+{
+  "product": "AHelevate-GRP",
+  "repo": "APIM-AHelevate_GRP",
+  "repoUrl": "https://myorg.visualstudio.com/APIM_IntegrationAPIS/_git/APIM-AHelevate_GRP",
+  "project": "APIM_IntegrationAPIS",
+  "projectId": "50ce1beb-fc81-42e1-8fa8-7cee30cf3197",
+  "pipeline": "APIM-AHelevate_GRP",
+  "pipelineId": 5767,
+  "pipelineUrl": "https://myorg.visualstudio.com//APIM_IntegrationAPIS/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_build?definitionId=5767",
+  "deployments": {
+    "DEV": {
+      "hash": "fd34b49cfdc4185849575bcf568b3c99b1e926fa",
+      "date": "2025-08-01T16:46:28.2102997Z",
+      "branch": "master",
+      "author": "Suneeth Kalluri",
+      "message": "No message",
+      "url": "https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_build/results?buildId=363954"
+    },
+    "QA": {
+      "hash": "fd34b49cfdc4185849575bcf568b3c99b1e926fa",
+      "date": "2025-08-01T16:46:28.2102997Z",
+      "branch": "master",
+      "author": "Suneeth Kalluri",
+      "message": "No message",
+      "url": "https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_build/results?buildId=363954"
+    },
+    "STAGE": {
+      "hash": "fd34b49cfdc4185849575bcf568b3c99b1e926fa",
+      "date": "2025-08-01T16:46:28.2102997Z",
+      "branch": "master",
+      "author": "Suneeth Kalluri",
+      "message": "No message",
+      "url": "https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_build/results?buildId=363954"
+    },
+    "PROD": {
+      "hash": "fd34b49cfdc4185849575bcf568b3c99b1e926fa",
+      "date": "2025-08-01T16:46:28.2102997Z",
+      "branch": "master",
+      "author": "Suneeth Kalluri",
+      "message": "No message",
+      "url": "https://myorg.visualstudio.com/50ce1beb-fc81-42e1-8fa8-7cee30cf3197/_build/results?buildId=363954"
+    }
+  }
+}
+
+∩┐╜ JSON Output: C:\APIM_self_service_design\swagger-scorer-main\apim-database\debug-output-ahelevategrp.json
+∩┐╜ CSV Output: C:\APIM_self_service_design\swagger-scorer-main\apim-database\debug-output-ahelevategrp.csv
+
+Γ£à Debug complete! Results saved to JSON and CSV files.
