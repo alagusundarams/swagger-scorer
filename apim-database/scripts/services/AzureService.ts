@@ -1047,11 +1047,12 @@ export class AzureService {
         definitionId: number,
         stageNames: string[],
         pat: string,
-        baseUrl: string = 'https://dev.azure.com'
-    ): Promise<Record<string, { hash: string; date: string }>> {
-        const results: Record<string, { hash: string; date: string }> = {};
+        baseUrl: string = 'https://dev.azure.com',
+        bearerToken?: string
+    ): Promise<Record<string, { hash: string; date: string; buildId?: number }>> {
+        const results: Record<string, { hash: string; date: string; buildId?: number }> = {};
         const remainingStages = new Set(stageNames.map(s => s.toLowerCase()));
-        const authHeader = this.getAuthHeader(pat);
+        const authHeader = this.getAuthHeader(pat, bearerToken);
 
         console.log(`      🔎 [Deep Scan] Searching for stages: [${stageNames.join(', ')}] in Pipeline ${definitionId}...`);
 
@@ -1060,7 +1061,7 @@ export class AzureService {
 
         try {
             for (let offset = 0; offset < maxBuilds && remainingStages.size > 0; offset += pageSize) {
-                const builds = await this.fetchBuildsByDefinition(org, project, definitionId, pat, baseUrl, undefined, pageSize, offset);
+                const builds = await this.fetchBuildsByDefinition(org, project, definitionId, pat, baseUrl, bearerToken, pageSize, offset);
                 if (builds.length === 0) break;
 
                 console.log(`      ⏳ [Deep Scan] Scanning builds ${offset + 1} to ${offset + builds.length}...`);
@@ -1081,7 +1082,8 @@ export class AzureService {
                         if (stage) {
                             results[stageName.toUpperCase()] = {
                                 hash: build.sourceVersion || 'unknown',
-                                date: stage.finishTime || build.finishTime
+                                date: stage.finishTime || build.finishTime,
+                                buildId: build.id
                             };
                             remainingStages.delete(stageName);
                             console.log(`      ✅ [HIT] Found ${stageName.toUpperCase()} in Build ${build.id} (${build.sourceVersion?.substring(0, 7)})`);

@@ -351,147 +351,71 @@ async function main() {
 
                 const envsToSync = targetEnv ? [targetEnv] : prod.environments;
 
-                // --- PHASE 3: DEPLOYMENT EXTRACTION (SURGICAL) ---
+                // --- PHASE 3: DEPLOYMENT EXTRACTION (SURGICAL PER-ENVIRONMENT) ---
                 const pipelineProject = (matchedPipeline as any).project?.id || (matchedPipeline as any).project?.name || projectId;
                 if (pipelineProject !== projectId) {
                     if (verbose) console.log(`      ℹ️  Pipeline project (${pipelineProject}) != Repo project (${projectId}). Switching context.`);
                 }
 
-                if (verbose) console.log(`   ⏳ Fetching latest successful build for Pipeline: ${matchedPipeline.name} (ID: ${matchedPipeline.id})...`);
+                if (verbose) console.log(`   ⏳ Scanning build history for environment-specific deployments in project ${pipelineProject}...`);
 
-                let latestBuild: any = null;
+                // Deep scan for current regions
+                const stageResults = await AzureService.fetchLatestStageResults(
+                    devops.organization,
+                    pipelineProject,
+                    matchedPipeline.id,
+                    envsToSync,
+                    devops.pat,
+                    devops.baseUrl,
+                    bearerToken
+                );
 
-                if ((matchedPipeline as any).isRelease) {
-                    const releases = await AzureService.fetchADOReleases(devops.organization, pipelineProject, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken);
-                    const successfulRelease = releases.find(r => r.environments?.some(e => ['succeeded', 'partiallysucceeded'].includes((e.status || '').toLowerCase())));
-                    if (successfulRelease) {
-                        latestBuild = {
-                            id: successfulRelease.id,
-                            sourceVersion: successfulRelease.artifacts?.[0]?.definitionReference?.version?.id,
-                            sourceBranch: successfulRelease.artifacts?.[0]?.definitionReference?.branch?.name || 'unknown',
-                            requestedFor: successfulRelease.createdBy,
-                            finishTime: successfulRelease.modifiedOn,
-                            _links: successfulRelease._links,
-                            project: successfulRelease.project || (matchedPipeline as any).project
-                        };
+                // Enrich each environment result with full build info (Author, Branch, Message, Multi-Repo)
+                const buildDetailsCache = new Map<number, any>();
+
+                for (const envName of envsToSync) {
+                    const result = stageResults[envName.toUpperCase()];
+                    if (!result || !result.buildId) continue;
+
+                    if (!buildDetailsCache.has(result.buildId)) {
+                        if (verbose) console.log(`      📡 Fetching full build details (ID: ${result.buildId}) from project ${pipelineProject}...`);
+                        const details = await AzureService.fetchADOBuild(devops.organization, pipelineProject, result.buildId, devops.pat, devops.baseUrl, bearerToken);
+                        buildDetailsCache.set(result.buildId, details);
                     }
-                } else {
-                    latestBuild = await AzureService.fetchLatestSuccessfulBuild(
-                        devops.organization,
-                        pipelineProject,
-                        matchedPipeline.id,
-                        devops.pat,
-                        devops.baseUrl,
-                        bearerToken
-                    );
-                }
 
-                if (latestBuild) {
-                    let commitHash = latestBuild.sourceVersion;
+                    const details = buildDetailsCache.get(result.buildId);
+                    if (details) {
+                        let commitHash = details.sourceVersion;
 
-                    // --- MULTI-REPO RESOLUTION ---
-                    const buildPrimaryRepo = latestBuild.repository?.name?.toLowerCase();
-                    const targetRepoName = repo.name.toLowerCase();
+                        // Multi-repo resolution
+                        const buildPrimaryRepo = details.repository?.name?.toLowerCase();
+                        const targetRepoName = repo.name.toLowerCase();
 
-                    if (buildPrimaryRepo && buildPrimaryRepo !== targetRepoName) {
-                        if (verbose) console.log(`      ⚠️  Build primary repo (${buildPrimaryRepo}) != target (${targetRepoName}). Scanning resources...`);
-                        if (latestBuild.resources?.repositories) {
-                            const targetRes = Object.values(latestBuild.resources.repositories).find((r: any) =>
-                                r.repository?.name?.toLowerCase() === targetRepoName ||
-                                r.repository?.id === repo.id
-                            );
-                            if ((targetRes as any)?.version) {
-                                commitHash = (targetRes as any).version;
+                        if (buildPrimaryRepo && buildPrimaryRepo !== targetRepoName) {
+                            if (verbose) console.log(`      ⚠️  [${envName}] Build primary repo (${buildPrimaryRepo}) != target (${targetRepoName}). Checking resources...`);
+                            if (details.resources?.repositories) {
+                                const targetRes = Object.values(details.resources.repositories).find((r: any) =>
+                                    r.repository?.name?.toLowerCase() === targetRepoName ||
+                                    r.repository?.id === repo.id
+                                );
+                                if ((targetRes as any)?.version) commitHash = (targetRes as any).version;
                             }
                         }
-                    }
 
-                    if (commitHash && commitHash !== 'unknown') {
-                        const author = latestBuild.requestedFor?.displayName ||
-                            latestBuild.requestedBy?.displayName ||
-                            latestBuild.lastChangedBy?.displayName || 'Unknown';
-
-                        const branch = (latestBuild.sourceBranch || 'unknown').replace('refs/heads/', '');
-                        const message = latestBuild.triggerInfo?.['ci.message'] ||
-                            latestBuild.sourceVersionMessage ||
-                            latestBuild.comment || 'No message';
-
-                        const url = latestBuild._links?.web?.href;
-                        const buildDate = latestBuild.finishTime || latestBuild.queueTime || new Date().toISOString();
-
-                        if (verbose) console.log(`      🎯 All Envs: Using Build ${latestBuild.id} | Hash: ${commitHash.substring(0, 7)} | Auth: ${author}`);
-
-                        // Apply to all required environments
-                        for (const envName of envsToSync) {
+                        if (commitHash && commitHash !== 'unknown') {
                             meta.deployments[envName] = {
                                 hash: commitHash,
-                                date: buildDate,
-                                branch,
-                                author,
-                                message,
-                                url
+                                date: result.date || details.finishTime || details.queueTime || new Date().toISOString(),
+                                branch: (details.sourceBranch || 'unknown').replace('refs/heads/', ''),
+                                author: details.requestedFor?.displayName || details.requestedBy?.displayName || 'Unknown',
+                                message: details.triggerInfo?.['ci.message'] || details.sourceVersionMessage || details.comment || 'No message',
+                                url: details._links?.web?.href
                             };
+                            if (verbose) console.log(`      🎯 ${envName.padEnd(5)}: Match! Build ${result.buildId} -> ${commitHash.substring(0, 7)}`);
                         }
                     }
                 }
 
-                // Fallback Scanner (Timeline Search) if results missing
-                const missingEnvs = envsToSync.filter(e => !meta.deployments[e]);
-                if (missingEnvs.length > 0) {
-                    if (verbose) console.log(`   🔍 Missed ${missingEnvs.length} envs. Falling back to timeline scan (Project: ${pipelineProject})...`);
-                    const timelineCache = new Map<number, any[]>();
-                    let skip = 0;
-                    const pageSize = 20;
-
-                    while (Object.keys(meta.deployments).length < envsToSync.length && skip < 100) {
-                        const builds = await AzureService.fetchBuildsByDefinition(devops.organization, pipelineProject, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken, pageSize, skip);
-                        if (builds.length === 0) break;
-
-                        for (const run of builds) {
-                            if (Object.keys(meta.deployments).length === envsToSync.length) break;
-
-                            const runProject = run.project?.id || run.project?.name || pipelineProject;
-                            if (!timelineCache.has(run.id)) {
-                                timelineCache.set(run.id, await AzureService.fetchPipelineRunTimeline(devops.organization, runProject, run.id, devops.pat, devops.baseUrl, bearerToken));
-                            }
-                            const timeline = timelineCache.get(run.id)!;
-
-                            for (const envName of envsToSync) {
-                                if (meta.deployments[envName]) continue;
-
-                                const record = timeline.find((t: any) => {
-                                    const nameMatches = sanitize(t.name).includes(sanitize(envName));
-                                    const isSuccess = ['succeeded', 'partiallysucceeded'].includes((t.result || '').toLowerCase());
-                                    return nameMatches && isSuccess && (t.status || '').toLowerCase() === 'completed';
-                                });
-
-                                if (record) {
-                                    let hash = run.sourceVersion || 'unknown';
-
-                                    // Multi-repo fix for scan
-                                    if (run.repository?.name?.toLowerCase() !== repo.name.toLowerCase()) {
-                                        if (run.resources?.repositories) {
-                                            const targetRes = Object.values(run.resources.repositories).find((r: any) =>
-                                                r.repository?.name?.toLowerCase() === repo.name.toLowerCase()
-                                            );
-                                            if ((targetRes as any)?.version) hash = (targetRes as any).version;
-                                        }
-                                    }
-
-                                    meta.deployments[envName] = {
-                                        hash,
-                                        date: record.finishTime || run.finishedDate || new Date().toISOString(),
-                                        branch: (run.sourceBranch || 'unknown').replace('refs/heads/', ''),
-                                        author: run.requestedFor?.displayName || 'Unknown',
-                                        message: run.triggerInfo?.['ci.message'] || 'No message',
-                                        url: run._links?.web?.href
-                                    };
-                                }
-                            }
-                        }
-                        skip += pageSize;
-                    }
-                }
 
                 results.push(meta);
                 if (verbose) console.log(`   ✅ ${prod.name}: Synced ${Object.keys(meta.deployments).length}/${envsToSync.length} environments.`);

@@ -370,224 +370,75 @@ async function runDebug() {
         console.log(`      🔗 URL: ${matchedPipeline._links?.web?.href || 'N/A'}`);
     }
 
-    // --- STEP 4: FETCH LATEST SUCCESSFUL BUILD ---
-    console.log(`\n➡️  Step 4: Fetch Latest Successful Build...`);
+    // --- STEP 4: FETCH PER-ENVIRONMENT SUCCESSFUL BUILDS ---
+    console.log(`\n➡️  Step 4: Fetch Per-Environment Successful Builds...`);
     const envsToSync = ['DEV', 'QA', 'STAGE', 'PROD'];
     const deployments: Record<string, { hash: string; date: string; branch?: string; author?: string; message?: string; url?: string }> = {};
-    const timelineCache = new Map<number, any[]>();
 
     const pipelineProject = (matchedPipeline as any).project?.id || (matchedPipeline as any).project?.name || projectIdentifier;
     if (pipelineProject !== projectIdentifier) {
         console.log(`      ℹ️  Pipeline belongs to a different project: ${pipelineProject}. Switching context for Step 4.`);
     }
 
-    console.log(`   ⏳ Fetching latest successful build for Pipeline Definition ID: ${matchedPipeline.id} (${matchedPipeline.name}) in Project: ${pipelineProject}...`);
-    const buildsApiUrl = `${devops.baseUrl}/${devops.organization}/${encodeURIComponent(pipelineProject)}/_apis/build/builds?definitions=${matchedPipeline.id}&resultFilter=succeeded&statusFilter=completed&$top=1&queryOrder=finishTimeDescending`;
-    console.log(`   📡 [ADO Request] GET ${buildsApiUrl}`);
+    console.log(`   ⏳ Scanning build history for environment-specific deployments in project ${pipelineProject}...`);
 
-    let latestBuild: any = null;
+    // Deep scan for current regions
+    const stageResults = await AzureService.fetchLatestStageResults(
+        devops.organization,
+        pipelineProject,
+        matchedPipeline.id,
+        envsToSync,
+        devops.pat,
+        devops.baseUrl,
+        bearerToken
+    );
 
-    if ((matchedPipeline as any).isRelease) {
-        // Handle Classic Release Pipelines separately
-        const releasesUrl = `${devops.baseUrl}/${devops.organization}/${encodeURIComponent(pipelineProject)}/_apis/release/releases?definitionId=${matchedPipeline.id}`;
-        console.log(`      📡 [ADO Request] [Classic Release] GET ${releasesUrl}`);
-        const releases = await AzureService.fetchADOReleases(devops.organization, pipelineProject, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken);
-        console.log(`      📦 [ADO Response]:`, JSON.stringify(releases, null, 2));
-        const successfulRelease = releases.find(r => r.environments?.some(e => e.status?.toLowerCase() === 'succeeded'));
-        if (successfulRelease) {
-            latestBuild = {
-                id: successfulRelease.id,
-                sourceVersion: successfulRelease.artifacts?.[0]?.definitionReference?.version?.id,
-                sourceBranch: successfulRelease.artifacts?.[0]?.definitionReference?.branch?.name || 'unknown',
-                requestedFor: successfulRelease.createdBy,
-                finishTime: successfulRelease.modifiedOn,
-                _links: successfulRelease._links,
-                project: successfulRelease.project || (matchedPipeline as any).project
-            };
+    // Enrich each environment result with full build info (Author, Branch, Message, Multi-Repo)
+    const buildDetailsCache = new Map<number, any>();
+
+    for (const envName of envsToSync) {
+        const result = stageResults[envName.toUpperCase()];
+        if (!result || !result.buildId) continue;
+
+        if (!buildDetailsCache.has(result.buildId)) {
+            console.log(`      📡 Fetching full build details (ID: ${result.buildId}) from project ${pipelineProject}...`);
+            const details = await AzureService.fetchADOBuild(devops.organization, pipelineProject, result.buildId, devops.pat, devops.baseUrl, bearerToken);
+            buildDetailsCache.set(result.buildId, details);
         }
-    } else {
-        // Use the new efficient Builds API for YAML pipelines
-        latestBuild = await AzureService.fetchLatestSuccessfulBuild(
-            devops.organization,
-            pipelineProject,
-            matchedPipeline.id,
-            devops.pat,
-            devops.baseUrl,
-            bearerToken
-        );
-        if (latestBuild) {
-            console.log(`   📦 [ADO Response] Latest Build:`, JSON.stringify(latestBuild, null, 2));
-        } else {
-            console.log(`   📦 [ADO Response]: No build found (null)`);
-        }
-    }
 
-    if (latestBuild) {
-        let commitHash = latestBuild.sourceVersion;
+        const details = buildDetailsCache.get(result.buildId);
+        if (details) {
+            let commitHash = details.sourceVersion;
 
-        // --- MULTI-REPO RESOLUTION ---
-        // If the build's primary repo doesn't match our target, search in resources
-        const primaryRepoName = latestBuild.repository?.name?.toLowerCase();
-        const targetRepoNameMatch = finalRepo.name.toLowerCase();
-        const targetRepoId = finalRepo.id;
+            // Multi-repo resolution
+            const buildPrimaryRepo = details.repository?.name?.toLowerCase();
+            const targetRepoName = finalRepo.name.toLowerCase();
 
-        if (primaryRepoName && primaryRepoName !== targetRepoNameMatch) {
-            console.log(`      ⚠️  Build primary repo (${primaryRepoName}) != target (${targetRepoNameMatch}). Scanning resources...`);
-            if (latestBuild.resources?.repositories) {
-                const repoResources = Object.values(latestBuild.resources.repositories);
-                const targetRes = repoResources.find((r: any) =>
-                    r.repository?.name?.toLowerCase() === targetRepoNameMatch ||
-                    r.repository?.id === targetRepoId
-                );
-                if ((targetRes as any)?.version) {
-                    commitHash = (targetRes as any).version;
-                    console.log(`      🎯 [Multi-Repo] Found version from target repository (${targetRepoNameMatch}): ${commitHash}`);
+            if (buildPrimaryRepo && buildPrimaryRepo !== targetRepoName) {
+                console.log(`      ⚠️  [${envName}] Build primary repo (${buildPrimaryRepo}) != target (${targetRepoName}). Checking resources...`);
+                if (details.resources?.repositories) {
+                    const targetRes = Object.values(details.resources.repositories).find((r: any) =>
+                        r.repository?.name?.toLowerCase() === targetRepoName ||
+                        r.repository?.id === finalRepo.id
+                    );
+                    if ((targetRes as any)?.version) commitHash = (targetRes as any).version;
                 }
             }
-        }
 
-        if (commitHash && commitHash !== 'unknown') {
-            const author = latestBuild.requestedFor?.displayName ||
-                latestBuild.requestedBy?.displayName ||
-                latestBuild.lastChangedBy?.displayName || 'Unknown';
-
-            const rawBranch = latestBuild.sourceBranch || 'unknown';
-            const branch = rawBranch.replace('refs/heads/', '');
-
-            const message = latestBuild.triggerInfo?.['ci.message'] ||
-                latestBuild.sourceVersionMessage ||
-                latestBuild.comment ||
-                latestBuild.description || 'No message';
-
-            const url = latestBuild._links?.web?.href;
-            const buildDate = latestBuild.finishTime || latestBuild.queueTime || new Date().toISOString();
-
-            console.log(`\n   🎯 Latest Successful Build Found!`);
-            console.log(`      📦 Build ID: ${latestBuild.id}`);
-            console.log(`      🔗 Commit: ${commitHash.substring(0, 7)}`);
-            console.log(`      👤 Author: ${author}`);
-            console.log(`      🌿 Branch: ${branch}`);
-            console.log(`      📅 Date: ${buildDate}`);
-            console.log(`      🔗 URL: ${url || 'N/A'}`);
-
-            // Apply same commit hash to ALL environments (same deployment across regions)
-            for (const envName of envsToSync) {
+            if (commitHash && commitHash !== 'unknown') {
                 deployments[envName] = {
                     hash: commitHash,
-                    date: buildDate,
-                    branch,
-                    author,
-                    message,
-                    url
+                    date: result.date || details.finishTime || details.queueTime || new Date().toISOString(),
+                    branch: (details.sourceBranch || 'unknown').replace('refs/heads/', ''),
+                    author: details.requestedFor?.displayName || details.requestedBy?.displayName || 'Unknown',
+                    message: details.triggerInfo?.['ci.message'] || details.sourceVersionMessage || details.comment || 'No message',
+                    url: details._links?.web?.href
                 };
+                console.log(`      🎯 ${envName.padEnd(5)}: Match! Build ${result.buildId} -> ${commitHash.substring(0, 7)}`);
             }
-        } else {
-            console.warn(`      ⚠️  Build found but could not extract commit hash.`);
-        }
-    } else {
-        console.warn(`      ⚠️  No successful builds found for this pipeline.`);
-    }
-
-    const missingEnvs = envsToSync.filter(e => !deployments[e]);
-    if (missingEnvs.length > 0) {
-        console.log(`   🔍 Missed ${missingEnvs.length} envs. Falling back to paginated timeline scan in project ${pipelineProject} (Depth: 100)...`);
-        let skip = 0;
-        const pageSize = 20;
-        const maxDepth = 100;
-
-        while (Object.keys(deployments).length < envsToSync.length && skip < maxDepth) {
-            const scanUrl = `${devops.baseUrl}/${devops.organization}/${encodeURIComponent(pipelineProject)}/_apis/build/builds?definitions=${matchedPipeline.id}&$top=${pageSize}&$skip=${skip}`;
-            console.log(`   📡 [ADO Request] [Scan Page ${Math.floor(skip / pageSize) + 1}] GET ${scanUrl}`);
-            const builds = await AzureService.fetchBuildsByDefinition(devops.organization, pipelineProject, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken, pageSize, skip);
-            console.log(`   📦 [ADO Response] [Scan] Page ${Math.floor(skip / pageSize) + 1}: Found ${builds.length} builds`);
-
-            if (builds.length === 0 && skip === 0) {
-                console.log(`   ⚠️ No builds found for definition in project ${pipelineProject}. Trying broader search...`);
-                let broadBuilds = await AzureService.fetchADOBuilds(devops.organization, pipelineProject, (matchedPipeline as any).repositoryId || primaryRepoId, devops.pat, devops.baseUrl, bearerToken);
-                if (broadBuilds.length === 0) {
-                    broadBuilds = await AzureService.fetchADOBuilds(devops.organization, pipelineProject, '', devops.pat, devops.baseUrl, bearerToken);
-                }
-                if (broadBuilds.length > 0) builds.push(...broadBuilds.slice(0, 20));
-            }
-            if (builds.length === 0) break;
-
-            for (const run of builds) {
-                if (Object.keys(deployments).length === envsToSync.length) break;
-
-                // Determine build project for timeline fetch
-                const runProject = run.project?.id || run.project?.name || pipelineProject;
-
-                if (!timelineCache.has(run.id)) {
-                    const timelineUrl = `${devops.baseUrl}/${devops.organization}/${encodeURIComponent(runProject)}/_apis/build/builds/${run.id}/timeline`;
-                    console.log(`      📡 [ADO Request] [Timeline] GET ${timelineUrl}`);
-                    const timeline = await AzureService.fetchPipelineRunTimeline(devops.organization, runProject, run.id, devops.pat, devops.baseUrl, bearerToken);
-                    console.log(`      📦 [ADO Response] [Timeline] Build ${run.id}: ${timeline.length} records`);
-                    timelineCache.set(run.id, timeline);
-                }
-                const timeline = timelineCache.get(run.id)!;
-                if (!timeline || timeline.length === 0) continue;
-
-                for (const envName of envsToSync) {
-                    if (deployments[envName]) continue;
-
-                    let record = timeline.find((t: any) => {
-                        const type = (t.type || '').toLowerCase();
-                        const isContainer = ['stage', 'job', 'phase'].includes(type);
-                        const nameMatches = sanitize(t.name).includes(sanitize(envName));
-                        const isSuccess = ['succeeded', 'partiallysucceeded'].includes((t.result || '').toLowerCase());
-                        return isContainer && nameMatches && isSuccess && (t.status || '').toLowerCase() === 'completed';
-                    });
-
-                    if (!record) {
-                        record = timeline.find((t: any) => {
-                            const nameMatches = sanitize(t.name).includes(sanitize(envName));
-                            const isSuccess = ['succeeded', 'partiallysucceeded'].includes((t.result || '').toLowerCase());
-                            return nameMatches && isSuccess && (t.status || '').toLowerCase() === 'completed';
-                        });
-                        if (record) console.log(`      💡 [Scan] Found non-container match for '${envName}' (${record.type}) in Build ${run.id}`);
-                    }
-
-                    if (record) {
-                        let hash = run.sourceVersion || 'unknown';
-
-                        // --- MULTI-REPO SCANNER FIX ---
-                        if (run.repository?.name?.toLowerCase() !== finalRepo.name.toLowerCase()) {
-                            console.log(`      ⚠️  Build ${run.id} primary repo (${run.repository?.name}) != target (${finalRepo.name}). Checking resources...`);
-                            // Since we don't have full details in the build list usually, we might need a fetchADOBuild here or rely on run.resources
-                            // but usually run list doesn't have it. Let's try to find it if possible.
-                            if (run.resources?.repositories) {
-                                const targetRes = Object.values(run.resources.repositories).find((r: any) =>
-                                    r.repository?.name?.toLowerCase() === finalRepo.name.toLowerCase() ||
-                                    r.repository?.id === finalRepo.id
-                                );
-                                if ((targetRes as any)?.version) {
-                                    hash = (targetRes as any).version;
-                                    console.log(`      🎯 [Multi-Repo Scan] Found version in run resources: ${hash}`);
-                                }
-                            }
-                        }
-
-                        const author = run.requestedFor?.displayName || run.requestedBy?.displayName || 'Unknown';
-                        const branch = (run.sourceBranch || 'unknown').replace('refs/heads/', '');
-                        const message = run.triggerInfo?.['ci.message'] || run.comment || 'No message';
-
-                        deployments[envName] = {
-                            hash,
-                            date: record.finishTime || run.finishedDate || new Date().toISOString(),
-                            branch,
-                            author,
-                            message,
-                            url: run._links?.web?.href
-                        };
-                        console.log(`      📍 ${envName.padEnd(5)}: Scanner Hit! Captured ${hash.substring(0, 7)}`);
-                        console.log(`         👤 Author: ${author}`);
-                        console.log(`         🌿 Branch: ${branch}`);
-                    }
-                }
-            }
-            skip += pageSize;
         }
     }
+
 
     // --- FINAL OUTPUT ---
     console.log(`\n✅ Final Seed Data:`);
