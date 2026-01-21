@@ -83,13 +83,28 @@ export async function extractADOMetadata(products: any[], targetProduct?: string
                 const latestBuild = await AzureService.fetchLatestSuccessfulBuild(devops.organization, pipelineProject, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken);
                 if (latestBuild) {
                     let commitHash = latestBuild.sourceVersion;
-                    if (latestBuild.repository?.name?.toLowerCase() !== repo.name.toLowerCase()) {
+                    const buildRepoId = latestBuild.repository?.id;
+                    const targetRepoId = repo.id;
+
+                    if (verbose) console.log(`      🔍 Comparing Repo IDs: Build(${buildRepoId}) vs Target(${targetRepoId})`);
+
+                    if (buildRepoId !== targetRepoId) {
+                        if (verbose) console.log(`      ⚠️  Multi-repo detected (IDs differ). Fetching build details...`);
                         const details = await AzureService.fetchADOBuild(devops.organization, latestBuild.project?.id || pipelineProject, latestBuild.id, devops.pat, devops.baseUrl, bearerToken);
                         if (details?.resources?.repositories) {
-                            const targetRes = Object.values(details.resources.repositories).find((r: any) => r.repository?.name?.toLowerCase() === repo.name.toLowerCase());
-                            if ((targetRes as any)?.version) commitHash = (targetRes as any).version;
+                            // Search by ID first, then fallback to Name
+                            const targetRes = Object.values(details.resources.repositories).find((r: any) =>
+                                r.repository?.id === targetRepoId || r.repository?.name?.toLowerCase() === repo.name.toLowerCase()
+                            );
+                            if ((targetRes as any)?.version) {
+                                commitHash = (targetRes as any).version;
+                                if (verbose) console.log(`         ✅ Resolved to target hash from resources: ${commitHash.substring(0, 7)}`);
+                            } else {
+                                if (verbose) console.warn(`         ⚠️  Target repo not found in build resources. Using build sourceVersion.`);
+                            }
                         }
                     }
+
                     if (commitHash && commitHash !== 'unknown') {
                         baselineData = {
                             hash: commitHash,
@@ -119,10 +134,15 @@ export async function extractADOMetadata(products: any[], targetProduct?: string
                     const build = deploy.build || deploy.owner;
                     if (build) {
                         let commitHash = build.sourceVersion;
-                        if (build.repository?.name?.toLowerCase() !== repo.name.toLowerCase()) {
+                        const buildRepoId = build.repository?.id;
+                        const targetRepoId = repo.id;
+
+                        if (buildRepoId !== targetRepoId) {
                             const details = await AzureService.fetchADOBuild(devops.organization, build.project?.id || pipelineProject, build.id, devops.pat, devops.baseUrl, bearerToken);
                             if (details?.resources?.repositories) {
-                                const targetRes = Object.values(details.resources.repositories).find((r: any) => r.repository?.name?.toLowerCase() === repo.name.toLowerCase());
+                                const targetRes = Object.values(details.resources.repositories).find((r: any) =>
+                                    r.repository?.id === targetRepoId || r.repository?.name?.toLowerCase() === repo.name.toLowerCase()
+                                );
                                 if ((targetRes as any)?.version) commitHash = (targetRes as any).version;
                             }
                         }

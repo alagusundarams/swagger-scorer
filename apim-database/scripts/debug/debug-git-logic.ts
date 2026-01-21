@@ -245,12 +245,23 @@ async function runDebug() {
         const latestBuild = await AzureService.fetchLatestSuccessfulBuild(devops.organization, pipelineProject, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken);
         if (latestBuild) {
             let commitHash = latestBuild.sourceVersion;
+            const buildRepoId = latestBuild.repository?.id;
+            const targetRepoId = finalRepo.id;
+
+            console.log(`      🔍 Comparing Repo IDs: Build(${buildRepoId}) vs Target(${targetRepoId})`);
+
             // Multi-repo resolution for baseline
-            if (latestBuild.repository?.name?.toLowerCase() !== finalRepo.name.toLowerCase()) {
+            if (buildRepoId !== targetRepoId) {
+                console.log(`      ⚠️  Multi-repo detected. Resolving version for target repo...`);
                 const details = await AzureService.fetchADOBuild(devops.organization, latestBuild.project?.id || pipelineProject, latestBuild.id, devops.pat, devops.baseUrl, bearerToken);
                 if (details?.resources?.repositories) {
-                    const targetRes = Object.values(details.resources.repositories).find((r: any) => r.repository?.name?.toLowerCase() === finalRepo.name.toLowerCase());
-                    if ((targetRes as any)?.version) commitHash = (targetRes as any).version;
+                    const targetRes = Object.values(details.resources.repositories).find((r: any) =>
+                        r.repository?.id === targetRepoId || r.repository?.name?.toLowerCase() === finalRepo.name.toLowerCase()
+                    );
+                    if ((targetRes as any)?.version) {
+                        commitHash = (targetRes as any).version;
+                        console.log(`         ✅ Resolved to target hash: ${commitHash.substring(0, 7)}`);
+                    }
                 }
             }
             if (commitHash && commitHash !== 'unknown') {
@@ -290,12 +301,20 @@ async function runDebug() {
             const build = deploy.build || deploy.owner;
             if (build) {
                 let commitHash = build.sourceVersion;
-                if (build.repository?.name?.toLowerCase() !== finalRepo.name.toLowerCase()) {
+                const buildRepoId = build.repository?.id;
+                const targetRepoId = finalRepo.id;
+
+                if (buildRepoId !== targetRepoId) {
                     console.log(`      ⚠️  Multi-repo detected for ${envName}. Resolving version...`);
                     const details = await AzureService.fetchADOBuild(devops.organization, build.project?.id || pipelineProject, build.id, devops.pat, devops.baseUrl, bearerToken);
                     if (details?.resources?.repositories) {
-                        const targetRes = Object.values(details.resources.repositories).find((r: any) => r.repository?.name?.toLowerCase() === finalRepo.name.toLowerCase());
-                        if ((targetRes as any)?.version) commitHash = (targetRes as any).version;
+                        const targetRes = Object.values(details.resources.repositories).find((r: any) =>
+                            r.repository?.id === targetRepoId || r.repository?.name?.toLowerCase() === finalRepo.name.toLowerCase()
+                        );
+                        if ((targetRes as any)?.version) {
+                            commitHash = (targetRes as any).version;
+                            console.log(`         ✅ Resolved to target hash: ${commitHash.substring(0, 7)}`);
+                        }
                     }
                 }
 
@@ -308,12 +327,11 @@ async function runDebug() {
                         message: build.triggerInfo?.['ci.message'] || 'No message',
                         url: build._links?.web?.href
                     };
-                    console.log(`      🎯 ${envName.padEnd(5)}: Strike Hit! Precision match: ${commitHash.substring(0, 7)}`);
+                    console.log(`      🎯 Strike Hit: ${envName} -> ${commitHash.substring(0, 7)}`);
                     continue;
                 }
             }
         }
-
         // 3. Fallback: Only Deep Scan if Baseline is missing
         if (!baselineData) {
             console.log(`      ⚠️  No surgical strike match and no baseline. Falling back to deep scan...`);
