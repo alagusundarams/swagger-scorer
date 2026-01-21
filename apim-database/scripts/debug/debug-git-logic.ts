@@ -230,152 +230,97 @@ async function runDebug() {
     const matchedPipeline = pipelineCandidates[0].pipe;
     console.log(`   ✅ Best Match: ${matchedPipeline.name} (ID: ${matchedPipeline.id})`);
 
-    // --- STEP 4: HYBRID DEPLOYMENT EXTRACTION ---
-    console.log(`\n➡️  Step 4: Fetch Latest Successful Deployments (Hybrid Mode)...`);
-    const envsToSync = ['DEV', 'QA', 'STAGE', 'PROD'];
-    const deployments: Record<string, { hash: string; date: string; branch?: string; author?: string; message?: string; url?: string }> = {};
+    // --- STEP 4: HYBRID DEPLOYMENT EXTRACTION (Environment-First) ---
+    console.log(`\n⏳ Step 4: Discovering Latest Deployments per Environment...`);
+
+    // Choose environments based on args
+    const envsToSync = envArg === 'ALL' ? ['DEV', 'QA', 'STAGE', 'PROD'] : [envArg];
+    const deployments: Record<string, { hash: string; date: string; branch?: string; author?: string; message?: string; url?: string; hashes?: Record<string, string>; discoverySource?: string }> = {};
     const pipelineProject = (matchedPipeline as any).project?.id || (matchedPipeline as any).project?.name || projectIdentifier;
 
-    // 4.1: CAPTURE BASELINE HASH (Fastest & Guaranteed)
-    console.log(`   ⏳ Step 4.1: Capturing Baseline Global Hash from Pipeline...`);
-    let baselineHash: string | undefined;
-    let baselineData: any | undefined;
+    const targetRepoId = finalRepo.id;
+    console.log(`   🎯 Target Project Repository: ${finalRepo.name} (ID: ${targetRepoId})`);
+    console.log(`   📂 Scanning Environments: ${envsToSync.join(', ')}`);
 
-    try {
-        const latestBuild = await AzureService.fetchLatestSuccessfulBuild(devops.organization, pipelineProject, matchedPipeline.id, devops.pat, devops.baseUrl, bearerToken);
-        if (latestBuild) {
-            let commitHash = latestBuild.sourceVersion;
-            const buildRepoId = latestBuild.repository?.id;
-            const targetRepoId = finalRepo.id;
-
-            console.log(`      🔍 Comparing Repo IDs: Build(${buildRepoId}) vs Target(${targetRepoId})`);
-
-            // Multi-repo resolution for baseline
-            if (buildRepoId !== targetRepoId) {
-                console.log(`      ⚠️  Multi-repo detected. Resolving version for target repo...`);
-                const details = await AzureService.fetchADOBuild(devops.organization, latestBuild.project?.id || pipelineProject, latestBuild.id, devops.pat, devops.baseUrl, bearerToken);
-                if (details?.resources?.repositories) {
-                    const matchedResources = Object.entries(details.resources.repositories).filter(([alias, r]: [string, any]) =>
-                        r.repository?.id === targetRepoId || r.repository?.name?.toLowerCase() === finalRepo.name.toLowerCase()
-                    );
-
-                    if (matchedResources.length > 0) {
-                        // If one match, just update commitHash. If multiple, we'll log it.
-                        commitHash = (matchedResources[0][1] as any).version;
-                        console.log(`         ✅ Resolved to target hash: ${commitHash.substring(0, 7)} (Alias: ${matchedResources[0][0]})`);
-
-                        if (matchedResources.length > 1) {
-                            console.log(`         ℹ️  Additional matches found:`);
-                            matchedResources.forEach(([alias, r]) => {
-                                console.log(`            - ${alias}: ${(r as any).version?.substring(0, 7)}`);
-                            });
-                        }
-                    }
-                }
-            }
-            if (commitHash && commitHash !== 'unknown') {
-                baselineHash = commitHash;
-                baselineData = {
-                    hash: commitHash,
-                    date: latestBuild.finishTime || latestBuild.queueTime || new Date().toISOString(),
-                    branch: (latestBuild.sourceBranch || 'unknown').replace('refs/heads/', ''),
-                    author: latestBuild.requestedFor?.displayName || 'Unknown',
-                    message: latestBuild.triggerInfo?.['ci.message'] || latestBuild.sourceVersionMessage || 'No message',
-                    url: latestBuild._links?.web?.href
-                };
-                console.log(`      ✅ Captured Baseline: ${commitHash.substring(0, 7)} (Build ID: ${latestBuild.id})`);
-            }
-        }
-    } catch (e: any) {
-        console.warn(`      ⚠️  Failed to capture baseline: ${e.message}`);
-    }
-
-    // 4.2: SURGICAL ENRICHMENT (Per Environment)
-    console.log(`\n   ⏳ Step 4.2: Attempting Surgical Enrichment per Environment...`);
     for (const envName of envsToSync) {
         console.log(`\n   📍 Checking Environment: ${envName}...`);
 
-        // Use baseline as a starting point
-        if (baselineData) {
-            deployments[envName] = { ...baselineData };
-        }
-
-        // Try to "Sharpen" the data with a specific Strike
+        // --- 4.1: SURGICAL STRIKE (Environment API) ---
         let deploy = await AzureService.fetchLatestEnvironmentDeployment(devops.organization, pipelineProject, matchedPipeline.id, envName, devops.pat, devops.baseUrl, bearerToken);
         if (!deploy && pipelineProject !== projectIdentifier) {
             deploy = await AzureService.fetchLatestEnvironmentDeployment(devops.organization, projectIdentifier, matchedPipeline.id, envName, devops.pat, devops.baseUrl, bearerToken);
         }
 
+        let buildToProcess: any = null;
+        let sourceMethod = "";
+
         if (deploy) {
-            const build = deploy.build || deploy.owner;
-            if (build) {
-                let commitHash = build.sourceVersion;
-                const buildRepoId = build.repository?.id;
-                const targetRepoId = finalRepo.id;
-
-                if (buildRepoId !== targetRepoId) {
-                    console.log(`      ⚠️  Multi-repo detected for ${envName}. Resolving version...`);
-                    const details = await AzureService.fetchADOBuild(devops.organization, build.project?.id || pipelineProject, build.id, devops.pat, devops.baseUrl, bearerToken);
-                    if (details?.resources?.repositories) {
-                        const matchedResources = Object.entries(details.resources.repositories).filter(([alias, r]: [string, any]) =>
-                            r.repository?.id === targetRepoId || r.repository?.name?.toLowerCase() === finalRepo.name.toLowerCase()
-                        );
-
-                        if (matchedResources.length > 0) {
-                            commitHash = (matchedResources[0][1] as any).version;
-                            console.log(`         ✅ Resolved to target hash: ${commitHash.substring(0, 7)} (Alias: ${matchedResources[0][0]})`);
-
-                            // Carry over multiple hashes if present
-                            const regionalHashes: Record<string, string> = {};
-                            matchedResources.forEach(([alias, r]) => {
-                                regionalHashes[alias] = (r as any).version;
-                            });
-
-                            (deployments[envName] as any).hashes = regionalHashes;
-                        }
-                    }
-                }
-
-                if (commitHash && commitHash !== 'unknown') {
-                    deployments[envName] = {
-                        hash: commitHash,
-                        date: deploy.finishTime || build.finishTime || new Date().toISOString(),
-                        branch: (build.sourceBranch || 'unknown').replace('refs/heads/', ''),
-                        author: build.requestedFor?.displayName || 'Unknown',
-                        message: build.triggerInfo?.['ci.message'] || 'No message',
-                        url: build._links?.web?.href
-                    };
-                    console.log(`      🎯 Strike Hit: ${envName} -> ${commitHash.substring(0, 7)}`);
-                    continue;
-                }
+            buildToProcess = deploy.build || deploy.owner;
+            sourceMethod = "Environment API Strike";
+        } else {
+            // --- 4.2: FALLBACK: STAGE SCANNER (Build Timeline) ---
+            console.log(`      ⚠️  Environment API strike failed for ${envName}. Trying stage scanner...`);
+            const stageResults = await AzureService.fetchLatestStageResults(devops.organization, pipelineProject, matchedPipeline.id, [envName], devops.pat, devops.baseUrl, bearerToken);
+            const scanResult = stageResults[envName.toUpperCase()];
+            if (scanResult && scanResult.buildId) {
+                buildToProcess = await AzureService.fetchADOBuild(devops.organization, pipelineProject, scanResult.buildId, devops.pat, devops.baseUrl, bearerToken);
+                sourceMethod = "Stage Scanner Hit";
             }
         }
-        // 3. Fallback: Only Deep Scan if Baseline is missing
-        if (!baselineData) {
-            console.log(`      ⚠️  No surgical strike match and no baseline. Falling back to deep scan...`);
-            const stageResults = await AzureService.fetchLatestStageResults(devops.organization, pipelineProject, matchedPipeline.id, [envName], devops.pat, devops.baseUrl, bearerToken);
-            const result = stageResults[envName.toUpperCase()];
-            if (result && result.buildId) {
-                const details = await AzureService.fetchADOBuild(devops.organization, pipelineProject, result.buildId, devops.pat, devops.baseUrl, bearerToken);
-                if (details) {
-                    let commitHash = details.sourceVersion;
-                    if (details.repository?.name?.toLowerCase() !== finalRepo.name.toLowerCase() && details.resources?.repositories) {
-                        const targetRes = Object.values(details.resources.repositories).find((r: any) => r.repository?.name?.toLowerCase() === finalRepo.name.toLowerCase());
-                        if ((targetRes as any)?.version) commitHash = (targetRes as any).version;
+
+        if (buildToProcess) {
+            console.log(`      ✅ Found build targeting ${envName}: ID ${buildToProcess.id} (found via ${sourceMethod})`);
+
+            // --- 4.3: MULTI-REPO DISAMBIGUATION ---
+            let primaryHash = buildToProcess.sourceVersion;
+            const buildRepoId = buildToProcess.repository?.id;
+            const extraHashes: Record<string, string> = {};
+
+            if (buildRepoId !== targetRepoId) {
+                console.log(`      ⚠️  Multi-repo detected. Disambiguating resources for project code...`);
+                // Ensure we have full build details (including resources)
+                const buildDetails = buildToProcess.resources ? buildToProcess : await AzureService.fetchADOBuild(devops.organization, buildToProcess.project?.id || pipelineProject, buildToProcess.id, devops.pat, devops.baseUrl, bearerToken);
+
+                if (buildDetails?.resources?.repositories) {
+                    const matchedResources = Object.entries(buildDetails.resources.repositories).filter(([alias, r]: [string, any]) =>
+                        r.repository?.id === targetRepoId || r.repository?.name?.toLowerCase() === finalRepo.name.toLowerCase()
+                    );
+
+                    if (matchedResources.length > 0) {
+                        // Use the most likely "source" alias as primary if multiple exist, otherwise take the first
+                        const primaryRes = matchedResources.find(([alias]) => alias.toLowerCase().includes('source') || alias.toLowerCase() === 'self') || matchedResources[0];
+                        primaryHash = (primaryRes[1] as any).version;
+
+                        console.log(`         ✅ Resolved Primary Hash: ${primaryHash.substring(0, 7)} (Alias: ${primaryRes[0]})`);
+
+                        // Collect ALL project-related hashes (source, config, etc.)
+                        matchedResources.forEach(([alias, r]) => {
+                            extraHashes[alias] = (r as any).version;
+                            if (alias !== primaryRes[0]) {
+                                console.log(`         📂 Additional Config/Resource: ${alias} -> ${(r as any).version?.substring(0, 7)}`);
+                            }
+                        });
+                    } else {
+                        console.warn(`         ⚠️  Target project repo (${finalRepo.name}) NOT found in build resources.`);
+                        console.log(`         ℹ️  Using pipeline repo hash as fallback: ${primaryHash.substring(0, 7)}`);
                     }
-                    deployments[envName] = {
-                        hash: commitHash,
-                        date: result.date || details.finishTime || new Date().toISOString(),
-                        branch: (details.sourceBranch || 'unknown').replace('refs/heads/', ''),
-                        author: details.requestedFor?.displayName || 'Unknown',
-                        message: details.triggerInfo?.['ci.message'] || 'No message',
-                        url: details._links?.web?.href
-                    };
-                    console.log(`      🎯 ${envName.padEnd(5)}: Scanner Hit! Precision match: ${commitHash.substring(0, 7)}`);
                 }
+            } else {
+                console.log(`      ✅ Build repository matches project repository direct.`);
             }
+
+            deployments[envName] = {
+                hash: primaryHash,
+                hashes: Object.keys(extraHashes).length > 0 ? extraHashes : undefined,
+                date: (deploy && deploy.finishTime) || buildToProcess.finishTime || buildToProcess.queueTime || new Date().toISOString(),
+                branch: (buildToProcess.sourceBranch || 'unknown').replace('refs/heads/', ''),
+                author: buildToProcess.requestedFor?.displayName || 'Unknown',
+                message: buildToProcess.triggerInfo?.['ci.message'] || buildToProcess.sourceVersionMessage || 'No message',
+                url: buildToProcess._links?.web?.href,
+                discoverySource: sourceMethod
+            };
         } else {
-            console.log(`      ✅ Regional info not found. Using baseline: ${baselineHash?.substring(0, 7)}`);
+            console.log(`      ❌ No deployment found for ${envName} in recent history.`);
         }
     }
 
