@@ -255,12 +255,21 @@ async function runDebug() {
                 console.log(`      ⚠️  Multi-repo detected. Resolving version for target repo...`);
                 const details = await AzureService.fetchADOBuild(devops.organization, latestBuild.project?.id || pipelineProject, latestBuild.id, devops.pat, devops.baseUrl, bearerToken);
                 if (details?.resources?.repositories) {
-                    const targetRes = Object.values(details.resources.repositories).find((r: any) =>
+                    const matchedResources = Object.entries(details.resources.repositories).filter(([alias, r]: [string, any]) =>
                         r.repository?.id === targetRepoId || r.repository?.name?.toLowerCase() === finalRepo.name.toLowerCase()
                     );
-                    if ((targetRes as any)?.version) {
-                        commitHash = (targetRes as any).version;
-                        console.log(`         ✅ Resolved to target hash: ${commitHash.substring(0, 7)}`);
+
+                    if (matchedResources.length > 0) {
+                        // If one match, just update commitHash. If multiple, we'll log it.
+                        commitHash = (matchedResources[0][1] as any).version;
+                        console.log(`         ✅ Resolved to target hash: ${commitHash.substring(0, 7)} (Alias: ${matchedResources[0][0]})`);
+
+                        if (matchedResources.length > 1) {
+                            console.log(`         ℹ️  Additional matches found:`);
+                            matchedResources.forEach(([alias, r]) => {
+                                console.log(`            - ${alias}: ${(r as any).version?.substring(0, 7)}`);
+                            });
+                        }
                     }
                 }
             }
@@ -308,12 +317,21 @@ async function runDebug() {
                     console.log(`      ⚠️  Multi-repo detected for ${envName}. Resolving version...`);
                     const details = await AzureService.fetchADOBuild(devops.organization, build.project?.id || pipelineProject, build.id, devops.pat, devops.baseUrl, bearerToken);
                     if (details?.resources?.repositories) {
-                        const targetRes = Object.values(details.resources.repositories).find((r: any) =>
+                        const matchedResources = Object.entries(details.resources.repositories).filter(([alias, r]: [string, any]) =>
                             r.repository?.id === targetRepoId || r.repository?.name?.toLowerCase() === finalRepo.name.toLowerCase()
                         );
-                        if ((targetRes as any)?.version) {
-                            commitHash = (targetRes as any).version;
-                            console.log(`         ✅ Resolved to target hash: ${commitHash.substring(0, 7)}`);
+
+                        if (matchedResources.length > 0) {
+                            commitHash = (matchedResources[0][1] as any).version;
+                            console.log(`         ✅ Resolved to target hash: ${commitHash.substring(0, 7)} (Alias: ${matchedResources[0][0]})`);
+
+                            // Carry over multiple hashes if present
+                            const regionalHashes: Record<string, string> = {};
+                            matchedResources.forEach(([alias, r]) => {
+                                regionalHashes[alias] = (r as any).version;
+                            });
+
+                            (deployments[envName] as any).hashes = regionalHashes;
                         }
                     }
                 }
