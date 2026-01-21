@@ -916,26 +916,35 @@ export class AzureService {
             }
 
             if (envResp.ok && envData.count > 0) {
-                envId = envData.value[0].id;
-            } else {
-                // FALLBACK: Fetch all and match case-insensitive
-                console.warn(`      ⚠️ [ADO] Exact env lookup failed. Trying case-insensitive scan...`);
-                envUrl = `${urlBase}/_apis/distributedtask/environments`;
-                console.log(`📡 [ADO Request] GET ${envUrl} (Fallback)`);
-                envResp = await fetch(envUrl, {
-                    headers: {
-                        'Authorization': authHeader,
-                        'Accept': 'application/json',
-                        'X-TFS-FedAuthRedirect': 'Suppress'
+                // Try exact match or fuzzy match
+                const targetLower = environmentName.toLowerCase().trim();
+                const match = envData.value.find((e: any) => e.name.toLowerCase().trim() === targetLower)
+                    || envData.value.find((e: any) => e.name.toLowerCase().includes(targetLower));
+
+                if (match) {
+                    envId = match.id;
+                    if (match.name.toLowerCase() !== targetLower) {
+                        console.log(`      ✅ Fuzzy match: '${match.name}' (ID: ${envId}) for '${environmentName}'`);
                     }
-                });
+                }
+            }
+
+            if (!envId) {
+                // FALLBACK: Fetch all and match
+                console.warn(`      ⚠️ [ADO] Direct lookup failed for '${environmentName}'. Trying broad project scan...`);
+                envUrl = `${urlBase}/_apis/distributedtask/environments`;
+                envResp = await fetch(envUrl, { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } });
                 if (envResp.ok) {
                     envData = await envResp.json() as { count: number; value: any[] };
                     const targetLower = environmentName.toLowerCase().trim();
-                    const match = envData.value.find((e: any) => e.name.toLowerCase().trim() === targetLower);
+                    // Match if env name contains the target (e.g. "Product-DEV" matches "DEV")
+                    const match = envData.value.find((e: any) => {
+                        const name = e.name.toLowerCase();
+                        return name === targetLower || name.includes(`-${targetLower}`) || name.includes(`${targetLower}-`) || name.includes(` ${targetLower}`);
+                    });
                     if (match) {
                         envId = match.id;
-                        console.log(`      ✅ Found match: '${match.name}' (ID: ${envId})`);
+                        console.log(`      ✅ Discovery match: '${match.name}' (ID: ${envId})`);
                     }
                 }
             }
@@ -948,34 +957,27 @@ export class AzureService {
             // 2. Query Deployments for this specific definition and environment (Surgical Step 2)
             const tryFetch = async (endpoint: string) => {
                 const url = `${urlBase}/_apis/distributedtask/environments/${envId}/${endpoint}`;
-                console.log(`📡 [ADO Request] GET ${url}`);
-                const resp = await fetch(url, { headers: { 'Authorization': authHeader, 'Accept': 'application/json', 'X-TFS-FedAuthRedirect': 'Suppress' } });
-                console.log(`📡 [ADO Response] ${resp.status} ${resp.statusText}`);
+                const resp = await fetch(url, { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } });
                 if (resp.ok) return await resp.json();
                 return null;
             };
 
-            let deployData = await tryFetch(`deployments?definitionId=${definitionId}&latestState=succeeded&$top=1`);
-
-            if (!deployData || deployData.count === 0) {
-                console.warn(`      ⚠️  Surgical strike with definitionId ${definitionId} failed. Trying broader environment scan...`);
-                deployData = await tryFetch(`deployments?$top=50`);
-                if (!deployData || deployData.count === 0) {
-                    deployData = await tryFetch(`environmentdeploymentrecords?$top=50`);
-                }
-            }
+            // Fetch recent deployments (broaden search to catch more types)
+            let deployData = await tryFetch(`deployments?$top=20`);
 
             if (deployData && deployData.count > 0) {
                 // Locally filter for definitionId and success
-                const match = deployData.value.find((d: any) =>
-                    (Number(d.definitionId) === Number(definitionId) ||
-                        Number(d.owner?.definition?.id) === Number(definitionId) ||
-                        Number(d.definition?.id) === Number(definitionId)) &&
-                    (['succeeded', 'partiallysucceeded'].includes((d.status || '').toLowerCase()) ||
-                        ['succeeded', 'partiallysucceeded'].includes((d.result || '').toLowerCase()))
-                );
+                // We search both the direct definitionId and nested owner objects
+                const matches = deployData.value.filter((d: any) => {
+                    const dId = Number(d.definitionId) || Number(d.owner?.definition?.id) || Number(d.definition?.id);
+                    const isTargetPipeline = dId === Number(definitionId);
+                    const isSuccess = ['succeeded', 'partiallysucceeded'].includes((d.status || d.result || '').toLowerCase());
+                    return isTargetPipeline && isSuccess;
+                });
 
-                if (match) {
+                if (matches.length > 0) {
+                    // Get the absolute latest successful one
+                    const match = matches[0];
                     console.log(`      ✅ Found matching deployment! (Build ID: ${match.owner?.id || match.id})`);
 
                     // Ensure project info is captured if present in the record
