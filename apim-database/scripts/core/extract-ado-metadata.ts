@@ -357,61 +357,90 @@ async function main() {
                     if (verbose) console.log(`      ℹ️  Pipeline project (${pipelineProject}) != Repo project (${projectId}). Switching context.`);
                 }
 
-                if (verbose) console.log(`   ⏳ Scanning build history for environment-specific deployments in project ${pipelineProject}...`);
-
-                // Deep scan for current regions
-                const stageResults = await AzureService.fetchLatestStageResults(
-                    devops.organization,
-                    pipelineProject,
-                    matchedPipeline.id,
-                    envsToSync,
-                    devops.pat,
-                    devops.baseUrl,
-                    bearerToken
-                );
-
-                // Enrich each environment result with full build info (Author, Branch, Message, Multi-Repo)
-                const buildDetailsCache = new Map<number, any>();
-
                 for (const envName of envsToSync) {
-                    const result = stageResults[envName.toUpperCase()];
-                    if (!result || !result.buildId) continue;
+                    if (verbose) console.log(`\n   📍 Checking Environment: ${envName}...`);
 
-                    if (!buildDetailsCache.has(result.buildId)) {
-                        if (verbose) console.log(`      📡 Fetching full build details (ID: ${result.buildId}) from project ${pipelineProject}...`);
-                        const details = await AzureService.fetchADOBuild(devops.organization, pipelineProject, result.buildId, devops.pat, devops.baseUrl, bearerToken);
-                        buildDetailsCache.set(result.buildId, details);
-                    }
+                    // 1. Surgical Strike: Use Environment API (Highest Confidence)
+                    let deploy = await AzureService.fetchLatestEnvironmentDeployment(
+                        devops.organization,
+                        pipelineProject,
+                        matchedPipeline.id,
+                        envName,
+                        devops.pat,
+                        devops.baseUrl,
+                        bearerToken
+                    );
 
-                    const details = buildDetailsCache.get(result.buildId);
-                    if (details) {
-                        let commitHash = details.sourceVersion;
+                    if (deploy) {
+                        const build = deploy.build || deploy.owner;
+                        if (build) {
+                            let commitHash = build.sourceVersion;
+                            const buildId = build.id;
 
-                        // Multi-repo resolution
-                        const buildPrimaryRepo = details.repository?.name?.toLowerCase();
-                        const targetRepoName = repo.name.toLowerCase();
+                            // Multi-repo resolution if needed
+                            const buildRepo = build.repository?.name?.toLowerCase();
+                            if (buildRepo && buildRepo !== repo.name.toLowerCase()) {
+                                if (verbose) console.log(`      ⚠️  Deployment build repo (${buildRepo}) != target (${repo.name}). Resolving...`);
+                                const fullBuild = await AzureService.fetchADOBuild(devops.organization, pipelineProject, buildId, devops.pat, devops.baseUrl, bearerToken);
+                                if (fullBuild?.resources?.repositories) {
+                                    const targetRes = Object.values(fullBuild.resources.repositories).find((r: any) =>
+                                        r.repository?.name?.toLowerCase() === repo.name.toLowerCase() ||
+                                        r.repository?.id === repo.id
+                                    );
+                                    if ((targetRes as any)?.version) commitHash = (targetRes as any).version;
+                                }
+                            }
 
-                        if (buildPrimaryRepo && buildPrimaryRepo !== targetRepoName) {
-                            if (verbose) console.log(`      ⚠️  [${envName}] Build primary repo (${buildPrimaryRepo}) != target (${targetRepoName}). Checking resources...`);
-                            if (details.resources?.repositories) {
-                                const targetRes = Object.values(details.resources.repositories).find((r: any) =>
-                                    r.repository?.name?.toLowerCase() === targetRepoName ||
-                                    r.repository?.id === repo.id
-                                );
-                                if ((targetRes as any)?.version) commitHash = (targetRes as any).version;
+                            if (commitHash && commitHash !== 'unknown') {
+                                meta.deployments[envName] = {
+                                    hash: commitHash,
+                                    date: deploy.finishTime || build.finishTime || new Date().toISOString(),
+                                    branch: (build.sourceBranch || 'unknown').replace('refs/heads/', ''),
+                                    author: build.requestedFor?.displayName || build.requestedBy?.displayName || 'Unknown',
+                                    message: build.triggerInfo?.['ci.message'] || build.sourceVersionMessage || 'No message',
+                                    url: build._links?.web?.href
+                                };
+                                if (verbose) console.log(`      🎯 ${envName.padEnd(5)}: Match! Build ${buildId} -> ${commitHash.substring(0, 7)}`);
+                                continue;
                             }
                         }
+                    }
 
-                        if (commitHash && commitHash !== 'unknown') {
+                    // 2. Fallback: Stage Scanner (Deep history search)
+                    if (verbose) console.log(`      ⚠️  Environment API strike failed for ${envName}. Falling back to stage scanner...`);
+                    const stageRes = await AzureService.fetchLatestStageResults(
+                        devops.organization,
+                        pipelineProject,
+                        matchedPipeline.id,
+                        [envName],
+                        devops.pat,
+                        devops.baseUrl,
+                        bearerToken
+                    );
+
+                    const result = stageRes[envName.toUpperCase()];
+                    if (result && result.buildId) {
+                        const details = await AzureService.fetchADOBuild(devops.organization, pipelineProject, result.buildId, devops.pat, devops.baseUrl, bearerToken);
+                        if (details) {
+                            let commitHash = details.sourceVersion;
+                            if (details.repository?.name?.toLowerCase() !== repo.name.toLowerCase()) {
+                                if (details.resources?.repositories) {
+                                    const targetRes = Object.values(details.resources.repositories).find((r: any) =>
+                                        r.repository?.name?.toLowerCase() === repo.name.toLowerCase()
+                                    );
+                                    if ((targetRes as any)?.version) commitHash = (targetRes as any).version;
+                                }
+                            }
+
                             meta.deployments[envName] = {
                                 hash: commitHash,
-                                date: result.date || details.finishTime || details.queueTime || new Date().toISOString(),
+                                date: result.date || details.finishTime || new Date().toISOString(),
                                 branch: (details.sourceBranch || 'unknown').replace('refs/heads/', ''),
-                                author: details.requestedFor?.displayName || details.requestedBy?.displayName || 'Unknown',
-                                message: details.triggerInfo?.['ci.message'] || details.sourceVersionMessage || details.comment || 'No message',
+                                author: details.requestedFor?.displayName || 'Unknown',
+                                message: details.triggerInfo?.['ci.message'] || 'No message',
                                 url: details._links?.web?.href
                             };
-                            if (verbose) console.log(`      🎯 ${envName.padEnd(5)}: Match! Build ${result.buildId} -> ${commitHash.substring(0, 7)}`);
+                            if (verbose) console.log(`      🎯 ${envName.padEnd(5)}: Match (Scanner)! Build ${result.buildId} -> ${commitHash.substring(0, 7)}`);
                         }
                     }
                 }
