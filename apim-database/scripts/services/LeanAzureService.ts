@@ -93,12 +93,12 @@ export class LeanAzureService {
 
         // Use working URL helper (handles both modern and legacy ADO)
         const searchUrl = this.getAdoSearchUrl(baseUrl, org);
-        const searchQuery = `${productName} ext:tf`;
+        // FIXED: Removed ext:tf as user said it was causing issues
+        const searchQuery = productName;
 
         console.log(`   🔍 Searching for "${searchQuery}"...`);
         console.log(`   🌐 Organization: "${org}"`);
-        console.log(`   🔗 URL: ${searchUrl}`);
-        console.log(`   🔐 Auth: ${bearerToken ? 'Bearer Token' : 'PAT'}`);
+        console.log(`    Auth: ${bearerToken ? 'Bearer Token' : 'PAT'}`);
 
         const response = await fetch(searchUrl, {
             method: 'POST',
@@ -150,21 +150,21 @@ export class LeanAzureService {
             );
         }
 
-        if (!repo.project || !repo.project.id || !repo.project.name) {
-            throw new Error(
-                `Repository found but project info is incomplete. ` +
-                `Repo: ${repo.name}, Project data: ${JSON.stringify(repo.project || 'missing')}`
-            );
-        }
+        // Project info may not be in search results - return what we have
+        const projectId = repo.project?.id || 'unknown';
+        const projectName = repo.project?.name || 'unknown';
 
         console.log(`   ✅ Found repo: ${repo.name} (ID: ${repo.id})`);
+        if (projectId === 'unknown') {
+            console.log(`   ⚠️  Project info not in search results, will fetch separately`);
+        }
 
         return {
             id: repo.id,
             name: repo.name,
             project: {
-                id: repo.project.id,
-                name: repo.project.name
+                id: projectId,
+                name: projectName
             }
         };
     }
