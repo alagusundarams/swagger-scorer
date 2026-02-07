@@ -79,6 +79,9 @@ export class LeanAzureService {
         const url = `${orgUrl}/_apis/search/codesearchresults?api-version=7.1-preview.1`;
 
         console.log(`   🔍 Searching for "${searchQuery}"...`);
+        console.log(`   🌐 Organization: "${org}"`);
+        console.log(`   🔗 URL: ${url}`);
+        console.log(`   🔐 Auth: ${bearerToken ? 'Bearer Token' : 'PAT'}`);
 
         const response = await fetch(url, {
             method: 'POST',
@@ -93,9 +96,12 @@ export class LeanAzureService {
         });
 
         if (!response.ok) {
+            const errorBody = await response.text();
             throw new Error(
-                `Code search failed (${response.status} ${response.statusText}). ` +
-                `Check if you have access to org "${org}".`
+                `Code search failed (${response.status} ${response.statusText}).\n` +
+                `Organization: "${org}"\n` +
+                `URL: ${url}\n` +
+                `Response: ${errorBody.substring(0, 200)}`
             );
         }
 
