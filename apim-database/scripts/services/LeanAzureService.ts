@@ -150,21 +150,53 @@ export class LeanAzureService {
             );
         }
 
-        // Project info may not be in search results - return what we have
-        const projectId = repo.project?.id || 'unknown';
-        const projectName = repo.project?.name || 'unknown';
-
-        console.log(`   ✅ Found repo: ${repo.name} (ID: ${repo.id})`);
-        if (projectId === 'unknown') {
-            console.log(`   ⚠️  Project info not in search results, will fetch separately`);
+        // Check if we have project info from search results
+        if (repo.project?.id && repo.project?.name) {
+            console.log(`   ✅ Found repo: ${repo.name} in project ${repo.project.name}`);
+            return {
+                id: repo.id,
+                name: repo.name,
+                project: {
+                    id: repo.project.id,
+                    name: repo.project.name
+                }
+            };
         }
+
+        // Project info missing - fetch it via Get Repository API (Option A)
+        console.log(`   ⚠️  Project info missing, fetching via Repository API...`);
+
+        const repoUrl = `${baseUrl}/${org}/_apis/git/repositories/${repo.id}?api-version=7.1`;
+        const repoResponse = await fetch(repoUrl, {
+            headers: { 'Authorization': authHeader }
+        });
+
+        if (!repoResponse.ok) {
+            // Option B: Fail fast if we can't get project info
+            throw new Error(
+                `Repository found but project info is missing and could not fetch it.\n` +
+                `Repo: ${repo.name}, API error: ${repoResponse.status} ${repoResponse.statusText}`
+            );
+        }
+
+        const repoDetails = await repoResponse.json();
+
+        if (!repoDetails.project?.id || !repoDetails.project?.name) {
+            // Option B: Fail fast if API doesn't return project
+            throw new Error(
+                `Repository API returned incomplete project data for ${repo.name}.\n` +
+                `Cannot proceed without project info.`
+            );
+        }
+
+        console.log(`   ✅ Found repo: ${repo.name} in project ${repoDetails.project.name}`);
 
         return {
             id: repo.id,
             name: repo.name,
             project: {
-                id: projectId,
-                name: projectName
+                id: repoDetails.project.id,
+                name: repoDetails.project.name
             }
         };
     }
