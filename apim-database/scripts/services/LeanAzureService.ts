@@ -72,18 +72,17 @@ export class LeanAzureService {
         bearerToken?: string
     ): Promise<Repo> {
         const authHeader = this.getAuthHeader(pat, bearerToken);
-        const orgUrl = `${baseUrl}/${org}`;
 
-        // Surgical search: product name in .tf files
+        // FIXED: Use correct ADO search endpoint (not preview API)
+        const searchUrl = `https://almsearch.dev.azure.com/${org}/_apis/search/codesearchresults?api-version=7.1-preview.1`;
         const searchQuery = `${productName} ext:tf`;
-        const url = `${orgUrl}/_apis/search/codesearchresults?api-version=7.1-preview.1`;
 
         console.log(`   🔍 Searching for "${searchQuery}"...`);
         console.log(`   🌐 Organization: "${org}"`);
-        console.log(`   🔗 URL: ${url}`);
+        console.log(`   🔗 URL: ${searchUrl}`);
         console.log(`   🔐 Auth: ${bearerToken ? 'Bearer Token' : 'PAT'}`);
 
-        const response = await fetch(url, {
+        const response = await fetch(searchUrl, {
             method: 'POST',
             headers: {
                 'Authorization': authHeader,
@@ -100,7 +99,7 @@ export class LeanAzureService {
             throw new Error(
                 `Code search failed (${response.status} ${response.statusText}).\n` +
                 `Organization: "${org}"\n` +
-                `URL: ${url}\n` +
+                `URL: ${searchUrl}\n` +
                 `Response: ${errorBody.substring(0, 200)}`
             );
         }
