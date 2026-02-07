@@ -61,6 +61,24 @@ export class LeanAzureService {
     }
 
     /**
+     * Helper: Get correct ADO search URL (handles both modern and legacy domains)
+     * COPIED FROM WORKING AzureService.ts
+     */
+    static getAdoSearchUrl(baseUrl: string, org: string): string {
+        const cleanBase = baseUrl.replace(/\/+$/, '').toLowerCase();
+
+        // Handle Legacy: https://org.visualstudio.com -> https://org.almsearch.visualstudio.com
+        if (cleanBase.includes('visualstudio.com')) {
+            const subdomainMatch = cleanBase.match(/https?:\/\/([^.]+)\.visualstudio\.com/);
+            const searchOrg = subdomainMatch ? subdomainMatch[1] : org;
+            return `https://${searchOrg}.almsearch.visualstudio.com/_apis/search/codesearchresults?api-version=7.1`;
+        }
+
+        // Handle Modern: https://dev.azure.com/org -> https://almsearch.dev.azure.com/org
+        return `https://almsearch.dev.azure.com/${org}/_apis/search/codesearchresults?api-version=7.1`;
+    }
+
+    /**
      * STEP 1: Find repository by product name
      * Uses Code Search API with .tf file filter (surgical search)
      */
@@ -73,8 +91,8 @@ export class LeanAzureService {
     ): Promise<Repo> {
         const authHeader = this.getAuthHeader(pat, bearerToken);
 
-        // FIXED: Use correct ADO search endpoint (not preview API)
-        const searchUrl = `https://almsearch.dev.azure.com/${org}/_apis/search/codesearchresults?api-version=7.1-preview.1`;
+        // Use working URL helper (handles both modern and legacy ADO)
+        const searchUrl = this.getAdoSearchUrl(baseUrl, org);
         const searchQuery = `${productName} ext:tf`;
 
         console.log(`   🔍 Searching for "${searchQuery}"...`);
