@@ -126,18 +126,34 @@ export class LeanAzureService {
 
         if (!data.results || data.results.length === 0) {
             throw new Error(
-                `No repository found containing "${productName}" in .tf files. ` +
+                `No repository found containing "${productName}". ` +
                 `Verify the product name is correct.`
             );
         }
 
         const firstResult = data.results[0];
+        console.log(`   📋 Raw result:`, JSON.stringify(firstResult, null, 2));
+
         const repo = firstResult.repository;
 
-        if (!repo || !repo.id || !repo.name) {
+        if (!repo) {
             throw new Error(
-                `Code search returned invalid repository data. ` +
-                `Response structure may have changed.`
+                `Code search returned results but no repository field found. ` +
+                `Response structure: ${JSON.stringify(Object.keys(firstResult))}`
+            );
+        }
+
+        if (!repo.id || !repo.name) {
+            throw new Error(
+                `Repository found but missing id or name. ` +
+                `Repo fields: ${JSON.stringify(Object.keys(repo))}`
+            );
+        }
+
+        if (!repo.project || !repo.project.id || !repo.project.name) {
+            throw new Error(
+                `Repository found but project info is incomplete. ` +
+                `Repo: ${repo.name}, Project data: ${JSON.stringify(repo.project || 'missing')}`
             );
         }
 
