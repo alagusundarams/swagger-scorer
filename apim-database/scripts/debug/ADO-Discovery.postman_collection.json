@@ -143,7 +143,7 @@
                     "raw": "{\n  \"searchText\": \"{{product_name}}\",\n  \"$top\": 10\n}"
                 },
                 "url": {
-                    "raw": "{{ado_search_url}}"
+                    "raw": "https://almsearch.dev.azure.com/{{ado_org}}/_apis/search/codesearchresults?api-version=7.1"
                 }
             }
         },
