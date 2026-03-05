@@ -54,6 +54,11 @@
             "key": "env_id",
             "value": "",
             "description": "Auto-set by Step 4"
+        },
+        {
+            "key": "ado_search_url",
+            "value": "",
+            "description": "Auto-computed by Step 1a pre-request script from ado_base_url"
         }
     ],
     "auth": {
@@ -76,18 +81,48 @@
             "name": "STEP 1a - Code Search (Find Repo by Product Name)",
             "event": [
                 {
+                    "listen": "prerequest",
+                    "script": {
+                        "exec": [
+                            "// Compute correct search URL - same logic as AzureService.getAdoSearchUrl()",
+                            "const baseUrl = pm.collectionVariables.get('ado_base_url') || 'https://dev.azure.com';",
+                            "const org = pm.collectionVariables.get('ado_org');",
+                            "let searchUrl;",
+                            "if (baseUrl.toLowerCase().includes('visualstudio.com')) {",
+                            "    // Legacy format: https://ORG.almsearch.visualstudio.com/...",
+                            "    const match = baseUrl.match(/https?:\\/\\/([^.]+)\\.visualstudio\\.com/);",
+                            "    const searchOrg = match ? match[1] : org;",
+                            "    searchUrl = `https://${searchOrg}.almsearch.visualstudio.com/_apis/search/codesearchresults?api-version=7.1`;",
+                            "} else {",
+                            "    // Modern format: https://almsearch.dev.azure.com/ORG/...",
+                            "    searchUrl = `https://almsearch.dev.azure.com/${org}/_apis/search/codesearchresults?api-version=7.1`;",
+                            "}",
+                            "pm.collectionVariables.set('ado_search_url', searchUrl);",
+                            "console.log('Search URL:', searchUrl);"
+                        ],
+                        "type": "text/javascript"
+                    }
+                },
+                {
                     "listen": "test",
                     "script": {
                         "exec": [
                             "const resp = pm.response.json();",
                             "if (resp.results && resp.results.length > 0) {",
-                            "    const repo = resp.results[0].repository;",
+                            "    const result = resp.results[0];",
+                            "    const repo = result.repository;",
                             "    pm.collectionVariables.set('repo_id', repo.id);",
                             "    pm.collectionVariables.set('repo_name', repo.name);",
+                            "    // Also grab project from result (not inside repo)",
+                            "    if (result.project) {",
+                            "        pm.collectionVariables.set('project_id', result.project.id);",
+                            "        pm.collectionVariables.set('project_name', result.project.name);",
+                            "        console.log('✅ Project (from search):', result.project.name, '| ID:', result.project.id);",
+                            "    }",
                             "    console.log('✅ Repo found:', repo.name, '| ID:', repo.id);",
                             "    pm.test('Repo found', () => pm.expect(repo.id).to.not.be.empty);",
                             "} else {",
-                            "    console.log('❌ No results found');",
+                            "    console.log('❌ No results found. Response:', JSON.stringify(resp));",
                             "    pm.test('Repo found', () => pm.expect(false).to.be.true);",
                             "}"
                         ],
@@ -108,26 +143,7 @@
                     "raw": "{\n  \"searchText\": \"{{product_name}}\",\n  \"$top\": 10\n}"
                 },
                 "url": {
-                    "raw": "https://almsearch.dev.azure.com/{{ado_org}}/_apis/search/codesearchresults?api-version=7.1",
-                    "protocol": "https",
-                    "host": [
-                        "almsearch",
-                        "dev",
-                        "azure",
-                        "com"
-                    ],
-                    "path": [
-                        "{{ado_org}}",
-                        "_apis",
-                        "search",
-                        "codesearchresults"
-                    ],
-                    "query": [
-                        {
-                            "key": "api-version",
-                            "value": "7.1"
-                        }
-                    ]
+                    "raw": "{{ado_search_url}}"
                 }
             }
         },
