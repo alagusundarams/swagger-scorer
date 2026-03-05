@@ -150,21 +150,10 @@ export class LeanAzureService {
             );
         }
 
-        // Check if we have project info from search results
-        if (repo.project?.id && repo.project?.name) {
-            console.log(`   ✅ Found repo: ${repo.name} in project ${repo.project.name}`);
-            return {
-                id: repo.id,
-                name: repo.name,
-                project: {
-                    id: repo.project.id,
-                    name: repo.project.name
-                }
-            };
-        }
+        console.log(`   ✅ Found repo: ${repo.name} (ID: ${repo.id})`);
 
-        // Project info missing - fetch it via Get Repository API (Option A)
-        console.log(`   ⚠️  Project info missing, fetching via Repository API...`);
+        // Code Search API never returns project info - always fetch via Repository API
+        console.log(`   🔍 Fetching project info via Repository API...`);
 
         const repoUrl = `${baseUrl}/${org}/_apis/git/repositories/${repo.id}?api-version=7.1`;
         const repoResponse = await fetch(repoUrl, {
