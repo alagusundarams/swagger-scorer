@@ -1,0 +1,403 @@
+{
+    "info": {
+        "name": "ADO Discovery - Step by Step",
+        "description": "Test each ADO API step independently.\n\nSETUP: Set these collection variables first:\n- ado_org: your ADO org name\n- ado_pat: your PAT token\n- ado_base_url: https://dev.azure.com (or https://yourorg.visualstudio.com)\n\nRun in ORDER - each step uses outputs from previous steps via collection variables.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+        {
+            "key": "ado_org",
+            "value": "YOUR_ORG_HERE",
+            "description": "ADO organization name"
+        },
+        {
+            "key": "ado_pat",
+            "value": "YOUR_PAT_HERE",
+            "description": "Personal Access Token"
+        },
+        {
+            "key": "ado_base_url",
+            "value": "https://dev.azure.com",
+            "description": "ADO base URL"
+        },
+        {
+            "key": "product_name",
+            "value": "AHelevate-GRP",
+            "description": "Product name to search"
+        },
+        {
+            "key": "repo_id",
+            "value": "",
+            "description": "Auto-set by Step 1"
+        },
+        {
+            "key": "repo_name",
+            "value": "",
+            "description": "Auto-set by Step 1"
+        },
+        {
+            "key": "project_id",
+            "value": "",
+            "description": "Auto-set by Step 2"
+        },
+        {
+            "key": "project_name",
+            "value": "",
+            "description": "Auto-set by Step 2"
+        },
+        {
+            "key": "pipeline_id",
+            "value": "",
+            "description": "Auto-set by Step 3"
+        },
+        {
+            "key": "env_id",
+            "value": "",
+            "description": "Auto-set by Step 4"
+        }
+    ],
+    "auth": {
+        "type": "basic",
+        "basic": [
+            {
+                "key": "username",
+                "value": "",
+                "type": "string"
+            },
+            {
+                "key": "password",
+                "value": "{{ado_pat}}",
+                "type": "string"
+            }
+        ]
+    },
+    "item": [
+        {
+            "name": "STEP 1a - Code Search (Find Repo by Product Name)",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "const resp = pm.response.json();",
+                            "if (resp.results && resp.results.length > 0) {",
+                            "    const repo = resp.results[0].repository;",
+                            "    pm.collectionVariables.set('repo_id', repo.id);",
+                            "    pm.collectionVariables.set('repo_name', repo.name);",
+                            "    console.log('✅ Repo found:', repo.name, '| ID:', repo.id);",
+                            "    pm.test('Repo found', () => pm.expect(repo.id).to.not.be.empty);",
+                            "} else {",
+                            "    console.log('❌ No results found');",
+                            "    pm.test('Repo found', () => pm.expect(false).to.be.true);",
+                            "}"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"searchText\": \"{{product_name}}\",\n  \"$top\": 10\n}"
+                },
+                "url": {
+                    "raw": "https://almsearch.dev.azure.com/{{ado_org}}/_apis/search/codesearchresults?api-version=7.1",
+                    "protocol": "https",
+                    "host": [
+                        "almsearch",
+                        "dev",
+                        "azure",
+                        "com"
+                    ],
+                    "path": [
+                        "{{ado_org}}",
+                        "_apis",
+                        "search",
+                        "codesearchresults"
+                    ],
+                    "query": [
+                        {
+                            "key": "api-version",
+                            "value": "7.1"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "STEP 1b - Get Repository Details (Fetch Project Info)",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "const resp = pm.response.json();",
+                            "if (resp.project) {",
+                            "    pm.collectionVariables.set('project_id', resp.project.id);",
+                            "    pm.collectionVariables.set('project_name', resp.project.name);",
+                            "    console.log('✅ Project found:', resp.project.name, '| ID:', resp.project.id);",
+                            "    pm.test('Project found', () => pm.expect(resp.project.id).to.not.be.empty);",
+                            "} else {",
+                            "    console.log('❌ No project data in response');",
+                            "    pm.test('Project found', () => pm.expect(false).to.be.true);",
+                            "}"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ],
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{ado_base_url}}/{{ado_org}}/_apis/git/repositories/{{repo_id}}?api-version=7.1",
+                    "host": [
+                        "{{ado_base_url}}"
+                    ],
+                    "path": [
+                        "{{ado_org}}",
+                        "_apis",
+                        "git",
+                        "repositories",
+                        "{{repo_id}}"
+                    ],
+                    "query": [
+                        {
+                            "key": "api-version",
+                            "value": "7.1"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "STEP 2 - Find Pipeline (Build Definition by Repo ID)",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "const resp = pm.response.json();",
+                            "if (resp.value && resp.value.length > 0) {",
+                            "    const pipeline = resp.value[0];",
+                            "    pm.collectionVariables.set('pipeline_id', pipeline.id);",
+                            "    console.log('✅ Pipeline found:', pipeline.name, '| ID:', pipeline.id);",
+                            "    console.log('   Total pipelines for this repo:', resp.count);",
+                            "    pm.test('Pipeline found', () => pm.expect(pipeline.id).to.not.be.undefined);",
+                            "} else {",
+                            "    console.log('❌ No pipelines found for repo ID:', pm.collectionVariables.get('repo_id'));",
+                            "    pm.test('Pipeline found', () => pm.expect(false).to.be.true);",
+                            "}"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ],
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{ado_base_url}}/{{ado_org}}/{{project_id}}/_apis/build/definitions?repositoryId={{repo_id}}&repositoryType=TfsGit&api-version=7.1",
+                    "host": [
+                        "{{ado_base_url}}"
+                    ],
+                    "path": [
+                        "{{ado_org}}",
+                        "{{project_id}}",
+                        "_apis",
+                        "build",
+                        "definitions"
+                    ],
+                    "query": [
+                        {
+                            "key": "repositoryId",
+                            "value": "{{repo_id}}"
+                        },
+                        {
+                            "key": "repositoryType",
+                            "value": "TfsGit"
+                        },
+                        {
+                            "key": "api-version",
+                            "value": "7.1"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "STEP 3 - List Environments (Find DEV, QA, STAGE, PROD)",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "const resp = pm.response.json();",
+                            "if (resp.value && resp.value.length > 0) {",
+                            "    console.log('✅ Environments found:', resp.count);",
+                            "    resp.value.forEach(e => console.log('  -', e.name, '| ID:', e.id));",
+                            "    // Auto-set first one that looks like DEV",
+                            "    const dev = resp.value.find(e => e.name.toLowerCase().includes('dev'));",
+                            "    if (dev) {",
+                            "        pm.collectionVariables.set('env_id', dev.id);",
+                            "        console.log('✅ Auto-selected DEV env ID:', dev.id);",
+                            "    }",
+                            "    pm.test('Environments listed', () => pm.expect(resp.value.length).to.be.above(0));",
+                            "} else {",
+                            "    console.log('❌ No environments found for project:', pm.collectionVariables.get('project_id'));",
+                            "    pm.test('Environments listed', () => pm.expect(false).to.be.true);",
+                            "}"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ],
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{ado_base_url}}/{{ado_org}}/{{project_id}}/_apis/distributedtask/environments?api-version=7.1",
+                    "host": [
+                        "{{ado_base_url}}"
+                    ],
+                    "path": [
+                        "{{ado_org}}",
+                        "{{project_id}}",
+                        "_apis",
+                        "distributedtask",
+                        "environments"
+                    ],
+                    "query": [
+                        {
+                            "key": "api-version",
+                            "value": "7.1"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "STEP 4 - Get Latest Deployment (by Pipeline + Environment)",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "const resp = pm.response.json();",
+                            "if (resp.value && resp.value.length > 0) {",
+                            "    const dep = resp.value[0];",
+                            "    const buildId = dep.owner?.id || dep.id;",
+                            "    console.log('✅ Deployment found!');",
+                            "    console.log('   Build ID:', buildId);",
+                            "    console.log('   Status:', dep.result);",
+                            "    console.log('   Finish Time:', dep.finishTime);",
+                            "    pm.collectionVariables.set('build_id', buildId);",
+                            "    pm.test('Deployment found', () => pm.expect(buildId).to.not.be.undefined);",
+                            "} else {",
+                            "    console.log('❌ No deployments found for pipeline', pm.collectionVariables.get('pipeline_id'), '→ env', pm.collectionVariables.get('env_id'));",
+                            "    pm.test('Deployment found', () => pm.expect(false).to.be.true);",
+                            "}"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ],
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{ado_base_url}}/{{ado_org}}/{{project_id}}/_apis/distributedtask/environments/{{env_id}}/deployments?ownerId={{pipeline_id}}&ownerType=build&$top=1&api-version=7.1",
+                    "host": [
+                        "{{ado_base_url}}"
+                    ],
+                    "path": [
+                        "{{ado_org}}",
+                        "{{project_id}}",
+                        "_apis",
+                        "distributedtask",
+                        "environments",
+                        "{{env_id}}",
+                        "deployments"
+                    ],
+                    "query": [
+                        {
+                            "key": "ownerId",
+                            "value": "{{pipeline_id}}"
+                        },
+                        {
+                            "key": "ownerType",
+                            "value": "build"
+                        },
+                        {
+                            "key": "$top",
+                            "value": "1"
+                        },
+                        {
+                            "key": "api-version",
+                            "value": "7.1"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "STEP 5 - Get Build Details (Extract Commit Hash)",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "const resp = pm.response.json();",
+                            "console.log('✅ Build details:');",
+                            "console.log('   Source Version (hash):', resp.sourceVersion);",
+                            "console.log('   Repository:', resp.repository?.name, '| ID:', resp.repository?.id);",
+                            "console.log('   Branch:', resp.sourceBranch);",
+                            "console.log('   Status:', resp.status, '| Result:', resp.result);",
+                            "",
+                            "if (resp.resources?.repositories) {",
+                            "    console.log('   Multi-repo resources:');",
+                            "    Object.entries(resp.resources.repositories).forEach(([alias, r]) => {",
+                            "        console.log('     -', alias, ':', r.version, '|', r.repository?.name);",
+                            "    });",
+                            "}",
+                            "",
+                            "pm.test('Build has source version', () => pm.expect(resp.sourceVersion).to.not.be.empty);"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ],
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{ado_base_url}}/{{ado_org}}/{{project_id}}/_apis/build/builds/{{build_id}}?api-version=7.1",
+                    "host": [
+                        "{{ado_base_url}}"
+                    ],
+                    "path": [
+                        "{{ado_org}}",
+                        "{{project_id}}",
+                        "_apis",
+                        "build",
+                        "builds",
+                        "{{build_id}}"
+                    ],
+                    "query": [
+                        {
+                            "key": "api-version",
+                            "value": "7.1"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
